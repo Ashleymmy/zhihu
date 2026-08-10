@@ -1,8 +1,15 @@
 <template>
   <div class="z-page">
     <div class="pg-header">
-      <div><h1 class="pg-title">字斟句酌 Pro</h1><p class="pg-sub">AI 智能优化推广文案，提升内容质量与转化率</p></div>
+      <div><h1 class="pg-title">文案模板工具</h1><p class="pg-sub">使用固定规则快速整理推广文案</p></div>
     </div>
+
+    <a-alert
+      message="本工具仅在浏览器中按固定模板处理文本，不调用 AI 或后端服务；本次记录会在刷新页面后清空。"
+      type="info"
+      show-icon
+      style="margin-bottom:16px"
+    />
 
     <div class="writing-layout">
       <!-- 左栏：输入 -->
@@ -13,7 +20,7 @@
         </div>
         <a-textarea
           v-model:value="inputText"
-          placeholder="粘贴你的推广文案，AI 将帮你优化措辞、增强说服力…"
+          placeholder="粘贴推广文案，选择固定模板进行整理…"
           :rows="12"
           :maxlength="2000"
           show-count
@@ -25,9 +32,9 @@
             <span v-for="s in styles" :key="s.v" :class="['style-chip', { active: selectedStyle === s.v }]" @click="selectedStyle = s.v">{{ s.l }}</span>
           </div>
         </div>
-        <a-button type="primary" size="large" :loading="optimizing" :disabled="!inputText.trim()" block @click="optimize" style="margin-top:12px">
+        <a-button type="primary" size="large" :disabled="!inputText.trim()" block @click="optimize" style="margin-top:12px">
           <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></template>
-          {{ optimizing ? 'AI 优化中…' : '立即优化' }}
+          应用本地模板
         </a-button>
       </div>
 
@@ -38,15 +45,12 @@
           <span style="color:var(--color-accent)">优化结果</span>
           <span v-if="outputText" class="copy-link" @click="copyOutput">复制结果</span>
         </div>
-        <div v-if="optimizing" class="output-loading">
-          <div v-for="i in 4" :key="i" class="skeleton" :style="{ height:'16px', width: (70 + Math.random()*30) + '%', marginBottom:'10px' }"></div>
-        </div>
-        <div v-else-if="outputText" class="output-text">{{ outputText }}</div>
+        <div v-if="outputText" class="output-text">{{ outputText }}</div>
         <div v-else class="output-empty">优化结果将显示在这里</div>
 
         <!-- 历史 -->
         <div v-if="history.length" class="history-section">
-          <div class="history-title">最近优化记录</div>
+          <div class="history-title">本次会话记录</div>
           <div v-for="h in history.slice(0, 3)" :key="h.ts" class="history-item" @click="restoreHistory(h)">
             <div class="hi-text">{{ h.output.slice(0, 60) }}…</div>
             <div class="hi-meta">{{ h.style }} · {{ h.ts }}</div>
@@ -66,7 +70,6 @@ interface HistoryItem { ts: string; style: string; input: string; output: string
 const inputText     = ref('')
 const outputText    = ref('')
 const selectedStyle = ref('professional')
-const optimizing    = ref(false)  // kept for template compat; always false now
 const history       = ref<HistoryItem[]>([])
 
 const styles = [
@@ -138,7 +141,6 @@ function restoreHistory(h: HistoryItem) {
 .style-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .style-chip { padding: 4px 12px; background: var(--color-bg-active); border: 1px solid var(--color-border); border-radius: var(--radius-full); font-size: 12px; color: var(--color-text-tertiary); cursor: pointer; transition: all var(--transition-fast); }
 .style-chip.active { background: var(--color-accent-subtle); border-color: var(--color-accent-border); color: var(--color-accent); }
-.output-loading { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
 .output-text { font-size: 13.5px; color: var(--color-text-secondary); line-height: 1.8; padding: 8px 0; flex: 1; }
 .output-empty { font-size: 13px; color: var(--color-text-disabled); padding: 40px 0; text-align: center; flex: 1; }
 .history-section { border-top: 1px solid var(--color-border); padding-top: 12px; margin-top: 4px; }

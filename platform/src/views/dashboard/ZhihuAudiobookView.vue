@@ -1,9 +1,16 @@
 <template>
   <div class="z-page">
     <div class="pg-header">
-      <div><h1 class="pg-title">有声书内容库</h1><p class="pg-sub">知乎盐选有声书内容，含播放试听</p></div>
+      <div><h1 class="pg-title">有声书内容库</h1><p class="pg-sub">知乎盐选有声书接口状态</p></div>
     </div>
-    <div class="table-card">
+    <div v-if="!apiAvailable" class="status-card">
+      <a-result
+        status="warning"
+        title="有声书接口暂不可用"
+        sub-title="当前知乎 OpenAPI 地址返回 HTTP 404。页面已停止自动请求，待确认官方接口路径或账号能力后再恢复。"
+      />
+    </div>
+    <div v-else class="table-card">
       <a-table :data-source="store.items" :loading="store.loading" row-key="section_id" size="middle"
         :pagination="{ total: store.total, pageSize: 20, current: store.page, onChange: store.fetchList }">
         <a-table-column title="封面" :width="60">
@@ -48,13 +55,14 @@ import { useZAudiobookStore } from '@/stores/zAudiobook.store'
 
 const store = useZAudiobookStore()
 const playerVisible = ref(false)
+const apiAvailable = false
 
 async function play(sectionId: string) {
   playerVisible.value = true
   await store.fetchPlayUrl(sectionId)
 }
 function stopPlay() { playerVisible.value = false }
-onMounted(() => store.fetchList())
+onMounted(() => { if (apiAvailable) store.fetchList() })
 </script>
 
 <style scoped>
@@ -62,6 +70,7 @@ onMounted(() => store.fetchList())
 .pg-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .pg-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 4px; }
 .pg-sub { font-size: 12.5px; color: var(--color-text-disabled); }
+.status-card { background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .table-card { background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
 .cover-thumb { width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--color-bg-active); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .content-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }

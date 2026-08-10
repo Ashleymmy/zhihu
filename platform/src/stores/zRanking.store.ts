@@ -37,9 +37,9 @@ export const useZRankingStore = defineStore('zRanking', () => {
     } finally { contentsLoading.value = false }
   }
 
-  async function fetchDetail(content_id: string) {
+  async function fetchDetail(id: string) {
     detailLoading.value = true; detail.value = null
-    try { detail.value = await allianceRankingApi.getDetail(content_id) }
+    try { detail.value = await allianceRankingApi.getDetail(id) }
     finally { detailLoading.value = false }
   }
 

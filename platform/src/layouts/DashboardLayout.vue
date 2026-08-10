@@ -253,8 +253,8 @@ const fullNavGroups: NavGroup[] = [
       {
         label: '创意中心',
         items: [
-          { to: '/dashboard/z-writing-tool', label: '字斟句酌Pro', localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>` },
-          { to: '/dashboard/z-rewrite',      label: '我的改写',    localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` },
+          { to: '/dashboard/z-writing-tool', label: '文案模板工具', localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>` },
+          { to: '/dashboard/z-rewrite',      label: '本地快速改写', localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` },
         ],
       },
       {
@@ -296,8 +296,8 @@ const workerZhihuGroup: NavGroup = {
     {
       label: '创意中心',
       items: [
-        { to: '/dashboard/z-writing-tool', label: '字斟句酌Pro', localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>` },
-        { to: '/dashboard/z-rewrite',      label: '我的改写',    localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` },
+        { to: '/dashboard/z-writing-tool', label: '文案模板工具', localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>` },
+        { to: '/dashboard/z-rewrite',      label: '本地快速改写', localOnly: true, icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` },
       ],
     },
   ],
@@ -332,8 +332,8 @@ const routeTitleMap: Record<string, string> = {
   '/dashboard/z-audiobook':        '有声书库',
   '/dashboard/z-comic':            '漫剧内容',
   '/dashboard/z-settlement':       '结算单',
-  '/dashboard/z-writing-tool':     '字斟句酌Pro',
-  '/dashboard/z-rewrite':          '我的改写',
+  '/dashboard/z-writing-tool':     '文案模板工具',
+  '/dashboard/z-rewrite':          '本地快速改写',
   '/dashboard/z-content-tag':      '内容标签',
   '/dashboard/z-intercept':        '截流举报',
   '/dashboard/z-risk':             '风险词',

@@ -26,7 +26,7 @@ export const useZComicStore = defineStore('zComic', () => {
   async function fetchEpisodes(drama: ComicDrama, page = 1) {
     selectedDrama.value = drama; episodesLoading.value = true; episodesPage.value = page
     try {
-      const res = await allianceComicApi.getEpisodes(drama.id, page)
+      const res = await allianceComicApi.getEpisodes(drama.drama_id, page)
       episodes.value = res.data; episodesTotal.value = res.pagination?.total ?? res.data.length
     } finally { episodesLoading.value = false }
   }

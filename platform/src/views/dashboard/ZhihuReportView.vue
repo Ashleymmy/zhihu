@@ -13,6 +13,14 @@
       <span v-if="store.timeRange" style="margin-left:12px;color:var(--color-text-disabled)">数据范围：{{ store.timeRange }}</span>
     </div>
 
+    <a-alert
+      v-if="store.error"
+      :message="store.error"
+      type="warning"
+      show-icon
+      style="margin-bottom:16px"
+    />
+
     <div class="table-card">
       <a-table :data-source="store.data" :columns="cols" :loading="store.loading"
                row-key="keyword" size="middle"

@@ -14,7 +14,11 @@ export const allianceChannelApi = {
   getAgentChannels: () =>
     zhGet<AgentChannel[]>(`${A}/get_agent_channels`),
   getSecondChannels: (channel_id: string) =>
-    zhGet<{ data: SecondChannel[]; pagination: Pagination }>(`${A}/second_channels`, { channel_id }),
+    zhGet<{ data: SecondChannel[]; pagination: Pagination }>(
+      `${A}/second_channels`,
+      { channel_id },
+      { suppressErrorMessage: true },
+    ),
 }
 
 // ─── 推广任务 ──────────────────────────────────────────────────────
@@ -100,12 +104,16 @@ export interface RealTimeDataResp { time_range: string; data: RealTimeDataItem[]
 
 export const allianceReportApi = {
   getRealTimeData: (fields = 'search_num,order_num,created_at') =>
-    zhGet<RealTimeDataResp>(`${A}/data_report/real_time_data`, { type: 1, time_scale: 1, fields }),
+    zhGet<RealTimeDataResp>(
+      `${A}/data_report/real_time_data`,
+      { type: 1, time_scale: 1, fields },
+      { suppressErrorMessage: true },
+    ),
 }
 
 // ─── 盐选榜单 ──────────────────────────────────────────────────────
 export interface RankingLabel   { id: string; name: string; type: number }
-export interface RankingContent { content_id: string; title: string; content_type: string; category: string; bayes_first_category?: string; bayes_second_category?: string; theme?: string }
+export interface RankingContent { id: string; title: string; content_type: string; category: string; bayes_first_category?: string; bayes_second_category?: string; theme?: string }
 export interface RankingContentDetail { title: string; word_count: number; public_at: string; section_url: string }
 export interface RankingContentsResp  { data: RankingContent[]; pagination: Pagination }
 export interface NewContent { section_title: string; well_title: string; author: string; hot_value: number; topic: string; created_at: string }
@@ -114,8 +122,8 @@ export const allianceRankingApi = {
   getLabels:       () => zhGet<RankingLabel[]>(`${A}/vip/content/rule/labels`),
   getContents:     (rule_id: string, page = 1) =>
     zhGet<RankingContentsResp>(`${A}/vip/rule_contents`, { rule_id, page }),
-  getDetail:       (content_id: string) =>
-    zhGet<RankingContentDetail>(`${A}/vip/rule_content/${content_id}`),
+  getDetail:       (id: string) =>
+    zhGet<RankingContentDetail>(`${A}/vip/rule_content/${id}`),
   getNewContents:  () => zhGet<NewContent[]>(`${A}/online_sections`),
 }
 
@@ -158,7 +166,7 @@ export const allianceAudiobookApi = {
 }
 
 // ─── 漫剧 ──────────────────────────────────────────────────────────
-export interface ComicDrama   { id: string; title: string; tab_artwork?: string }
+export interface ComicDrama   { drama_id: string; title: string; story_url?: string; tab_artwork?: string }
 export interface ComicEpisode { id: string; title: string; is_pay: boolean; video_url: string; douyin_video_url?: string }
 export interface ComicDramaListResp   { data: ComicDrama[];   pagination: Pagination }
 export interface ComicEpisodesResp    { data: ComicEpisode[]; pagination: Pagination }
@@ -166,8 +174,8 @@ export interface ComicEpisodesResp    { data: ComicEpisode[]; pagination: Pagina
 export const allianceComicApi = {
   getDramas:   (params?: { title?: string; page?: number }) =>
     zhGet<ComicDramaListResp>(`${A}/comic_dramas`, params),
-  getEpisodes: (drama_id: string, page = 1) =>
-    zhGet<ComicEpisodesResp>(`${A}/comic_drama/${drama_id}/episodes`, { page }),
+  getEpisodes: (dramaId: string, page = 1) =>
+    zhGet<ComicEpisodesResp>(`${A}/comic_drama/${dramaId}/episodes`, { page }),
 }
 
 // ─── 内容标签 ──────────────────────────────────────────────────────

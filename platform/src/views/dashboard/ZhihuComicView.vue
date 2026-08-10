@@ -12,8 +12,8 @@
         </div>
         <div class="drama-list">
           <div v-if="store.dramasLoading" class="list-loading"><a-spin /></div>
-          <div v-for="d in store.dramas" :key="d.id"
-               :class="['drama-item', { active: store.selectedDrama?.id === d.id }]"
+          <div v-for="d in store.dramas" :key="d.drama_id"
+               :class="['drama-item', { active: store.selectedDrama?.drama_id === d.drama_id }]"
                @click="store.fetchEpisodes(d)">
             <div class="drama-cover" v-if="d.tab_artwork">
               <img :src="d.tab_artwork" :alt="d.title" />

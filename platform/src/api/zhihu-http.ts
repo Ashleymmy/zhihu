@@ -4,8 +4,12 @@
  * 浏览器只携带登录 JWT；知乎签名统一由 BFF 生成。
  */
 import axios from 'axios'
-import type { AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios'
+import type { AxiosResponse, AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
 import { message } from 'ant-design-vue'
+
+interface ZhihuRequestConfig extends AxiosRequestConfig {
+  suppressErrorMessage?: boolean
+}
 
 // ── 大整数安全解析（Snowflake ID 精度保护）────────────────────────
 function safeJsonParse(raw: string): unknown {
@@ -32,7 +36,7 @@ function successInterceptor(res: AxiosResponse): unknown {
   if (body && typeof body === 'object' && 'success' in body) {
     if ((body as any).success === false) {
       const msg = ((body as any).error as any)?.message ?? (body as any).msg ?? '请求失败'
-      message.error(msg)
+      if (!(res.config as ZhihuRequestConfig).suppressErrorMessage) message.error(msg)
       return Promise.reject(new Error(msg))
     }
     if ('time_range'  in body) return body
@@ -49,10 +53,10 @@ function errorInterceptor(err: AxiosError): Promise<never> {
   let msg = apiMsg ?? err.message
   if (s === 401) msg = '未授权，access_token 无效或已过期'
   else if (s === 403) msg = '接口未授权，请联系知乎运营申请开通权限'
-  else if (s === 404) msg = '接口不存在，该账号可能未开通此功能'
+  else if (s === 404) msg = '上游接口返回 404，请确认接口路径或功能是否可用'
   else if (s === 429) msg = '请求过于频繁，已触发限流'
   else if (!err.response) msg = '网络连接失败，请检查网络'
-  message.error(msg)
+  if (!(err.config as ZhihuRequestConfig | undefined)?.suppressErrorMessage) message.error(msg)
   return Promise.reject(err)
 }
 
@@ -67,8 +71,8 @@ const zhihuHttp = axios.create({
 zhihuHttp.interceptors.request.use(authInterceptor)
 zhihuHttp.interceptors.response.use(successInterceptor as any, errorInterceptor)
 
-export function zhGet<T>(url: string, params?: object): Promise<T> {
-  return zhihuHttp.get(url, { params }) as unknown as Promise<T>
+export function zhGet<T>(url: string, params?: object, config?: ZhihuRequestConfig): Promise<T> {
+  return zhihuHttp.get(url, { ...config, params }) as unknown as Promise<T>
 }
 export function zhPost<T>(url: string, data?: unknown, cfg?: object): Promise<T> {
   return zhihuHttp.post(url, data, cfg) as unknown as Promise<T>

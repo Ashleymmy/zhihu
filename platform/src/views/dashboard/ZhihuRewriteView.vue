@@ -1,9 +1,16 @@
 <template>
   <div class="z-page">
     <div class="pg-header">
-      <div><h1 class="pg-title">我的改写</h1><p class="pg-sub">查看和管理历史文案改写记录</p></div>
+      <div><h1 class="pg-title">本地快速改写</h1><p class="pg-sub">使用固定语气规则整理文案</p></div>
       <button v-if="rewrites.length" class="btn-danger-sm" @click="clearAll">清空记录</button>
     </div>
+
+    <a-alert
+      message="本工具仅执行浏览器本地字符串规则，不调用 AI 或后端服务；历史记录会在刷新页面后清空。"
+      type="info"
+      show-icon
+      style="margin-bottom:16px"
+    />
 
     <!-- 新建改写 -->
     <div class="new-rewrite-card">
@@ -27,7 +34,7 @@
     <!-- 历史记录 -->
     <div v-if="rewrites.length" class="rewrite-list">
       <div class="list-header">
-        <span class="list-title">改写历史（{{ rewrites.length }} 条）</span>
+        <span class="list-title">本次会话记录（{{ rewrites.length }} 条）</span>
       </div>
       <div v-for="(r, i) in rewrites" :key="r.id" class="rewrite-item animate-card" :style="{ animationDelay: i * 40 + 'ms' }">
         <div class="ri-header">

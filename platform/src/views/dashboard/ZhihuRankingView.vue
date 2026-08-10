@@ -17,7 +17,7 @@
           </div>
           <div class="content-area">
             <div class="table-card">
-              <a-table :data-source="store.contents" :loading="store.contentsLoading" row-key="content_id" size="middle"
+              <a-table :data-source="store.contents" :loading="store.contentsLoading" row-key="id" size="middle"
                 :pagination="{ total: store.contentsTotal, pageSize: 20, current: store.contentsPage, onChange: (p: number) => store.fetchContents(store.currentRuleId, p) }"
                 :locale="{ emptyText: '← 请在左侧选择榜单' }">
                 <a-table-column title="标题">
@@ -84,7 +84,7 @@ async function selectLabel(lb: RankingLabel) {
 }
 async function showDetail(record: RankingContent) {
   detailVisible.value = true
-  await store.fetchDetail(record.content_id)
+  await store.fetchDetail(record.id)
 }
 onMounted(async () => {
   await store.fetchLabels()
