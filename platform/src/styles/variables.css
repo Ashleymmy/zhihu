@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── Background layers ── */
+  --color-bg-primary:   #07080c;
+  --color-bg-secondary: #0f1117;
+  --color-bg-tertiary:  #16181f;
+  --color-bg-elevated:  #1c1e27;
+  --color-bg-hover:     #22242e;
+  --color-bg-active:    #282b36;
+
+  /* ── Indigo accent ── */
+  --color-accent:         #6366f1;
+  --color-accent-hover:   #7c7ff5;
+  --color-accent-pressed: #4f52d9;
+  --color-accent-subtle:  rgba(99, 102, 241, 0.08);
+  --color-accent-muted:   rgba(99, 102, 241, 0.16);
+  --color-accent-border:  rgba(99, 102, 241, 0.32);
+
+  /* ── Semantic ── */
+  --color-success:    #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.08);
+  --color-warning:    #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.08);
+  --color-error:      #ef4444;
+  --color-error-bg:   rgba(239, 68, 68, 0.08);
+  --color-info:       #3b82f6;
+  --color-info-bg:    rgba(59, 130, 246, 0.08);
+
+  /* ── Text ── */
+  --color-text-primary:   #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary:  #94a3b8;
+  --color-text-disabled:  #475569;
+  --color-text-inverse:   #07080c;
+
+  /* ── Border ── */
+  --color-border:       rgba(248, 250, 252, 0.07);
+  --color-border-hover: rgba(248, 250, 252, 0.12);
+  --color-border-focus: var(--color-accent);
+
+  /* ── Typography ── */
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body:    'Inter',         -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono','Courier New', monospace;
+
+  /* ── Layout ── */
+  --header-height:           60px;
+  --sidebar-width:           236px;
+  --sidebar-collapsed-width: 64px;
+  --content-max-width:       1360px;
+  --page-max-width:          1360px;
+  --content-padding:         28px;
+
+  /* ── Radius ── */
+  --radius-sm:   0.375rem;
+  --radius-md:   0.625rem;
+  --radius-lg:   0.875rem;
+  --radius-xl:   1.25rem;
+  --radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-sm:   0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:   0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg:   0 12px 28px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 24px rgba(99,102,241,0.25);
+
+  /* ── Transitions ── */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 360ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Z-index ── */
+  --z-dropdown: 1000;
+  --z-fixed:    1030;
+  --z-modal:    1050;
+  --z-tooltip:  1070;
+
+  /* ── Gradients ── */
+  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-glow:   radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.18) 0%, transparent 70%);
+  --gradient-subtle: linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
+}

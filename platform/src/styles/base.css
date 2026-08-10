@@ -1,0 +1,243 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+html { scroll-behavior: smooth; }
+a { text-decoration: none; color: inherit; }
+img { display: block; max-width: 100%; }
+h1,h2,h3,h4,h5,h6 { margin: 0; font-family: var(--font-display); font-weight: 600; }
+p { margin: 0; }
+button { cursor: pointer; }
+
+/* ── Layout utilities ── */
+.container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 40px;
+}
+.section { padding: 96px 0; }
+.section-sm { padding: 56px 0; }
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glass card ── */
+.card-glass {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Status badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.badge-success { background: var(--color-success-bg); color: var(--color-success); }
+.badge-success .badge-dot { background: var(--color-success); }
+.badge-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-warning .badge-dot { background: var(--color-warning); }
+.badge-error   { background: var(--color-error-bg);   color: var(--color-error);   }
+.badge-error .badge-dot   { background: var(--color-error);   }
+.badge-info    { background: var(--color-info-bg);    color: var(--color-info);    }
+.badge-info .badge-dot    { background: var(--color-info);    }
+.badge-default { background: var(--color-bg-active);  color: var(--color-text-tertiary); }
+.badge-default .badge-dot { background: var(--color-text-disabled); }
+.badge-accent  { background: var(--color-accent-subtle); color: var(--color-accent); }
+.badge-accent .badge-dot  { background: var(--color-accent); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-bg-active); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-bg-hover); }
+
+/* ── AntDV global overrides ── */
+.ant-btn {
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-body) !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  transition: all var(--transition-fast) !important;
+}
+.ant-btn-primary {
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 0 rgba(99,102,241,0) !important;
+}
+.ant-btn-primary:hover {
+  background: var(--color-accent-hover) !important;
+  border-color: var(--color-accent-hover) !important;
+  box-shadow: var(--shadow-glow) !important;
+}
+.ant-btn-default {
+  background: var(--color-bg-elevated) !important;
+  border-color: var(--color-border-hover) !important;
+  color: var(--color-text-secondary) !important;
+}
+.ant-btn-default:hover {
+  border-color: var(--color-accent) !important;
+  color: var(--color-accent) !important;
+}
+.ant-input, .ant-select-selector, .ant-picker {
+  background: var(--color-bg-elevated) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  border-radius: var(--radius-md) !important;
+}
+.ant-input:focus, .ant-input-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 2px var(--color-accent-muted) !important;
+}
+.ant-table {
+  background: transparent !important;
+  font-size: 13.5px !important;
+}
+.ant-table-thead > tr > th {
+  background: var(--color-bg-tertiary) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-tertiary) !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+}
+.ant-table-tbody > tr > td {
+  border-color: var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+}
+.ant-table-tbody > tr:hover > td {
+  background: var(--color-bg-hover) !important;
+}
+.ant-table-tbody > tr > td:first-child,
+.ant-table-thead > tr > th:first-child { color: var(--color-text-primary) !important; }
+.ant-modal-wrap,
+.ant-modal-root .ant-modal-wrap { z-index: 1050 !important; }
+.ant-modal-mask { z-index: 1049 !important; }
+.ant-modal-content {
+  background: var(--color-bg-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-xl) !important;
+}
+.ant-modal-body {
+  max-height: calc(100vh - 200px) !important;
+  overflow-y: auto !important;
+}
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--color-border) !important;
+}
+.ant-modal-title { color: var(--color-text-primary) !important; font-family: var(--font-display) !important; }
+.ant-form-item-label > label { color: var(--color-text-secondary) !important; font-size: 13px !important; }
+.ant-tag {
+  border-radius: var(--radius-full) !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+}
+.ant-pagination .ant-pagination-item-active {
+  background: var(--color-accent-subtle) !important;
+  border-color: var(--color-accent-border) !important;
+}
+.ant-pagination .ant-pagination-item-active a { color: var(--color-accent) !important; }
+.ant-select-dropdown {
+  background: var(--color-bg-elevated) !important;
+  border: 1px solid var(--color-border-hover) !important;
+  border-radius: var(--radius-lg) !important;
+}
+.ant-select-item-option-selected {
+  background: var(--color-accent-subtle) !important;
+  color: var(--color-accent) !important;
+}
+.ant-select-item-option:hover {
+  background: var(--color-bg-hover) !important;
+}
+.ant-input-affix-wrapper {
+  background: var(--color-bg-elevated) !important;
+  border-color: var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+}
+.ant-input-affix-wrapper:focus-within {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 2px var(--color-accent-muted) !important;
+}
+.ant-tooltip-inner {
+  background: var(--color-bg-elevated) !important;
+  border: 1px solid var(--color-border-hover) !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 12.5px !important;
+}
+
+/* ── Page transition ── */
+.page-enter-active {
+  transition: opacity 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.page-leave-active {
+  transition: opacity 0.16s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.page-enter-from { opacity: 0; transform: translateY(18px); }
+.page-leave-to   { opacity: 0; transform: translateY(-6px); }
+
+/* ── Card stagger entrance ── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.animate-card {
+  opacity: 0;
+  animation: card-in 0.38s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -400% 0; }
+  100% { background-position:  400% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-elevated) 25%,
+    var(--color-bg-active)   50%,
+    var(--color-bg-elevated) 75%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ── Pulse dot (live indicator) ── */
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+}
+.pulse { animation: pulse-dot 2s ease-in-out infinite; }

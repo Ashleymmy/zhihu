@@ -1,0 +1,37 @@
+# 依赖与缓存
+**/node_modules/
+**/.vite/
+**/.vitest/
+**/.cache/
+**/.turbo/
+
+# 构建与测试产物
+**/dist/
+**/dist-ssr/
+**/coverage/
+**/unpackage/
+**/*.tsbuildinfo
+**/public/mockServiceWorker.js
+
+# 环境变量与本地敏感配置
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+**/*.local
+**/project.private.config.json
+
+# 日志与临时文件
+**/*.log
+**/*.tmp
+**/*.temp
+~$*
+
+# 编辑器与系统文件
+**/.idea/
+**/.vscode/
+**/.DS_Store
+**/Thumbs.db
+**/*.suo
+**/*.swp
+**/*.swo

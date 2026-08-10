@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS withdrawal_requests;
+DROP TABLE IF EXISTS earnings;
+DROP TABLE IF EXISTS daily_metrics;
+DROP TABLE IF EXISTS compositions;
+DROP TABLE IF EXISTS plans;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS channels;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS users;
