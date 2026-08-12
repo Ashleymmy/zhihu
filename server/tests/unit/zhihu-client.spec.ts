@@ -33,3 +33,19 @@ it('渠道查询只携带 access_token，不附加签名参数', async () => {
   await expect(zhihuGet('/alliance/api/get_agent_channels'))
     .resolves.toEqual({ success: true, data: [] });
 });
+
+it('未知上游错误仅保留 HTTP 状态、错误码和脱敏消息', async () => {
+  server.use(
+    http.post('https://open.zhihu.com/alliance/api/popularize_plan', () => HttpResponse.json({
+      code: 40317,
+      message: 'permission denied access_token=real-token signature=real-signature',
+    }, { status: 403 })),
+  );
+
+  await expect(zhihuPost('/alliance/api/popularize_plan', { keyword: '测试' }))
+    .rejects.toMatchObject({
+      httpStatus: 502,
+      code: 50002,
+      message: '知乎接口失败（HTTP 403 / code 40317）：permission denied access_token=[REDACTED] signature=[REDACTED]',
+    });
+});

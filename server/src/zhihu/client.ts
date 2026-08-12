@@ -17,10 +17,38 @@ const errorMap: Record<string, AppError> = {
   配额超限: new AppError(429, 42901, '今日操作次数已达上限，请明天再试'),
 };
 
+const UPSTREAM_DETAIL_KEYS = ['message', 'msg', 'error_description', 'error'] as const;
+const UPSTREAM_CODE_KEYS = ['code', 'error_code', 'errno'] as const;
+
+function safeUpstreamText(value: unknown, maxLength: number): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\b(access[_-]?token|token|signature|secret(?:[_-]?key)?)\s*[:=]\s*[^\s,;&]+/gi, '$1=[REDACTED]')
+    .replace(/\bBearer\s+[^\s,;&]+/gi, 'Bearer [REDACTED]')
+    .trim()
+    .slice(0, maxLength);
+}
+
 function translateError(error: unknown): never {
   const axiosError = error as AxiosError<Record<string, unknown>>;
-  const upstream = String(axiosError.response?.data?.message ?? axiosError.response?.data?.msg ?? '');
+  const responseData = axiosError.response?.data;
+  const upstream = safeUpstreamText(
+    UPSTREAM_DETAIL_KEYS.map((key) => responseData?.[key]).find((value) => value != null),
+    240,
+  );
   for (const [needle, mapped] of Object.entries(errorMap)) if (upstream.includes(needle)) throw mapped;
+
+  if (axiosError.response) {
+    const status = axiosError.response.status;
+    const upstreamCode = safeUpstreamText(
+      UPSTREAM_CODE_KEYS.map((key) => responseData?.[key]).find((value) => value != null),
+      64,
+    );
+    const codeDetail = upstreamCode ? ` / code ${upstreamCode}` : '';
+    const messageDetail = upstream ? `：${upstream}` : '';
+    throw new AppError(502, 50002, `知乎接口失败（HTTP ${status}${codeDetail}）${messageDetail}`);
+  }
   throw new AppError(502, 50002, '知乎服务暂时不可用，请稍后重试');
 }
 
