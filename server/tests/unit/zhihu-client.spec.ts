@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { zhihuGet, zhihuPost } from '../../src/zhihu/client';
+import { zhihuGet, zhihuPost, zhihuSyncErrorDetail } from '../../src/zhihu/client';
 
 const server = setupServer(
   http.post('https://open.zhihu.com/alliance/api/popularize_plan', async ({ request }) => {
@@ -34,7 +34,7 @@ it('渠道查询只携带 access_token，不附加签名参数', async () => {
     .resolves.toEqual({ success: true, data: [] });
 });
 
-it('未知上游错误仅保留 HTTP 状态、错误码和脱敏消息', async () => {
+it('未知上游错误对外保持通用文案，仅在同步详情中保留脱敏诊断', async () => {
   server.use(
     http.post('https://open.zhihu.com/alliance/api/popularize_plan', () => HttpResponse.json({
       code: 40317,
@@ -42,10 +42,27 @@ it('未知上游错误仅保留 HTTP 状态、错误码和脱敏消息', async (
     }, { status: 403 })),
   );
 
-  await expect(zhihuPost('/alliance/api/popularize_plan', { keyword: '测试' }))
-    .rejects.toMatchObject({
-      httpStatus: 502,
-      code: 50002,
-      message: '知乎接口失败（HTTP 403 / code 40317）：permission denied access_token=[REDACTED] signature=[REDACTED]',
-    });
+  const error = await zhihuPost('/alliance/api/popularize_plan', { keyword: '测试' }).catch((reason) => reason);
+  expect(error).toMatchObject({
+    httpStatus: 502,
+    code: 50002,
+    message: '知乎服务暂时不可用，请稍后重试',
+  });
+  expect(zhihuSyncErrorDetail(error)).toBe(
+    '知乎接口失败（HTTP 403 / code 40317）：permission denied access_token=[REDACTED] signature=[REDACTED]',
+  );
+});
+
+it('HTTP 200 中的 error envelope 仍按失败处理', async () => {
+  server.use(
+    http.post('https://open.zhihu.com/alliance/api/popularize_plan', () => HttpResponse.json({
+      error: { code: 400400, name: 'OpenApiParamError', message: 'unknown parameter' },
+    })),
+  );
+
+  const error = await zhihuPost('/alliance/api/popularize_plan', { keyword: '测试' }).catch((reason) => reason);
+  expect(error).toMatchObject({ code: 50002, message: '知乎服务暂时不可用，请稍后重试' });
+  expect(zhihuSyncErrorDetail(error)).toBe(
+    '知乎接口失败（HTTP 200 / code 400400）：unknown parameter',
+  );
 });

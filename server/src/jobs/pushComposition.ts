@@ -1,6 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../db';
-import { zhihuPost, zhihuPut } from '../zhihu/client';
+import { zhihuPost, zhihuPut, zhihuSyncErrorDetail } from '../zhihu/client';
 
 interface CompositionRow extends RowDataPacket {
   id: string;
@@ -49,7 +49,7 @@ export async function pushComposition(data: Record<string, unknown>) {
       [upstreamId(response), id],
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 512) : 'unknown error';
+    const message = zhihuSyncErrorDetail(error);
     await db.query("UPDATE compositions SET sync_status = 'failed', sync_error = ? WHERE id = ?", [message, id]);
     throw error;
   }

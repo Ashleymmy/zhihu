@@ -20,9 +20,19 @@ const errorMap: Record<string, AppError> = {
 const UPSTREAM_DETAIL_KEYS = ['message', 'msg', 'error_description', 'error'] as const;
 const UPSTREAM_CODE_KEYS = ['code', 'error_code', 'errno'] as const;
 
+class ZhihuUpstreamError extends AppError {
+  constructor(public readonly syncDetail: string) {
+    super(502, 50002, '知乎服务暂时不可用，请稍后重试');
+  }
+}
+
 function safeUpstreamText(value: unknown, maxLength: number): string {
   if (typeof value !== 'string' && typeof value !== 'number') return '';
-  return String(value)
+  let text = String(value);
+  for (const secret of [config.zhihu.accessToken, config.zhihu.secretKey]) {
+    if (secret.length >= 4) text = text.split(secret).join('[REDACTED]');
+  }
+  return text
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/\b(access[_-]?token|token|signature|secret(?:[_-]?key)?)\s*[:=]\s*[^\s,;&]+/gi, '$1=[REDACTED]')
     .replace(/\bBearer\s+[^\s,;&]+/gi, 'Bearer [REDACTED]')
@@ -30,24 +40,60 @@ function safeUpstreamText(value: unknown, maxLength: number): string {
     .slice(0, maxLength);
 }
 
-function translateError(error: unknown): never {
-  const axiosError = error as AxiosError<Record<string, unknown>>;
-  const responseData = axiosError.response?.data;
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function upstreamErrorData(data: unknown): Record<string, unknown> | null {
+  const response = asRecord(data);
+  if (!response) return null;
+  return asRecord(response.error) ?? response;
+}
+
+function translatedUpstreamError(data: unknown, status: number): AppError | ZhihuUpstreamError | null {
+  const response = asRecord(data);
+  if (!response) return null;
+  const detail = upstreamErrorData(data);
+  const hasErrorEnvelope = Object.prototype.hasOwnProperty.call(response, 'error');
+  if (!detail || (!hasErrorEnvelope && status < 400)) return null;
+
   const upstream = safeUpstreamText(
-    UPSTREAM_DETAIL_KEYS.map((key) => responseData?.[key]).find((value) => value != null),
+    UPSTREAM_DETAIL_KEYS.map((key) => detail[key]).find((value) => value != null),
     240,
   );
-  for (const [needle, mapped] of Object.entries(errorMap)) if (upstream.includes(needle)) throw mapped;
+  for (const [needle, mapped] of Object.entries(errorMap)) {
+    if (upstream.includes(needle)) return mapped;
+  }
 
+  const upstreamCode = safeUpstreamText(
+    UPSTREAM_CODE_KEYS.map((key) => detail[key]).find((value) => value != null),
+    64,
+  );
+  const codeDetail = upstreamCode ? ` / code ${upstreamCode}` : '';
+  const messageDetail = upstream ? `：${upstream}` : '';
+  return new ZhihuUpstreamError(`知乎接口失败（HTTP ${status}${codeDetail}）${messageDetail}`.slice(0, 512));
+}
+
+function responseData<T>(data: T, status: number): T {
+  const upstreamError = translatedUpstreamError(data, status);
+  if (upstreamError) throw upstreamError;
+  return data;
+}
+
+export function zhihuSyncErrorDetail(error: unknown): string {
+  if (error instanceof ZhihuUpstreamError) return error.syncDetail;
+  return error instanceof Error ? error.message.slice(0, 512) : 'unknown error';
+}
+
+function translateError(error: unknown): never {
+  if (error instanceof AppError) throw error;
+  const axiosError = error as AxiosError<Record<string, unknown>>;
+  const responseData = axiosError.response?.data;
   if (axiosError.response) {
-    const status = axiosError.response.status;
-    const upstreamCode = safeUpstreamText(
-      UPSTREAM_CODE_KEYS.map((key) => responseData?.[key]).find((value) => value != null),
-      64,
-    );
-    const codeDetail = upstreamCode ? ` / code ${upstreamCode}` : '';
-    const messageDetail = upstream ? `：${upstream}` : '';
-    throw new AppError(502, 50002, `知乎接口失败（HTTP ${status}${codeDetail}）${messageDetail}`);
+    throw translatedUpstreamError(responseData, axiosError.response.status)
+      ?? new ZhihuUpstreamError(`知乎接口失败（HTTP ${axiosError.response.status}）`);
   }
   throw new AppError(502, 50002, '知乎服务暂时不可用，请稍后重试');
 }
@@ -57,20 +103,23 @@ export async function zhihuGet<T = unknown>(path: string, params: Record<string,
     const authenticated = TOKEN_ONLY_GET_PATHS.has(path)
       ? { ...params, access_token: config.zhihu.accessToken }
       : injectSignParams(params, config.zhihu.accessToken, config.zhihu.secretKey);
-    return (await client.get<T>(path, { params: authenticated })).data;
+    const response = await client.get<T>(path, { params: authenticated });
+    return responseData(response.data, response.status);
   } catch (error) { return translateError(error); }
 }
 
 export async function zhihuPost<T = unknown>(path: string, body: Record<string, unknown> = {}): Promise<T> {
   try {
     const signed = injectSignParams(body, config.zhihu.accessToken, config.zhihu.secretKey);
-    return (await client.post<T>(path, signed)).data;
+    const response = await client.post<T>(path, signed);
+    return responseData(response.data, response.status);
   } catch (error) { return translateError(error); }
 }
 
 export async function zhihuPut<T = unknown>(path: string, body: Record<string, unknown> = {}): Promise<T> {
   try {
     const signed = injectSignParams(body, config.zhihu.accessToken, config.zhihu.secretKey);
-    return (await client.put<T>(path, signed)).data;
+    const response = await client.put<T>(path, signed);
+    return responseData(response.data, response.status);
   } catch (error) { return translateError(error); }
 }
