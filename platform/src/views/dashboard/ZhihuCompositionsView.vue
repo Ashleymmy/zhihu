@@ -56,7 +56,7 @@
           <a-form-item label="推广计划 ID" name="planId" :rules="[{required:true,message:'请输入 planId'}]">
             <a-input v-model:value="cf.planId" placeholder="来自「创建计划」页面的 Plan ID" />
           </a-form-item>
-          <a-form-item label="渠道" name="channelId" :rules="[{required:true,message:'请选择渠道'}]">
+          <a-form-item label="渠道" name="channel_id" :rules="[{required:true,message:'请选择渠道'}]">
             <a-select v-model:value="cf.channel_id" placeholder="选择渠道" style="width:100%">
               <a-select-option v-for="o in ch.channelOptions" :key="o.value" :value="o.value">{{ o.label }}</a-select-option>
             </a-select>
