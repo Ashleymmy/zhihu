@@ -8,7 +8,7 @@
       <!-- ── 单个创建 ── -->
       <a-tab-pane key="single" tab="单个创建">
         <a-form ref="formRef" :model="form" layout="vertical" style="max-width:560px;margin-top:8px" @finish="submitForm">
-          <a-form-item label="一代渠道" name="channelId" :rules="[{required:true,message:'请选择渠道'}]">
+          <a-form-item label="一代渠道" name="channel_id" :rules="[{required:true,message:'请选择渠道'}]">
             <a-select v-model:value="form.channel_id" placeholder="选择渠道" @change="(val: any) => onChannelChange(val)">
               <a-select-option v-for="o in ch.channelOptions" :key="o.value" :value="o.value">{{ o.label }}</a-select-option>
             </a-select>

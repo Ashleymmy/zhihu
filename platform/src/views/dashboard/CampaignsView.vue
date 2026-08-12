@@ -56,6 +56,12 @@
           <template v-if="column.key === 'actions'">
             <div class="actions-cell">
               <button class="act-btn" @click="editItem(record as Plan)">编辑</button>
+              <button
+                v-if="record.syncStatus === 'failed'"
+                class="act-btn warning"
+                :disabled="retryingPlanId === record.id"
+                @click="retrySync(record as Plan)"
+              >{{ retryingPlanId === record.id ? '重试中' : '重试同步' }}</button>
               <button class="act-btn danger" v-if="record.status==='active'" @click="handleToggle(record as Plan)">暂停</button>
               <button class="act-btn success" v-else-if="record.status==='paused'" @click="handleToggle(record as Plan)">启动</button>
             </div>
@@ -153,6 +159,7 @@ const showChannelManager = ref(false)
 const submitting = ref(false)
 const syncingChannels = ref(false)
 const assigningChannelId = ref<string>()
+const retryingPlanId = ref<string>()
 const editingId  = ref<string>()
 const form       = ref({ channelId: '', taskId: '', keyword: '', landingUrl: '', popularizeType: 0, dailyBudget: 100, startDate: '' as string | undefined })
 
@@ -252,6 +259,19 @@ async function handleToggle(r: Plan) {
     await plansApi.update(r.id, {} as any) // trigger sync; reflect locally
     r.status = next
   } catch (e: any) { message.error(e.message || '操作失败') }
+}
+
+async function retrySync(r: Plan) {
+  retryingPlanId.value = r.id
+  try {
+    const result = await plansApi.retrySync(r.id)
+    r.syncStatus = result.syncStatus as Plan['syncStatus']
+    message.success('已重新提交同步，请稍后刷新查看结果')
+  } catch (e: any) {
+    message.error(e.message || '重试同步失败')
+  } finally {
+    retryingPlanId.value = undefined
+  }
 }
 
 async function handleCreate() {

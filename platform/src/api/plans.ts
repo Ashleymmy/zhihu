@@ -22,6 +22,9 @@ export const plansApi = {
   update: (id: string, data: UpdatePlanReq) =>
     http.patch<Plan>(`/plans/${id}`, data),
 
+  retrySync: (id: string) =>
+    http.post<{ id: string; syncStatus: string }>(`/plans/${id}/retry-sync`),
+
   checkKeyword: (data: CheckKeywordReq) =>
     http.post<CheckKeywordResp>('/plans/check-keyword', data),
 }
