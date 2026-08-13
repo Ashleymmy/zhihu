@@ -13,12 +13,14 @@ import { requirePermission } from '../auth/permissions';
 import { asyncHandler } from '../middleware/errors';
 import { config } from '../config';
 import { injectSignParams } from '../sign/zhihu';
+import { parseZhihuJson } from '../zhihu/json';
 
 export const allianceRouter = Router();
 allianceRouter.use(requireAuth);
 allianceRouter.use(requirePermission('project.manage'));
 
 const ZHIHU_BASE = config.zhihu.apiBase.replace(/\/$/, ''); // e.g. https://open.zhihu.com
+const zhihuProxyClient = axios.create({ timeout: 15_000, transformResponse: [parseZhihuJson] });
 
 function signParams(params: Record<string, unknown>): Record<string, unknown> {
   return injectSignParams(params, config.zhihu.accessToken, config.zhihu.secretKey);
@@ -37,15 +39,15 @@ async function proxyRequest(
     let data: unknown;
     if (method === 'GET') {
       const signed = signParams(params);
-      const resp = await axios.get(url, { params: signed, timeout: 15_000 });
+      const resp = await zhihuProxyClient.get(url, { params: signed });
       data = resp.data;
     } else if (method === 'POST') {
       const signed = signParams(body ?? {});
-      const resp = await axios.post(url, signed, { timeout: 15_000 });
+      const resp = await zhihuProxyClient.post(url, signed);
       data = resp.data;
     } else {
       const signed = signParams(body ?? {});
-      const resp = await axios.put(url, signed, { timeout: 15_000 });
+      const resp = await zhihuProxyClient.put(url, signed);
       data = resp.data;
     }
     res!.json(data);

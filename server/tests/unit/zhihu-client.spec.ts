@@ -29,6 +29,18 @@ it('所有知乎写请求由 MSW 拦截并携带签名', async () => {
     .resolves.toEqual({ data: { plan_id: '1234567890123456789' } });
 });
 
+it('保留知乎未加引号返回的 Snowflake ID 精度', async () => {
+  server.use(
+    http.post('https://open.zhihu.com/alliance/api/popularize_plan', () =>
+      new HttpResponse('{"data":{"plan_id":2071265453767405652},"success":true}', {
+        headers: { 'Content-Type': 'application/json' },
+      })),
+  );
+
+  await expect(zhihuPost('/alliance/api/popularize_plan', { keyword: '测试' }))
+    .resolves.toEqual({ data: { plan_id: '2071265453767405652' }, success: true });
+});
+
 it('渠道查询只携带 access_token，不附加签名参数', async () => {
   await expect(zhihuGet('/alliance/api/get_agent_channels'))
     .resolves.toEqual({ success: true, data: [] });
@@ -80,6 +92,19 @@ it('推广计划 400402 即使文案变化，也按关键词规则错误处理',
     '知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词',
   );
   expect(JSON.stringify(error)).not.toContain('sentinel');
+});
+
+it('作品链接重复的 400402 不误报为关键词规则', async () => {
+  server.use(
+    http.post('https://open.zhihu.com/alliance/api/popularize_composition/v2', () => HttpResponse.json({
+      error: { code: 400402, name: 'OpenApiBadRequestError', message: '作品链接重复绑定' },
+    }, { status: 400 })),
+  );
+
+  const error = await zhihuPost('/alliance/api/popularize_composition/v2', {}).catch((reason) => reason);
+  expect(zhihuSyncErrorDetail(error)).toBe(
+    '知乎接口失败（HTTP 400 / code 400402）：作品链接已绑定，请更换作品链接',
+  );
 });
 
 it('HTTP 200 中的 error envelope 仍按失败处理', async () => {

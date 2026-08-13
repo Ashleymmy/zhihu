@@ -60,9 +60,32 @@
         <a-form-item label="内容链接" name="promoUrl" :rules="[{ required: !editingId, message: '请输入内容链接' }]">
           <a-input v-model:value="bForm.promoUrl" placeholder="https://www.zhihu.com/question/…" />
         </a-form-item>
+        <template v-if="!editingId">
+          <a-form-item label="媒体平台" name="mediaType" :rules="[{ required: true, message: '请选择媒体平台' }]">
+            <a-select v-model:value="bForm.mediaType" placeholder="选择作品发布平台">
+              <a-select-option v-for="item in mediaTypeOptions" :key="item.value" :value="String(item.value)">{{ item.label }}</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="媒体账号" name="mediaAccount" :rules="[{ required: true, whitespace: true, message: '请输入媒体账号' }]">
+            <a-input v-model:value="bForm.mediaAccount" placeholder="作品发布平台的账号名称或 ID" />
+          </a-form-item>
+          <a-form-item label="作品类型" name="compositionType" :rules="[{ required: true, message: '请选择作品类型' }]">
+            <a-select v-model:value="bForm.compositionType" placeholder="选择作品类型" @change="onCompositionTypeChange">
+              <a-select-option v-for="item in compositionTypeOptions" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="作品子类型" name="compositionSubType" :rules="[{ required: true, message: '请选择作品子类型' }]">
+            <a-select v-model:value="bForm.compositionSubType" placeholder="选择作品子类型">
+              <a-select-option v-for="item in compositionSubTypeOptions" :key="item.value" :value="Number(item.value)">{{ item.label }}</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="作品发布时间" name="releaseTime" :rules="[{ required: true, message: '请选择作品发布时间' }]">
+            <a-date-picker v-model:value="bForm.releaseTime" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width:100%" />
+          </a-form-item>
+        </template>
         <div style="display:flex;gap:10px;margin-top:8px">
           <a-button @click="showBind=false" style="flex:1">取消</a-button>
-          <a-button type="primary" html-type="submit" :loading="submitting" style="flex:1">{{ editingId ? '保存' : '确认分配' }}</a-button>
+          <a-button type="primary" html-type="submit" :loading="submitting" style="flex:1">{{ editingId ? '保存' : '提交回传' }}</a-button>
         </div>
       </a-form>
     </a-modal>
@@ -74,8 +97,10 @@ import { ref, computed, onMounted } from 'vue'
 import { compositionsApi } from '@/api/compositions'
 import { plansApi } from '@/api/plans'
 import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import type { Composition, Plan } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
+import { useMetaStore } from '@/stores/meta'
 
 // status → UI bind status mapping
 const toBindStatus = (s: string) => ['approved', 'active'].includes(s) ? 'bound' : ['rejected', 'failed'].includes(s) ? 'failed' : 'pending'
@@ -84,7 +109,8 @@ interface KwRow extends Composition { bindStatus: string }
 
 const compositions = ref<KwRow[]>([])
 const auth         = useAuthStore()
-const createButtonLabel = computed(() => auth.isBoss || auth.isLeader ? '分配词条' : '提交编词回传')
+const meta         = useMetaStore()
+const createButtonLabel = computed(() => auth.isBoss || auth.isLeader ? '新增作品回传' : '提交编词回传')
 const plans        = ref<Plan[]>([])
 const q            = ref('')
 const planFilter   = ref<string>()
@@ -92,7 +118,13 @@ const statusF      = ref('all')
 const showBind     = ref(false)
 const submitting   = ref(false)
 const editingId    = ref<string>()
-const bForm = ref({ planId: '', promoUrl: '' })
+const bForm = ref({ planId: '', promoUrl: '', mediaType: '', mediaAccount: '', compositionType: 1, compositionSubType: 1, releaseTime: '' })
+const mediaTypeOptions = computed(() => meta.mediaTypeOptions)
+const compositionTypeOptions = computed(() => meta.compositionTypeOptions)
+const compositionSubTypeOptions = computed(() => {
+  const matching = meta.enums?.compositionSubType.filter(item => Number(item.parent) === bForm.value.compositionType) ?? []
+  return matching.length > 0 ? matching : meta.enums?.compositionSubType ?? []
+})
 
 const statusFilters = [
   { val: 'all', label: '全部' }, { val: 'bound', label: '已绑定' },
@@ -110,12 +142,33 @@ const assigneeLabel = (row: KwRow) => row.assigneeName || (row.ownerId === auth.
 
 function openBind() {
   editingId.value = undefined
-  bForm.value = { planId: '', promoUrl: '' }
+  bForm.value = {
+    planId: '',
+    promoUrl: '',
+    mediaType: String(mediaTypeOptions.value[0]?.value ?? ''),
+    mediaAccount: '',
+    compositionType: Number(compositionTypeOptions.value[0]?.value ?? 1),
+    compositionSubType: Number(meta.enums?.compositionSubType.find(item => Number(item.parent) === Number(compositionTypeOptions.value[0]?.value ?? 0))?.value ?? 11),
+    releaseTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  }
   showBind.value = true
+}
+function onCompositionTypeChange(value: unknown) {
+  const type = Number(value)
+  const options = meta.enums?.compositionSubType.filter(item => Number(item.parent) === type) ?? []
+  if (options.length > 0) bForm.value.compositionSubType = Number(options[0].value)
 }
 function editComp(r: KwRow) {
   editingId.value = r.id
-  bForm.value = { planId: r.planId, promoUrl: r.promoUrl }
+  bForm.value = {
+    planId: r.planId,
+    promoUrl: r.promoUrl,
+    mediaType: r.mediaType,
+    mediaAccount: r.mediaAccount,
+    compositionType: r.compositionType,
+    compositionSubType: r.compositionSubType,
+    releaseTime: r.releaseTime ? dayjs(r.releaseTime).format('YYYY-MM-DD HH:mm:ss') : '',
+  }
   showBind.value = true
 }
 async function handleBind() {
@@ -125,8 +178,16 @@ async function handleBind() {
       await compositionsApi.update(editingId.value, { promoUrl: bForm.value.promoUrl })
       message.success('已更新')
     } else {
-      await compositionsApi.create({ planId: bForm.value.planId, promoUrl: bForm.value.promoUrl, mediaType: 'KOC知乎', mediaAccount: '', compositionType: 1, compositionSubType: 1 })
-      message.success(auth.isBoss || auth.isLeader ? '词条已分配' : '编词回传已提交')
+      await compositionsApi.create({
+        planId: bForm.value.planId,
+        promoUrl: bForm.value.promoUrl,
+        mediaType: bForm.value.mediaType,
+        mediaAccount: bForm.value.mediaAccount.trim(),
+        compositionType: bForm.value.compositionType,
+        compositionSubType: bForm.value.compositionSubType,
+        releaseTime: dayjs(bForm.value.releaseTime).toISOString(),
+      })
+      message.success('作品回传已提交')
     }
     showBind.value = false
     await loadData()
@@ -155,7 +216,10 @@ const cols = [
   { title: '操作',   key: 'actions', width: 110 },
 ]
 
-onMounted(loadData)
+onMounted(async () => {
+  await meta.loadEnums()
+  await loadData()
+})
 </script>
 
 <style scoped>

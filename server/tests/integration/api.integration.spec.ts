@@ -11,11 +11,26 @@ import { syncMetrics } from '../../src/jobs/syncMetrics';
 const enabled = process.env.RUN_DB_TESTS === '1';
 const suite = enabled ? describe : describe.skip;
 let metricValue = 12;
+let receivedComposition: Record<string, unknown> | null = null;
 
 const upstream = setupServer(
-  http.post('https://open.zhihu.com/alliance/api/popularize_plan', () =>
-    HttpResponse.json({ data: { plan_id: '998877665544332211' } }),
-  ),
+  http.post('https://open.zhihu.com/alliance/api/popularize_plan', async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const planId = body.keyword === 'v2-keyword'
+      ? '2071265453767405652'
+      : body.keyword === 'race-keyword'
+        ? '2071265453767405651'
+        : '2071265453767405650';
+    return new HttpResponse(`{"data":{"plan_id":${planId}},"success":true}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }),
+  http.post('https://open.zhihu.com/alliance/api/popularize_composition/v2', async ({ request }) => {
+    receivedComposition = await request.json() as Record<string, unknown>;
+    return new HttpResponse('{"data":{"composition_id":2071266138193975100},"success":true}', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }),
   http.get('https://open.zhihu.com/alliance/api/data_report/daily_data', () =>
     HttpResponse.json({
       data: {
@@ -185,6 +200,71 @@ suite('MySQL API integration', () => {
     const results = await Promise.all([call(), call()]);
     expect(results.map((item) => item.status).sort()).toEqual([201, 409]);
     expect(results.find((item) => item.status === 409)?.body.code).toBe(40901);
+  });
+
+  it('persists exact plan ID and pushes a complete v2 composition payload', async () => {
+    const planBody = {
+      taskId: 'task-v2',
+      channelId: 'channel-v2',
+      keyword: 'v2-keyword',
+      landingUrl: 'https://example.com/v2',
+      popularizeType: 0,
+    };
+    const createdPlan = await request(app)
+      .post('/api/v1/plans')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send(planBody);
+    expect(createdPlan.status).toBe(201);
+
+    let plan: ({ zhihu_plan_id: string | null; sync_status: string } & RowDataPacket) | undefined;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      [plan] = await rows<{ zhihu_plan_id: string | null; sync_status: string } & RowDataPacket>(
+        'SELECT zhihu_plan_id, sync_status FROM plans WHERE id = ?',
+        [createdPlan.body.data.id],
+      );
+      if (plan?.sync_status === 'synced') break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(plan).toMatchObject({ zhihu_plan_id: '2071265453767405652', sync_status: 'synced' });
+
+    const createdComposition = await request(app)
+      .post('/api/v1/compositions')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({
+        planId: createdPlan.body.data.id,
+        mediaType: 1,
+        mediaAccount: 'integration-account',
+        compositionType: 1,
+        compositionSubType: 1,
+        promoUrl: 'https://example.com/composition',
+        releaseTime: '2026-08-13T16:05:00+08:00',
+      });
+    expect(createdComposition.status).toBe(201);
+
+    let composition: ({ zhihu_composition_id: string | null; sync_status: string } & RowDataPacket) | undefined;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      [composition] = await rows<{ zhihu_composition_id: string | null; sync_status: string } & RowDataPacket>(
+        'SELECT zhihu_composition_id, sync_status FROM compositions WHERE id = ?',
+        [createdComposition.body.data.id],
+      );
+      if (composition?.sync_status === 'synced') break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(composition).toMatchObject({
+      zhihu_composition_id: '2071266138193975100',
+      sync_status: 'synced',
+    });
+    expect(receivedComposition).toMatchObject({
+      plan_id: '2071265453767405652',
+      channel_id: 'channel-v2',
+      media_type: 'KOC抖音',
+      media_account: 'integration-account',
+      composition_type: 1,
+      composition_sub_type: 1,
+      composition_url: 'https://example.com/composition',
+      release_time: 1786608300,
+    });
+    expect(receivedComposition).not.toHaveProperty('promo_url');
   });
 
   it('forces leader-created users into the leader team as members', async () => {

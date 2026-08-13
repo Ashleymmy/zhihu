@@ -2,8 +2,13 @@ import axios from 'axios';
 import { config } from '../config';
 import { AppError } from '../middleware/errors';
 import { injectSignParams } from '../sign/zhihu';
+import { parseZhihuJson } from './json';
 
-const client = axios.create({ baseURL: config.zhihu.apiBase, timeout: 15_000 });
+const client = axios.create({
+  baseURL: config.zhihu.apiBase,
+  timeout: 15_000,
+  transformResponse: [parseZhihuJson],
+});
 
 const TOKEN_ONLY_GET_PATHS = new Set([
   '/alliance/api/get_agent_channels',
@@ -23,7 +28,7 @@ const UPSTREAM_CODE_KEYS = ['code', 'error_code', 'errno'] as const;
 interface SafeUpstreamDiagnostic {
   status: number;
   code: string | null;
-  messageKey: 'keyword_rule' | 'channel_invalid' | null;
+  messageKey: 'keyword_rule' | 'channel_invalid' | 'composition_duplicate' | null;
 }
 
 class ZhihuUpstreamError extends AppError {
@@ -43,8 +48,9 @@ function safeUpstreamCode(value: unknown): string {
 }
 
 function safeMessageKey(code: string, value: unknown): SafeUpstreamDiagnostic['messageKey'] {
-  if (code === '400402') return 'keyword_rule';
   const message = upstreamText(value);
+  if (message.includes('作品链接') && message.includes('重复绑定')) return 'composition_duplicate';
+  if (code === '400402') return 'keyword_rule';
   if (!message) return null;
   if (message.includes('关键词') && (message.includes('词根') || message.includes('更换关键词'))) {
     return 'keyword_rule';
@@ -101,6 +107,7 @@ export function zhihuSyncErrorDetail(error: unknown): string {
     const prefix = `知乎接口失败（HTTP ${status}${code ? ` / code ${code}` : ''}）`;
     if (messageKey === 'keyword_rule') return `${prefix}：关键词不符合知乎规则，请更换关键词`;
     if (messageKey === 'channel_invalid') return `${prefix}：渠道 ID 无效，请重新同步渠道`;
+    if (messageKey === 'composition_duplicate') return `${prefix}：作品链接已绑定，请更换作品链接`;
     return prefix;
   }
   if (error instanceof AppError && knownErrors.some((item) => item.error === error)) return error.message;

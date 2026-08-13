@@ -25,11 +25,15 @@ export const useZChannelStore = defineStore('zChannel', () => {
   }
 
   async function fetchSecondChannels(parentId: string, force = false) {
-    if (secondMap.value[parentId] && !force) return
+    if (secondMap.value[parentId] && !force) return true
     secondLoading.value = { ...secondLoading.value, [parentId]: true }
     try {
       const res = await allianceChannelApi.getSecondChannels(parentId)
       secondMap.value = { ...secondMap.value, [parentId]: res.data }
+      return true
+    } catch {
+      secondMap.value = { ...secondMap.value, [parentId]: [] }
+      return false
     } finally {
       secondLoading.value = { ...secondLoading.value, [parentId]: false }
     }

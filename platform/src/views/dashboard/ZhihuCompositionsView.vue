@@ -31,7 +31,7 @@
               </template>
             </a-table-column>
             <a-table-column title="分类" :width="150">
-              <template #default="{ record }">{{ record.category1 }}<span v-if="record.category2"> / {{ record.category2 }}</span></template>
+              <template #default="{ record }">{{ formatCompositionCategory(record) }}</template>
             </a-table-column>
             <a-table-column title="提交时间" data-index="submit_time" :width="160" />
             <a-table-column title="状态" :width="100">
@@ -53,8 +53,8 @@
       <!-- ── 创建作品 ── -->
       <a-tab-pane key="create" tab="创建作品">
         <a-form :model="cf" layout="vertical" style="max-width:560px;margin-top:8px" @finish="handleCreate">
-          <a-form-item label="推广计划 ID" name="planId" :rules="[{required:true,message:'请输入 planId'}]">
-            <a-input v-model:value="cf.planId" placeholder="来自「创建计划」页面的 Plan ID" />
+          <a-form-item label="推广计划 ID" name="plan_id" :rules="[{required:true,message:'请输入 planId'}]">
+            <a-input v-model:value="cf.plan_id" placeholder="来自「创建计划」页面的 Plan ID" />
           </a-form-item>
           <a-form-item label="渠道" name="channel_id" :rules="[{required:true,message:'请选择渠道'}]">
             <a-select v-model:value="cf.channel_id" placeholder="选择渠道" style="width:100%">
@@ -62,20 +62,24 @@
             </a-select>
           </a-form-item>
           <a-form-item label="媒体类型（media_type）" name="media_type" :rules="[{required:true}]">
-            <a-input-number v-model:value="cf.media_type" style="width:100%" placeholder="参考枚举说明" />
+            <a-select v-model:value="cf.media_type" style="width:100%" placeholder="选择作品发布平台">
+              <a-select-option v-for="mediaType in MEDIA_TYPES" :key="mediaType" :value="mediaType">{{ mediaType }}</a-select-option>
+            </a-select>
           </a-form-item>
           <a-form-item label="媒体账号" name="media_account" :rules="[{required:true,message:'请输入媒体账号'}]">
             <a-input v-model:value="cf.media_account" placeholder="知乎账号 ID 或用户名" />
           </a-form-item>
           <a-form-item label="作品类型（composition_type）" :rules="[{required:true}]">
-            <a-select v-model:value="cf.composition_type" style="width:100%">
+            <a-select v-model:value="cf.composition_type" style="width:100%" @change="onCompositionTypeChange">
               <a-select-option :value="0">其他</a-select-option>
               <a-select-option :value="1">图文</a-select-option>
               <a-select-option :value="2">视频</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="子类型（composition_sub_type）" :rules="[{required:true}]">
-            <a-input-number v-model:value="cf.composition_sub_type" style="width:100%" :min="1" :max="11" />
+          <a-form-item label="子类型（composition_sub_type）" name="composition_sub_type" :rules="[{required:true}]">
+            <a-select v-model:value="cf.composition_sub_type" style="width:100%">
+              <a-select-option v-for="item in compositionSubTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+            </a-select>
           </a-form-item>
           <a-form-item label="作品 URL" name="composition_url" :rules="[{required:true,message:'请输入作品 URL'},{type:'url',message:'请输入合法 URL'}]">
             <a-input v-model:value="cf.composition_url" placeholder="知乎内容链接" />
@@ -132,18 +136,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
+import { MEDIA_TYPES } from '@/api/alliance'
+import type { CompositionListItem, CreateCompositionReq } from '@/api/alliance'
 import { useZChannelStore }      from '@/stores/zChannel.store'
 import { useZCompositionStore }  from '@/stores/zComposition.store'
 
 const ch = useZChannelStore(); const co = useZCompositionStore()
 const route = useRoute(); const tab = ref('list')
 const lq = reactive({ channel_id: '', keyword: '' })
-const cf = reactive({ planId:'', channel_id:'', media_type:1, media_account:'', composition_type:1, composition_sub_type:1, composition_url:'', release_time:'' })
+const cf = reactive({ plan_id:'', channel_id:'', media_type:MEDIA_TYPES[0], media_account:'', composition_type:1, composition_sub_type:1, composition_url:'', release_time:'' })
 const bf = reactive({ channel_id:'', bind_type:1 }); const batchFile = ref<File|null>(null)
 const editVisible = ref(false); const editingId = ref(''); const ef = reactive({ composition_url:'' })
+
+const compositionSubTypes = {
+  0: [{ value: 11, label: '其他' }],
+  1: [{ value: 1, label: '实拍' }, { value: 2, label: 'Live 图' }, { value: 3, label: '截屏' }, { value: 4, label: '漫画' }],
+  2: [{ value: 5, label: '表情包解说' }, { value: 6, label: '真人演绎' }, { value: 7, label: '猫 meme' }, { value: 8, label: '漫剧' }, { value: 9, label: '解压' }, { value: 10, label: '滚屏' }],
+} as const
+const compositionSubTypeOptions = computed(() => compositionSubTypes[cf.composition_type as keyof typeof compositionSubTypes])
+const compositionTypeLabels = { 0: '其他', 1: '图文', 2: '视频' } as const
+
+function formatCompositionCategory(record: CompositionListItem) {
+  const type = compositionTypeLabels[record.composition_type as keyof typeof compositionTypeLabels]
+  const subType = compositionSubTypes[record.composition_type as keyof typeof compositionSubTypes]
+    ?.find(item => item.value === record.composition_sub_type)?.label
+  if (type) return subType ? `${type} / ${subType}` : type
+  return [record.category1, record.category2].filter(Boolean).join(' / ') || '—'
+}
 
 function onChannelChange(id: string) { lq.channel_id = id }
 async function fetchList() {
@@ -151,8 +174,23 @@ async function fetchList() {
   await co.fetchList(lq)
 }
 async function handleCreate() {
-  await co.submitCreate(cf as any)
+  const req: CreateCompositionReq = {
+    plan_id: cf.plan_id,
+    channel_id: cf.channel_id,
+    media_type: cf.media_type,
+    media_account: cf.media_account,
+    composition_type: cf.composition_type,
+    composition_sub_type: cf.composition_sub_type,
+    composition_url: cf.composition_url,
+    release_time: dayjs(cf.release_time).unix(),
+  }
+  await co.submitCreate(req)
   tab.value = 'list'
+}
+function onCompositionTypeChange(value: unknown) {
+  const type = Number(value) as keyof typeof compositionSubTypes
+  const options = compositionSubTypes[type]
+  if (options) cf.composition_sub_type = options[0].value
 }
 function openEdit(record: any) { editingId.value = record.composition_id; ef.composition_url = record.composition_url; editVisible.value = true }
 async function handleUpdate() { await co.submitUpdate(editingId.value, ef); editVisible.value = false }
@@ -166,7 +204,7 @@ async function copyId(id: string) { await navigator.clipboard.writeText(id); mes
 onMounted(async () => {
   await ch.fetchChannels()
   if (route.query.tab) tab.value = route.query.tab as string
-  if (route.query.planId) cf.planId = route.query.planId as string
+  if (route.query.planId) cf.plan_id = route.query.planId as string
   if (route.query.channel_id) { cf.channel_id = route.query.channel_id as string }
 })
 </script>

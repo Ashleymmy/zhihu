@@ -14,7 +14,10 @@ describe('HTTP 基础契约', () => {
     const response = await request(createApp()).get('/api/v1/meta/enums').set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(200);
     expect(response.body.code).toBe(0);
-    expect(response.body.data.compositionSubType[0]).toMatchObject({ value: 11, parent: 1 });
+    expect(response.body.data.mediaType).toHaveLength(10);
+    expect(response.body.data.mediaType).toContainEqual({ value: 'KOC定向', label: 'KOC定向' });
+    expect(response.body.data.compositionSubType).toContainEqual({ value: 11, label: '其他', parent: 0 });
+    expect(response.body.data.compositionSubType).toContainEqual({ value: 10, label: '滚屏', parent: 2 });
   });
 
   it('普通账号不能访问仅管理员使用的知乎透传入口', async () => {

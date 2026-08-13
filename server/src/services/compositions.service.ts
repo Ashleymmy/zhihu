@@ -7,19 +7,20 @@ import { AuthUser } from '../types';
 import { pageOffset } from '../utils/pagination';
 import { scopeFilter } from '../utils/scopeFilter';
 import { writeAudit } from './audit.service';
+import { isCompositionCategoryValid } from '../zhihu/composition';
 
 interface CountRow extends RowDataPacket { total: number }
 interface ItemRow extends RowDataPacket { id: string; owner_id: string; status: string; sync_status: string }
 interface PlanOwnerRow extends RowDataPacket { owner_id: string }
 export interface CompositionInput {
   planId: string;
-  mediaType: number;
+  mediaType: string;
   mediaAccount: string;
   compositionType: number;
   compositionSubType: number;
   title?: string | null;
   promoUrl: string;
-  releaseTime?: string | null;
+  releaseTime: string;
 }
 
 const stableHash = (value: unknown) => crypto
@@ -103,7 +104,7 @@ async function insertComposition(
       input.compositionSubType,
       input.title ?? null,
       input.promoUrl,
-      input.releaseTime ?? null,
+      new Date(input.releaseTime),
     ],
   );
   return String(result.insertId);
@@ -150,7 +151,19 @@ export async function updateComposition(
   patch: Record<string, unknown>,
   ip?: string,
 ) {
-  await getComposition(user, id);
+  const existing = await getComposition(user, id) as ItemRow & {
+    composition_type: number;
+    composition_sub_type: number;
+  };
+  const nextType = patch.compositionType === undefined
+    ? Number(existing.composition_type)
+    : Number(patch.compositionType);
+  const nextSubType = patch.compositionSubType === undefined
+    ? Number(existing.composition_sub_type)
+    : Number(patch.compositionSubType);
+  if (!isCompositionCategoryValid(nextType, nextSubType)) {
+    throw new AppError(422, 42200, '作品分类组合不正确');
+  }
   const mapping: Record<string, string> = {
     mediaAccount: 'media_account',
     compositionType: 'composition_type',
@@ -164,7 +177,7 @@ export async function updateComposition(
   for (const [key, column] of Object.entries(mapping)) {
     if (key in patch) {
       fields.push(`${column} = ?`);
-      bindings.push(patch[key]);
+      bindings.push(key === 'releaseTime' && patch[key] != null ? new Date(String(patch[key])) : patch[key]);
     }
   }
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');

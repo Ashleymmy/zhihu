@@ -54,15 +54,22 @@ export const alliancePlanApi = {
 }
 
 // ─── 推广作品 ──────────────────────────────────────────────────────
+export const MEDIA_TYPES = [
+  'KOC视频号', 'KOC百家号', 'KOC抖音', 'KOC快手', 'KOC微博',
+  'KOC小红书', 'KOC定向', 'KOC头条号', 'KOC哔哩哔哩', 'KOC公众号',
+] as const
+export type MediaType = typeof MEDIA_TYPES[number]
+
 export interface CreateCompositionReq {
-  plan_id: string; channel_id: string; media_type: number; media_account: string
+  plan_id: string; channel_id: string; media_type: MediaType; media_account: string
   composition_type: number; composition_sub_type: number
-  composition_url: string; release_time: string
+  composition_url: string; release_time: number
 }
 export interface CreateCompositionResp { composition_id: string }
 export interface CompositionListItem {
   keyword: string; composition_id: string; composition_url: string
-  category1: string; category2: string; submit_time: string
+  composition_type: number; composition_sub_type: number
+  category1?: string; category2?: string; submit_time: string
   popularize_channel: string; audit_status: number
 }
 export interface CompositionListResp { data: CompositionListItem[]; pagination: Pagination }
@@ -71,7 +78,7 @@ export const allianceCompositionApi = {
   createComposition: (req: CreateCompositionReq) =>
     zhPost<CreateCompositionResp>(`${A}/popularize_composition/v2`, req),
   listCompositions: (params: { channel_id: string; keyword: string; offset?: number; limit?: number }) =>
-    zhGet<CompositionListResp>(`${A}/popularize_compositions`, params),
+    zhGet<CompositionListResp>(`${A}/popularize_compositions/v2`, params),
   updateComposition: (id: string, req: Partial<CreateCompositionReq>) =>
     zhPut<void>(`${A}/popularize_composition/v2/${id}`, req),
   batchCreateCompositions: (file: File, fields: { bind_type: number; channel_id: string }) => {

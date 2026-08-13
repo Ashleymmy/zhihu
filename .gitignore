@@ -4,6 +4,7 @@
 **/.vitest/
 **/.cache/
 **/.turbo/
+**/.workflow/
 
 # 构建与测试产物
 **/dist/
@@ -18,6 +19,7 @@
 **/.env.*
 !**/.env.example
 !**/.env.sample
+!/.env.docker.example
 **/*.local
 **/project.private.config.json
 

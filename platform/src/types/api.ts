@@ -283,7 +283,7 @@ export interface CreateCompositionReq {
   compositionSubType: number
   title?:             string
   promoUrl:           string
-  releaseTime?:       string
+  releaseTime:        string
 }
 
 export interface UpdateCompositionReq {

@@ -14,9 +14,16 @@
             </a-select>
           </a-form-item>
           <a-form-item label="二代渠道（可选）">
-            <a-select v-model:value="form.second_channel_id" placeholder="不指定（可选）" allow-clear :disabled="!form.channel_id">
+            <a-select
+              v-model:value="form.second_channel_id"
+              :placeholder="secondChannelUnavailable ? '未开通/不可用' : '不指定（可选）'"
+              allow-clear
+              :disabled="!form.channel_id || secondChannelUnavailable"
+              :loading="Boolean(ch.secondLoading[form.channel_id])"
+            >
               <a-select-option v-for="o in ch.getSecondOptions(form.channel_id)" :key="o.value" :value="o.value">{{ o.label }}</a-select-option>
             </a-select>
+            <div v-if="secondChannelUnavailable" class="optional-tip">当前账号未开通二代渠道权限，不影响推广任务选择。</div>
           </a-form-item>
           <a-form-item label="推广任务" name="task_id" :rules="[{required:true,message:'请选择推广任务'}]">
             <a-select v-model:value="form.task_id" placeholder="选择推广任务" :disabled="!form.channel_id" :loading="tk.loading">
@@ -85,10 +92,16 @@ const ch = useZChannelStore(); const tk = useZTaskStore(); const pl = useZPlanSt
 const router = useRouter(); const formRef = ref<any>(); const activeTab = ref('single')
 const form  = reactive({ channel_id: '', second_channel_id: '', task_id: '', keyword: '', content_url: '' })
 const bForm = reactive({ channel_id: '', task_id: '' }); const batchFile = ref<File|null>(null)
+const secondChannelUnavailable = ref(false)
 
 async function onChannelChange(id: string) {
   form.task_id = ''; form.second_channel_id = ''
-  if (id) await Promise.all([tk.fetchTasks(id), ch.fetchSecondChannels(id)])
+  secondChannelUnavailable.value = false
+  if (!id) return
+  const secondChannelRequest = ch.fetchSecondChannels(id).then(available => {
+    if (form.channel_id === id) secondChannelUnavailable.value = !available
+  })
+  await Promise.all([tk.fetchTasks(id), secondChannelRequest])
 }
 async function submitForm() {
   await pl.submitCreatePlan({ task_id: form.task_id, channel_id: form.channel_id, content_url: form.content_url, popularize_type: 0, keyword: form.keyword, second_channel_id: form.second_channel_id || undefined })
@@ -115,5 +128,6 @@ onMounted(() => ch.fetchChannels())
 .act-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
 .act-btn.accent { background: var(--color-accent-subtle); border-color: var(--color-accent-border); color: var(--color-accent); }
 .batch-tip { padding: 10px 14px; background: var(--color-info-bg); border: 1px solid rgba(59,130,246,0.2); border-radius: var(--radius-md); font-size: 12.5px; color: var(--color-info); margin-bottom: 16px; }
+.optional-tip { margin-top: 6px; color: var(--color-warning); font-size: 12px; }
 .file-input { color: var(--color-text-secondary); font-size: 13px; }
 </style>
