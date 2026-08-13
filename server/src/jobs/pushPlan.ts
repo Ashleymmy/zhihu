@@ -1,4 +1,4 @@
-import { RowDataPacket } from 'mysql2/promise';
+import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../db';
 import { zhihuPost, zhihuPut, zhihuSyncErrorDetail } from '../zhihu/client';
 
@@ -48,7 +48,11 @@ export async function pushPlan(data: Record<string, unknown>) {
   const [plan] = await rows<PlanRow>('SELECT * FROM plans WHERE id = ? LIMIT 1', [id]);
   if (!plan || plan.status === 'ended') return;
 
-  await db.query("UPDATE plans SET sync_status = 'syncing', sync_error = NULL WHERE id = ?", [id]);
+  const [claimed] = await db.query<ResultSetHeader>(
+    "UPDATE plans SET sync_status = 'syncing', sync_error = NULL WHERE id = ? AND keyword = ? AND sync_status IN ('local', 'failed')",
+    [id, plan.keyword],
+  );
+  if (claimed.affectedRows === 0) return;
   const body = buildPlanPayload(plan);
 
   try {
@@ -58,12 +62,15 @@ export async function pushPlan(data: Record<string, unknown>) {
     await db.query(
       `UPDATE plans
        SET sync_status = 'synced', zhihu_plan_id = COALESCE(?, zhihu_plan_id), sync_error = NULL
-       WHERE id = ?`,
-      [upstreamId(response), id],
+       WHERE id = ? AND keyword = ? AND sync_status = 'syncing'`,
+      [upstreamId(response), id, plan.keyword],
     );
   } catch (error) {
     const message = zhihuSyncErrorDetail(error);
-    await db.query("UPDATE plans SET sync_status = 'failed', sync_error = ? WHERE id = ?", [message, id]);
+    await db.query(
+      "UPDATE plans SET sync_status = 'failed', sync_error = ? WHERE id = ? AND keyword = ? AND sync_status = 'syncing'",
+      [message, id, plan.keyword],
+    );
     throw error;
   }
 }

@@ -9,15 +9,19 @@ import { paginationSchema } from '../utils/pagination';
 import { ok, okList } from '../utils/response';
 
 const id = z.string().regex(/^\d+$/);
+const keyword = z.string().trim().min(1).max(128).refine(
+  (value) => !/[\s,，、;；]/u.test(value),
+  '仅支持单个关键词，不能包含空格或分隔符',
+);
 const listSchema = paginationSchema.extend({ taskId: z.string().optional(), channelId: z.string().optional(), keyword: z.string().optional(), status: z.string().optional() });
-const checkSchema = z.object({ channelId: z.string().min(1), keyword: z.string().trim().min(1).max(128) });
+const checkSchema = z.object({ channelId: z.string().min(1), keyword });
 const createSchema = z.object({
   taskId: z.string().min(1), channelId: z.string().min(1), secondChannelId: z.string().nullable().optional(),
-  keyword: z.string().trim().min(1).max(128), landingUrl: z.string().url().max(1024), popularizeType: z.number().int(),
+  keyword, landingUrl: z.string().url().max(1024), popularizeType: z.number().int(),
   name: z.string().max(255).nullable().optional(), dailyBudget: z.number().nonnegative().nullable().optional(),
   startDate: z.string().date().nullable().optional(), endDate: z.string().date().nullable().optional(), ownerId: id.optional(),
 });
-const updateSchema = z.object({ landingUrl: z.string().url().max(1024).optional(), name: z.string().max(255).nullable().optional(), dailyBudget: z.number().nonnegative().nullable().optional() });
+const updateSchema = z.object({ keyword: keyword.optional(), landingUrl: z.string().url().max(1024).optional(), name: z.string().max(255).nullable().optional(), dailyBudget: z.number().nonnegative().nullable().optional() });
 
 export const plansRouter = Router();
 plansRouter.use(requireAuth);

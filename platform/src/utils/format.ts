@@ -37,11 +37,11 @@ export const planStatusClass = (s: string): string =>
 
 /** sync status → Chinese label */
 export const syncStatusLabel = (s: string): string =>
-  ({ local: '本地', synced: '已同步', failed: '同步失败' })[s] ?? s
+  ({ local: '待同步', syncing: '同步中', synced: '已同步', failed: '同步失败' })[s] ?? s
 
 /** sync status → badge class */
 export const syncStatusClass = (s: string): string =>
-  ({ synced: 'badge-success', failed: 'badge-error', local: 'badge-warning' })[s] ?? 'badge-default'
+  ({ synced: 'badge-success', failed: 'badge-error', local: 'badge-warning', syncing: 'badge-info' })[s] ?? 'badge-default'
 
 /** composition status → Chinese label */
 export const compStatusLabel = (s: string): string =>

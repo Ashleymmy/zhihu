@@ -1,5 +1,26 @@
-import { describe, expect, it } from 'vitest';
-import { buildPlanPayload, type PlanPayloadInput } from '../../src/jobs/pushPlan';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { publicPlanSyncError } from '../../src/services/plans.service';
+import { buildPlanPayload, pushPlan } from '../../src/jobs/pushPlan';
+import type { PlanPayloadInput } from '../../src/jobs/pushPlan';
+
+const mocks = vi.hoisted(() => ({
+  dbQuery: vi.fn(),
+  rows: vi.fn(),
+  zhihuPost: vi.fn(),
+  zhihuPut: vi.fn(),
+  zhihuSyncErrorDetail: vi.fn(() => '知乎同步失败，请稍后重试'),
+}));
+
+vi.mock('../../src/db', () => ({
+  db: { query: mocks.dbQuery },
+  rows: mocks.rows,
+}));
+
+vi.mock('../../src/zhihu/client', () => ({
+  zhihuPost: mocks.zhihuPost,
+  zhihuPut: mocks.zhihuPut,
+  zhihuSyncErrorDetail: mocks.zhihuSyncErrorDetail,
+}));
 
 describe('知乎推广计划 payload', () => {
   const localPlan: PlanPayloadInput = {
@@ -26,5 +47,78 @@ describe('知乎推广计划 payload', () => {
       second_channel_id: 'second-1',
     });
     expect(buildPlanPayload(localPlan)).not.toHaveProperty('second_channel_id');
+  });
+
+  it('仅向前端暴露白名单化的同步失败原因', () => {
+    expect(publicPlanSyncError(
+      '知乎接口失败（HTTP 400 / code 400402）：关键词，不能包含违规词词根，请更换关键词',
+    )).toBe('知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词');
+    expect(publicPlanSyncError(
+      '知乎接口失败（HTTP 403 / code 40317）：secret=sentinel',
+    )).toBe('知乎接口失败（HTTP 403 / code 40317）');
+    expect(publicPlanSyncError('arbitrary sentinel')).toBe('知乎同步失败，请稍后重试');
+  });
+
+});
+
+describe('知乎推广计划同步竞态保护', () => {
+  const plan = {
+    id: '1',
+    status: 'pending',
+    zhihu_plan_id: null,
+    name: null,
+    daily_budget: null,
+    zhihu_task_id: 'task-1',
+    channel_id: 'channel-1',
+    second_channel_id: null,
+    keyword: '新关键词',
+    landing_url: 'https://example.com/content',
+    popularize_type: 0,
+  };
+
+  beforeEach(() => {
+    mocks.dbQuery.mockReset();
+    mocks.rows.mockReset();
+    mocks.zhihuPost.mockReset();
+    mocks.zhihuPut.mockReset();
+    mocks.zhihuSyncErrorDetail.mockClear();
+    mocks.rows.mockResolvedValue([plan]);
+  });
+
+  it('未抢到当前 local/failed 状态时不调用知乎接口', async () => {
+    mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+    await pushPlan({ planId: '1' });
+
+    expect(mocks.zhihuPost).not.toHaveBeenCalled();
+    expect(mocks.dbQuery).toHaveBeenCalledWith(
+      expect.stringContaining("sync_status IN ('local', 'failed')"),
+      ['1', '新关键词'],
+    );
+  });
+
+  it('成功结果只更新相同关键词且仍为 syncing 的计划', async () => {
+    mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+    mocks.zhihuPost.mockResolvedValue({ data: { plan_id: 'upstream-1' } });
+
+    await pushPlan({ planId: '1' });
+
+    expect(mocks.dbQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining("WHERE id = ? AND keyword = ? AND sync_status = 'syncing'"),
+      ['upstream-1', '1', '新关键词'],
+    );
+  });
+
+  it('失败结果不覆盖已换关键词或已完成的计划', async () => {
+    const upstreamError = new Error('upstream sentinel');
+    mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 0 }]);
+    mocks.zhihuPost.mockRejectedValue(upstreamError);
+
+    await expect(pushPlan({ planId: '1' })).rejects.toBe(upstreamError);
+
+    expect(mocks.dbQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining("WHERE id = ? AND keyword = ? AND sync_status = 'syncing'"),
+      ['知乎同步失败，请稍后重试', '1', '新关键词'],
+    );
   });
 });

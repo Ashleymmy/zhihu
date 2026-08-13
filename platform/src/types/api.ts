@@ -93,7 +93,7 @@ export interface Task {
 
 // ─── Plans (推广计划) ──────────────────────────────────────────
 export type PlanStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'ended'
-export type SyncStatus = 'local' | 'synced' | 'failed'
+export type SyncStatus = 'local' | 'syncing' | 'synced' | 'failed'
 
 export interface Plan {
   id: string
@@ -112,6 +112,7 @@ export interface Plan {
   ownerName: string
   status: PlanStatus
   syncStatus: SyncStatus
+  syncError: string | null
   zhihuPlanId: string | null
   createdAt: string
   updatedAt: string
@@ -141,6 +142,7 @@ export interface CreatePlanReq {
 }
 
 export interface UpdatePlanReq {
+  keyword?: string
   landingUrl?: string
   name?: string | null
   dailyBudget?: number | null

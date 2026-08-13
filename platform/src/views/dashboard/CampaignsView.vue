@@ -41,9 +41,11 @@
             <span :class="['badge', statusClass(record.status)]"><span class="badge-dot"/>{{ planStatusLabel(record.status) }}</span>
           </template>
           <template v-if="column.key === 'syncStatus'">
-            <span :class="['badge', record.syncStatus === 'synced' ? 'badge-success' : record.syncStatus === 'failed' ? 'badge-error' : 'badge-warning']">
-              <span class="badge-dot"/>{{ syncStatusLabel(record.syncStatus) }}
-            </span>
+            <a-tooltip :title="record.syncStatus === 'failed' ? record.syncError || '知乎同步失败，请稍后重试' : undefined">
+              <span :class="['badge', syncStatusClass(record.syncStatus)]">
+                <span class="badge-dot"/>{{ syncStatusLabel(record.syncStatus) }}
+              </span>
+            </a-tooltip>
           </template>
           <template v-if="column.key === 'budget'">
             <span style="font-family:var(--font-mono);font-size:13px;color:var(--color-text-primary)">{{ fmtFen(record.dailyBudget) }}</span>
@@ -57,7 +59,7 @@
             <div class="actions-cell">
               <button class="act-btn" @click="editItem(record as Plan)">编辑</button>
               <button
-                v-if="record.syncStatus === 'failed'"
+                v-if="record.syncStatus === 'failed' && (record.zhihuPlanId || !requiresKeywordChange(record as Plan))"
                 class="act-btn warning"
                 :disabled="retryingPlanId === record.id"
                 @click="retrySync(record as Plan)"
@@ -73,6 +75,14 @@
     <!-- Create / Edit Modal -->
     <a-modal v-model:open="showCreate" :title="editingId ? '编辑推广计划' : '新建推广计划'" :footer="null" width="520">
       <a-form :model="form" layout="vertical" @finish="handleCreate">
+        <a-alert
+          v-if="editingFailedDraft"
+          message="该计划尚未同步到知乎，可修改关键词后保存并重试"
+          :description="editingSyncError || '请根据知乎规则更换关键词'"
+          type="warning"
+          show-icon
+          style="margin-bottom:16px"
+        />
         <a-alert v-if="!editingId && channels.length === 0" message="暂无可用渠道，请联系管理员先同步并分配渠道。" type="warning" show-icon style="margin-bottom:16px" />
         <a-form-item v-if="!editingId" label="推广渠道" name="channelId" :rules="[{ required: true, message: '请选择推广渠道' }]">
           <a-select v-model:value="form.channelId" placeholder="选择渠道">
@@ -84,7 +94,13 @@
             <a-select-option v-for="task in tasks" :key="task.id" :value="task.zhihuTaskId">{{ task.name }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item v-if="!editingId" label="推广关键词" name="keyword" :rules="[{ required: true, message: '请输入关键词' }]">
+        <a-form-item
+          v-if="!editingId || editingFailedDraft"
+          label="推广关键词"
+          name="keyword"
+          :rules="keywordRules"
+          extra="仅支持单个关键词；最终是否符合词根规则由知乎接口校验。"
+        >
           <a-input v-model:value="form.keyword" placeholder="例：夸克网盘" />
         </a-form-item>
         <a-form-item v-if="!editingId" label="推广内容地址" name="landingUrl" :rules="[{ required: true, message: '请输入推广内容地址' }, { type: 'url', message: '请输入合法的 URL' }]">
@@ -101,15 +117,15 @@
         </a-form-item>
         <div style="display:flex;gap:10px;margin-top:8px">
           <a-button @click="showCreate = false" style="flex:1">取消</a-button>
-          <a-button type="primary" html-type="submit" :loading="submitting" style="flex:1">{{ editingId ? '保存修改' : '创建计划' }}</a-button>
+          <a-button type="primary" html-type="submit" :loading="submitting" style="flex:1">{{ editingId ? (editingFailedDraft ? '保存并重试' : '保存修改') : '创建计划' }}</a-button>
         </div>
       </a-form>
     </a-modal>
 
     <a-modal v-model:open="showChannelManager" title="渠道同步与归属" :footer="null" width="720">
       <div class="channel-toolbar">
-        <span>同步由 Admin 发起；团长和达人只会看到已分配或已产生本人计划的渠道。</span>
-        <a-button type="primary" :loading="syncingChannels" @click="syncChannels">同步渠道</a-button>
+        <span>同步由 Admin 发起；将同时提交渠道和推广任务同步，团长和达人仍只看到权限范围内的数据。</span>
+        <a-button type="primary" :loading="syncingChannels" @click="syncChannels">同步渠道及任务</a-button>
       </div>
       <a-table :data-source="channels" row-key="id" size="small" :pagination="false">
         <a-table-column title="渠道名称" data-index="name" />
@@ -142,7 +158,7 @@ import { plansApi } from '@/api/plans'
 import { channelsApi } from '@/api/channels'
 import { tasksApi } from '@/api/tasks'
 import { teamApi } from '@/api/team'
-import { fmtFen, planStatusLabel, syncStatusLabel } from '@/utils/format'
+import { fmtFen, planStatusLabel, syncStatusClass, syncStatusLabel } from '@/utils/format'
 import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
 import type { Channel, Plan, Task, TeamMember } from '@/types/api'
@@ -161,7 +177,27 @@ const syncingChannels = ref(false)
 const assigningChannelId = ref<string>()
 const retryingPlanId = ref<string>()
 const editingId  = ref<string>()
+const editingFailedDraft = ref(false)
+const editingSyncError = ref<string | null>(null)
+const editingKeyword = ref('')
+const editingRequiresKeywordChange = ref(false)
 const form       = ref({ channelId: '', taskId: '', keyword: '', landingUrl: '', popularizeType: 0, dailyBudget: 100, startDate: '' as string | undefined })
+
+const keywordRules = [
+  { required: true, message: '请输入关键词' },
+  {
+    validator: (_rule: unknown, value: unknown) => {
+      const keyword = String(value ?? '').trim()
+      if (/[\s,，、;；]/u.test(keyword)) {
+        return Promise.reject(new Error('仅支持单个关键词，不能包含空格或分隔符'))
+      }
+      if (editingRequiresKeywordChange.value && keyword === editingKeyword.value) {
+        return Promise.reject(new Error('请更换为新的关键词后再重试'))
+      }
+      return Promise.resolve()
+    },
+  },
+]
 
 const statusFilters = [
   { val: 'all', label: '全部' }, { val: 'active', label: '投放中' },
@@ -175,6 +211,7 @@ const filtered = computed(() => plans.value
 const totalDailyBudget = computed(() => plans.value.reduce((s, p) => s + (p.dailyBudget ?? 0), 0))
 const syncedCount      = computed(() => plans.value.filter(p => p.syncStatus === 'synced').length)
 const statusClass      = (s: string) => ({ active: 'badge-success', paused: 'badge-warning', ended: 'badge-default' })[s] ?? 'badge-default'
+const requiresKeywordChange = (plan: Plan) => !plan.zhihuPlanId && Boolean(plan.syncError?.includes('请更换关键词'))
 const statPills = computed(() => [
   { v: plans.value.length,                                         l: '计划总数',   color: '' },
   { v: plans.value.filter(p => p.status === 'active').length,      l: '投放中',     color: 'var(--color-success)' },
@@ -197,11 +234,19 @@ async function loadData() {
 
 function openCreate() {
   editingId.value = undefined
+  editingFailedDraft.value = false
+  editingSyncError.value = null
+  editingKeyword.value = ''
+  editingRequiresKeywordChange.value = false
   form.value = { channelId: '', taskId: '', keyword: '', landingUrl: '', popularizeType: 0, dailyBudget: 100, startDate: undefined }
   showCreate.value = true
 }
 function editItem(r: Plan) {
   editingId.value = r.id
+  editingFailedDraft.value = r.syncStatus === 'failed' && !r.zhihuPlanId
+  editingSyncError.value = r.syncError
+  editingKeyword.value = r.keyword
+  editingRequiresKeywordChange.value = requiresKeywordChange(r)
   form.value = { channelId: r.channelId, taskId: r.taskId, keyword: r.keyword, landingUrl: r.landingUrl, popularizeType: r.popularizeType, dailyBudget: (r.dailyBudget ?? 0) / 100, startDate: r.startDate ?? undefined }
   showCreate.value = true
 }
@@ -230,7 +275,13 @@ async function syncChannels() {
   syncingChannels.value = true
   try {
     await channelsApi.sync()
-    message.success('渠道同步已提交，请稍后重新打开本窗口查看')
+    try {
+      await tasksApi.sync()
+    } catch {
+      message.warning('渠道同步已提交，但任务同步提交失败，请前往「推广任务」页面重试')
+      return
+    }
+    message.success('渠道与推广任务同步均已提交，请稍后刷新查看')
   } catch (e: any) {
     message.error(e.message || '渠道同步失败')
   } finally {
@@ -278,16 +329,20 @@ async function handleCreate() {
   submitting.value = true
   try {
     if (editingId.value) {
+      const keywordChanged = editingFailedDraft.value && form.value.keyword.trim() !== editingKeyword.value
       const updatePayload = {
         dailyBudget: Math.round(form.value.dailyBudget * 100),
+        ...(keywordChanged
+          ? { keyword: form.value.keyword.trim() }
+          : {}),
       }
       await plansApi.update(editingId.value, updatePayload)
-      message.success('计划已更新')
+      message.success(keywordChanged ? '关键词已更新，正在重新同步知乎' : '计划已更新，正在重新同步知乎')
     } else {
       await plansApi.create({
         taskId: form.value.taskId,
         channelId: form.value.channelId,
-        keyword: form.value.keyword,
+        keyword: form.value.keyword.trim(),
         landingUrl: form.value.landingUrl,
         popularizeType: form.value.popularizeType,
         dailyBudget: Math.round(form.value.dailyBudget * 100),

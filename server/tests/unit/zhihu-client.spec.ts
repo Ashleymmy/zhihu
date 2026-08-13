@@ -34,7 +34,7 @@ it('渠道查询只携带 access_token，不附加签名参数', async () => {
     .resolves.toEqual({ success: true, data: [] });
 });
 
-it('未知上游错误对外保持通用文案，仅在同步详情中保留脱敏诊断', async () => {
+it('未知上游错误只保留状态和数字错误码，不转发上游原文', async () => {
   server.use(
     http.post('https://open.zhihu.com/alliance/api/popularize_plan', () => HttpResponse.json({
       code: 40317,
@@ -49,8 +49,37 @@ it('未知上游错误对外保持通用文案，仅在同步详情中保留脱�
     message: '知乎服务暂时不可用，请稍后重试',
   });
   expect(zhihuSyncErrorDetail(error)).toBe(
-    '知乎接口失败（HTTP 403 / code 40317）：permission denied access_token=[REDACTED] signature=[REDACTED]',
+    '知乎接口失败（HTTP 403 / code 40317）',
   );
+});
+
+it('推广计划关键词规则错误映射为安全、可操作的同步原因', async () => {
+  server.use(
+    http.post('https://open.zhihu.com/alliance/api/popularize_plan', () => HttpResponse.json({
+      error: { code: 400402, message: '关键词，不能包含违规词词根，请更换关键词 access_token=sentinel' },
+    }, { status: 400 })),
+  );
+
+  const error = await zhihuPost('/alliance/api/popularize_plan', { keyword: '知乎故事' }).catch((reason) => reason);
+  expect(zhihuSyncErrorDetail(error)).toBe(
+    '知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词',
+  );
+  expect(zhihuSyncErrorDetail(error)).not.toContain('sentinel');
+});
+
+it('推广计划 400402 即使文案变化，也按关键词规则错误处理', async () => {
+  server.use(
+    http.post('https://open.zhihu.com/alliance/api/popularize_plan', () => HttpResponse.json({
+      code: 400402,
+      message: 'upstream wording changed access_token=sentinel',
+    }, { status: 400 })),
+  );
+
+  const error = await zhihuPost('/alliance/api/popularize_plan', { keyword: '知乎故事' }).catch((reason) => reason);
+  expect(zhihuSyncErrorDetail(error)).toBe(
+    '知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词',
+  );
+  expect(JSON.stringify(error)).not.toContain('sentinel');
 });
 
 it('HTTP 200 中的 error envelope 仍按失败处理', async () => {
@@ -63,6 +92,6 @@ it('HTTP 200 中的 error envelope 仍按失败处理', async () => {
   const error = await zhihuPost('/alliance/api/popularize_plan', { keyword: '测试' }).catch((reason) => reason);
   expect(error).toMatchObject({ code: 50002, message: '知乎服务暂时不可用，请稍后重试' });
   expect(zhihuSyncErrorDetail(error)).toBe(
-    '知乎接口失败（HTTP 200 / code 400400）：unknown parameter',
+    '知乎接口失败（HTTP 200 / code 400400）',
   );
 });
