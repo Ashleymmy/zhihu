@@ -305,9 +305,18 @@ const workerZhihuGroup: NavGroup = {
 
 const baseNavGroups = fullNavGroups.filter(group => group.label !== '知乎')
 const adminZhihuGroup = fullNavGroups.find(group => group.label === '知乎')
+const workerZhihuRoutes = new Set(
+  workerZhihuGroup.children?.flatMap(group => group.items.map(item => item.to)) ?? [],
+)
+const workerBaseNavGroups = baseNavGroups.map(group => ({
+  ...group,
+  items: group.items.filter(item => !workerZhihuRoutes.has(item.to)),
+}))
 const navGroups = computed<NavGroup[]>(() => {
-  const zhihuGroup = canAccess(auth.user, 'allianceAdmin') ? adminZhihuGroup : workerZhihuGroup
-  return zhihuGroup ? [...baseNavGroups, zhihuGroup] : baseNavGroups
+  if (canAccess(auth.user, 'allianceAdmin')) {
+    return adminZhihuGroup ? [...baseNavGroups, adminZhihuGroup] : baseNavGroups
+  }
+  return [...workerBaseNavGroups, workerZhihuGroup]
 })
 
 const routeTitleMap: Record<string, string> = {

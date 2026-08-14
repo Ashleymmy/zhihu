@@ -242,7 +242,8 @@ export interface UpdateMemberReq {
 }
 
 // ─── Compositions (推广作品) ───────────────────────────────────
-export type CompositionStatus = 'pending' | 'accepted' | 'submitted' | 'approved' | 'rejected'
+export type CompositionStatus = 'pending' | 'active' | 'rejected' | 'ended' | 'accepted' | 'submitted' | 'approved'
+export type CompositionSyncStatus = 'local' | 'syncing' | 'synced' | 'failed'
 
 export interface Composition {
   id:                  string
@@ -261,9 +262,9 @@ export interface Composition {
   releaseTime:         string | null
   status:              CompositionStatus
   rejectReason:        string | null
-  syncStatus:          string
-  zhihuTaskId:         string | null
-  callbackAt:          string | null
+  syncStatus:          CompositionSyncStatus
+  syncError:           string | null
+  zhihuCompositionId:  string | null
   createdAt:           string
   updatedAt:           string
 }

@@ -28,17 +28,20 @@
             <div class="kw-sub">{{ record.channelName }}</div>
           </template>
           <template v-if="column.key === 'bindStatus'">
-            <span :class="['badge', bindClass(record.bindStatus)]"><span class="badge-dot"/>{{ bindLabel(record.bindStatus) }}</span>
+            <span :class="['badge', record.displayStatus.badgeClass]"><span class="badge-dot"/>{{ record.displayStatus.label }}</span>
+            <div v-if="statusError(record as KwRow)" class="status-error" :title="statusError(record as KwRow) || undefined">
+              {{ statusError(record as KwRow) }}
+            </div>
           </template>
           <template v-if="column.key === 'assignee'">
             <span style="font-size:12.5px;color:var(--color-text-secondary)">{{ assigneeLabel(record as any) }}</span>
           </template>
-          <template v-if="column.key === 'content_url'">
-            <a v-if="record.content_url" :href="record.content_url" target="_blank" class="url-link">查看内容</a>
+          <template v-if="column.key === 'promoUrl'">
+            <a v-if="record.promoUrl" :href="record.promoUrl" target="_blank" rel="noopener noreferrer" class="url-link">查看内容</a>
             <span v-else style="color:var(--color-text-disabled);font-size:12px">—</span>
           </template>
           <template v-if="column.key === 'updated'">
-            <span style="font-size:12px;color:var(--color-text-tertiary)">{{ record.callbackAt ? record.callbackAt.slice(0,10) : '—' }}</span>
+            <span style="font-size:12px;color:var(--color-text-tertiary)">{{ record.updatedAt ? dayjs(record.updatedAt).format('YYYY-MM-DD HH:mm') : '—' }}</span>
           </template>
           <template v-if="column.key === 'actions'">
             <div class="actions-cell">
@@ -57,7 +60,7 @@
             <a-select-option v-for="p in plans" :key="p.id" :value="p.id">{{ p.keyword }} · {{ p.channelName }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="内容链接" name="promoUrl" :rules="[{ required: !editingId, message: '请输入内容链接' }]">
+        <a-form-item label="内容链接" name="promoUrl" :rules="promoUrlRules">
           <a-input v-model:value="bForm.promoUrl" placeholder="https://www.zhihu.com/question/…" />
         </a-form-item>
         <template v-if="!editingId">
@@ -101,11 +104,13 @@ import dayjs from 'dayjs'
 import type { Composition, Plan } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 import { useMetaStore } from '@/stores/meta'
+import {
+  normalizePromoUrl,
+  resolveCompositionDisplayStatus,
+  type CompositionDisplayStatus,
+} from '@/utils/compositionFeedback'
 
-// status → UI bind status mapping
-const toBindStatus = (s: string) => ['approved', 'active'].includes(s) ? 'bound' : ['rejected', 'failed'].includes(s) ? 'failed' : 'pending'
-
-interface KwRow extends Composition { bindStatus: string }
+interface KwRow extends Composition { displayStatus: CompositionDisplayStatus }
 
 const compositions = ref<KwRow[]>([])
 const auth         = useAuthStore()
@@ -127,18 +132,33 @@ const compositionSubTypeOptions = computed(() => {
 })
 
 const statusFilters = [
-  { val: 'all', label: '全部' }, { val: 'bound', label: '已绑定' },
-  { val: 'pending', label: '审核中' }, { val: 'failed', label: '失败' },
+  { val: 'all', label: '全部' }, { val: 'pending', label: '待回传' },
+  { val: 'syncing', label: '回传中' }, { val: 'reviewing', label: '审核中' },
+  { val: 'bound', label: '已绑定' }, { val: 'failed', label: '失败' },
+  { val: 'ended', label: '已结束' },
 ]
 
 const filtered = computed(() => compositions.value
-  .filter(k => statusF.value === 'all' || k.bindStatus === statusF.value)
+  .filter(k => statusF.value === 'all' || k.displayStatus.key === statusF.value)
   .filter(k => !planFilter.value || k.planId === planFilter.value)
   .filter(k => !q.value || k.keyword.includes(q.value)))
 
-const bindClass = (s: string) => ({ bound:'badge-success', pending:'badge-info', failed:'badge-error' })[s] ?? 'badge-default'
-const bindLabel = (s: string) => ({ bound:'已回传', pending:'待回传', failed:'回传失败' })[s] ?? s
 const assigneeLabel = (row: KwRow) => row.assigneeName || (row.ownerId === auth.user?.id ? '本人' : row.ownerId ? `账号 ${row.ownerId}` : '未分配')
+const statusError = (row: KwRow) => row.syncStatus === 'failed' ? row.syncError : row.status === 'rejected' ? row.rejectReason : null
+const promoUrlRules = [
+  { required: true, message: '请输入内容链接' },
+  {
+    validator: (_rule: unknown, value: string) => {
+      try {
+        normalizePromoUrl(value ?? '')
+        return Promise.resolve()
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    },
+    trigger: 'blur' as const,
+  },
+]
 
 function openBind() {
   editingId.value = undefined
@@ -174,13 +194,15 @@ function editComp(r: KwRow) {
 async function handleBind() {
   submitting.value = true
   try {
+    const promoUrl = normalizePromoUrl(bForm.value.promoUrl)
+    bForm.value.promoUrl = promoUrl
     if (editingId.value) {
-      await compositionsApi.update(editingId.value, { promoUrl: bForm.value.promoUrl })
+      await compositionsApi.update(editingId.value, { promoUrl })
       message.success('已更新')
     } else {
       await compositionsApi.create({
         planId: bForm.value.planId,
-        promoUrl: bForm.value.promoUrl,
+        promoUrl,
         mediaType: bForm.value.mediaType,
         mediaAccount: bForm.value.mediaAccount.trim(),
         compositionType: bForm.value.compositionType,
@@ -197,22 +219,31 @@ async function handleBind() {
 }
 
 async function loadData() {
-  try {
-    const [compList, planList] = await Promise.all([
-      compositionsApi.list({ page: 1, pageSize: 100 }),
-      plansApi.list({ page: 1, pageSize: 50 }),
-    ])
-    compositions.value = compList.list.map(c => ({ ...c, bindStatus: toBindStatus(c.status) }))
-    plans.value = planList.list
-  } catch (_) { /* empty */ }
+  const [compositionResult, planResult] = await Promise.allSettled([
+    compositionsApi.list({ page: 1, pageSize: 100 }),
+    plansApi.list({ page: 1, pageSize: 50 }),
+  ])
+  if (compositionResult.status === 'fulfilled') {
+    compositions.value = compositionResult.value.list.map(c => ({
+      ...c,
+      displayStatus: resolveCompositionDisplayStatus(c),
+    }))
+  } else {
+    message.error(compositionResult.reason?.message || '加载回传记录失败')
+  }
+  if (planResult.status === 'fulfilled') {
+    plans.value = planResult.value.list
+  } else {
+    message.error(planResult.reason?.message || '加载推广计划失败')
+  }
 }
 
 const cols = [
   { title: '关键词 / 渠道', key: 'keyword' },
-  { title: '绑定状态', key: 'bindStatus', width: 100 },
+  { title: '绑定状态', key: 'bindStatus', width: 180 },
   { title: '达人',    key: 'assignee', width: 100 },
-  { title: '内容链接', key: 'content_url', width: 100 },
-  { title: '更新时间', key: 'updated', width: 110 },
+  { title: '内容链接', dataIndex: 'promoUrl', key: 'promoUrl', width: 100 },
+  { title: '更新时间', dataIndex: 'updatedAt', key: 'updated', width: 150 },
   { title: '操作',   key: 'actions', width: 110 },
 ]
 
@@ -241,6 +272,7 @@ onMounted(async () => {
 .kw-sub { font-size: 11px; color: var(--color-text-disabled); margin-top: 2px; }
 .url-link { font-size: 12px; color: var(--color-accent); text-decoration: none; }
 .url-link:hover { text-decoration: underline; }
+.status-error { max-width: 160px; margin-top: 4px; overflow: hidden; color: var(--color-error); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .actions-cell { display: flex; gap: 6px; }
 .act-btn { padding: 4px 10px; background: var(--color-bg-active); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11.5px; color: var(--color-text-secondary); cursor: pointer; transition: all var(--transition-fast); }
 .act-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }

@@ -83,7 +83,7 @@
           show-icon
           style="margin-bottom:16px"
         />
-        <a-alert v-if="!editingId && channels.length === 0" message="暂无可用渠道，请联系管理员先同步并分配渠道。" type="warning" show-icon style="margin-bottom:16px" />
+        <a-alert v-if="!editingId && channels.length === 0" :message="emptyChannelMessage" type="warning" show-icon style="margin-bottom:16px" />
         <a-form-item v-if="!editingId" label="推广渠道" name="channelId" :rules="[{ required: true, message: '请选择推广渠道' }]">
           <a-select v-model:value="form.channelId" placeholder="选择渠道">
             <a-select-option v-for="ch in channels" :key="ch.id" :value="ch.zhihuChannelId">{{ ch.name }}</a-select-option>
@@ -210,6 +210,11 @@ const filtered = computed(() => plans.value
 
 const totalDailyBudget = computed(() => plans.value.reduce((s, p) => s + (p.dailyBudget ?? 0), 0))
 const syncedCount      = computed(() => plans.value.filter(p => p.syncStatus === 'synced').length)
+const emptyChannelMessage = computed(() => {
+  if (auth.isBoss) return '暂无可用渠道，请点击页面右上角「渠道归属」同步并分配。'
+  if (auth.isLeader) return '当前团长尚未分配渠道，请联系管理员在「推广计划 → 渠道归属」中分配。'
+  return '当前达人尚无可用渠道，请联系管理员直接分配，或由管理员将渠道分配给所属团长后自动继承。'
+})
 const statusClass      = (s: string) => ({ active: 'badge-success', paused: 'badge-warning', ended: 'badge-default' })[s] ?? 'badge-default'
 const requiresKeywordChange = (plan: Plan) => !plan.zhihuPlanId && Boolean(plan.syncError?.includes('请更换关键词'))
 const statPills = computed(() => [

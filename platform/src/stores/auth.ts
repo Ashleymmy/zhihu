@@ -25,8 +25,15 @@ export const useAuthStore = defineStore('auth', {
       try {
         const resp = await authApi.login({ username, password })
         this.token = resp.token
-        this.user = resp.user
         localStorage.setItem('token', resp.token)
+        try {
+          this.user = await authApi.me()
+        } catch (error) {
+          this.token = null
+          this.user = null
+          localStorage.removeItem('token')
+          throw error
+        }
       } finally {
         this.loading = false
       }

@@ -87,6 +87,18 @@
             <a-select-option v-for="l in leaders" :key="l.id" :value="l.id">{{ l.displayName }}</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item
+          v-if="!editingId && auth.isBoss && (form.role === 'leader' || !form.parentId)"
+          label="分配渠道（可选）"
+          name="channelId"
+          extra="仅显示未归属渠道；达人若选择了归属团长，将自动继承团长渠道。"
+        >
+          <a-select v-model:value="form.channelId" placeholder="可稍后在推广计划页分配" allow-clear>
+            <a-select-option v-for="channel in assignableChannels" :key="channel.id" :value="channel.id">
+              {{ channel.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <div style="display:flex;gap:10px;margin-top:8px">
           <a-button @click="showModal = false" style="flex:1">取消</a-button>
           <a-button type="primary" html-type="submit" :loading="submitting" style="flex:1">{{ editingId ? '保存' : '创建成员' }}</a-button>
@@ -124,15 +136,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { teamApi } from '@/api/team'
+import { channelsApi } from '@/api/channels'
 import { useAuthStore } from '@/stores/auth'
 import { fmtFen, initials, roleLabel } from '@/utils/format'
 import { message } from 'ant-design-vue'
-import type { TeamMember } from '@/types/api'
+import type { Channel, TeamMember } from '@/types/api'
 
 const auth = useAuthStore()
 const createButtonLabel = computed(() => auth.isBoss ? '添加子账号' : '添加 KOC 达人')
 
 const members    = ref<TeamMember[]>([])
+const channels   = ref<Channel[]>([])
 const q          = ref('')
 const roleF      = ref('all')
 const showModal  = ref(false)
@@ -142,7 +156,7 @@ const resettingId = ref<string>()
 const showPasswordModal = ref(false)
 const temporaryUsername = ref('')
 const temporaryPassword = ref('')
-const form = ref({ displayName: '', username: '', role: 'member' as 'leader'|'member', parentId: undefined as string | undefined })
+const form = ref({ displayName: '', username: '', role: 'member' as 'leader'|'member', parentId: undefined as string | undefined, channelId: undefined as string | undefined })
 
 const roleFilters = [
   { val: 'all', label: '全部' }, { val: 'leader', label: '团长' }, { val: 'member', label: '达人' },
@@ -153,16 +167,17 @@ const filtered = computed(() => members.value
   .filter(m => !q.value || m.displayName.includes(q.value)))
 
 const leaders        = computed(() => members.value.filter(m => m.role === 'leader'))
+const assignableChannels = computed(() => channels.value.filter(channel => !channel.ownerId))
 const totalEarnings  = computed(() => members.value.reduce((s, m) => s + m.totalEarnings, 0))
 
 function openCreate() {
   editingId.value = undefined
-  form.value = { displayName: '', username: '', role: 'member', parentId: undefined }
+  form.value = { displayName: '', username: '', role: 'member', parentId: undefined, channelId: undefined }
   showModal.value = true
 }
 function openEdit(m: TeamMember) {
   editingId.value = m.id
-  form.value = { displayName: m.displayName, username: m.username, role: m.role, parentId: m.parentId ?? undefined }
+  form.value = { displayName: m.displayName, username: m.username, role: m.role, parentId: m.parentId ?? undefined, channelId: undefined }
   showModal.value = true
 }
 
@@ -213,9 +228,21 @@ async function handleSubmit() {
       message.success('成员信息已更新')
     } else {
       const created = await teamApi.create({ username: form.value.username, displayName: form.value.displayName, role: form.value.role, parentId: form.value.parentId })
+      let channelAssignmentFailed = false
+      if (form.value.channelId) {
+        try {
+          await channelsApi.assignOwner(form.value.channelId, created.id)
+        } catch {
+          channelAssignmentFailed = true
+        }
+      }
       await loadData()
       showTemporaryPassword(created.username, created.temporaryPassword)
-      message.success(`「${form.value.displayName}」已添加`)
+      if (channelAssignmentFailed) {
+        message.warning(`「${form.value.displayName}」已添加，但渠道分配失败，请前往推广计划页重试`)
+      } else {
+        message.success(`「${form.value.displayName}」已添加`)
+      }
     }
     showModal.value = false
   } catch (e: any) {
@@ -225,7 +252,12 @@ async function handleSubmit() {
 
 async function loadData() {
   try {
-    members.value = await teamApi.list()
+    const [memberList, channelList] = await Promise.all([
+      teamApi.list(),
+      auth.isBoss ? channelsApi.list({ page: 1, pageSize: 100 }) : Promise.resolve(null),
+    ])
+    members.value = memberList
+    channels.value = channelList?.list ?? []
   } catch (_) { /* empty */ }
 }
 

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc && vite build",
+    "test": "tsc src/utils/compositionFeedback.ts --outDir node_modules/.tmp/composition-feedback-tests --module ES2022 --target ES2022 --moduleResolution Bundler --skipLibCheck && node --test tests/compositionFeedback.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
