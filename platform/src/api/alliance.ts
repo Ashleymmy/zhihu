@@ -70,9 +70,9 @@ export interface CompositionListItem {
   keyword: string; composition_id: string; composition_url: string
   composition_type: number; composition_sub_type: number
   category1?: string; category2?: string; submit_time: string
-  popularize_channel: string; audit_status: number
+  popularize_channel: string; audit_status?: number | null
 }
-export interface CompositionListResp { data: CompositionListItem[]; pagination: Pagination }
+export interface CompositionListResp { data: CompositionListItem[] | null; pagination: Pagination }
 
 export const allianceCompositionApi = {
   createComposition: (req: CreateCompositionReq) =>

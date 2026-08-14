@@ -7,16 +7,20 @@
 
       <!-- ── 作品列表 ── -->
       <a-tab-pane key="list" tab="作品列表">
+        <div class="alert-info">
+          本页须使用 channel_id + 单个计划关键词从知乎上游实时查询；“本地工作台”使用本地回传记录，两者不是同一数据源。
+        </div>
         <div class="filter-row">
           <a-select v-model:value="lq.channel_id" placeholder="选择渠道（必填）" style="width:200px" @change="(val: any) => onChannelChange(val)">
             <a-select-option v-for="o in ch.channelOptions" :key="o.value" :value="o.value">{{ o.label }}</a-select-option>
           </a-select>
-          <a-input v-model:value="lq.keyword" placeholder="关键词（必填）" style="width:160px" allow-clear />
+          <a-input v-model:value="lq.keyword" placeholder="单个计划关键词（必填）" style="width:220px" allow-clear />
           <a-button type="primary" :disabled="!lq.channel_id||!lq.keyword" @click="fetchList">查询</a-button>
         </div>
         <div class="table-card">
           <a-table :data-source="co.items" :loading="co.loading" row-key="composition_id" size="middle"
-            :pagination="{ total: co.total, pageSize: co.limit, onChange: co.fetchPage }">
+            :pagination="{ total: co.total, pageSize: co.limit, current: co.current, onChange: co.fetchPage }"
+            :locale="{ emptyText: listEmptyText }">
             <a-table-column title="关键词" data-index="keyword" :width="140" />
             <a-table-column title="作品 ID" :width="200">
               <template #default="{ record }">
@@ -36,14 +40,14 @@
             <a-table-column title="提交时间" data-index="submit_time" :width="160" />
             <a-table-column title="状态" :width="100">
               <template #default="{ record }">
-                <span :class="['badge', record.audit_status===1?'badge-success':record.audit_status===2?'badge-error':'badge-warning']">
-                  {{ record.audit_status===1?'审核通过':record.audit_status===2?'审核拒绝':'审核中' }}
+                <span :class="['badge', auditStatus(record.audit_status).badgeClass]">
+                  {{ auditStatus(record.audit_status).label }}
                 </span>
               </template>
             </a-table-column>
             <a-table-column title="操作" :width="80">
               <template #default="{ record }">
-                <button v-if="record.audit_status!==1" class="copy-btn" @click="openEdit(record)">修改</button>
+                <button v-if="record.audit_status===2" class="copy-btn" @click="openEdit(record)">修改</button>
               </template>
             </a-table-column>
           </a-table>
@@ -55,6 +59,10 @@
         <a-form :model="cf" layout="vertical" style="max-width:560px;margin-top:8px" @finish="handleCreate">
           <a-form-item label="推广计划 ID" name="plan_id" :rules="[{required:true,message:'请输入 planId'}]">
             <a-input v-model:value="cf.plan_id" placeholder="来自「创建计划」页面的 Plan ID" />
+          </a-form-item>
+          <a-form-item label="计划关键词（用于创建后查询）" name="keyword" :rules="[{required:true,message:'请输入计划关键词'},{pattern:/^[^,\s，]+$/,message:'仅支持单个关键词，不能含逗号或空格'}]">
+            <a-input v-model:value="cf.keyword" placeholder="必须与创建计划时的关键词一致" />
+            <div class="optional-tip">该字段只用于创建成功后实时回查，不会加入创建作品的上游请求。</div>
           </a-form-item>
           <a-form-item label="渠道" name="channel_id" :rules="[{required:true,message:'请选择渠道'}]">
             <a-select v-model:value="cf.channel_id" placeholder="选择渠道" style="width:100%">
@@ -144,11 +152,12 @@ import { MEDIA_TYPES } from '@/api/alliance'
 import type { CompositionListItem, CreateCompositionReq } from '@/api/alliance'
 import { useZChannelStore }      from '@/stores/zChannel.store'
 import { useZCompositionStore }  from '@/stores/zComposition.store'
+import { resolveCompositionAuditStatus } from '@/utils/compositionList'
 
 const ch = useZChannelStore(); const co = useZCompositionStore()
 const route = useRoute(); const tab = ref('list')
 const lq = reactive({ channel_id: '', keyword: '' })
-const cf = reactive({ plan_id:'', channel_id:'', media_type:MEDIA_TYPES[0], media_account:'', composition_type:1, composition_sub_type:1, composition_url:'', release_time:'' })
+const cf = reactive({ plan_id:'', keyword:'', channel_id:'', media_type:MEDIA_TYPES[0], media_account:'', composition_type:1, composition_sub_type:1, composition_url:'', release_time:'' })
 const bf = reactive({ channel_id:'', bind_type:1 }); const batchFile = ref<File|null>(null)
 const editVisible = ref(false); const editingId = ref(''); const ef = reactive({ composition_url:'' })
 
@@ -159,6 +168,14 @@ const compositionSubTypes = {
 } as const
 const compositionSubTypeOptions = computed(() => compositionSubTypes[cf.composition_type as keyof typeof compositionSubTypes])
 const compositionTypeLabels = { 0: '其他', 1: '图文', 2: '视频' } as const
+const listEmptyText = computed(() => {
+  const keyword = lq.keyword.trim()
+  if (!lq.channel_id || !keyword) return '请选择 channel_id 并输入单个计划关键词后查询'
+  if (co.lastQuery?.channel_id !== lq.channel_id || co.lastQuery?.keyword !== keyword) {
+    return '条件已填写，请点击“查询”从知乎上游实时加载'
+  }
+  return '知乎上游未返回匹配作品，请确认渠道和计划关键词，或稍后重新查询'
+})
 
 function formatCompositionCategory(record: CompositionListItem) {
   const type = compositionTypeLabels[record.composition_type as keyof typeof compositionTypeLabels]
@@ -170,6 +187,7 @@ function formatCompositionCategory(record: CompositionListItem) {
 
 function onChannelChange(id: string) { lq.channel_id = id }
 async function fetchList() {
+  lq.keyword = lq.keyword.trim()
   if (!lq.channel_id || !lq.keyword) return
   await co.fetchList(lq)
 }
@@ -184,8 +202,18 @@ async function handleCreate() {
     composition_url: cf.composition_url,
     release_time: dayjs(cf.release_time).unix(),
   }
-  await co.submitCreate(req)
+  const createdId = await co.submitCreate(req)
+  lq.channel_id = cf.channel_id
+  lq.keyword = cf.keyword.trim()
   tab.value = 'list'
+  try {
+    const items = await co.fetchList(lq)
+    if (!items.some(item => item.composition_id === createdId)) {
+      message.warning('作品已创建，但知乎实时列表暂未返回该作品，请稍后重新查询')
+    }
+  } catch {
+    message.warning('作品已创建，但实时列表查询失败，请稍后重新查询')
+  }
 }
 function onCompositionTypeChange(value: unknown) {
   const type = Number(value) as keyof typeof compositionSubTypes
@@ -200,12 +228,27 @@ async function submitBatch() {
   await co.submitBatch(batchFile.value, bf)
 }
 async function copyId(id: string) { await navigator.clipboard.writeText(id); message.success('已复制') }
+const auditStatus = (status?: number) => resolveCompositionAuditStatus(status)
+
+function routeText(value: unknown) {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
+}
 
 onMounted(async () => {
   await ch.fetchChannels()
-  if (route.query.tab) tab.value = route.query.tab as string
-  if (route.query.planId) cf.plan_id = route.query.planId as string
-  if (route.query.channel_id) { cf.channel_id = route.query.channel_id as string }
+  const routeTab = routeText(route.query.tab)
+  const routeChannelId = routeText(route.query.channel_id)
+  const routeKeyword = routeText(route.query.keyword).trim()
+  const initialChannelId = routeChannelId || ch.channelOptions[0]?.value || ''
+
+  if (['list', 'create', 'batch'].includes(routeTab)) tab.value = routeTab
+  cf.plan_id = routeText(route.query.planId)
+  cf.keyword = routeKeyword
+  cf.channel_id = initialChannelId
+  lq.channel_id = initialChannelId
+  lq.keyword = routeKeyword
+  bf.channel_id = initialChannelId
 })
 </script>
 
@@ -215,6 +258,7 @@ onMounted(async () => {
 .pg-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 4px; }
 .pg-sub { font-size: 12.5px; color: var(--color-text-disabled); }
 .z-tabs :deep(.ant-tabs-nav) { margin-bottom: 16px; }
+.alert-info { padding: 10px 14px; background: var(--color-info-bg); border: 1px solid rgba(59,130,246,0.2); border-radius: var(--radius-md); font-size: 12.5px; color: var(--color-info); margin-bottom: 14px; }
 .filter-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
 .table-card { background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
 .mono-sm { font-size: 11.5px; font-family: var(--font-mono); color: var(--color-text-tertiary); }
@@ -223,5 +267,6 @@ onMounted(async () => {
 .link-btn { font-size: 12px; color: var(--color-accent); text-decoration: none; }
 .link-btn:hover { text-decoration: underline; }
 .batch-tip { padding: 10px 14px; background: var(--color-info-bg); border: 1px solid rgba(59,130,246,0.2); border-radius: var(--radius-md); font-size: 12.5px; color: var(--color-info); margin-bottom: 16px; }
+.optional-tip { margin-top: 6px; color: var(--color-text-tertiary); font-size: 12px; }
 .file-input { color: var(--color-text-secondary); font-size: 13px; }
 </style>

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { allianceCompositionApi, allianceBatchApi } from '@/api/alliance'
 import type { CompositionListItem, CreateCompositionReq } from '@/api/alliance'
+import { createCompositionQuerySnapshot, normalizeCompositionItems } from '@/utils/compositionList'
 import { message } from 'ant-design-vue'
 
 export const useZCompositionStore = defineStore('zComposition', () => {
@@ -13,23 +14,34 @@ export const useZCompositionStore = defineStore('zComposition', () => {
   const offset        = ref(0)
   const limit         = ref(20)
   const lastQuery     = ref<{ channel_id: string; keyword: string } | null>(null)
+  const current       = computed(() => Math.floor(offset.value / limit.value) + 1)
   const batchUploading = ref(false)
   const batchPolling  = ref(false)
 
   async function fetchList(query: { channel_id: string; keyword: string }) {
-    loading.value = true; lastQuery.value = query; offset.value = 0
+    const snapshot = createCompositionQuerySnapshot(query)
+    loading.value = true; lastQuery.value = snapshot; offset.value = 0
     try {
-      const res = await allianceCompositionApi.listCompositions({ ...query, offset: 0, limit: limit.value })
-      items.value = res.data; total.value = res.pagination?.total ?? res.data.length
+      const res = await allianceCompositionApi.listCompositions({ ...snapshot, offset: 0, limit: limit.value })
+      const nextItems = normalizeCompositionItems<CompositionListItem>(res.data)
+      items.value = nextItems
+      offset.value = typeof res.pagination?.offset === 'number' ? res.pagination.offset : 0
+      total.value = res.pagination?.total ?? nextItems.length
+      return nextItems
     } finally { loading.value = false }
   }
 
   async function fetchPage(page: number) {
     if (!lastQuery.value) return
-    loading.value = true; offset.value = (page - 1) * limit.value
+    const requestedOffset = (page - 1) * limit.value
+    loading.value = true; offset.value = requestedOffset
     try {
-      const res = await allianceCompositionApi.listCompositions({ ...lastQuery.value, offset: offset.value, limit: limit.value })
-      items.value = res.data; total.value = res.pagination?.total ?? res.data.length
+      const res = await allianceCompositionApi.listCompositions({ ...lastQuery.value, offset: requestedOffset, limit: limit.value })
+      const nextItems = normalizeCompositionItems<CompositionListItem>(res.data)
+      items.value = nextItems
+      offset.value = typeof res.pagination?.offset === 'number' ? res.pagination.offset : requestedOffset
+      total.value = res.pagination?.total ?? nextItems.length
+      return nextItems
     } finally { loading.value = false }
   }
 
@@ -68,5 +80,5 @@ export const useZCompositionStore = defineStore('zComposition', () => {
     } finally { batchUploading.value = false; batchPolling.value = false }
   }
 
-  return { items, loading, creating, updating, total, offset, limit, batchUploading, batchPolling, fetchList, fetchPage, submitCreate, submitUpdate, submitBatch }
+  return { items, loading, creating, updating, total, offset, limit, current, lastQuery, batchUploading, batchPolling, fetchList, fetchPage, submitCreate, submitUpdate, submitBatch }
 })

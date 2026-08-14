@@ -8,6 +8,7 @@ export const useZPlanStore = defineStore('zPlan', () => {
   const creating      = ref(false)
   const lastPlanId    = ref('')
   const lastChannelId = ref('')
+  const lastKeyword   = ref('')
   const batchUploading = ref(false)
   const batchPolling  = ref(false)
 
@@ -17,6 +18,7 @@ export const useZPlanStore = defineStore('zPlan', () => {
       const res = await alliancePlanApi.createPlan(req)
       lastPlanId.value    = res.plan_id
       lastChannelId.value = req.channel_id
+      lastKeyword.value   = req.keyword.trim()
       message.success(`计划创建成功！Plan ID: ${res.plan_id}`)
     } catch { /* error handled by interceptor */ } finally { creating.value = false }
   }
@@ -44,5 +46,5 @@ export const useZPlanStore = defineStore('zPlan', () => {
     message.error('批量任务超时，请稍后手动查询结果')
   }
 
-  return { creating, lastPlanId, lastChannelId, batchUploading, batchPolling, submitCreatePlan, submitBatchCreate }
+  return { creating, lastPlanId, lastChannelId, lastKeyword, batchUploading, batchPolling, submitCreatePlan, submitBatchCreate }
 })

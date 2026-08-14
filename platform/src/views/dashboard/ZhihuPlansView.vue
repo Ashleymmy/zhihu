@@ -107,7 +107,12 @@ async function submitForm() {
   await pl.submitCreatePlan({ task_id: form.task_id, channel_id: form.channel_id, content_url: form.content_url, popularize_type: 0, keyword: form.keyword, second_channel_id: form.second_channel_id || undefined })
 }
 async function copyPlanId() { await navigator.clipboard.writeText(pl.lastPlanId); message.success('已复制') }
-function goCreateComp() { router.push({ path: '/dashboard/z-compositions', query: { tab: 'create', planId: pl.lastPlanId, channel_id: pl.lastChannelId } }) }
+function goCreateComp() {
+  router.push({
+    path: '/dashboard/z-compositions',
+    query: { tab: 'create', planId: pl.lastPlanId, channel_id: pl.lastChannelId, keyword: pl.lastKeyword },
+  })
+}
 function onFileChange(e: Event) { batchFile.value = (e.target as HTMLInputElement).files?.[0] ?? null }
 async function submitBatch() {
   if (!batchFile.value) return
