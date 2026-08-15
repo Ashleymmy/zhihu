@@ -7,7 +7,7 @@
 > 权限常量定义见 `server/src/auth/permissions.ts`（服务端）与
 > `platform/src/composables/usePermission.ts`（前端镜像），两者必须同步。
 
-最后核对：2026-08-07（`vue-tsc --noEmit` 通过，门控矩阵已复算）
+最后核对：2026-08-15（路由配置已更新，权限矩阵需人工复核）
 
 ---
 

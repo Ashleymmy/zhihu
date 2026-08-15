@@ -68,54 +68,10 @@ v2 的差异：`composition_sub_type`（作品二级分类）**必填且参与�
 
 ---
 
-## 二、当前真实进度（2026-08-06 实盘）
+## 二、当前真实进度（2026-08-15 实盘）
 
-`docs/02-开发计划.md` 里写的 0% 已经过期很久了，`docs/06-platform-开发计划.md`
-描述的是 Vant4 移动端 375px，跟磁盘上的代码完全不是一回事。以下是实际情况。
-
-### 2.1 platform/ —— 我负责的前端
-
-技术栈实测：Vue 3.4 + Vite 5 + TypeScript + Ant Design Vue 4.2.3（`darkAlgorithm` 暗色主题），
-桌面端，端口 5174。
-
-| 页面 | 文件 | 状态 | 缺什么 |
-|---|---|---|---|
-| 登录 | `LoginView.vue` | UI 完成 | 无鉴权，随便填就进 |
-| 工作台 | `DashboardView.vue` | UI 完成 | 数据全部 mock |
-| 推广计划 | `CampaignsView.vue` | UI 完成 | 本地 state 增删改，刷新即丢 |
-| 关键词 | `KeywordsView.vue` | UI 完成 | 同上 |
-| 数据分析 | `AnalyticsView.vue` | UI 完成 | 图表读死数据 |
-| 回传管理 | `CallbacksView.vue` | UI 完成 | 同上 |
-| 项目管理 | `ProjectsView.vue`（router 内） | UI 完成 | 同上 |
-| 团队管理 | `TeamView.vue` | UI 完成 | 同上 |
-| 收益 | `EarningsView.vue` | UI 完成 | 同上 |
-| 提现 | `WithdrawView.vue` | UI 完成 | 同上 |
-| 设置 | `SettingsView.vue` | UI 完成 | 同上 |
-| 达人列表 | `TalentsView.vue` | UI 完成 | 同上 |
-
-**前端真正缺的（我要补的）：**
-
-- 没有 `src/api/` 目录，没有 axios，**一行网络请求都没有**
-- 没有 `src/stores/`，没装 Pinia
-- `router/index.ts` 32 行，**零 meta 字段、零路由守卫**，任何人可以直接敲 URL 进任何页
-- 三个孤儿页面不在路由里：`HomeView.vue`(240行)、`LinksView.vue`(269行)、
-  `ProjectsView.vue`(263行 · 与路由内同名页重复)。这三个是浅色主题、引用了不存在的
-  `--color-primary` 变量、链接到不存在的 `/dashboard/projects` 和 `/dashboard/links`。
-  **处理方式：删除**，不要花时间适配。
-- `mock/data.ts` 13 个导出里有 2 个是死代码
-
-### 2.2 web/ —— 已有的签名与服务层实现
-
-`web/` 是另一套（Element Plus，端口 5173），但它的**签名实现和拦截器是可以直接复用的**，
-后端不用从零写：
-
-| 可复用 | 路径 | 说明 |
-|---|---|---|
-| 签名算法 | `web/src/utils/signature.ts` + `.spec.ts` | 两层哈希已实现，有单测 |
-| 签名拦截器 | `web/src/infra/interceptors/interceptor-sign.ts` | 自动注入 timestamp/signature |
-| 错误拦截器 | `web/src/infra/interceptors/interceptor-error.ts` | 统一错误码映射 |
-| 雪花 ID 修复 | `web/src/infra/http.ts` 的 `safeJsonParse` | 18-19 位 ID 保留为字符串，见 §6.3 |
-| 13 个 service | `web/src/services/` | 知乎接口的 TS 封装 |
+⚠️ **本章已过期**：§2.1 和 §2.3 描述的「前端缺什么」四条论断全部失效。
+实际进度应以代码仓库为准，或参考 [10-platform-权限门控.md](./10-platform-权限门控.md) 了解路由与权限的实际实现。
 
 `.env.local` 里有真实凭据，**不要提交、不要打印、不要贴进任何文档**。
 
