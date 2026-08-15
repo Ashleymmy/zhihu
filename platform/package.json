@@ -8,7 +8,8 @@
     "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc && vite build",
     "test": "tsc src/utils/compositionFeedback.ts src/utils/compositionList.ts --outDir node_modules/.tmp/composition-feedback-tests --module ES2022 --target ES2022 --moduleResolution Bundler --skipLibCheck && node --test tests/compositionFeedback.test.mjs tests/compositionList.test.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mock": "node mock-server.cjs"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
