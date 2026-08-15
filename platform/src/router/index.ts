@@ -44,7 +44,6 @@ const router = createRouter({
         { path: 'z-products',        name: 'z-products',        component: () => import('@/views/dashboard/ZhihuProductsView.vue'),      meta: { requiresAuth: true } },
         { path: 'z-materials',       name: 'z-materials',       component: () => import('@/views/dashboard/ZhihuMaterialsView.vue'),     meta: { requiresAuth: true } },
         { path: 'z-content-search',  name: 'z-content-search',  component: () => import('@/views/dashboard/ZhihuContentSearchView.vue'), meta: { requiresAuth: true } },
-        { path: 'z-ranking-recommend', name: 'z-ranking-recommend', component: () => import('@/views/dashboard/ZhihuRankingView.vue'),   meta: { requiresAuth: true } },
         // 只读 BFF earningsApi（非联盟接口），故按 earnings 门控而非默认的 allianceAdmin
         { path: 'z-settlement',      name: 'z-settlement',      component: () => import('@/views/dashboard/ZhihuSettlementView.vue'),    meta: { requiresAuth: true, access: 'earnings' } },
         // 纯本地创意工具：零网络调用，不依赖知乎联盟接口，故豁免 allianceAdmin 默认门控
