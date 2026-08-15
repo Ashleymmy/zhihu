@@ -6,6 +6,7 @@ import { encryptSecret, generateCallbackSecret } from '../utils/secretCrypto';
 import { pageOffset } from '../utils/pagination';
 import { scopeFilter } from '../utils/scopeFilter';
 import { writeAudit } from './audit.service';
+import { config } from '../config';
 
 interface CountRow extends RowDataPacket { total: number }
 interface RuleRow extends RowDataPacket { id: string; owner_id: string; events_json: string | unknown[] }
@@ -54,8 +55,9 @@ export async function createRule(
     const [result] = await connection.query<ResultSetHeader>(
       `INSERT INTO callback_rules
         (project_id, plan_id, owner_id, callback_url, events_json, status, created_by)
-       VALUES (1, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
+        config.defaultProjectId,
         input.planId,
         plan.owner_id,
         input.callbackUrl,
@@ -122,7 +124,8 @@ export async function deleteRule(user: AuthUser, id: string, ip?: string) {
 
 export async function getSecret() {
   const [secret] = await rows<RowDataPacket & { last_four: string }>(
-    'SELECT last_four FROM callback_secrets WHERE project_id = 1 LIMIT 1',
+    'SELECT last_four FROM callback_secrets WHERE project_id = ? LIMIT 1',
+    [config.defaultProjectId],
   );
   if (!secret) throw new AppError(404, 40402, '尚未生成回传秘钥');
   return { signKey: `sk_live_****${secret.last_four}` };
@@ -135,7 +138,7 @@ export async function rotateSecret(user: AuthUser, ip?: string) {
     await connection.query(
       `INSERT INTO callback_secrets
         (project_id, secret_ciphertext, secret_iv, secret_auth_tag, last_four, rotated_by)
-       VALUES (1, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
         secret_ciphertext = VALUES(secret_ciphertext),
         secret_iv = VALUES(secret_iv),
@@ -143,13 +146,13 @@ export async function rotateSecret(user: AuthUser, ip?: string) {
         last_four = VALUES(last_four),
         rotated_by = VALUES(rotated_by),
         rotated_at = NOW()`,
-      [value.ciphertext, value.iv, value.authTag, value.lastFour, user.sub],
+      [config.defaultProjectId, value.ciphertext, value.iv, value.authTag, value.lastFour, user.sub],
     );
     await writeAudit({
       userId: user.sub,
       action: 'callback.secret_rotate',
       resourceType: 'project',
-      resourceId: '1',
+      resourceId: String(config.defaultProjectId),
       ip,
     }, connection);
   });

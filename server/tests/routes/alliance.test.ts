@@ -109,7 +109,6 @@ describe('POST /api/alliance/api - multipart/form-data 透传', () => {
       username: 'testuser',
       displayName: 'Test User',
       jti: 'test-jti',
-      iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
 

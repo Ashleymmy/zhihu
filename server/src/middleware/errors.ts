@@ -41,5 +41,6 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     return;
   }
   if (process.env.NODE_ENV !== 'test') console.error('unhandled_error', error);
+  else console.error('test_error', error);
   res.status(500).json({ code: 50000, data: null, message: '服务器内部错误' });
 };

@@ -7,6 +7,7 @@ import { signToken, tokenTtl } from '../auth/jwt';
 import { permissionsFor } from '../auth/permissions';
 import { revocationStore } from '../auth/revocation';
 import { writeAudit } from './audit.service';
+import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 
 interface UserRow extends RowDataPacket {
   id: string; username: string; password_hash: string; role: Role; parent_id: string | null;
@@ -19,9 +20,22 @@ const publicUser = (user: UserRow) => ({
 });
 
 export async function login(username: string, password: string, ip?: string) {
+  const ipKey = `login:ip:${ip ?? 'unknown'}`;
+  const ipCheck = await incrRateLimit(ipKey, 20, 300);
+  if (!ipCheck.allowed) throw new AppError(429, 42903, '登录请求过于频繁，请 5 分钟后再试');
+
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE username = ? LIMIT 1', [username]);
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) throw new AppError(401, 40102, '用户名或密码错误');
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    const userKey = `login:user:${username}`;
+    const userCheck = await incrRateLimit(userKey, 5, 900);
+    if (!userCheck.allowed) throw new AppError(429, 42903, '登录失败次数过多，请 15 分钟后再试');
+    throw new AppError(401, 40102, '用户名或密码错误');
+  }
   if (!user.is_active) throw new AppError(403, 40302, '账号已停用');
+
+  const userKey = `login:user:${username}`;
+  await deleteRateLimit(userKey);
+
   const token = await signToken({
     id: String(user.id), role: user.role, parentId: user.parent_id ? String(user.parent_id) : null,
     username: user.username, displayName: user.display_name,

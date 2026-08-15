@@ -8,6 +8,7 @@ import { maskName } from '../utils/maskSecret';
 import { pageOffset } from '../utils/pagination';
 import { scopeFilter } from '../utils/scopeFilter';
 import { writeAudit } from './audit.service';
+import { config } from '../config';
 
 interface CountRow extends RowDataPacket { total: number }
 interface PlanRow extends RowDataPacket {
@@ -156,8 +157,9 @@ export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) 
       `INSERT INTO plans
         (project_id, zhihu_task_id, channel_id, second_channel_id, keyword, landing_url,
          popularize_type, owner_id, created_by, name, daily_budget, start_date, end_date, sync_status)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local')`,
       [
+        config.defaultProjectId,
         input.taskId,
         input.channelId,
         input.secondChannelId ?? null,

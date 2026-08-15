@@ -1,6 +1,7 @@
 import { RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../db';
 import { zhihuGet } from '../zhihu/client';
+import { config } from '../config';
 
 interface ChannelRow extends RowDataPacket {
   zhihu_channel_id: string;
@@ -65,11 +66,11 @@ export async function syncChannels() {
     await db.query(
       `INSERT INTO channels
         (project_id, zhihu_channel_id, parent_channel_id, generation, name, commission_rate, is_enabled, synced_at)
-       VALUES (1, ?, ?, ?, ?, ?, 1, NOW())
+       VALUES (?, ?, ?, ?, ?, ?, 1, NOW())
        ON DUPLICATE KEY UPDATE
         parent_channel_id=VALUES(parent_channel_id), generation=VALUES(generation), name=VALUES(name),
         commission_rate=VALUES(commission_rate), synced_at=NOW()`,
-      [channel.channelId, channel.parentChannelId, channel.generation, channel.name, channel.commissionRate],
+      [config.defaultProjectId, channel.channelId, channel.parentChannelId, channel.generation, channel.name, channel.commissionRate],
     );
   }
 }
@@ -95,12 +96,13 @@ export async function syncTasks(data: Record<string, unknown> = {}) {
         `INSERT INTO tasks
           (project_id, zhihu_task_id, name, popularize_type, settle_type, unit_price,
            start_time, end_time, status, raw_json, synced_at)
-         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
          ON DUPLICATE KEY UPDATE
           name=VALUES(name), popularize_type=VALUES(popularize_type), settle_type=VALUES(settle_type),
           unit_price=VALUES(unit_price), start_time=VALUES(start_time), end_time=VALUES(end_time),
           status=VALUES(status), raw_json=VALUES(raw_json), synced_at=NOW()`,
         [
+          config.defaultProjectId,
           task.taskId, task.name, task.popularizeType, task.settleType, task.unitPrice,
           task.startTime, task.endTime, task.status, task.rawJson,
         ],
