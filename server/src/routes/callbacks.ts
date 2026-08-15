@@ -26,10 +26,14 @@ const rule = z.object({
 
 export const callbacksRouter = Router();
 callbacksRouter.use(requireAuth);
-callbacksRouter.get('/rules', validateQuery(paginationSchema), asyncHandler(async (req, res) => {
-  const data = await listRules(req.user, req.query);
-  okList(res, data.list, data.total, data.page, data.pageSize);
-}));
+callbacksRouter.get(
+  '/rules',
+  validateQuery(paginationSchema),
+  asyncHandler(async (req, res) => {
+    const data = await listRules(req.user, req.query);
+    okList(res, data.list, data.total, data.page, data.pageSize);
+  }),
+);
 callbacksRouter.post(
   '/rules',
   requirePermission('callback.config'),
@@ -40,10 +44,7 @@ callbacksRouter.patch(
   '/rules/:id',
   requirePermission('callback.config'),
   validateBody(rule.omit({ planId: true }).partial()),
-  asyncHandler(async (req, res) => ok(
-    res,
-    await updateRule(req.user, id.parse(req.params.id), req.body, req.ip),
-  )),
+  asyncHandler(async (req, res) => ok(res, await updateRule(req.user, id.parse(req.params.id), req.body, req.ip))),
 );
 callbacksRouter.delete(
   '/rules/:id',
@@ -65,9 +66,11 @@ callbacksRouter.post(
 );
 callbacksRouter.get(
   '/logs',
-  validateQuery(paginationSchema.extend({
-    status: z.enum(['success', 'failed', 'retry']).optional(),
-  })),
+  validateQuery(
+    paginationSchema.extend({
+      status: z.enum(['success', 'failed', 'retry']).optional(),
+    }),
+  ),
   asyncHandler(async (req, res) => {
     const data = await listLogs(req.user, req.query);
     okList(res, data.list, data.total, data.page, data.pageSize);

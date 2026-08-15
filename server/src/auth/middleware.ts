@@ -24,7 +24,9 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
   })().catch(next);
 };
 
-export const requireRole = (...roles: Role[]): RequestHandler => (req, _res, next) => {
-  if (!roles.includes(req.user.role)) return next(new AppError(403, 40301, '无权执行此操作'));
-  next();
-};
+export const requireRole =
+  (...roles: Role[]): RequestHandler =>
+  (req, _res, next) => {
+    if (!roles.includes(req.user.role)) return next(new AppError(403, 40301, '无权执行此操作'));
+    next();
+  };

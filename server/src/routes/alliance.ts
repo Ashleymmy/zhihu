@@ -120,17 +120,27 @@ async function proxyRequest(
 }
 
 // ── GET ────────────────────────────────────────────────────────
-allianceRouter.get('/*', asyncHandler(async (req: Request, res: Response) => {
-  await proxyRequest('GET', req.path, req.query as Record<string, unknown>, undefined, undefined, res);
-}));
+allianceRouter.get(
+  '/*',
+  asyncHandler(async (req: Request, res: Response) => {
+    await proxyRequest('GET', req.path, req.query as Record<string, unknown>, undefined, undefined, res);
+  }),
+);
 
 // ── POST ───────────────────────────────────────────────────────
-allianceRouter.post('/*', upload.any(), asyncHandler(async (req: Request, res: Response) => {
-  const files = req.files as Express.Multer.File[] | undefined;
-  await proxyRequest('POST', req.path, {}, req.body as Record<string, unknown>, files, res);
-}));
+allianceRouter.post(
+  '/*',
+  upload.any(),
+  asyncHandler(async (req: Request, res: Response) => {
+    const files = req.files as Express.Multer.File[] | undefined;
+    await proxyRequest('POST', req.path, {}, req.body as Record<string, unknown>, files, res);
+  }),
+);
 
 // ── PUT (JSON only) ────────────────────────────────────────────
-allianceRouter.put('/*', asyncHandler(async (req: Request, res: Response) => {
-  await proxyRequest('PUT', req.path, {}, req.body as Record<string, unknown>, undefined, res);
-}));
+allianceRouter.put(
+  '/*',
+  asyncHandler(async (req: Request, res: Response) => {
+    await proxyRequest('PUT', req.path, {}, req.body as Record<string, unknown>, undefined, res);
+  }),
+);

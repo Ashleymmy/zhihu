@@ -14,6 +14,13 @@ export async function writeAudit(input: AuditInput, connection: PoolConnection |
   await connection.query(
     `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, detail_json, ip)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [input.userId, input.action, input.resourceType, input.resourceId ?? null, JSON.stringify(input.detail ?? null), input.ip ?? null],
+    [
+      input.userId,
+      input.action,
+      input.resourceType,
+      input.resourceId ?? null,
+      JSON.stringify(input.detail ?? null),
+      input.ip ?? null,
+    ],
   );
 }

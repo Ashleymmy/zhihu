@@ -22,15 +22,11 @@ function queue() {
 
 function retryDelay(options: JobOptions, attempt: number) {
   const backoff = options.backoff;
-  const base = typeof backoff === 'number' ? backoff : backoff?.delay ?? 1_000;
-  return base * (2 ** attempt);
+  const base = typeof backoff === 'number' ? backoff : (backoff?.delay ?? 1_000);
+  return base * 2 ** attempt;
 }
 
-async function runMemoryJob(
-  name: JobName,
-  data: Record<string, unknown>,
-  options: JobOptions,
-) {
+async function runMemoryJob(name: JobName, data: Record<string, unknown>, options: JobOptions) {
   const handler = handlers.get(name);
   if (!handler) throw new Error(`未注册任务处理器: ${name}`);
   const attempts = Math.max(Number(options.attempts ?? 3), 1);

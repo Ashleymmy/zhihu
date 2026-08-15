@@ -10,7 +10,9 @@ import { scopeFilter } from '../utils/scopeFilter';
 import { writeAudit } from './audit.service';
 import { config } from '../config';
 
-interface CountRow extends RowDataPacket { total: number }
+interface CountRow extends RowDataPacket {
+  total: number;
+}
 interface PlanRow extends RowDataPacket {
   id: string;
   owner_id: string;
@@ -51,7 +53,10 @@ export function publicPlanSyncError(value: unknown): string | null {
 
   const prefix = text.match(/^知乎接口失败（HTTP \d{3}(?: \/ code \d{1,20})?）/)?.[0];
   if (!prefix) return '知乎同步失败，请稍后重试';
-  if (text.includes('关键词') && (text.includes('词根') || text.includes('更换关键词') || text.includes('不符合知乎规则'))) {
+  if (
+    text.includes('关键词') &&
+    (text.includes('词根') || text.includes('更换关键词') || text.includes('不符合知乎规则'))
+  ) {
     return `${prefix}：关键词不符合知乎规则，请更换关键词`;
   }
   if (text.includes('渠道') && text.includes('无效')) return `${prefix}：渠道 ID 无效，请重新同步渠道`;
@@ -137,10 +142,10 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
 
 export async function getPlan(user: AuthUser, id: string) {
   const scope = scopeFilter(user, 'p.owner_id');
-  const [plan] = await rows<PlanRow>(
-    `SELECT p.* FROM plans p WHERE p.id = ? AND ${scope.clause} LIMIT 1`,
-    [id, ...scope.bindings],
-  );
+  const [plan] = await rows<PlanRow>(`SELECT p.* FROM plans p WHERE p.id = ? AND ${scope.clause} LIMIT 1`, [
+    id,
+    ...scope.bindings,
+  ]);
   if (!plan) throw new AppError(404, 40401, '推广计划不存在');
   return publicPlan(plan);
 }
@@ -175,14 +180,17 @@ export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) 
       ],
     );
     const planId = String(result.insertId);
-    await writeAudit({
-      userId: user.sub,
-      action: 'plan.create',
-      resourceType: 'plan',
-      resourceId: planId,
-      detail: { ownerId },
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'plan.create',
+        resourceType: 'plan',
+        resourceId: planId,
+        detail: { ownerId },
+        ip,
+      },
+      connection,
+    );
     return planId;
   }).catch(translateBindingConflict);
 
@@ -202,16 +210,26 @@ export async function updatePlan(
     fields.push('keyword = ?');
     bindings.push(patch.keyword);
   }
-  if (patch.landingUrl !== undefined) { fields.push('landing_url = ?'); bindings.push(patch.landingUrl); }
-  if (patch.name !== undefined) { fields.push('name = ?'); bindings.push(patch.name); }
-  if (patch.dailyBudget !== undefined) { fields.push('daily_budget = ?'); bindings.push(patch.dailyBudget); }
+  if (patch.landingUrl !== undefined) {
+    fields.push('landing_url = ?');
+    bindings.push(patch.landingUrl);
+  }
+  if (patch.name !== undefined) {
+    fields.push('name = ?');
+    bindings.push(patch.name);
+  }
+  if (patch.dailyBudget !== undefined) {
+    fields.push('daily_budget = ?');
+    bindings.push(patch.dailyBudget);
+  }
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
 
   await withTransaction(async (connection) => {
     const plan = await getPlanForUpdate(connection, user, id);
-    const requiresNewKeyword = plan.sync_status === 'failed'
-      && !plan.zhihu_plan_id
-      && publicPlanSyncError(plan.sync_error)?.includes('请更换关键词');
+    const requiresNewKeyword =
+      plan.sync_status === 'failed' &&
+      !plan.zhihu_plan_id &&
+      publicPlanSyncError(plan.sync_error)?.includes('请更换关键词');
     if (requiresNewKeyword && patch.keyword === undefined) {
       throw new AppError(409, 40904, '请先修改关键词，再重新同步');
     }
@@ -232,21 +250,20 @@ export async function updatePlan(
       `UPDATE plans SET ${fields.join(', ')}, sync_status = 'local', sync_error = NULL WHERE id = ?`,
       [...bindings, id],
     );
-    await writeAudit({
-      userId: user.sub,
-      action: 'plan.update',
-      resourceType: 'plan',
-      resourceId: id,
-      detail: patch,
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'plan.update',
+        resourceType: 'plan',
+        resourceId: id,
+        detail: patch,
+        ip,
+      },
+      connection,
+    );
   }).catch(translateBindingConflict);
   const updated = await getPlan(user, id);
-  await enqueue(
-    'push-plan',
-    { planId: id },
-    syncJobOptions(id, updated.keyword),
-  );
+  await enqueue('push-plan', { planId: id }, syncJobOptions(id, updated.keyword));
   return updated;
 }
 
@@ -254,13 +271,16 @@ export async function deletePlan(user: AuthUser, id: string, ip?: string) {
   await getPlan(user, id);
   await withTransaction(async (connection) => {
     await connection.query("UPDATE plans SET status = 'ended' WHERE id = ?", [id]);
-    await writeAudit({
-      userId: user.sub,
-      action: 'plan.delete',
-      resourceType: 'plan',
-      resourceId: id,
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'plan.delete',
+        resourceType: 'plan',
+        resourceId: id,
+        ip,
+      },
+      connection,
+    );
   });
 }
 

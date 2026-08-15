@@ -8,8 +8,14 @@ import { scopeFilter } from '../utils/scopeFilter';
 import { writeAudit } from './audit.service';
 import { config } from '../config';
 
-interface CountRow extends RowDataPacket { total: number }
-interface RuleRow extends RowDataPacket { id: string; owner_id: string; events_json: string | unknown[] }
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+interface RuleRow extends RowDataPacket {
+  id: string;
+  owner_id: string;
+  events_json: string | unknown[];
+}
 
 export async function listRules(user: AuthUser, query: Record<string, unknown>) {
   const page = Number(query.page ?? 1);
@@ -31,9 +37,7 @@ export async function listRules(user: AuthUser, query: Record<string, unknown>) 
   return {
     list: list.map((item) => ({
       ...item,
-      events_json: typeof item.events_json === 'string'
-        ? JSON.parse(item.events_json)
-        : item.events_json,
+      events_json: typeof item.events_json === 'string' ? JSON.parse(item.events_json) : item.events_json,
     })),
     total: Number(count?.total ?? 0),
     page,
@@ -46,10 +50,9 @@ export async function createRule(
   input: { planId: string; callbackUrl: string; events: string[]; status?: 'active' | 'inactive' },
   ip?: string,
 ) {
-  const [plan] = await rows<RowDataPacket & { owner_id: string }>(
-    'SELECT owner_id FROM plans WHERE id = ? LIMIT 1',
-    [input.planId],
-  );
+  const [plan] = await rows<RowDataPacket & { owner_id: string }>('SELECT owner_id FROM plans WHERE id = ? LIMIT 1', [
+    input.planId,
+  ]);
   if (!plan) throw new AppError(404, 40401, '推广计划不存在');
   const id = await withTransaction(async (connection) => {
     const [result] = await connection.query<ResultSetHeader>(
@@ -67,13 +70,16 @@ export async function createRule(
       ],
     );
     const value = String(result.insertId);
-    await writeAudit({
-      userId: user.sub,
-      action: 'callback.rule_create',
-      resourceType: 'callback_rule',
-      resourceId: value,
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'callback.rule_create',
+        resourceType: 'callback_rule',
+        resourceId: value,
+        ip,
+      },
+      connection,
+    );
     return value;
   });
   return { id };
@@ -89,20 +95,32 @@ export async function updateRule(
   if (!rule) throw new AppError(404, 40401, '回传规则不存在');
   const fields: string[] = [];
   const bindings: unknown[] = [];
-  if (patch.callbackUrl !== undefined) { fields.push('callback_url = ?'); bindings.push(patch.callbackUrl); }
-  if (patch.events !== undefined) { fields.push('events_json = ?'); bindings.push(JSON.stringify(patch.events)); }
-  if (patch.status !== undefined) { fields.push('status = ?'); bindings.push(patch.status); }
+  if (patch.callbackUrl !== undefined) {
+    fields.push('callback_url = ?');
+    bindings.push(patch.callbackUrl);
+  }
+  if (patch.events !== undefined) {
+    fields.push('events_json = ?');
+    bindings.push(JSON.stringify(patch.events));
+  }
+  if (patch.status !== undefined) {
+    fields.push('status = ?');
+    bindings.push(patch.status);
+  }
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
   await withTransaction(async (connection) => {
     await connection.query(`UPDATE callback_rules SET ${fields.join(', ')} WHERE id = ?`, [...bindings, id]);
-    await writeAudit({
-      userId: user.sub,
-      action: 'callback.rule_update',
-      resourceType: 'callback_rule',
-      resourceId: id,
-      detail: patch,
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'callback.rule_update',
+        resourceType: 'callback_rule',
+        resourceId: id,
+        detail: patch,
+        ip,
+      },
+      connection,
+    );
   });
   return { id };
 }
@@ -112,13 +130,16 @@ export async function deleteRule(user: AuthUser, id: string, ip?: string) {
   if (!rule) throw new AppError(404, 40401, '回传规则不存在');
   await withTransaction(async (connection) => {
     await connection.query("UPDATE callback_rules SET status = 'inactive' WHERE id = ?", [id]);
-    await writeAudit({
-      userId: user.sub,
-      action: 'callback.rule_delete',
-      resourceType: 'callback_rule',
-      resourceId: id,
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'callback.rule_delete',
+        resourceType: 'callback_rule',
+        resourceId: id,
+        ip,
+      },
+      connection,
+    );
   });
 }
 
@@ -148,13 +169,16 @@ export async function rotateSecret(user: AuthUser, ip?: string) {
         rotated_at = NOW()`,
       [config.defaultProjectId, value.ciphertext, value.iv, value.authTag, value.lastFour, user.sub],
     );
-    await writeAudit({
-      userId: user.sub,
-      action: 'callback.secret_rotate',
-      resourceType: 'project',
-      resourceId: String(config.defaultProjectId),
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'callback.secret_rotate',
+        resourceType: 'project',
+        resourceId: String(config.defaultProjectId),
+        ip,
+      },
+      connection,
+    );
   });
   return { signKey: `sk_live_****${value.lastFour}` };
 }
@@ -165,12 +189,12 @@ export async function listLogs(user: AuthUser, query: Record<string, unknown>) {
   const scope = scopeFilter(user, 'l.owner_id');
   const where = [scope.clause];
   const bindings: unknown[] = [...scope.bindings];
-  if (query.status) { where.push('l.status = ?'); bindings.push(query.status); }
+  if (query.status) {
+    where.push('l.status = ?');
+    bindings.push(query.status);
+  }
   const clause = where.join(' AND ');
-  const [count] = await rows<CountRow>(
-    `SELECT COUNT(*) total FROM callback_logs l WHERE ${clause}`,
-    bindings,
-  );
+  const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM callback_logs l WHERE ${clause}`, bindings);
   const list = await rows(
     `SELECT l.* FROM callback_logs l
      WHERE ${clause}

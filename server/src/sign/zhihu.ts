@@ -1,7 +1,13 @@
 import crypto from 'node:crypto';
 
 export const SIGN_EXCLUDED_KEYS = [
-  'offset', 'limit', 'file', 'image', 'second_channel_id', 'X-Requested-With', 'signature',
+  'offset',
+  'limit',
+  'file',
+  'image',
+  'second_channel_id',
+  'X-Requested-With',
+  'signature',
 ] as const;
 
 export interface SignatureTrace {
@@ -12,7 +18,7 @@ export interface SignatureTrace {
 
 export function buildSignatureTrace(params: Record<string, unknown>, secretKey: string): SignatureTrace {
   const kvStr = Object.keys(params)
-    .filter((key) => !SIGN_EXCLUDED_KEYS.includes(key as typeof SIGN_EXCLUDED_KEYS[number]))
+    .filter((key) => !SIGN_EXCLUDED_KEYS.includes(key as (typeof SIGN_EXCLUDED_KEYS)[number]))
     .sort()
     .map((key) => `${key}=${String(params[key])}`)
     .join('&');

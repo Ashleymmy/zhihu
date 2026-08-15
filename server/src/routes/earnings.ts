@@ -1,2 +1,23 @@
-import { Router } from 'express';import { z } from 'zod';import { requireAuth } from '../auth/middleware';import { asyncHandler } from '../middleware/errors';import { validateQuery } from '../middleware/validate';import { earningsSummary,listEarnings } from '../services/earnings.service';import { paginationSchema } from '../utils/pagination';import { ok,okList } from '../utils/response';
-const list=paginationSchema.extend({status:z.enum(['pending','confirmed','paid']).optional()});export const earningsRouter=Router();earningsRouter.use(requireAuth);earningsRouter.get('/',validateQuery(list),asyncHandler(async(req,res)=>{const data=await listEarnings(req.user,req.query);okList(res,data.list,data.total,data.page,data.pageSize);}));earningsRouter.get('/summary',asyncHandler(async(req,res)=>ok(res,await earningsSummary(req.user))));
+import { Router } from 'express';
+import { z } from 'zod';
+import { requireAuth } from '../auth/middleware';
+import { asyncHandler } from '../middleware/errors';
+import { validateQuery } from '../middleware/validate';
+import { earningsSummary, listEarnings } from '../services/earnings.service';
+import { paginationSchema } from '../utils/pagination';
+import { ok, okList } from '../utils/response';
+const list = paginationSchema.extend({ status: z.enum(['pending', 'confirmed', 'paid']).optional() });
+export const earningsRouter = Router();
+earningsRouter.use(requireAuth);
+earningsRouter.get(
+  '/',
+  validateQuery(list),
+  asyncHandler(async (req, res) => {
+    const data = await listEarnings(req.user, req.query);
+    okList(res, data.list, data.total, data.page, data.pageSize);
+  }),
+);
+earningsRouter.get(
+  '/summary',
+  asyncHandler(async (req, res) => ok(res, await earningsSummary(req.user))),
+);

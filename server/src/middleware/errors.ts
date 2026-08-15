@@ -11,19 +11,19 @@ export class AppError extends Error {
   }
 }
 
-export const asyncHandler = (
-  handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
-): RequestHandler => (req, res, next) => void Promise.resolve(handler(req, res, next)).catch(next);
+export const asyncHandler =
+  (handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>): RequestHandler =>
+  (req, res, next) =>
+    void Promise.resolve(handler(req, res, next)).catch(next);
 
-export const notFound: RequestHandler = (_req, _res, next) =>
-  next(new AppError(404, 40400, '接口不存在'));
+export const notFound: RequestHandler = (_req, _res, next) => next(new AppError(404, 40400, '接口不存在'));
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   const bodyParserError = error as { status?: number; type?: string };
   if (
-    error instanceof SyntaxError
-    && bodyParserError.status === 400
-    && bodyParserError.type === 'entity.parse.failed'
+    error instanceof SyntaxError &&
+    bodyParserError.status === 400 &&
+    bodyParserError.type === 'entity.parse.failed'
   ) {
     res.status(400).json({ code: 40000, data: null, message: '请求体不是有效 JSON' });
     return;

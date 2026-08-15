@@ -53,7 +53,9 @@ class RedisRevocationStore implements RevocationStore {
     retryStrategy: () => null,
   });
 
-  constructor() { this.redis.on('error', () => undefined); }
+  constructor() {
+    this.redis.on('error', () => undefined);
+  }
 
   private async ready() {
     if (this.redis.status === 'wait') await this.redis.connect();
@@ -85,7 +87,9 @@ class RedisRevocationStore implements RevocationStore {
     return (await this.redis.exists(`auth:blacklist:${jti}`)) === 1;
   }
 
-  async close() { await this.redis.quit().catch(() => undefined); }
+  async close() {
+    await this.redis.quit().catch(() => undefined);
+  }
 }
 
 class ResilientRevocationStore implements RevocationStore {
@@ -112,7 +116,9 @@ class ResilientRevocationStore implements RevocationStore {
     return (await this.redis?.isRevoked(jti).catch(() => false)) ?? false;
   }
 
-  async close() { await this.redis?.close(); }
+  async close() {
+    await this.redis?.close();
+  }
 }
 
 export const revocationStore: RevocationStore = new ResilientRevocationStore();

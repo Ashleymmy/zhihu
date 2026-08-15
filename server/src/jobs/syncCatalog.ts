@@ -12,9 +12,7 @@ export function listOf(response: unknown): Array<Record<string, unknown>> {
   if (!response || typeof response !== 'object') return [];
   const value = response as Record<string, unknown>;
   if (Array.isArray(value.data)) return value.data as Array<Record<string, unknown>>;
-  const data = value.data && typeof value.data === 'object'
-    ? value.data as Record<string, unknown>
-    : value;
+  const data = value.data && typeof value.data === 'object' ? (value.data as Record<string, unknown>) : value;
   if (Array.isArray(data.list)) return data.list as Array<Record<string, unknown>>;
   if (Array.isArray(data.items)) return data.items as Array<Record<string, unknown>>;
   if (Array.isArray(value.list)) return value.list as Array<Record<string, unknown>>;
@@ -70,7 +68,14 @@ export async function syncChannels() {
        ON DUPLICATE KEY UPDATE
         parent_channel_id=VALUES(parent_channel_id), generation=VALUES(generation), name=VALUES(name),
         commission_rate=VALUES(commission_rate), synced_at=NOW()`,
-      [config.defaultProjectId, channel.channelId, channel.parentChannelId, channel.generation, channel.name, channel.commissionRate],
+      [
+        config.defaultProjectId,
+        channel.channelId,
+        channel.parentChannelId,
+        channel.generation,
+        channel.name,
+        channel.commissionRate,
+      ],
     );
   }
 }
@@ -79,9 +84,11 @@ export async function syncTasks(data: Record<string, unknown> = {}) {
   const requestedChannelId = nullableString(data.channelId);
   const channelIds = requestedChannelId
     ? [requestedChannelId]
-    : (await rows<ChannelRow>(
-      'SELECT zhihu_channel_id FROM channels WHERE is_enabled = 1 AND generation = 1 ORDER BY id',
-    )).map((row) => String(row.zhihu_channel_id));
+    : (
+        await rows<ChannelRow>(
+          'SELECT zhihu_channel_id FROM channels WHERE is_enabled = 1 AND generation = 1 ORDER BY id',
+        )
+      ).map((row) => String(row.zhihu_channel_id));
 
   for (const channelId of channelIds) {
     const response = await zhihuGet('/alliance/api/popularize_tasks', {
@@ -103,8 +110,15 @@ export async function syncTasks(data: Record<string, unknown> = {}) {
           status=VALUES(status), raw_json=VALUES(raw_json), synced_at=NOW()`,
         [
           config.defaultProjectId,
-          task.taskId, task.name, task.popularizeType, task.settleType, task.unitPrice,
-          task.startTime, task.endTime, task.status, task.rawJson,
+          task.taskId,
+          task.name,
+          task.popularizeType,
+          task.settleType,
+          task.unitPrice,
+          task.startTime,
+          task.endTime,
+          task.status,
+          task.rawJson,
         ],
       );
     }

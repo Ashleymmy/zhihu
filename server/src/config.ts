@@ -19,7 +19,10 @@ const envSchema = z.object({
   ZHIHU_ACCESS_TOKEN: z.string().default('mock_access_token'),
   ZHIHU_SECRET_KEY: z.string().default('mock_secret_key'),
   ZHIHU_API_BASE: z.string().url().default('https://open.zhihu.com'),
-  CALLBACK_SECRET_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/).default('0'.repeat(64)),
+  CALLBACK_SECRET_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[a-fA-F0-9]{64}$/)
+    .default('0'.repeat(64)),
   REDIS_URL: z.string().default('redis://127.0.0.1:6379'),
   QUEUE_DRIVER: z.enum(['bull', 'memory']).default('memory'),
   TZ: z.string().default('Asia/Shanghai'),

@@ -27,7 +27,8 @@ export async function signToken(user: TokenUser) {
 
 export function verifyToken(token: string): AuthUser {
   const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] }) as jwt.JwtPayload;
-  if (!decoded.sub || !decoded.jti || !decoded.role || !decoded.username || !decoded.displayName) throw new Error('invalid token');
+  if (!decoded.sub || !decoded.jti || !decoded.role || !decoded.username || !decoded.displayName)
+    throw new Error('invalid token');
   return {
     sub: decoded.sub,
     jti: decoded.jti,

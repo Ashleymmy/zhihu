@@ -9,9 +9,18 @@ import { scopeFilter } from '../utils/scopeFilter';
 import { writeAudit } from './audit.service';
 import { isCompositionCategoryValid } from '../zhihu/composition';
 
-interface CountRow extends RowDataPacket { total: number }
-interface ItemRow extends RowDataPacket { id: string; owner_id: string; status: string; sync_status: string }
-interface PlanOwnerRow extends RowDataPacket { owner_id: string }
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+interface ItemRow extends RowDataPacket {
+  id: string;
+  owner_id: string;
+  status: string;
+  sync_status: string;
+}
+interface PlanOwnerRow extends RowDataPacket {
+  owner_id: string;
+}
 export interface CompositionInput {
   planId: string;
   mediaType: string;
@@ -23,11 +32,12 @@ export interface CompositionInput {
   releaseTime: string;
 }
 
-const stableHash = (value: unknown) => crypto
-  .createHash('sha256')
-  .update(JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort()))
-  .digest('hex')
-  .slice(0, 16);
+const stableHash = (value: unknown) =>
+  crypto
+    .createHash('sha256')
+    .update(JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort()))
+    .digest('hex')
+    .slice(0, 16);
 
 const syncJobOptions = (jobId: string) => ({ jobId, removeOnComplete: true, removeOnFail: true });
 
@@ -51,13 +61,16 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
   const scope = scopeFilter(user, 'c.owner_id');
   const where = [scope.clause];
   const bindings: unknown[] = [...scope.bindings];
-  if (query.planId) { where.push('c.plan_id = ?'); bindings.push(query.planId); }
-  if (query.status) { where.push('c.status = ?'); bindings.push(query.status); }
+  if (query.planId) {
+    where.push('c.plan_id = ?');
+    bindings.push(query.planId);
+  }
+  if (query.status) {
+    where.push('c.status = ?');
+    bindings.push(query.status);
+  }
   const clause = where.join(' AND ');
-  const [count] = await rows<CountRow>(
-    `SELECT COUNT(*) total FROM compositions c WHERE ${clause}`,
-    bindings,
-  );
+  const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM compositions c WHERE ${clause}`, bindings);
   const list = await rows<ItemRow>(
     `SELECT c.*, p.keyword, p.channel_id, ch.name channel_name,
             u.display_name assignee_name
@@ -76,19 +89,15 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
 
 export async function getComposition(user: AuthUser, id: string) {
   const scope = scopeFilter(user, 'c.owner_id');
-  const [item] = await rows<ItemRow>(
-    `SELECT c.* FROM compositions c WHERE c.id = ? AND ${scope.clause} LIMIT 1`,
-    [id, ...scope.bindings],
-  );
+  const [item] = await rows<ItemRow>(`SELECT c.* FROM compositions c WHERE c.id = ? AND ${scope.clause} LIMIT 1`, [
+    id,
+    ...scope.bindings,
+  ]);
   if (!item) throw new AppError(404, 40401, '作品不存在');
   return item;
 }
 
-async function insertComposition(
-  user: AuthUser,
-  input: CompositionInput,
-  connection: PoolConnection,
-) {
+async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection) {
   const ownerId = await planOwner(user, input.planId, connection);
   const [result] = await connection.query<ResultSetHeader>(
     `INSERT INTO compositions
@@ -113,13 +122,16 @@ async function insertComposition(
 export async function createComposition(user: AuthUser, input: CompositionInput, ip?: string) {
   const id = await withTransaction(async (connection) => {
     const value = await insertComposition(user, input, connection);
-    await writeAudit({
-      userId: user.sub,
-      action: 'composition.create',
-      resourceType: 'composition',
-      resourceId: value,
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'composition.create',
+        resourceType: 'composition',
+        resourceId: value,
+        ip,
+      },
+      connection,
+    );
     return value;
   });
   await enqueue('push-composition', { compositionId: id }, syncJobOptions(`composition-${id}`));
@@ -130,13 +142,16 @@ export async function createCompositionBatch(user: AuthUser, items: CompositionI
   const ids = await withTransaction(async (connection) => {
     const created: string[] = [];
     for (const item of items) created.push(await insertComposition(user, item, connection));
-    await writeAudit({
-      userId: user.sub,
-      action: 'composition.batch_create',
-      resourceType: 'composition',
-      detail: { count: created.length },
-      ip,
-    }, connection);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'composition.batch_create',
+        resourceType: 'composition',
+        detail: { count: created.length },
+        ip,
+      },
+      connection,
+    );
     return created;
   });
   for (const id of ids) {
@@ -145,22 +160,15 @@ export async function createCompositionBatch(user: AuthUser, items: CompositionI
   return { ids, count: ids.length, syncStatus: 'local' };
 }
 
-export async function updateComposition(
-  user: AuthUser,
-  id: string,
-  patch: Record<string, unknown>,
-  ip?: string,
-) {
-  const existing = await getComposition(user, id) as ItemRow & {
+export async function updateComposition(user: AuthUser, id: string, patch: Record<string, unknown>, ip?: string) {
+  const existing = (await getComposition(user, id)) as ItemRow & {
     composition_type: number;
     composition_sub_type: number;
   };
-  const nextType = patch.compositionType === undefined
-    ? Number(existing.composition_type)
-    : Number(patch.compositionType);
-  const nextSubType = patch.compositionSubType === undefined
-    ? Number(existing.composition_sub_type)
-    : Number(patch.compositionSubType);
+  const nextType =
+    patch.compositionType === undefined ? Number(existing.composition_type) : Number(patch.compositionType);
+  const nextSubType =
+    patch.compositionSubType === undefined ? Number(existing.composition_sub_type) : Number(patch.compositionSubType);
   if (!isCompositionCategoryValid(nextType, nextSubType)) {
     throw new AppError(422, 42200, '作品分类组合不正确');
   }
@@ -183,18 +191,21 @@ export async function updateComposition(
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
 
   await withTransaction(async (connection) => {
-    await connection.query(
-      `UPDATE compositions SET ${fields.join(', ')}, sync_status = 'local' WHERE id = ?`,
-      [...bindings, id],
+    await connection.query(`UPDATE compositions SET ${fields.join(', ')}, sync_status = 'local' WHERE id = ?`, [
+      ...bindings,
+      id,
+    ]);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'composition.update',
+        resourceType: 'composition',
+        resourceId: id,
+        detail: patch,
+        ip,
+      },
+      connection,
     );
-    await writeAudit({
-      userId: user.sub,
-      action: 'composition.update',
-      resourceType: 'composition',
-      resourceId: id,
-      detail: patch,
-      ip,
-    }, connection);
   });
   await enqueue(
     'push-composition',

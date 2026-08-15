@@ -10,13 +10,24 @@ import { writeAudit } from './audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 
 interface UserRow extends RowDataPacket {
-  id: string; username: string; password_hash: string; role: Role; parent_id: string | null;
-  display_name: string; phone: string | null; is_active: number; must_change_pwd: number;
+  id: string;
+  username: string;
+  password_hash: string;
+  role: Role;
+  parent_id: string | null;
+  display_name: string;
+  phone: string | null;
+  is_active: number;
+  must_change_pwd: number;
 }
 
 const publicUser = (user: UserRow) => ({
-  id: String(user.id), username: user.username, displayName: user.display_name,
-  role: user.role, parentId: user.parent_id ? String(user.parent_id) : null, phone: user.phone,
+  id: String(user.id),
+  username: user.username,
+  displayName: user.display_name,
+  role: user.role,
+  parentId: user.parent_id ? String(user.parent_id) : null,
+  phone: user.phone,
 });
 
 export async function login(username: string, password: string, ip?: string) {
@@ -37,12 +48,18 @@ export async function login(username: string, password: string, ip?: string) {
   await deleteRateLimit(userKey);
 
   const token = await signToken({
-    id: String(user.id), role: user.role, parentId: user.parent_id ? String(user.parent_id) : null,
-    username: user.username, displayName: user.display_name,
+    id: String(user.id),
+    role: user.role,
+    parentId: user.parent_id ? String(user.parent_id) : null,
+    username: user.username,
+    displayName: user.display_name,
   });
   await withTransaction(async (connection) => {
     await connection.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
-    await writeAudit({ userId: String(user.id), action: 'auth.login', resourceType: 'user', resourceId: String(user.id), ip }, connection);
+    await writeAudit(
+      { userId: String(user.id), action: 'auth.login', resourceType: 'user', resourceId: String(user.id), ip },
+      connection,
+    );
   });
   return { token, user: publicUser(user), mustChangePwd: Boolean(user.must_change_pwd) };
 }
@@ -65,10 +82,14 @@ export async function changePassword(auth: AuthUser, oldPassword: string, newPas
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await withTransaction(async (connection) => {
     const [result] = await connection.query<ResultSetHeader>(
-      'UPDATE users SET password_hash = ?, must_change_pwd = 0 WHERE id = ?', [passwordHash, auth.sub],
+      'UPDATE users SET password_hash = ?, must_change_pwd = 0 WHERE id = ?',
+      [passwordHash, auth.sub],
     );
     if (result.affectedRows !== 1) throw new AppError(404, 40401, '用户不存在');
-    await writeAudit({ userId: auth.sub, action: 'auth.change_password', resourceType: 'user', resourceId: auth.sub, ip }, connection);
+    await writeAudit(
+      { userId: auth.sub, action: 'auth.change_password', resourceType: 'user', resourceId: auth.sub, ip },
+      connection,
+    );
   });
   await revocationStore.revokeUser(auth.sub);
 }

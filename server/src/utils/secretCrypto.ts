@@ -1,7 +1,12 @@
 import crypto from 'node:crypto';
 import { config } from '../config';
 
-export interface EncryptedSecret { ciphertext: string; iv: string; authTag: string; lastFour: string }
+export interface EncryptedSecret {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
+  lastFour: string;
+}
 
 export function encryptSecret(secret: string): EncryptedSecret {
   const iv = crypto.randomBytes(12);

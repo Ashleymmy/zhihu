@@ -1,11 +1,19 @@
 import { AppError } from '../middleware/errors';
 
 export const ZHIHU_MEDIA_TYPES = [
-  'KOC视频号', 'KOC百家号', 'KOC抖音', 'KOC快手', 'KOC微博',
-  'KOC小红书', 'KOC定向', 'KOC头条号', 'KOC哔哩哔哩', 'KOC公众号',
+  'KOC视频号',
+  'KOC百家号',
+  'KOC抖音',
+  'KOC快手',
+  'KOC微博',
+  'KOC小红书',
+  'KOC定向',
+  'KOC头条号',
+  'KOC哔哩哔哩',
+  'KOC公众号',
 ] as const;
 
-export type ZhihuMediaType = typeof ZHIHU_MEDIA_TYPES[number];
+export type ZhihuMediaType = (typeof ZHIHU_MEDIA_TYPES)[number];
 
 export const COMPOSITION_TYPES = [
   { value: 0, label: '其他' },
@@ -45,8 +53,7 @@ export function isCompositionCategoryValid(type: number, subType: number): boole
 }
 
 export function isZonedIsoDateTime(value: string): boolean {
-  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
-    && Number.isFinite(Date.parse(normalizeZonedIsoDateTime(value)));
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) && Number.isFinite(Date.parse(normalizeZonedIsoDateTime(value)));
 }
 
 export function normalizeZonedIsoDateTime(value: string): string {
