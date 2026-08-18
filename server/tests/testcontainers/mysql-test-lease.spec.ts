@@ -13,10 +13,11 @@ import {
   resetHarnessDockerApiCallCount,
   withMySqlTestLease,
 } from '../support/mysqlTestLease';
+import { productionMigrations } from '../support/migrations';
 
 const suite = process.env.RUN_TESTCONTAINERS === '1' ? describe : describe.skip;
 const migrationsDirectory = path.resolve(process.cwd(), 'migrations');
-const expectedMigrations = ['001_init.sql', '002_callbacks.sql', '003_composition_v2.sql', '004_identity_rbac.sql'];
+const expectedMigrations = productionMigrations(migrationsDirectory);
 
 interface DatabaseIdentityRow extends RowDataPacket {
   databaseName: string;

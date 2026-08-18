@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node';
 import request from 'supertest';
 import { runMigrations } from '../../scripts/migrationRunner';
 import { createMySqlTestLease, type MySqlTestLease } from '../support/mysqlTestLease';
+import { productionMigrations } from '../support/migrations';
 
 const upstream = setupServer();
 const gateMessage = '资金链启动 Gate 未关闭';
@@ -36,7 +37,7 @@ suite('Acceptance scope', () => {
     try {
       createdLease.injectEnvironment();
       const migration = await runMigrations(createdLease.migrationTarget, resolve(process.cwd(), 'migrations'));
-      expect(migration.applied).toEqual(['001_init.sql', '002_callbacks.sql', '003_composition_v2.sql', '004_identity_rbac.sql']);
+      expect(migration.applied).toEqual(productionMigrations());
       expect(migration.skipped).toEqual([]);
       vi.resetModules();
       const [{ createApp }, databaseModule, jwtModule] = await Promise.all([
@@ -224,12 +225,7 @@ suite('Acceptance scope', () => {
     const [identity] = await rows<{ currentDatabase: string } & RowDataPacket>('SELECT DATABASE() AS currentDatabase');
     expect(identity.currentDatabase).toBe(lease?.metadata.database);
     const migrations = await rows<{ name: string } & RowDataPacket>('SELECT name FROM schema_migrations ORDER BY name');
-    expect(migrations.map((item) => item.name)).toEqual([
-      '001_init.sql',
-      '002_callbacks.sql',
-      '003_composition_v2.sql',
-      '004_identity_rbac.sql',
-    ]);
+    expect(migrations.map((item) => item.name)).toEqual(productionMigrations());
   });
 
   it('preserves the eight-module scope and cross-team mutation boundaries', async () => {

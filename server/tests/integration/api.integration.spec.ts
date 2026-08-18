@@ -6,6 +6,7 @@ import { setupServer } from 'msw/node';
 import request from 'supertest';
 import { runMigrations } from '../../scripts/migrationRunner';
 import { createMySqlTestLease, type MySqlTestLease } from '../support/mysqlTestLease';
+import { productionMigrations } from '../support/migrations';
 
 let metricValue = 12;
 let receivedComposition: Record<string, unknown> | null = null;
@@ -82,7 +83,7 @@ suite('MySQL API integration', () => {
     try {
       createdLease.injectEnvironment();
       const migration = await runMigrations(createdLease.migrationTarget, resolve(process.cwd(), 'migrations'));
-      expect(migration.applied).toEqual(['001_init.sql', '002_callbacks.sql', '003_composition_v2.sql', '004_identity_rbac.sql']);
+      expect(migration.applied).toEqual(productionMigrations());
       expect(migration.skipped).toEqual([]);
       vi.resetModules();
       const [{ createApp }, databaseModule, jwtModule, metricsModule, earningsModule] = await Promise.all([
