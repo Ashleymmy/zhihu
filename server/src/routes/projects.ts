@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { addProjectMember, listProjectMembers, removeProjectMember } from '../services/projectMembers.service';
 import { ok } from '../utils/response';
+import { projectCoursesRouter } from './project-courses';
 
 const id = z.string().regex(/^\d+$/);
 const addMember = z.object({
@@ -15,6 +16,7 @@ const addMember = z.object({
 
 export const projectsRouter = Router();
 projectsRouter.use(requireAuth);
+projectsRouter.use('/:projectId/courses', projectCoursesRouter);
 projectsRouter.get(
   '/:projectId/members',
   asyncHandler(async (req, res) => ok(res, await listProjectMembers(req.user, id.parse(req.params.projectId)))),

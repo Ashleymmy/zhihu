@@ -10,6 +10,17 @@ export interface AuthUser {
   exp?: number;
 }
 
+export interface ProjectCourse {
+  id: string;
+  projectId: string;
+  courseName: string;
+  courseUrl: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 declare global {
   namespace Express {
     interface Request {
