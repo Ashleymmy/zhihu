@@ -103,6 +103,20 @@ export const ALLIANCE_ENDPOINT_DEFINITIONS = Object.freeze(
 ) as readonly AllianceEndpointDefinition[];
 export const ALLIANCE_ENDPOINTS = ALLIANCE_ENDPOINT_DEFINITIONS;
 
+// 仅供内部 Job（如 syncMetrics 的 D+1 日批）使用的端点：
+// 不生成公共代理路由，也不进入公共版本策略，只能通过 resolveClientEndpoint 命中。
+const clientOnlyDefinitions: ReadonlyArray<AllianceEndpointDefinition> = [
+  {
+    definitionKey: 'GET /data_report/daily_data',
+    method: 'GET',
+    publicPath: '/data_report/daily_data',
+    clientPath: '/alliance/api/data_report/daily_data',
+    upstreamPath: '/data_report/daily_data',
+    requestKind: 'query',
+    requiredPermission: 'earning.view_all',
+  },
+];
+
 const registeredEndpoints = new WeakSet<object>();
 const staticEndpoints = new Map<string, AllianceEndpoint>();
 
@@ -139,6 +153,21 @@ for (const definition of ALLIANCE_ENDPOINT_DEFINITIONS) {
     requiredPermission: definition.requiredPermission,
   });
   staticEndpoints.set(`${definition.method} ${definition.publicPath}`, registerEndpoint(endpoint));
+}
+
+const clientOnlyEndpoints = new Map<string, AllianceEndpoint>();
+for (const definition of clientOnlyDefinitions) {
+  const endpoint = Object.freeze({
+    definitionKey: definition.definitionKey,
+    operationKey: definition.definitionKey,
+    method: definition.method,
+    publicPath: definition.publicPath,
+    clientPath: definition.clientPath,
+    upstreamPath: definition.upstreamPath,
+    requestKind: definition.requestKind,
+    requiredPermission: definition.requiredPermission,
+  });
+  clientOnlyEndpoints.set(`${definition.method} ${definition.publicPath}`, registerEndpoint(endpoint));
 }
 
 function requestPath(requestTarget: unknown): string | null {
@@ -212,7 +241,7 @@ export function resolveClientEndpoint(method: string, requestTarget: unknown): A
   if (!isCanonicalAlliancePath(path) || path === CLIENT_ALLIANCE_PREFIX) return undefined;
   if (!path!.startsWith(`${CLIENT_ALLIANCE_PREFIX}/`)) return undefined;
   const localPath = path!.slice(CLIENT_ALLIANCE_PREFIX.length);
-  const endpoint = resolveLocalPath(method, localPath);
+  const endpoint = resolveLocalPath(method, localPath) ?? clientOnlyEndpoints.get(`${method} ${localPath}`);
   if (!endpoint || endpoint.clientPath !== path) return undefined;
   return endpoint;
 }

@@ -217,6 +217,22 @@ const realtimeUpstreamSchema = z
   })
   .strict();
 
+const reportDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u, '日期格式应为 YYYY-MM-DD');
+
+const dailyIngressSchema = z
+  .object({
+    startDate: reportDate,
+    endDate: reportDate,
+  })
+  .strict();
+
+const dailyUpstreamSchema = z
+  .object({
+    start_date: reportDate,
+    end_date: reportDate,
+  })
+  .strict();
+
 export type AllianceOperationKey =
   | 'POST /popularize_plan'
   | 'POST /popularize_plans'
@@ -224,7 +240,8 @@ export type AllianceOperationKey =
   | 'POST /popularize_compositions/v2'
   | 'PUT /popularize_composition/v2/{composition_id}'
   | 'GET /popularize_compositions'
-  | 'GET /data_report/real_time_data';
+  | 'GET /data_report/real_time_data'
+  | 'GET /data_report/daily_data';
 
 export interface AllianceSignatureProfile extends SignatureProfile {
   readonly mode: 'signed' | 'token-only';
@@ -253,6 +270,7 @@ export const ALLIANCE_SIGNATURE_PROFILES: Record<AllianceOperationKey, AllianceS
   'PUT /popularize_composition/v2/{composition_id}': signedProfile(),
   'GET /popularize_compositions': signedProfile('offset', 'limit'),
   'GET /data_report/real_time_data': tokenOnlyProfile,
+  'GET /data_report/daily_data': tokenOnlyProfile,
 });
 
 export const ALLIANCE_SUCCESS_MESSAGES: Record<AllianceOperationKey, string> = Object.freeze({
@@ -263,6 +281,7 @@ export const ALLIANCE_SUCCESS_MESSAGES: Record<AllianceOperationKey, string> = O
   'PUT /popularize_composition/v2/{composition_id}': '作品更新成功',
   'GET /popularize_compositions': '作品列表获取成功',
   'GET /data_report/real_time_data': '实时数据获取成功',
+  'GET /data_report/daily_data': '每日数据获取成功',
 });
 
 export interface AllianceListMeta {
@@ -487,6 +506,33 @@ function asRealtimeUpstream(ingress: Record<string, unknown>): Record<string, un
   return { type: ingress.type, time_scale: ingress.timeScale, fields: ingress.fields };
 }
 
+function asDailyUpstream(ingress: Record<string, unknown>): Record<string, unknown> {
+  return { start_date: ingress.startDate, end_date: ingress.endDate };
+}
+
+function projectDaily(upstream: unknown, message: string): AllianceSuccessProjection {
+  const envelope = recordOf(upstream);
+  const container = recordOf(envelopeData(envelope));
+  if (!Array.isArray(container.list)) throw new AllianceProtocolError();
+  const items = container.list.map((item) => {
+    const source = recordOf(item);
+    return {
+      channel_id: safeString(source.channel_id),
+      keyword: safeString(source.keyword),
+      stat_date: safeString(source.stat_date),
+      impressions: safeScalar(source.impressions ?? 0),
+      clicks: safeScalar(source.clicks ?? 0),
+      conversions: safeScalar(source.conversions ?? 0),
+      earning: safeScalar(source.earning ?? 0),
+    };
+  });
+  return {
+    data: { list: items },
+    clientData: { data: { list: items } },
+    message,
+  };
+}
+
 function parseWith(schema: ZodTypeAny, value: unknown): Record<string, unknown> {
   return schema.parse(value) as Record<string, unknown>;
 }
@@ -562,6 +608,16 @@ export const ALLIANCE_OPERATION_CONTRACTS: Record<AllianceOperationKey, Alliance
     toUpstream: asRealtimeUpstream,
     projectSuccess: (upstream, _ingress) =>
       projectRealtime(upstream, ALLIANCE_SUCCESS_MESSAGES['GET /data_report/real_time_data']),
+  },
+  'GET /data_report/daily_data': {
+    ingressSchema: dailyIngressSchema,
+    upstreamRequestSchema: dailyUpstreamSchema,
+    signatureProfile: ALLIANCE_SIGNATURE_PROFILES['GET /data_report/daily_data'],
+    message: ALLIANCE_SUCCESS_MESSAGES['GET /data_report/daily_data'],
+    parseIngress: (input) => parseWith(dailyIngressSchema, input),
+    toUpstream: asDailyUpstream,
+    projectSuccess: (upstream, _ingress) =>
+      projectDaily(upstream, ALLIANCE_SUCCESS_MESSAGES['GET /data_report/daily_data']),
   },
 });
 

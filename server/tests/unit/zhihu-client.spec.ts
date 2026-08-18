@@ -120,7 +120,6 @@ describe('知乎后台 Client', () => {
     for (const path of [
       '/alliance/api/get_agent_channels',
       '/alliance/api/popularize_tasks',
-      '/alliance/api/data_report/daily_data',
       'https://attacker.example/alliance/api/popularize_plan',
     ]) {
       await expect(zhihuGet(path)).rejects.toMatchObject({

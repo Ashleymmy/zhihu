@@ -15,6 +15,7 @@ export const ALLIANCE_QUOTA_OPERATION_KEYS = Object.freeze([
   'PUT /popularize_composition/v2/{composition_id}',
   'GET /popularize_compositions',
   'GET /data_report/real_time_data',
+  'GET /data_report/daily_data',
 ] satisfies readonly AllianceOperationKey[]);
 
 const operationKeySet = new Set<string>(ALLIANCE_QUOTA_OPERATION_KEYS);

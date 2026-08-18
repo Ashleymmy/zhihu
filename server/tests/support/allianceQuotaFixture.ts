@@ -16,6 +16,7 @@ export const TEST_ALLIANCE_QUOTA_POLICY: AllianceQuotaPolicy = Object.freeze({
     'PUT /popularize_composition/v2/{composition_id}': 1,
     'GET /popularize_compositions': 1,
     'GET /data_report/real_time_data': 1,
+    'GET /data_report/daily_data': 1,
   }),
 });
 
