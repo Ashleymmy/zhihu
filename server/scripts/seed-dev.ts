@@ -10,8 +10,8 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 12);
   await db.query(
     `INSERT INTO users (username, password_hash, role, display_name, is_active, must_change_pwd)
-     VALUES (?, ?, 'boss', ?, 1, 0)
-     ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), display_name = VALUES(display_name), is_active = 1`,
+     VALUES (?, ?, 'admin', ?, 1, 0)
+     ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), display_name = VALUES(display_name), role = 'admin', is_active = 1`,
     [username, passwordHash, displayName],
   );
   console.log(`seeded ${username}`);
