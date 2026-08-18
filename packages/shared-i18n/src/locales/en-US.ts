@@ -1,0 +1,40 @@
+export default {
+  common: {
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    save: 'Save',
+    delete: 'Delete',
+    loading: 'Loading…',
+    empty: 'No data',
+    unavailable: 'Unavailable',
+  },
+  auth: {
+    login: 'Sign in',
+    logout: 'Sign out',
+    username: 'Username',
+    password: 'Password',
+    loginFailed: 'Sign-in failed',
+    sessionExpired: 'Session expired, please sign in again',
+    wrongWorkspace: 'This account cannot access the current workspace',
+  },
+  workspace: {
+    admin: 'Admin Console',
+    leader: 'Leader Workspace',
+    creator: 'Creator Workspace',
+  },
+  nav: {
+    overview: 'Overview',
+    projects: 'Projects',
+    courses: 'Courses',
+    members: 'Members',
+    mcn: 'MCN Accounts',
+    team: 'Team',
+    earnings: 'Earnings',
+    profile: 'Profile',
+  },
+  finance: {
+    blocked: 'Finance pipeline disabled',
+    blockedHint: 'Finance operations stay closed until the settlement data contract is confirmed.',
+    failedGates: 'Failed gates',
+  },
+} as const

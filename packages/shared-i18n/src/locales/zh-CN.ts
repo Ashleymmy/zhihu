@@ -1,0 +1,40 @@
+export default {
+  common: {
+    confirm: '确定',
+    cancel: '取消',
+    save: '保存',
+    delete: '删除',
+    loading: '加载中…',
+    empty: '暂无数据',
+    unavailable: '暂不可用',
+  },
+  auth: {
+    login: '登录',
+    logout: '退出登录',
+    username: '用户名',
+    password: '密码',
+    loginFailed: '登录失败',
+    sessionExpired: '登录已过期，请重新登录',
+    wrongWorkspace: '当前账号无权进入该工作台',
+  },
+  workspace: {
+    admin: 'Admin 管理后台',
+    leader: '团长 / 运营工作台',
+    creator: 'KOC 达人工作台',
+  },
+  nav: {
+    overview: '总览',
+    projects: '项目',
+    courses: '课程',
+    members: '成员',
+    mcn: 'MCN 账户',
+    team: '团队',
+    earnings: '收益',
+    profile: '个人中心',
+  },
+  finance: {
+    blocked: '财务链路未开放',
+    blockedHint: '结算数据源口径确认前，财务相关操作保持关闭。',
+    failedGates: '未通过的门禁',
+  },
+} as const
