@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-/** 通过本地正式 BFF 验证：登录 -> 创建作品 -> 轮询同步 -> 查询知乎 v2 列表。 */
+/** 通过本地正式 BFF 验证：登录 -> 创建作品 -> 轮询同步 -> 查询作品列表。 */
 
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -64,7 +64,7 @@ async function main() {
   }
 
   const query = new URLSearchParams({ channel_id: channelId, keyword, offset: '0', limit: '20' })
-  const listed = await request(base, `/api/alliance/api/popularize_compositions/v2?${query}`, { headers })
+  const listed = await request(base, `/api/alliance/api/popularize_compositions?${query}`, { headers })
   const items = Array.isArray(listed?.data) ? listed.data : Array.isArray(listed) ? listed : []
   const matching = items.find((item) => item.composition_url === compositionUrl)
   if (!matching) throw new Error('v2 列表未找到刚同步的作品')

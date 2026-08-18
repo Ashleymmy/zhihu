@@ -1,50 +1,67 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { alliancePlanApi, allianceBatchApi } from '@/api/alliance'
-import type { CreatePlanReq } from '@/api/alliance'
-import { message } from 'ant-design-vue'
+import { defineStore } from "pinia";
+import { ref } from "vue";
+import { alliancePlanApi } from "@/api/alliance";
+import type { CreatePlanReq } from "@/api/alliance";
+import { AllianceHttpError } from "@/api/alliance-http";
+import { message } from "ant-design-vue";
 
-export const useZPlanStore = defineStore('zPlan', () => {
-  const creating      = ref(false)
-  const lastPlanId    = ref('')
-  const lastChannelId = ref('')
-  const lastKeyword   = ref('')
-  const batchUploading = ref(false)
-  const batchPolling  = ref(false)
+export const useZPlanStore = defineStore("zPlan", () => {
+  const creating = ref(false);
+  const lastPlanId = ref("");
+  const lastChannelId = ref("");
+  const lastKeyword = ref("");
+  const batchUploading = ref(false);
+  const lastBatchTaskId = ref("");
 
   async function submitCreatePlan(req: CreatePlanReq) {
-    creating.value = true
+    creating.value = true;
     try {
-      const res = await alliancePlanApi.createPlan(req)
-      lastPlanId.value    = res.plan_id
-      lastChannelId.value = req.channel_id
-      lastKeyword.value   = req.keyword.trim()
-      message.success(`计划创建成功！Plan ID: ${res.plan_id}`)
-    } catch { /* error handled by interceptor */ } finally { creating.value = false }
-  }
-
-  async function submitBatchCreate(file: File, fields: { task_id: string; channel_id: string; popularize_type: number }) {
-    batchUploading.value = true
-    try {
-      const { batch_task_id } = await alliancePlanApi.batchCreatePlans(file, fields)
-      batchUploading.value = false
-      batchPolling.value = true
-      await pollResult(batch_task_id, '批量创建计划结果.xlsx')
-    } catch { /* error handled */ } finally { batchUploading.value = false; batchPolling.value = false }
-  }
-
-  async function pollResult(taskId: string, filename: string, maxRetry = 30, interval = 3000) {
-    for (let i = 0; i < maxRetry; i++) {
-      await new Promise(r => setTimeout(r, interval))
-      try {
-        const blob = await allianceBatchApi.getResult(taskId)
-        allianceBatchApi.downloadBlob(blob, filename)
-        message.success('批量任务完成，结果已下载')
-        return
-      } catch { /* 任务未完成，继续等待 */ }
+      const res = await alliancePlanApi.createPlan(req);
+      lastPlanId.value = res.planId;
+      lastChannelId.value = req.channelId;
+      lastKeyword.value = req.keyword.trim();
+      message.success(`计划创建成功！Plan ID: ${res.planId}`);
+    } catch (error: unknown) {
+      if (error instanceof AllianceHttpError) message.error(error.message);
+      else throw error;
+    } finally {
+      creating.value = false;
     }
-    message.error('批量任务超时，请稍后手动查询结果')
   }
 
-  return { creating, lastPlanId, lastChannelId, lastKeyword, batchUploading, batchPolling, submitCreatePlan, submitBatchCreate }
-})
+  async function submitBatchCreate(
+    file: File,
+    fields: {
+      taskId: string;
+      channelId: string;
+      popularizeType: 0;
+      secondChannelId?: string;
+    },
+  ) {
+    if (batchUploading.value) return;
+    batchUploading.value = true;
+    lastBatchTaskId.value = "";
+    try {
+      const result = await alliancePlanApi.batchCreatePlans(file, fields);
+      lastBatchTaskId.value = result.batchTaskId;
+      message.success("批量计划已提交");
+      return result.batchTaskId;
+    } catch (error: unknown) {
+      if (error instanceof AllianceHttpError) message.error(error.message);
+      else throw error;
+    } finally {
+      batchUploading.value = false;
+    }
+  }
+
+  return {
+    creating,
+    lastPlanId,
+    lastChannelId,
+    lastKeyword,
+    batchUploading,
+    lastBatchTaskId,
+    submitCreatePlan,
+    submitBatchCreate,
+  };
+});

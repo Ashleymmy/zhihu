@@ -1,47 +1,61 @@
-// 知乎联盟渠道 store — 一代 + 二代渠道，带缓存
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { allianceChannelApi } from '@/api/alliance'
-import type { AgentChannel, SecondChannel } from '@/api/alliance'
+import { defineStore } from "pinia";
+import { computed, ref } from "vue";
+import { channelsApi } from "@/api/channels";
+import type { Channel } from "@/types/api";
 
-export const useZChannelStore = defineStore('zChannel', () => {
-  const channels       = ref<AgentChannel[]>([])
-  const loading        = ref(false)
-  const loaded         = ref(false)
-  const secondMap      = ref<Record<string, SecondChannel[]>>({})
-  const secondLoading  = ref<Record<string, boolean>>({})
-  const selectedId     = ref('')
+export const useZChannelStore = defineStore("zChannel", () => {
+  const channels = ref<Channel[]>([]);
+  const loading = ref(false);
+  const loaded = ref(false);
+  const secondMap = ref<Record<string, never[]>>({});
+  const secondLoading = ref<Record<string, boolean>>({});
+  const selectedId = ref("");
+  const secondChannelUnavailable = ref(true);
 
-  const channelOptions = computed(() => channels.value.map(c => ({ label: c.channel_name, value: c.channel_id })))
+  const channelOptions = computed(() =>
+    channels.value.map((channel) => ({
+      label: channel.name,
+      value: channel.zhihuChannelId,
+    })),
+  );
 
   async function fetchChannels(force = false) {
-    if (loaded.value && !force) return
-    loading.value = true
+    if (loaded.value && !force) return;
+    loading.value = true;
     try {
-      channels.value = await allianceChannelApi.getAgentChannels()
-      loaded.value = true
-      if (!selectedId.value && channels.value.length) selectedId.value = channels.value[0].channel_id
-    } finally { loading.value = false }
-  }
-
-  async function fetchSecondChannels(parentId: string, force = false) {
-    if (secondMap.value[parentId] && !force) return true
-    secondLoading.value = { ...secondLoading.value, [parentId]: true }
-    try {
-      const res = await allianceChannelApi.getSecondChannels(parentId)
-      secondMap.value = { ...secondMap.value, [parentId]: res.data }
-      return true
-    } catch {
-      secondMap.value = { ...secondMap.value, [parentId]: [] }
-      return false
+      const response = await channelsApi.list({ page: 1, pageSize: 100 });
+      channels.value = response.list;
+      loaded.value = true;
+      if (!selectedId.value && channels.value.length)
+        selectedId.value = channels.value[0].zhihuChannelId;
     } finally {
-      secondLoading.value = { ...secondLoading.value, [parentId]: false }
+      loading.value = false;
     }
   }
 
-  function getSecondOptions(parentId: string) {
-    return (secondMap.value[parentId] ?? []).map(c => ({ label: c.channel_name, value: c.channel_id }))
+  async function fetchSecondChannels(parentId: string, _force = false) {
+    secondLoading.value = { ...secondLoading.value, [parentId]: false };
+    secondMap.value = { ...secondMap.value, [parentId]: [] };
+    secondChannelUnavailable.value = true;
+    return false;
   }
 
-  return { channels, loading, loaded, secondMap, secondLoading, selectedId, channelOptions, fetchChannels, fetchSecondChannels, getSecondOptions }
-})
+  function getSecondOptions(parentId: string) {
+    void parentId;
+    return [] as { label: string; value: string }[];
+  }
+
+  return {
+    channels,
+    loading,
+    loaded,
+    secondMap,
+    secondLoading,
+    selectedId,
+    secondChannelUnavailable,
+    channelOptions,
+    fetchChannels,
+    fetchSecondChannels,
+    getSecondOptions,
+  };
+});

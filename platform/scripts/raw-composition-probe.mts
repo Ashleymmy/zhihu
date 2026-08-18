@@ -8,8 +8,8 @@
 
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { config } from '../../server/src/config.ts';
-import { injectSignParams } from '../../server/src/sign/zhihu.ts';
+
+const CANONICAL_LIST_PATH = '/alliance/api/popularize_compositions';
 
 function arg(name: string, fallback?: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -24,7 +24,23 @@ function sanitize(raw: string): string {
     .replace(/"signature"\s*:\s*"[^"]*"/gu, '"signature":"***"');
 }
 
-async function createComposition() {
+export function validateListPath(value: string): string {
+  if (value !== CANONICAL_LIST_PATH) {
+    throw new Error(`--list-path 只能是 ${CANONICAL_LIST_PATH}`);
+  }
+  return value;
+}
+
+async function loadRuntime() {
+  const [{ config }, { injectSignParams }] = await Promise.all([
+    import('../../server/src/config.ts'),
+    import('../../server/src/sign/zhihu.ts'),
+  ]);
+  return { config, injectSignParams };
+}
+
+async function createComposition(runtime: Awaited<ReturnType<typeof loadRuntime>>) {
+  const { config, injectSignParams } = runtime;
   const body = {
     plan_id: arg('plan-id'),
     channel_id: arg('channel-id'),
@@ -46,7 +62,8 @@ async function createComposition() {
   return response.ok;
 }
 
-async function listCompositions() {
+async function listCompositions(runtime: Awaited<ReturnType<typeof loadRuntime>>, listPath: string) {
+  const { config, injectSignParams } = runtime;
   const params = injectSignParams({
     channel_id: arg('channel-id'),
     keyword: arg('keyword'),
@@ -54,7 +71,6 @@ async function listCompositions() {
     limit: 20,
   }, config.zhihu.accessToken, config.zhihu.secretKey);
   const query = new URLSearchParams(Object.entries(params).map(([key, value]) => [key, String(value)]));
-  const listPath = arg('list-path', '/alliance/api/popularize_compositions');
   const response = await fetch(`${config.zhihu.apiBase.replace(/\/$/u, '')}${listPath}?${query}`);
   const raw = await response.text();
   console.log(JSON.stringify({ operation: 'list', httpStatus: response.status, ok: response.ok, response: sanitize(raw) }, null, 2));
@@ -62,10 +78,12 @@ async function listCompositions() {
 }
 
 async function main() {
+  const listPath = validateListPath(arg('list-path', CANONICAL_LIST_PATH));
   const listOnly = process.argv.includes('--list-only');
-  const created = listOnly ? true : await createComposition();
+  const runtime = await loadRuntime();
+  const created = listOnly ? true : await createComposition(runtime);
   if (!listOnly) await delay(Number(arg('wait-ms', '3000')));
-  const listed = await listCompositions();
+  const listed = await listCompositions(runtime, listPath);
   if (!created || !listed) process.exitCode = 2;
 }
 

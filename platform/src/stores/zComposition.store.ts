@@ -1,84 +1,148 @@
-import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import { allianceCompositionApi, allianceBatchApi } from '@/api/alliance'
-import type { CompositionListItem, CreateCompositionReq } from '@/api/alliance'
-import { createCompositionQuerySnapshot, normalizeCompositionItems } from '@/utils/compositionList'
-import { message } from 'ant-design-vue'
+import { defineStore } from "pinia";
+import { computed, ref } from "vue";
+import { allianceCompositionApi } from "@/api/alliance";
+import type { CompositionListItem, CreateCompositionReq } from "@/api/alliance";
+import type { UpdateCompositionRequest } from "@/contracts/alliance";
+import { AllianceHttpError } from "@/api/alliance-http";
+import { message } from "ant-design-vue";
 
-export const useZCompositionStore = defineStore('zComposition', () => {
-  const items         = ref<CompositionListItem[]>([])
-  const loading       = ref(false)
-  const creating      = ref(false)
-  const updating      = ref(false)
-  const total         = ref(0)
-  const offset        = ref(0)
-  const limit         = ref(20)
-  const lastQuery     = ref<{ channel_id: string; keyword: string } | null>(null)
-  const current       = computed(() => Math.floor(offset.value / limit.value) + 1)
-  const batchUploading = ref(false)
-  const batchPolling  = ref(false)
+interface CompositionQuery {
+  channelId: string;
+  keyword: string;
+}
 
-  async function fetchList(query: { channel_id: string; keyword: string }) {
-    const snapshot = createCompositionQuerySnapshot(query)
-    loading.value = true; lastQuery.value = snapshot; offset.value = 0
-    try {
-      const res = await allianceCompositionApi.listCompositions({ ...snapshot, offset: 0, limit: limit.value })
-      const nextItems = normalizeCompositionItems<CompositionListItem>(res.data)
-      items.value = nextItems
-      offset.value = typeof res.pagination?.offset === 'number' ? res.pagination.offset : 0
-      total.value = res.pagination?.total ?? nextItems.length
-      return nextItems
-    } finally { loading.value = false }
+export function canUpdateCompositionFromList(
+  _item: CompositionListItem,
+): boolean {
+  return false;
+}
+
+export async function runCompositionBatchUiAction(
+  action: () => Promise<unknown>,
+): Promise<boolean> {
+  await action();
+  return true;
+}
+
+export const useZCompositionStore = defineStore("zComposition", () => {
+  const items = ref<CompositionListItem[]>([]);
+  const loading = ref(false);
+  const creating = ref(false);
+  const updating = ref(false);
+  const total = ref(0);
+  const page = ref(1);
+  const pageSize = ref(20);
+  const lastQuery = ref<CompositionQuery | null>(null);
+  const current = computed(() => page.value);
+  const batchUploading = ref(false);
+  const lastBatchTaskId = ref("");
+
+  function querySnapshot(query: CompositionQuery): CompositionQuery {
+    return { channelId: query.channelId.trim(), keyword: query.keyword.trim() };
   }
 
-  async function fetchPage(page: number) {
-    if (!lastQuery.value) return
-    const requestedOffset = (page - 1) * limit.value
-    loading.value = true; offset.value = requestedOffset
+  async function fetchList(query: CompositionQuery) {
+    const snapshot = querySnapshot(query);
+    loading.value = true;
+    lastQuery.value = snapshot;
+    page.value = 1;
     try {
-      const res = await allianceCompositionApi.listCompositions({ ...lastQuery.value, offset: requestedOffset, limit: limit.value })
-      const nextItems = normalizeCompositionItems<CompositionListItem>(res.data)
-      items.value = nextItems
-      offset.value = typeof res.pagination?.offset === 'number' ? res.pagination.offset : requestedOffset
-      total.value = res.pagination?.total ?? nextItems.length
-      return nextItems
-    } finally { loading.value = false }
+      const res = await allianceCompositionApi.listCompositions({
+        ...snapshot,
+        page: 1,
+        pageSize: pageSize.value,
+      });
+      items.value = res.data;
+      page.value = res.meta.page;
+      pageSize.value = res.meta.pageSize;
+      total.value = res.meta.total;
+      return res.data;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchPage(requestedPage: number) {
+    if (!lastQuery.value) return;
+    loading.value = true;
+    page.value = requestedPage;
+    try {
+      const res = await allianceCompositionApi.listCompositions({
+        ...lastQuery.value,
+        page: requestedPage,
+        pageSize: pageSize.value,
+      });
+      items.value = res.data;
+      page.value = res.meta.page;
+      pageSize.value = res.meta.pageSize;
+      total.value = res.meta.total;
+      return res.data;
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function submitCreate(req: CreateCompositionReq): Promise<string> {
-    creating.value = true
+    creating.value = true;
     try {
-      const res = await allianceCompositionApi.createComposition(req)
-      message.success(`作品创建成功！ID: ${res.composition_id}`)
-      return res.composition_id
-    } finally { creating.value = false }
+      const res = await allianceCompositionApi.createComposition(req);
+      message.success(`作品创建成功！ID: ${res.compositionId}`);
+      return res.compositionId;
+    } finally {
+      creating.value = false;
+    }
   }
 
-  async function submitUpdate(id: string, req: Partial<CreateCompositionReq>) {
-    updating.value = true
+  async function submitUpdate(id: string, req: UpdateCompositionRequest) {
+    updating.value = true;
     try {
-      await allianceCompositionApi.updateComposition(id, req)
-      message.success('作品已更新')
-      if (lastQuery.value) await fetchList(lastQuery.value)
-    } finally { updating.value = false }
+      await allianceCompositionApi.updateComposition(id, req);
+      message.success("作品已更新");
+      if (lastQuery.value) await fetchList(lastQuery.value);
+    } finally {
+      updating.value = false;
+    }
   }
 
-  async function submitBatch(file: File, fields: { bind_type: number; channel_id: string }) {
-    batchUploading.value = true
+  async function submitBatch(
+    file: File,
+    fields: { bindType: 1 | 2; channelId: string },
+  ) {
+    if (batchUploading.value) return;
+    batchUploading.value = true;
+    lastBatchTaskId.value = "";
     try {
-      const { batch_task_id } = await allianceCompositionApi.batchCreateCompositions(file, fields)
-      batchUploading.value = false; batchPolling.value = true
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 3000))
-        try {
-          const blob = await allianceBatchApi.getResult(batch_task_id)
-          allianceBatchApi.downloadBlob(blob, '批量创建作品结果.xlsx')
-          message.success('批量任务完成，结果已下载'); return
-        } catch { /* 继续等待 */ }
-      }
-      message.error('批量任务超时')
-    } finally { batchUploading.value = false; batchPolling.value = false }
+      const result = await allianceCompositionApi.batchCreateCompositions(
+        file,
+        fields,
+      );
+      lastBatchTaskId.value = result.batchTaskId;
+      message.success("批量作品已提交");
+      return result.batchTaskId;
+    } catch (error: unknown) {
+      if (error instanceof AllianceHttpError) message.error(error.message);
+      else throw error;
+    } finally {
+      batchUploading.value = false;
+    }
   }
 
-  return { items, loading, creating, updating, total, offset, limit, current, lastQuery, batchUploading, batchPolling, fetchList, fetchPage, submitCreate, submitUpdate, submitBatch }
-})
+  return {
+    items,
+    loading,
+    creating,
+    updating,
+    total,
+    page,
+    pageSize,
+    current,
+    lastQuery,
+    batchUploading,
+    lastBatchTaskId,
+    fetchList,
+    fetchPage,
+    submitCreate,
+    submitUpdate,
+    submitBatch,
+  };
+});
