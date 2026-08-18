@@ -1,0 +1,31 @@
+{
+  "name": "platform-leader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test:unit": "vitest run",
+    "lint": "echo \"lint: platform-leader (no linter configured yet)\""
+  },
+  "dependencies": {
+    "@zhihu-koc/shared-components": "workspace:*",
+    "@zhihu-koc/shared-contracts": "workspace:*",
+    "@zhihu-koc/shared-i18n": "workspace:*",
+    "@zhihu-koc/shared-services": "workspace:*",
+    "@zhihu-koc/shared-utils": "workspace:*",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "@zhihu-koc/test-support": "workspace:*",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vitest": "^2.1.8",
+    "vue-tsc": "^2.0.6"
+  }
+}
