@@ -29,6 +29,13 @@
 **/*.temp
 ~$*
 
+# 本地工具与运行时
+**/.runtime/
+**/.maestroignore
+/.claude/
+/image*.png
+/opc-permanent-site.zip
+
 # 编辑器与系统文件
 **/.idea/
 **/.vscode/
