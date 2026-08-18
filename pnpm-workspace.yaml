@@ -1,0 +1,5 @@
+# server 迁移期保持 npm 管理（testcontainers/依赖已就绪，避免重装引入变量）；
+# 后端并入 pnpm workspace 放到切换 CI 时一并处理。
+packages:
+  - apps/*
+  - packages/*
