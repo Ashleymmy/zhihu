@@ -124,7 +124,7 @@ describe('知乎联盟批量上传 Gate', () => {
     });
     vi.spyOn(jwt, 'verifyToken').mockReturnValue({
       sub: 'test-user-id',
-      role: 'boss' as const,
+      role: 'admin' as const,
       parentId: null,
       username: 'testuser',
       displayName: 'Test User',

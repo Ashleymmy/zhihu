@@ -10,7 +10,7 @@ describe('HTTP 基础契约', () => {
   });
 
   it('有效 token 可以读取枚举且使用统一外壳', async () => {
-    const token = await signToken({ id: '1', role: 'member', parentId: '2', username: 'member', displayName: '成员' });
+    const token = await signToken({ id: '1', role: 'creator', parentId: '2', username: 'creator', displayName: '成员' });
     const response = await request(createApp()).get('/api/v1/meta/enums').set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(200);
     expect(response.body.code).toBe(0);
@@ -21,7 +21,7 @@ describe('HTTP 基础契约', () => {
   });
 
   it('普通账号不能访问仅管理员使用的知乎透传入口', async () => {
-    const token = await signToken({ id: '1', role: 'member', parentId: '2', username: 'member', displayName: '成员' });
+    const token = await signToken({ id: '1', role: 'creator', parentId: '2', username: 'creator', displayName: '成员' });
     const response = await request(createApp())
       .get('/api/alliance/api/popularize_compositions')
       .set('Authorization', `Bearer ${token}`);

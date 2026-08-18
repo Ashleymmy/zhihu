@@ -22,9 +22,9 @@ vi.mock('../../src/services/earnings.service', () => ({
 }));
 
 const users: Record<string, AuthUser> = {
-  member: {
+  creator: {
     sub: '4',
-    role: 'member',
+    role: 'creator',
     parentId: '2',
     username: 'member-a',
     displayName: 'Member A',
@@ -38,11 +38,11 @@ const users: Record<string, AuthUser> = {
     displayName: 'Leader A',
     jti: 'leader-jti',
   },
-  boss: {
+  admin: {
     sub: '1',
-    role: 'boss',
+    role: 'admin',
     parentId: null,
-    username: 'boss',
+    username: 'admin',
     displayName: 'Boss',
     jti: 'boss-jti',
   },
@@ -102,7 +102,7 @@ describe('legacy 提现写路径 Gate', () => {
   });
 
   it('member 和 leader 对 approve/reject 保持 40301 且不调用写 Service', async () => {
-    for (const token of ['member', 'leader'] as const) {
+    for (const token of ['creator', 'leader'] as const) {
       for (const path of ['/api/v1/withdrawals/1/approve', '/api/v1/withdrawals/1/reject']) {
         const response = await request(app)
           .post(path)
@@ -116,7 +116,7 @@ describe('legacy 提现写路径 Gate', () => {
   });
 
   it('合法 member/leader 申请稳定返回 50310 且不调用 Service', async () => {
-    for (const token of ['member', 'leader'] as const) {
+    for (const token of ['creator', 'leader'] as const) {
       const response = await request(app)
         .post('/api/v1/withdrawals')
         .set('Authorization', authorization(token))
@@ -129,10 +129,10 @@ describe('legacy 提现写路径 Gate', () => {
 
   it('合法 boss approve/reject 稳定返回 50310 且不调用 Service', async () => {
     const responses = await Promise.all([
-      request(app).post('/api/v1/withdrawals/1/approve').set('Authorization', authorization('boss')).send({}),
+      request(app).post('/api/v1/withdrawals/1/approve').set('Authorization', authorization('admin')).send({}),
       request(app)
         .post('/api/v1/withdrawals/1/reject')
-        .set('Authorization', authorization('boss'))
+        .set('Authorization', authorization('admin'))
         .send({ remark: '拒绝原因' }),
     ]);
 
@@ -149,21 +149,21 @@ describe('legacy 提现写路径 Gate', () => {
       request(app)
         .post('/api/v1/withdrawals')
         .query(bypass)
-        .set('Authorization', authorization('member'))
+        .set('Authorization', authorization('creator'))
         .set('x-finance-gate', 'open')
         .set('Cookie', 'financeGate=open')
         .send({ amount: 0, payMethod: 'alipay', payAccount: '', ...bypass }),
       request(app)
         .post('/api/v1/withdrawals/1/approve')
         .query(bypass)
-        .set('Authorization', authorization('boss'))
+        .set('Authorization', authorization('admin'))
         .set('x-finance-gate', 'open')
         .set('Cookie', 'financeGate=open')
         .send(bypass),
       request(app)
         .post('/api/v1/withdrawals/1/reject')
         .query(bypass)
-        .set('Authorization', authorization('boss'))
+        .set('Authorization', authorization('admin'))
         .set('x-finance-gate', 'open')
         .set('Cookie', 'financeGate=open')
         .send({ remark: '', ...bypass }),
@@ -180,15 +180,15 @@ describe('legacy 提现写路径 Gate', () => {
     const gatedResponses = await Promise.all([
       request(app)
         .post('/api/v1/withdrawals')
-        .set('Authorization', authorization('member'))
+        .set('Authorization', authorization('creator'))
         .send({ amount: 0, payMethod: 'alipay', payAccount: '' }),
       request(app)
         .post('/api/v1/withdrawals/not-a-number/approve')
-        .set('Authorization', authorization('boss'))
+        .set('Authorization', authorization('admin'))
         .send({}),
       request(app)
         .post('/api/v1/withdrawals/not-a-number/reject')
-        .set('Authorization', authorization('boss'))
+        .set('Authorization', authorization('admin'))
         .send({ remark: '' }),
     ]);
 
@@ -199,7 +199,7 @@ describe('legacy 提现写路径 Gate', () => {
 
     const malformed = await request(app)
       .post('/api/v1/withdrawals')
-      .set('Authorization', authorization('member'))
+      .set('Authorization', authorization('creator'))
       .set('Content-Type', 'application/json')
       .send('{"amount":');
     expect(malformed.status).toBe(400);
@@ -217,7 +217,7 @@ describe('legacy 提现写路径 Gate', () => {
 
     const response = await request(app)
       .get('/api/v1/withdrawals?page=1&pageSize=20')
-      .set('Authorization', authorization('member'));
+      .set('Authorization', authorization('creator'));
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({

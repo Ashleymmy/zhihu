@@ -121,19 +121,19 @@ suite('MySQL API integration', () => {
         `INSERT INTO users
         (id, username, password_hash, role, parent_id, display_name, is_active, must_change_pwd)
        VALUES
-        (1, 'boss', ?, 'boss', NULL, 'Boss', 1, 0),
+        (1, 'admin', ?, 'admin', NULL, 'Boss', 1, 0),
         (2, 'leader-a', ?, 'leader', 1, 'Leader A', 1, 0),
         (3, 'leader-b', ?, 'leader', 1, 'Leader B', 1, 0),
-        (4, 'member-a', ?, 'member', 2, 'Member A', 1, 0),
-        (5, 'member-b', ?, 'member', 3, 'Member B', 1, 0)`,
+        (4, 'member-a', ?, 'creator', 2, 'Member A', 1, 0),
+        (5, 'member-b', ?, 'creator', 3, 'Member B', 1, 0)`,
         [hash, hash, hash, hash, hash],
       );
 
       bossToken = await signToken({
         id: '1',
-        role: 'boss',
+        role: 'admin',
         parentId: null,
-        username: 'boss',
+        username: 'admin',
         displayName: 'Boss',
       });
       leaderToken = await signToken({
@@ -145,7 +145,7 @@ suite('MySQL API integration', () => {
       });
       memberToken = await signToken({
         id: '4',
-        role: 'member',
+        role: 'creator',
         parentId: '2',
         username: 'member-a',
         displayName: 'Member A',
@@ -238,7 +238,7 @@ suite('MySQL API integration', () => {
   }
 
   it('returns JWT, string IDs, and permissions after login', async () => {
-    const response = await request(app).post('/api/v1/auth/login').send({ username: 'boss', password: 'password123' });
+    const response = await request(app).post('/api/v1/auth/login').send({ username: 'admin', password: 'password123' });
 
     expect(response.status).toBe(200);
     expect(response.body.data.user.id).toBe('1');
@@ -368,7 +368,7 @@ suite('MySQL API integration', () => {
       [response.body.data.id],
     );
     expect(String(member.parent_id)).toBe('2');
-    expect(member.role).toBe('member');
+    expect(member.role).toBe('creator');
     expect(response.body.data.temporaryPassword).toBeTruthy();
   });
 
@@ -376,7 +376,7 @@ suite('MySQL API integration', () => {
     const response = await request(app).post('/api/v1/team/members').set('Authorization', `Bearer ${bossToken}`).send({
       username: 'another-boss',
       displayName: 'Another Boss',
-      role: 'boss',
+      role: 'admin',
     });
 
     expect(response.status).toBe(422);
@@ -448,7 +448,7 @@ suite('MySQL API integration', () => {
           {
             sub: '4',
             jti: 'integration-member',
-            role: 'member',
+            role: 'creator',
             parentId: '2',
             username: 'member-a',
             displayName: 'Member A',
@@ -466,9 +466,9 @@ suite('MySQL API integration', () => {
           {
             sub: '1',
             jti: 'integration-boss',
-            role: 'boss',
+            role: 'admin',
             parentId: null,
-            username: 'boss',
+            username: 'admin',
             displayName: 'Boss',
           },
           '901',
@@ -484,9 +484,9 @@ suite('MySQL API integration', () => {
           {
             sub: '1',
             jti: 'integration-boss-reject',
-            role: 'boss',
+            role: 'admin',
             parentId: null,
-            username: 'boss',
+            username: 'admin',
             displayName: 'Boss',
           },
           '902',

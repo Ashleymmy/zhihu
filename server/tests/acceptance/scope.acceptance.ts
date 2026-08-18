@@ -66,11 +66,11 @@ suite('Acceptance scope', () => {
         `INSERT INTO users
        (id, username, password_hash, role, parent_id, display_name, is_active, must_change_pwd)
       VALUES
-       (1, 'boss', 'unused', 'boss', NULL, 'Boss', 1, 0),
+       (1, 'admin', 'unused', 'admin', NULL, 'Boss', 1, 0),
        (2, 'leader-a', 'unused', 'leader', 1, 'Leader A', 1, 0),
        (3, 'leader-b', 'unused', 'leader', 1, 'Leader B', 1, 0),
-       (4, 'member-a', 'unused', 'member', 2, 'Member A', 1, 0),
-       (5, 'member-b', 'unused', 'member', 3, 'Member B', 1, 0)`,
+       (4, 'member-a', 'unused', 'creator', 2, 'Member A', 1, 0),
+       (5, 'member-b', 'unused', 'creator', 3, 'Member B', 1, 0)`,
       );
       await db.query(
         `INSERT INTO plans
@@ -144,14 +144,14 @@ suite('Acceptance scope', () => {
       });
       bossToken = await signToken({
         id: '1',
-        role: 'boss',
+        role: 'admin',
         parentId: null,
-        username: 'boss',
+        username: 'admin',
         displayName: 'Boss',
       });
       memberToken = await signToken({
         id: '4',
-        role: 'member',
+        role: 'creator',
         parentId: '2',
         username: 'member-a',
         displayName: 'Member A',

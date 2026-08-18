@@ -8,15 +8,15 @@ const user = (role: AuthUser['role']): AuthUser => ({ sub: '42', role, parentId:
 
 describe('权限与安全工具', () => {
   it('角色权限按矩阵收敛', () => {
-    expect(permissionsFor('boss')).toContain('callback.secret');
+    expect(permissionsFor('admin')).toContain('callback.secret');
     expect(permissionsFor('leader')).toContain('team.create_member');
-    expect(permissionsFor('member')).not.toContain('team.view');
+    expect(permissionsFor('creator')).not.toContain('team.view');
   });
 
   it('生成参数化分级范围', () => {
-    expect(scopeFilter(user('boss'))).toEqual({ clause: '1=1', bindings: [] });
+    expect(scopeFilter(user('admin'))).toEqual({ clause: '1=1', bindings: [] });
     expect(scopeFilter(user('leader')).bindings).toEqual(['42', '42']);
-    expect(scopeFilter(user('member'))).toEqual({ clause: 'owner_id = ?', bindings: ['42'] });
+    expect(scopeFilter(user('creator'))).toEqual({ clause: 'owner_id = ?', bindings: ['42'] });
   });
 
   it('加密回传秘钥且只显示脱敏结果', () => {

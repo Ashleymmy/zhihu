@@ -3,7 +3,7 @@ import { AuthUser } from '../../src/types';
 
 const member: AuthUser = {
   sub: '4',
-  role: 'member',
+  role: 'creator',
   parentId: '2',
   username: 'member-a',
   displayName: 'Member A',

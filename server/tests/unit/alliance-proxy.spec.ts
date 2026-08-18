@@ -283,10 +283,10 @@ afterEach(async () => {
 afterAll(() => upstream.close());
 
 async function bossToken(): Promise<string> {
-  return signToken({ id: '1', role: 'boss', parentId: null, username: 'boss', displayName: 'Boss' });
+  return signToken({ id: '1', role: 'admin', parentId: null, username: 'admin', displayName: 'Boss' });
 }
 
-async function roleToken(role: 'boss' | 'leader' | 'member'): Promise<string> {
+async function roleToken(role: 'admin' | 'leader' | 'creator'): Promise<string> {
   return signToken({ id: role, role, parentId: null, username: role, displayName: role });
 }
 
@@ -699,9 +699,9 @@ describe('知乎联盟严格代理', () => {
         expectedStatus: 200,
       },
     ] as const;
-    const expectedForbidden = new Set(['leader:project', 'leader:earning', 'member:project', 'member:earning']);
+    const expectedForbidden = new Set(['leader:project', 'leader:earning', 'creator:project', 'creator:earning']);
 
-    for (const role of ['boss', 'leader', 'member'] as const) {
+    for (const role of ['admin', 'leader', 'creator'] as const) {
       for (const endpoint of endpoints) {
         quota.decisions.length = 0;
         multerMock.single.mockClear();
@@ -728,7 +728,7 @@ describe('知乎联盟严格代理', () => {
   });
 
   it('P0007-R5-NOSCOPE-001 ignores permission values supplied by clients', async () => {
-    for (const role of ['leader', 'member'] as const) {
+    for (const role of ['leader', 'creator'] as const) {
       quota.decisions.length = 0;
       multerMock.single.mockClear();
       signMock.inject.mockClear();

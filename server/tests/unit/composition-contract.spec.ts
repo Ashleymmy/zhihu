@@ -20,7 +20,7 @@ describe('作品 v2 契约', () => {
   });
 
   it('创建作品要求带时区发布时间且校验分类组合', async () => {
-    const token = await signToken({ id: '1', role: 'member', parentId: '2', username: 'member', displayName: '成员' });
+    const token = await signToken({ id: '1', role: 'creator', parentId: '2', username: 'creator', displayName: '成员' });
     const base = {
       planId: '1',
       mediaType: 'KOC定向',
