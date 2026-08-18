@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "generatorId": "A-001-INVENTORY",
-  "inputManifestSha256": "d52afe3ac7464f545719aeef2f51988d6fa44be0806f988880fdfd759a367468",
+  "inputManifestSha256": "41daafb4aa94be719b3849a16baad73a76de1815883cef20abb45fd7576e6fde",
   "registrySha256": "2544b308c36dca5b50afe2cc042eebbb270fffbef8fe91cec99d7119e7999e1e",
   "artifactSha256": {
-    "docCandidates": "90ec3ae6aa94f2d7325a8aac241d6a3a6597aa75a4a1b58b7c7b51ccdc357501",
-    "serverRoutes": "c1f8c1dd5b7566d50641612dfda91b3b61f08480636e83cd605ac0e8bdbcc3a0",
-    "platformCalls": "8189a45326a092dcd8927dfd67a57e19296fa3f6462db76133cd340db7332342"
+    "docCandidates": "ab17d6c6a302e2c26b140ff3db2147d6f96e0add0074e7b9d0c9480d76ec60b5",
+    "serverRoutes": "349ad8be22557dc6d8f97dc86454563003d0902bfbcfeae38767eb3ce2e381fe",
+    "platformCalls": "d44e2985cf28cc4c2465cb8b24178dba247331b03cf8e4348cdf84e899bbd3ae"
   },
   "declaredImplementedCount": 0,
   "derivedImplementedCount": 0,
@@ -42,21 +42,21 @@
       }
     },
     "server": {
-      "mounts": 12,
-      "callSites": 54,
-      "uniqueOperations": 54,
+      "mounts": 14,
+      "callSites": 60,
+      "uniqueOperations": 60,
       "byMethod": {
-        "GET": 23,
-        "POST": 23,
+        "GET": 25,
+        "POST": 26,
         "PUT": 1,
         "PATCH": 5,
-        "DELETE": 2,
+        "DELETE": 3,
         "HEAD": 0,
         "OPTIONS": 0
       },
       "byPathKind": {
-        "static": 38,
-        "parameterized": 16,
+        "static": 41,
+        "parameterized": 19,
         "wildcard": 0
       }
     },
@@ -80,10 +80,10 @@
       }
     },
     "apiV1": {
-      "server": 46,
+      "server": 52,
       "platform": 41,
       "observedExact": 39,
-      "serverOnly": 7,
+      "serverOnly": 13,
       "platformOnly": 2
     }
   },
@@ -94,7 +94,8 @@
         "GET /api/v1/meta/enums",
         "POST /api/v1/auth/change-password",
         "POST /api/v1/auth/login",
-        "POST /api/v1/auth/logout"
+        "POST /api/v1/auth/logout",
+        "POST /api/v1/auth/refresh"
       ],
       "shapeOnlyMatch": [],
       "targetOnly": [
@@ -240,7 +241,6 @@
         "POST /api/v1/admin/zhihu/compositions",
         "POST /api/v1/admin/zhihu/plans",
         "POST /api/v1/admin/zhihu/tasks",
-        "POST /api/v1/auth/refresh",
         "POST /api/v1/creator/creative-tools/{id}/use",
         "POST /api/v1/creator/withdrawals",
         "POST /api/v1/creator/withdrawals/{id}/submit",
@@ -266,6 +266,7 @@
       "serverOnly": [
         "DELETE /api/v1/callbacks/rules/{id}",
         "DELETE /api/v1/plans/{id}",
+        "DELETE /api/v1/projects/{projectId}/members/{userId}",
         "GET /api/alliance/api/data_report/real_time_data",
         "GET /api/alliance/api/popularize_compositions",
         "GET /api/v1/callbacks/logs",
@@ -276,12 +277,14 @@
         "GET /api/v1/compositions/{id}/audit-status",
         "GET /api/v1/earnings",
         "GET /api/v1/earnings/summary",
+        "GET /api/v1/mcn-accounts",
         "GET /api/v1/metrics/by-keyword",
         "GET /api/v1/metrics/by-member",
         "GET /api/v1/metrics/overview",
         "GET /api/v1/metrics/trend",
         "GET /api/v1/plans",
         "GET /api/v1/plans/{id}",
+        "GET /api/v1/projects/{projectId}/members",
         "GET /api/v1/tasks",
         "GET /api/v1/tasks/{id}",
         "GET /api/v1/team/members",
@@ -301,10 +304,12 @@
         "POST /api/v1/channels/sync",
         "POST /api/v1/compositions",
         "POST /api/v1/compositions/batch",
+        "POST /api/v1/mcn-accounts",
         "POST /api/v1/metrics/sync",
         "POST /api/v1/plans",
         "POST /api/v1/plans/check-keyword",
         "POST /api/v1/plans/{id}/retry-sync",
+        "POST /api/v1/projects/{projectId}/members",
         "POST /api/v1/tasks/sync",
         "POST /api/v1/team/members",
         "POST /api/v1/team/members/{id}/disable",

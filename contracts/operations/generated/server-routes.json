@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatorId": "A-001-INVENTORY",
-  "inputManifestSha256": "d52afe3ac7464f545719aeef2f51988d6fa44be0806f988880fdfd759a367468",
+  "inputManifestSha256": "41daafb4aa94be719b3849a16baad73a76de1815883cef20abb45fd7576e6fde",
   "records": [
     {
       "method": "DELETE",
@@ -30,6 +30,21 @@
       "source": {
         "file": "server/src/routes/plans.ts",
         "line": 85,
+        "column": 1
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/projects/{projectId}/members/{userId}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/projects/{}/members/{}",
+      "operationKey": "DELETE /api/v1/projects/{projectId}/members/{userId}",
+      "shapeKey": "DELETE /api/v1/projects/{}/members/{}",
+      "receiver": "projectsRouter",
+      "mount": "/api/v1/projects",
+      "source": {
+        "file": "server/src/routes/projects.ts",
+        "line": 30,
         "column": 1
       }
     },
@@ -74,7 +89,7 @@
       "mount": "/api/v1/auth",
       "source": {
         "file": "server/src/routes/auth.ts",
-        "line": 22,
+        "line": 80,
         "column": 1
       }
     },
@@ -200,6 +215,21 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/mcn-accounts",
+      "pathKind": "static",
+      "shapePath": "/api/v1/mcn-accounts",
+      "operationKey": "GET /api/v1/mcn-accounts",
+      "shapeKey": "GET /api/v1/mcn-accounts",
+      "receiver": "mcnRouter",
+      "mount": "/api/v1/mcn-accounts",
+      "source": {
+        "file": "server/src/routes/mcn.ts",
+        "line": 24,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/meta/enums",
       "pathKind": "static",
       "shapePath": "/api/v1/meta/enums",
@@ -305,6 +335,21 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/projects/{projectId}/members",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/projects/{}/members",
+      "operationKey": "GET /api/v1/projects/{projectId}/members",
+      "shapeKey": "GET /api/v1/projects/{}/members",
+      "receiver": "projectsRouter",
+      "mount": "/api/v1/projects",
+      "source": {
+        "file": "server/src/routes/projects.ts",
+        "line": 18,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/tasks",
       "pathKind": "static",
       "shapePath": "/api/v1/tasks",
@@ -344,7 +389,7 @@
       "mount": "/api/v1/team",
       "source": {
         "file": "server/src/routes/team.ts",
-        "line": 24,
+        "line": 27,
         "column": 1
       }
     },
@@ -374,7 +419,7 @@
       "mount": "/",
       "source": {
         "file": "server/src/app.ts",
-        "line": 24,
+        "line": 26,
         "column": 3
       }
     },
@@ -449,7 +494,7 @@
       "mount": "/api/v1/team",
       "source": {
         "file": "server/src/routes/team.ts",
-        "line": 35,
+        "line": 38,
         "column": 1
       }
     },
@@ -524,7 +569,7 @@
       "mount": "/api/v1/auth",
       "source": {
         "file": "server/src/routes/auth.ts",
-        "line": 35,
+        "line": 94,
         "column": 1
       }
     },
@@ -539,7 +584,7 @@
       "mount": "/api/v1/auth",
       "source": {
         "file": "server/src/routes/auth.ts",
-        "line": 14,
+        "line": 51,
         "column": 1
       }
     },
@@ -554,7 +599,22 @@
       "mount": "/api/v1/auth",
       "source": {
         "file": "server/src/routes/auth.ts",
-        "line": 28,
+        "line": 86,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/refresh",
+      "operationKey": "POST /api/v1/auth/refresh",
+      "shapeKey": "POST /api/v1/auth/refresh",
+      "receiver": "authRouter",
+      "mount": "/api/v1/auth",
+      "source": {
+        "file": "server/src/routes/auth.ts",
+        "line": 60,
         "column": 1
       }
     },
@@ -635,6 +695,21 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/mcn-accounts",
+      "pathKind": "static",
+      "shapePath": "/api/v1/mcn-accounts",
+      "operationKey": "POST /api/v1/mcn-accounts",
+      "shapeKey": "POST /api/v1/mcn-accounts",
+      "receiver": "mcnRouter",
+      "mount": "/api/v1/mcn-accounts",
+      "source": {
+        "file": "server/src/routes/mcn.ts",
+        "line": 29,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/metrics/sync",
       "pathKind": "static",
       "shapePath": "/api/v1/metrics/sync",
@@ -695,6 +770,21 @@
     },
     {
       "method": "POST",
+      "path": "/api/v1/projects/{projectId}/members",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/projects/{}/members",
+      "operationKey": "POST /api/v1/projects/{projectId}/members",
+      "shapeKey": "POST /api/v1/projects/{}/members",
+      "receiver": "projectsRouter",
+      "mount": "/api/v1/projects",
+      "source": {
+        "file": "server/src/routes/projects.ts",
+        "line": 22,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/tasks/sync",
       "pathKind": "static",
       "shapePath": "/api/v1/tasks/sync",
@@ -719,7 +809,7 @@
       "mount": "/api/v1/team",
       "source": {
         "file": "server/src/routes/team.ts",
-        "line": 29,
+        "line": 32,
         "column": 1
       }
     },
@@ -734,7 +824,7 @@
       "mount": "/api/v1/team",
       "source": {
         "file": "server/src/routes/team.ts",
-        "line": 49,
+        "line": 52,
         "column": 1
       }
     },
@@ -749,7 +839,7 @@
       "mount": "/api/v1/team",
       "source": {
         "file": "server/src/routes/team.ts",
-        "line": 44,
+        "line": 47,
         "column": 1
       }
     },
