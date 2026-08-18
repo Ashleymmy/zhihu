@@ -36,7 +36,7 @@ suite('Acceptance scope', () => {
     try {
       createdLease.injectEnvironment();
       const migration = await runMigrations(createdLease.migrationTarget, resolve(process.cwd(), 'migrations'));
-      expect(migration.applied).toEqual(['001_init.sql', '002_callbacks.sql', '003_composition_v2.sql']);
+      expect(migration.applied).toEqual(['001_init.sql', '002_callbacks.sql', '003_composition_v2.sql', '004_identity_rbac.sql']);
       expect(migration.skipped).toEqual([]);
       vi.resetModules();
       const [{ createApp }, databaseModule, jwtModule] = await Promise.all([
@@ -228,6 +228,7 @@ suite('Acceptance scope', () => {
       '001_init.sql',
       '002_callbacks.sql',
       '003_composition_v2.sql',
+      '004_identity_rbac.sql',
     ]);
   });
 

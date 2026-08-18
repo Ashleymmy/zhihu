@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS roles (
   is_system TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO roles (role_key, role_name, description, level, is_system) VALUES
   ('admin', '超级管理员', '拥有所有权限', 0, 1),
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS mcn_accounts (
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY uk_mcn_accounts_key (account_key),
   KEY idx_mcn_accounts_owner (owner_user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE mcn_accounts
   ADD CONSTRAINT fk_mcn_accounts_owner FOREIGN KEY (owner_user_id) REFERENCES users(id);
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS project_members (
   UNIQUE KEY uk_project_user (project_id, user_id),
   CONSTRAINT fk_project_members_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 5. Refresh Token 会话（轮换 + 复用检测 + family 撤销）
 CREATE TABLE IF NOT EXISTS token_sessions (
@@ -89,4 +89,4 @@ CREATE TABLE IF NOT EXISTS token_sessions (
   KEY idx_token_sessions_user (user_id, expires_at),
   CONSTRAINT fk_token_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_token_sessions_rotated_from FOREIGN KEY (rotated_from_id) REFERENCES token_sessions(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
