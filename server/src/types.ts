@@ -1,4 +1,4 @@
-export type Role = 'boss' | 'leader' | 'member';
+export type Role = 'admin' | 'leader' | 'creator';
 
 export interface AuthUser {
   sub: string;

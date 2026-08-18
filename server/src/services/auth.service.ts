@@ -4,8 +4,16 @@ import { db, rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
 import { AuthUser, Role } from '../types';
 import { signToken, tokenTtl } from '../auth/jwt';
+import { normalizeRole } from '../auth/roles';
 import { permissionsFor } from '../auth/permissions';
 import { revocationStore } from '../auth/revocation';
+import {
+  RefreshSession,
+  issueRefreshSession,
+  revokeRefreshFamily,
+  revokeUserSessions,
+  rotateRefreshSession,
+} from '../auth/tokenSessions';
 import { writeAudit } from './audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 
@@ -13,7 +21,7 @@ interface UserRow extends RowDataPacket {
   id: string;
   username: string;
   password_hash: string;
-  role: Role;
+  role: string;
   parent_id: string | null;
   display_name: string;
   phone: string | null;
@@ -21,14 +29,41 @@ interface UserRow extends RowDataPacket {
   must_change_pwd: number;
 }
 
-const publicUser = (user: UserRow) => ({
+const publicUser = (user: UserRow, role: Role) => ({
   id: String(user.id),
   username: user.username,
   displayName: user.display_name,
-  role: user.role,
+  role,
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
 });
+
+/** 未知角色值必须拒绝并审计，不得默认提升权限（03 §5.3）。 */
+async function requireKnownRole(user: UserRow, ip?: string): Promise<Role> {
+  const role = normalizeRole(user.role);
+  if (!role) {
+    await writeAudit({
+      userId: String(user.id),
+      action: 'auth.unknown_role_rejected',
+      resourceType: 'user',
+      resourceId: String(user.id),
+      detail: { role: user.role },
+      ip,
+    });
+    throw new AppError(403, 40303, '账号角色异常，请联系管理员');
+  }
+  return role;
+}
+
+async function issueAccessToken(user: UserRow, role: Role) {
+  return signToken({
+    id: String(user.id),
+    role,
+    parentId: user.parent_id ? String(user.parent_id) : null,
+    username: user.username,
+    displayName: user.display_name,
+  });
+}
 
 export async function login(username: string, password: string, ip?: string) {
   const ipKey = `login:ip:${ip ?? 'unknown'}`;
@@ -43,17 +78,13 @@ export async function login(username: string, password: string, ip?: string) {
     throw new AppError(401, 40102, '用户名或密码错误');
   }
   if (!user.is_active) throw new AppError(403, 40302, '账号已停用');
+  const role = await requireKnownRole(user, ip);
 
   const userKey = `login:user:${username}`;
   await deleteRateLimit(userKey);
 
-  const token = await signToken({
-    id: String(user.id),
-    role: user.role,
-    parentId: user.parent_id ? String(user.parent_id) : null,
-    username: user.username,
-    displayName: user.display_name,
-  });
+  const token = await issueAccessToken(user, role);
+  const refresh = await issueRefreshSession(String(user.id));
   await withTransaction(async (connection) => {
     await connection.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
     await writeAudit(
@@ -61,17 +92,34 @@ export async function login(username: string, password: string, ip?: string) {
       connection,
     );
   });
-  return { token, user: publicUser(user), mustChangePwd: Boolean(user.must_change_pwd) };
+  return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh };
+}
+
+/** Refresh Cookie 轮换：换发新 Access Token 与新 Refresh Token。 */
+export async function refresh(plainToken: string, ip?: string) {
+  const session = await rotateRefreshSession(plainToken);
+  const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [session.userId]);
+  if (!user || !user.is_active) throw new AppError(401, 40101, '登录已过期，请重新登录');
+  const role = await requireKnownRole(user, ip);
+  const token = await issueAccessToken(user, role);
+  return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh: session };
 }
 
 export async function me(auth: AuthUser) {
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [auth.sub]);
   if (!user || !user.is_active) throw new AppError(401, 40101, '登录已过期，请重新登录');
-  return { ...publicUser(user), permissions: permissionsFor(user.role), mustChangePwd: Boolean(user.must_change_pwd) };
+  const role = normalizeRole(user.role);
+  if (!role) throw new AppError(403, 40303, '账号角色异常，请联系管理员');
+  return {
+    ...publicUser(user, role),
+    permissions: permissionsFor(role),
+    mustChangePwd: Boolean(user.must_change_pwd),
+  };
 }
 
-export async function logout(auth: AuthUser, ip?: string) {
+export async function logout(auth: AuthUser, refreshToken: string | null, ip?: string) {
   await revocationStore.revoke(auth.jti, tokenTtl(auth));
+  if (refreshToken) await revokeRefreshFamily(refreshToken, 'logout');
   await writeAudit({ userId: auth.sub, action: 'auth.logout', resourceType: 'user', resourceId: auth.sub, ip });
 }
 
@@ -92,4 +140,7 @@ export async function changePassword(auth: AuthUser, oldPassword: string, newPas
     );
   });
   await revocationStore.revokeUser(auth.sub);
+  await revokeUserSessions(auth.sub, 'password_changed');
 }
+
+export type { RefreshSession };

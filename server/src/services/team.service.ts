@@ -5,6 +5,7 @@ import { rows, withTransaction } from '../db';
 import { revocationStore } from '../auth/revocation';
 import { AppError } from '../middleware/errors';
 import { AuthUser, Role } from '../types';
+import { normalizeRole } from '../auth/roles';
 import { writeAudit } from './audit.service';
 
 interface MemberRow extends RowDataPacket {
@@ -22,7 +23,7 @@ async function resolveParentId(user: AuthUser, role: Role, requestedParentId?: s
   const [parent] = await rows<MemberRow>('SELECT id, role, parent_id, is_active FROM users WHERE id = ? LIMIT 1', [
     parentId,
   ]);
-  if (!parent || !parent.is_active || !['boss', 'leader'].includes(parent.role)) {
+  if (!parent || !parent.is_active || !['admin', 'leader'].includes(normalizeRole(parent.role) ?? '')) {
     throw new AppError(422, 42205, '成员必须归属于有效的管理员或团长账号');
   }
   return String(parent.id);
@@ -36,7 +37,7 @@ const target = async (user: AuthUser, id: string) => {
 };
 
 export async function listMembers(user: AuthUser) {
-  if (user.role === 'boss')
+  if (user.role === 'admin')
     return rows(
       'SELECT id, username, role, parent_id, display_name, phone, is_active, must_change_pwd, last_login_at, created_at FROM users ORDER BY created_at DESC',
     );
@@ -51,7 +52,7 @@ export async function createMember(
   input: { username: string; displayName: string; phone?: string | null; role?: Role; parentId?: string | null },
   ip?: string,
 ) {
-  const role: Role = user.role === 'boss' ? (input.role ?? 'member') : 'member';
+  const role: Role = user.role === 'admin' ? (input.role ?? 'creator') : 'creator';
   const parentId = await resolveParentId(user, role, input.parentId);
   const temporaryPassword = crypto.randomBytes(9).toString('base64url');
   const hash = await bcrypt.hash(temporaryPassword, 12);

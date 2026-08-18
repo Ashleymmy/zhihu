@@ -27,7 +27,7 @@ export const ALL_PERMISSIONS = [
 export type Permission = (typeof ALL_PERMISSIONS)[number];
 
 const rolePermissions: Record<Role, readonly Permission[]> = {
-  boss: ALL_PERMISSIONS,
+  admin: ALL_PERMISSIONS,
   leader: [
     'plan.create',
     'plan.edit',
@@ -43,7 +43,7 @@ const rolePermissions: Record<Role, readonly Permission[]> = {
     'earning.view_team',
     'withdraw.apply',
   ],
-  member: [
+  creator: [
     'plan.create',
     'plan.edit',
     'plan.delete',

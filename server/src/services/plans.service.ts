@@ -151,7 +151,7 @@ export async function getPlan(user: AuthUser, id: string) {
 }
 
 export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) {
-  const ownerId = user.role === 'boss' && input.ownerId ? input.ownerId : user.sub;
+  const ownerId = user.role === 'admin' && input.ownerId ? input.ownerId : user.sub;
   const id = await withTransaction(async (connection) => {
     const [existing] = await connection.query<RowDataPacket[]>(
       'SELECT id FROM plans WHERE channel_id = ? AND keyword = ? LIMIT 1 FOR UPDATE',

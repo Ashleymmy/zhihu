@@ -7,7 +7,9 @@ import { compositionsRouter } from './routes/compositions';
 import { earningsRouter } from './routes/earnings';
 import { metaRouter } from './routes/meta';
 import { metricsRouter } from './routes/metrics';
+import { mcnRouter } from './routes/mcn';
 import { plansRouter } from './routes/plans';
+import { projectsRouter } from './routes/projects';
 import { tasksRouter } from './routes/tasks';
 import { teamRouter } from './routes/team';
 import { withdrawalsRouter } from './routes/withdrawals';
@@ -23,6 +25,8 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/mcn-accounts', mcnRouter);
+  app.use('/api/v1/projects', projectsRouter);
   app.use('/api/v1/meta', metaRouter);
   app.use('/api/v1/plans', plansRouter);
   app.use('/api/v1/metrics', metricsRouter);

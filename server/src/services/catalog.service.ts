@@ -10,7 +10,7 @@ interface CountRow extends RowDataPacket {
   total: number;
 }
 export function channelVisibility(user: AuthUser) {
-  if (user.role === 'member') {
+  if (user.role === 'creator') {
     return {
       clause:
         "(c.owner_id=? OR c.owner_id=? OR EXISTS (SELECT 1 FROM plans p WHERE p.channel_id=c.zhihu_channel_id AND p.owner_id=? AND p.status<>'ended'))",

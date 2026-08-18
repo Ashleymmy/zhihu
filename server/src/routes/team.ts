@@ -12,7 +12,10 @@ const create = z.object({
   username: z.string().trim().min(1).max(64),
   displayName: z.string().trim().min(1).max(64),
   phone: z.string().max(20).nullable().optional(),
-  role: z.enum(['leader', 'member']).optional(),
+  role: z
+    .enum(['leader', 'member', 'creator'])
+    .transform((value) => (value === 'member' ? 'creator' : value))
+    .optional(),
   parentId: id.nullable().optional(),
 });
 const update = z.object({
