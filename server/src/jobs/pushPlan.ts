@@ -1,6 +1,7 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../db';
-import { zhihuPost, zhihuPut, zhihuSyncErrorDetail } from '../zhihu/client';
+import { zhihuPost, zhihuSyncErrorDetail } from '../zhihu/client';
+import { PLAN_UPDATE_UNSUPPORTED_ERROR } from '../zhihu/allianceVersionPolicy';
 
 export interface PlanPayloadInput {
   zhihu_task_id: string;
@@ -48,6 +49,14 @@ export async function pushPlan(data: Record<string, unknown>) {
   const [plan] = await rows<PlanRow>('SELECT * FROM plans WHERE id = ? LIMIT 1', [id]);
   if (!plan || plan.status === 'ended') return;
 
+  if (plan.zhihu_plan_id != null) {
+    await db.query(
+      "UPDATE plans SET sync_status = 'failed', sync_error = ? WHERE id = ? AND keyword = ? AND sync_status IN ('local', 'failed') AND zhihu_plan_id = ?",
+      [PLAN_UPDATE_UNSUPPORTED_ERROR, id, plan.keyword, plan.zhihu_plan_id],
+    );
+    return;
+  }
+
   const [claimed] = await db.query<ResultSetHeader>(
     "UPDATE plans SET sync_status = 'syncing', sync_error = NULL WHERE id = ? AND keyword = ? AND sync_status IN ('local', 'failed')",
     [id, plan.keyword],
@@ -56,9 +65,7 @@ export async function pushPlan(data: Record<string, unknown>) {
   const body = buildPlanPayload(plan);
 
   try {
-    const response = plan.zhihu_plan_id
-      ? await zhihuPut(`/alliance/api/popularize_plan/${plan.zhihu_plan_id}`, body)
-      : await zhihuPost('/alliance/api/popularize_plan', body);
+    const response = await zhihuPost('/alliance/api/popularize_plan', body);
     await db.query(
       `UPDATE plans
        SET sync_status = 'synced', zhihu_plan_id = COALESCE(?, zhihu_plan_id), sync_error = NULL

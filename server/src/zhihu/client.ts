@@ -1,16 +1,16 @@
 import axios from 'axios';
 import { config } from '../config';
 import { AppError } from '../middleware/errors';
-import { injectSignParams } from '../sign/zhihu';
-import { parseZhihuJson } from './json';
-
-const client = axios.create({
-  baseURL: config.zhihu.apiBase,
-  timeout: 15_000,
-  transformResponse: [parseZhihuJson],
-});
-
-const TOKEN_ONLY_GET_PATHS = new Set(['/alliance/api/get_agent_channels']);
+import {
+  ALLIANCE_BATCH_UPLOAD_UNAVAILABLE_MESSAGE,
+  AllianceBusinessError,
+  AllianceProtocolError,
+  parseAllianceUpstreamRequest,
+  prepareAllianceRequest,
+  projectAllianceSuccess,
+} from './allianceContracts';
+import { resolveClientEndpoint, type AllianceEndpoint } from './allianceEndpointRegistry';
+import { requestAlliance } from './allianceEgress';
 
 const knownErrors = [
   { needles: ['timestamp无效'], error: new AppError(502, 50001, '系统时间校验失败，请稍后重试') },
@@ -87,10 +87,20 @@ function translatedUpstreamError(data: unknown, status: number): AppError | Zhih
   });
 }
 
-function responseData<T>(data: T, status: number): T {
+function responseData<T>(endpoint: AllianceEndpoint, data: unknown, status: number): T {
   const upstreamError = translatedUpstreamError(data, status);
   if (upstreamError) throw upstreamError;
-  return data;
+  try {
+    return projectAllianceSuccess(endpoint, data, {}).clientData as T;
+  } catch (error) {
+    if (error instanceof AllianceBusinessError) {
+      throw new ZhihuUpstreamError({ status, code: null, messageKey: null });
+    }
+    if (error instanceof AllianceProtocolError) {
+      throw new AppError(502, 50002, '知乎服务暂时不可用，请稍后重试');
+    }
+    throw error;
+  }
 }
 
 export function zhihuSyncErrorDetail(error: unknown): string {
@@ -106,6 +116,25 @@ export function zhihuSyncErrorDetail(error: unknown): string {
   return '知乎同步失败，请稍后重试';
 }
 
+async function requestClient<T>(
+  method: 'GET' | 'POST' | 'PUT',
+  path: string,
+  input: Record<string, unknown>,
+): Promise<T> {
+  const endpoint = resolveClientEndpoint(method, path);
+  if (!endpoint) throw new AppError(502, 50002, '知乎服务暂时不可用，请稍后重试');
+  if (endpoint.requestKind === 'multipart') {
+    throw new AppError(503, 50300, ALLIANCE_BATCH_UPLOAD_UNAVAILABLE_MESSAGE);
+  }
+  const upstream = parseAllianceUpstreamRequest(endpoint, input);
+  const prepared = prepareAllianceRequest(endpoint, upstream, config.zhihu.accessToken, config.zhihu.secretKey);
+  const response = await requestAlliance<T>({
+    endpoint,
+    ...(method === 'GET' ? { params: prepared } : { data: prepared }),
+  });
+  return responseData<T>(endpoint, response.data, response.status);
+}
+
 function translateError(error: unknown): never {
   if (error instanceof AppError) throw error;
   if (axios.isAxiosError<Record<string, unknown>>(error) && error.response) {
@@ -119,11 +148,7 @@ function translateError(error: unknown): never {
 
 export async function zhihuGet<T = unknown>(path: string, params: Record<string, unknown> = {}): Promise<T> {
   try {
-    const authenticated = TOKEN_ONLY_GET_PATHS.has(path)
-      ? { ...params, access_token: config.zhihu.accessToken }
-      : injectSignParams(params, config.zhihu.accessToken, config.zhihu.secretKey);
-    const response = await client.get<T>(path, { params: authenticated });
-    return responseData(response.data, response.status);
+    return await requestClient<T>('GET', path, params);
   } catch (error) {
     return translateError(error);
   }
@@ -131,9 +156,7 @@ export async function zhihuGet<T = unknown>(path: string, params: Record<string,
 
 export async function zhihuPost<T = unknown>(path: string, body: Record<string, unknown> = {}): Promise<T> {
   try {
-    const signed = injectSignParams(body, config.zhihu.accessToken, config.zhihu.secretKey);
-    const response = await client.post<T>(path, signed);
-    return responseData(response.data, response.status);
+    return await requestClient<T>('POST', path, body);
   } catch (error) {
     return translateError(error);
   }
@@ -141,9 +164,7 @@ export async function zhihuPost<T = unknown>(path: string, body: Record<string, 
 
 export async function zhihuPut<T = unknown>(path: string, body: Record<string, unknown> = {}): Promise<T> {
   try {
-    const signed = injectSignParams(body, config.zhihu.accessToken, config.zhihu.secretKey);
-    const response = await client.put<T>(path, signed);
-    return responseData(response.data, response.status);
+    return await requestClient<T>('PUT', path, body);
   } catch (error) {
     return translateError(error);
   }

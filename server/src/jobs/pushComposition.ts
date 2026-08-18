@@ -1,6 +1,7 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../db';
 import { zhihuPost, zhihuPut, zhihuSyncErrorDetail } from '../zhihu/client';
+import { COMPOSITION_ID_INVALID_ERROR, isCanonicalCompositionId } from '../zhihu/allianceVersionPolicy';
 
 export interface CompositionPayloadInput {
   zhihu_plan_id: string;
@@ -74,9 +75,17 @@ export async function pushComposition(data: Record<string, unknown>) {
     return;
   }
 
+  const hasExistingCompositionId = item.zhihu_composition_id != null;
+  if (hasExistingCompositionId) {
+    if (!isCanonicalCompositionId(item.zhihu_composition_id)) {
+      await failLocally(id, COMPOSITION_ID_INVALID_ERROR);
+      return;
+    }
+  }
+
   const body = buildCompositionPayload(item as CompositionPayloadInput);
   try {
-    const response = item.zhihu_composition_id
+    const response = hasExistingCompositionId
       ? await zhihuPut(`/alliance/api/popularize_composition/v2/${item.zhihu_composition_id}`, body)
       : await zhihuPost('/alliance/api/popularize_composition/v2', body);
     await db.query(

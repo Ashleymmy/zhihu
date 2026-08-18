@@ -1,6 +1,7 @@
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
+import { assertLegacyWithdrawalWritesBlocked } from '../middleware/financeGate';
 import { AuthUser } from '../types';
 import { maskAccount } from '../utils/maskSecret';
 import { pageOffset } from '../utils/pagination';
@@ -88,6 +89,7 @@ export async function createWithdrawal(
   input: { amount: number; payMethod: 'alipay' | 'wechat'; payAccount: string },
   ip?: string,
 ) {
+  assertLegacyWithdrawalWritesBlocked();
   return withTransaction(async (connection) => {
     await connection.query('SELECT id FROM users WHERE id=? FOR UPDATE', [user.sub]);
     const [[income]] = await connection.query<AmountRow[]>(
@@ -132,6 +134,7 @@ async function handleWithdrawal(
   remark: string | null,
   ip?: string,
 ) {
+  assertLegacyWithdrawalWritesBlocked();
   return withTransaction(async (connection) => {
     const [[item]] = await connection.query<WithdrawalRow[]>(
       'SELECT * FROM withdrawal_requests WHERE id=? FOR UPDATE',

@@ -28,8 +28,16 @@ const envSchema = z.object({
   TZ: z.string().default('Asia/Shanghai'),
 });
 
+function validateZhihuApiBase(value: string): string {
+  if (value !== 'https://open.zhihu.com' && value !== 'https://open.zhihu.com/') {
+    throw new Error('知乎 API 地址必须固定为 https://open.zhihu.com');
+  }
+  return value.replace(/\/$/u, '');
+}
+
 export function parseEnvironment(input: NodeJS.ProcessEnv) {
   const parsed = envSchema.parse(input);
+  parsed.ZHIHU_API_BASE = validateZhihuApiBase(parsed.ZHIHU_API_BASE);
   if (parsed.NODE_ENV === 'production') {
     const unsafe = [
       parsed.JWT_SECRET.startsWith('test_only_'),

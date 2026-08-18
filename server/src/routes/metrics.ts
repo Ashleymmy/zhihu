@@ -13,12 +13,10 @@ const range = z.object({
   to: z.string().date().optional(),
   granularity: z.literal('day').default('day'),
 });
-const keyword = paginationSchema
-  .merge(range)
-  .extend({
-    sort: z.enum(['earning', 'impressions', 'clicks', 'conversions']).optional(),
-    order: z.enum(['asc', 'desc']).optional(),
-  });
+const keyword = paginationSchema.merge(range).extend({
+  sort: z.enum(['earning', 'impressions', 'clicks', 'conversions']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+});
 export const metricsRouter = Router();
 metricsRouter.use(requireAuth);
 metricsRouter.get(
