@@ -1,0 +1,2843 @@
+{
+  "schemaVersion": 1,
+  "generatorId": "A-001-INVENTORY",
+  "inputManifestSha256": "d52afe3ac7464f545719aeef2f51988d6fa44be0806f988880fdfd759a367468",
+  "registrySha256": "2544b308c36dca5b50afe2cc042eebbb270fffbef8fe91cec99d7119e7999e1e",
+  "sources": [
+    {
+      "surface": "public-bff",
+      "file": "docs/重构文档/02-API接口契约.md",
+      "section": "2.2-public-bff",
+      "baselineCount": 169,
+      "semanticSha256": "78a1983a0c6e0d1ce9081544d4412de0aadf651a731d9f992f6c93f601c5e87f",
+      "state": "candidate-inventory-frozen"
+    },
+    {
+      "surface": "upstream-adapter",
+      "file": "docs/重构文档/02-API接口契约.md",
+      "section": "7.1-upstream-adapter",
+      "baselineCount": 7,
+      "semanticSha256": "b38c2d7a151b312813fbfa8f2220c56322071a0294cf38cf962973b2e569a061",
+      "state": "candidate-inventory-frozen"
+    }
+  ],
+  "records": [
+    {
+      "candidateId": "A001-PUB-0001",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/users",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/users",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "用户列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 188
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0002",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/users",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/users",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "创建用户",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 189
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0003",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/users/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/users/{}",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "用户详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 190
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0004",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/users/{}",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "更新用户",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 191
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0005",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/users/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/users/{}",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "删除用户",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 192
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0006",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/users/{id}/reset-password",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/users/{}/reset-password",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "重置密码",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 193
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0007",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/users/{id}/ban",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/users/{}/ban",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "封禁用户",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 194
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0008",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/users/{id}/unban",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/users/{}/unban",
+      "role": "admin",
+      "group": "用户管理",
+      "notes": "解封用户",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 195
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0009",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/orders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/orders",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "订单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 198
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0010",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/orders",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "创建订单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 199
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0011",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/orders/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "订单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 200
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0012",
+      "surface": "public-bff",
+      "method": "PATCH",
+      "path": "/api/v1/admin/orders/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "仅 draft 更新来源字段；不可写派生金额或状态",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 201
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0013",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/orders/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "仅 draft/cancelled 可软删除",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 202
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0014",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{id}/submit",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/submit",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "draft → pending",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 203
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0015",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{id}/activate",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/activate",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "pending → active；Admin 金额审批边界",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 204
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0016",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{id}/complete",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/complete",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "active → completed",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 205
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0017",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{id}/settle",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/settle",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "completed → settled；受 D-001-DECISION、D-001-READINESS、P0-008 与 M6 阻断",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 206
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0018",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{id}/refunds",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/refunds",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "创建退款资源（带 Idempotency-Key）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 207
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0019",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/orders/{id}/refunds",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/refunds",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "退款记录",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 208
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0020",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/orders/{id}/cancel",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/orders/{}/cancel",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "取消订单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 209
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0021",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/orders/batch",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/orders/batch",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "批量软删，仅 draft/cancelled",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 210
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0022",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/orders/export",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/orders/export",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "导出订单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 211
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0023",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/orders/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/orders/stats",
+      "role": "admin",
+      "group": "订单管理",
+      "notes": "订单统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 212
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0024",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/settlements",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/settlements",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "结算单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 215
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0025",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/settlements",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/settlements",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "创建结算单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 216
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0026",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/settlements/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/settlements/{}",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "结算单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 217
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0027",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/admin/settlements/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/settlements/{}",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "更新结算单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 218
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0028",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/settlements/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/settlements/{}",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "仅软删无审批/支付事实的 draft",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 219
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0029",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/settlements/{id}/approve",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/settlements/{}/approve",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "只完成当前审批级",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 220
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0030",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/settlements/{id}/reject",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/settlements/{}/reject",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "驳回当前审批级",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 221
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0031",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/settlements/{id}/pay",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/settlements/{}/pay",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "创建幂等打款意图，不能直接标记成功",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 222
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0032",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/settlements/generate",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/settlements/generate",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "批量生成结算单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 223
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0033",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/settlements/export",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/settlements/export",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "导出结算单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 224
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0034",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/settlements/batch",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/settlements/batch",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "批量软删，每项适用同一事实 Gate",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 225
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0035",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/settlements/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/settlements/stats",
+      "role": "admin",
+      "group": "结算管理",
+      "notes": "结算统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 226
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0036",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/withdrawals",
+      "role": "admin",
+      "group": "提现管理",
+      "notes": "提现工单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 229
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0037",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/withdrawals/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/withdrawals/{}",
+      "role": "admin",
+      "group": "提现管理",
+      "notes": "提现工单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 230
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0038",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/withdrawals/{id}/approve",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/withdrawals/{}/approve",
+      "role": "admin",
+      "group": "提现管理",
+      "notes": "只完成当前审批级",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 231
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0039",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/withdrawals/{id}/reject",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/withdrawals/{}/reject",
+      "role": "admin",
+      "group": "提现管理",
+      "notes": "拒绝当前审批级",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 232
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0040",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/withdrawals/{id}/pay",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/withdrawals/{}/pay",
+      "role": "admin",
+      "group": "提现管理",
+      "notes": "创建幂等打款意图，不能直接标记成功",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 233
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0041",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/zhihu/tasks",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/tasks",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "知乎任务列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 236
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0042",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/zhihu/tasks",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/tasks",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "创建任务",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 237
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0043",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/zhihu/tasks/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/tasks/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "任务详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 238
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0044",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/admin/zhihu/tasks/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/tasks/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "更新任务",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 239
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0045",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/zhihu/tasks/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/tasks/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "删除任务",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 240
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0046",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/zhihu/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/plans",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "推广计划列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 242
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0047",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/zhihu/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/plans",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "创建计划",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 243
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0048",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/plans/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "计划详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 244
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0049",
+      "surface": "public-bff",
+      "method": "PATCH",
+      "path": "/api/v1/admin/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/plans/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "仅本地草稿；已同步计划不得调用未披露的官方更新接口",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 245
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0050",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/plans/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "删除计划",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 246
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0051",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/zhihu/plans/batch",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/plans/batch",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "批量删除",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 247
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0052",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/zhihu/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/compositions",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "推广作品列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 249
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0053",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/zhihu/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/compositions",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "创建作品（仅官方 v2）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 250
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0054",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/zhihu/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/compositions/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "作品详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 251
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0055",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/zhihu/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/zhihu/compositions/{}",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "删除作品",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 252
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0056",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/zhihu/compositions/batch",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/zhihu/compositions/batch",
+      "role": "admin",
+      "group": "推广管理",
+      "notes": "批量删除",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 253
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0057",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/relay/configs",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/relay/configs",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "中继配置列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 256
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0058",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/relay/configs",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/relay/configs",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "创建规则草稿/新版本",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 257
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0059",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/relay/configs/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/relay/configs/{}",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "配置详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 258
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0060",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/relay/configs/{id}/publish",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/relay/configs/{}/publish",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "发布不可变版本",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 259
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0061",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/relay/configs/{id}/retire",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/relay/configs/{}/retire",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "停止后续匹配，不改历史",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 260
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0062",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/relay/ledger",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/relay/ledger",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "账本分录（Admin，按项目过滤）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 262
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0063",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/relay/revisions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/relay/revisions",
+      "role": "admin",
+      "group": "数据中继配置",
+      "notes": "追加冲正与替换分录",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 263
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0064",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/earning-source-batches",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/earning-source-batches",
+      "role": "admin",
+      "group": "结算来源批次（D-001）",
+      "notes": "上传 XLSX 草稿批次",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 266
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0065",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/earning-source-batches/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/earning-source-batches/{}",
+      "role": "admin",
+      "group": "结算来源批次（D-001）",
+      "notes": "批次与校验摘要",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 267
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0066",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/earning-source-batches/{id}/validate",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/earning-source-batches/{}/validate",
+      "role": "admin",
+      "group": "结算来源批次（D-001）",
+      "notes": "校验",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 268
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0067",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/earning-source-batches/{id}/approve",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/earning-source-batches/{}/approve",
+      "role": "admin",
+      "group": "结算来源批次（D-001）",
+      "notes": "独立 Admin 审批",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 269
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0068",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/earning-source-batches/{id}/post",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/earning-source-batches/{}/post",
+      "role": "admin",
+      "group": "结算来源批次（D-001）",
+      "notes": "幂等入账",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 270
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0069",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/projects",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/projects",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "项目列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 273
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0070",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/projects",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/projects",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "创建项目",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 274
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0071",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/projects/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/projects/{}",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "项目详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 275
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0072",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/admin/projects/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/projects/{}",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "更新项目",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 276
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0073",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/projects/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/projects/{}",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "删除项目",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 277
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0074",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/projects/{id}/members",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/projects/{}/members",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "项目成员列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 278
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0075",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/projects/{id}/members",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/projects/{}/members",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "添加成员",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 279
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0076",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/projects/{id}/members/{uid}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/projects/{}/members/{}",
+      "role": "admin",
+      "group": "项目管理",
+      "notes": "移除成员",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 280
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0077",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/creative-tools",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/creative-tools",
+      "role": "admin",
+      "group": "创意工具配置",
+      "notes": "工具配置列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 283
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0078",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/creative-tools",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/creative-tools",
+      "role": "admin",
+      "group": "创意工具配置",
+      "notes": "创建工具配置",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 284
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0079",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/admin/creative-tools/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/creative-tools/{}",
+      "role": "admin",
+      "group": "创意工具配置",
+      "notes": "更新工具配置",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 285
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0080",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/admin/creative-tools/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/creative-tools/{}",
+      "role": "admin",
+      "group": "创意工具配置",
+      "notes": "删除工具配置",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 286
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0081",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/creative-tools/usage",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/creative-tools/usage",
+      "role": "admin",
+      "group": "创意工具配置",
+      "notes": "工具使用统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 287
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0082",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/overview",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/dashboard/overview",
+      "role": "admin",
+      "group": "数据看板",
+      "notes": "总览数据",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 290
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0083",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/dashboard/earnings",
+      "role": "admin",
+      "group": "数据看板",
+      "notes": "收益趋势",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 291
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0084",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/orders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/dashboard/orders",
+      "role": "admin",
+      "group": "数据看板",
+      "notes": "订单趋势",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 292
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0085",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/users",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/dashboard/users",
+      "role": "admin",
+      "group": "数据看板",
+      "notes": "用户趋势",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 293
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0086",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/top-leaders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/dashboard/top-leaders",
+      "role": "admin",
+      "group": "数据看板",
+      "notes": "团长排行",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 294
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0087",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/top-creators",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/dashboard/top-creators",
+      "role": "admin",
+      "group": "数据看板",
+      "notes": "达人排行",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 295
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0088",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/system/configs",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/system/configs",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "系统配置列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 298
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0089",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/admin/system/configs/{key}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/system/configs/{}",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "更新配置",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 299
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0090",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/system/audit-logs",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/system/audit-logs",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "审计日志",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 300
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0091",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/roles",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/roles",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "角色列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 301
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0092",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/roles",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/roles",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "创建角色",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 302
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0093",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/admin/permissions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/admin/permissions",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "权限列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 303
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0094",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/admin/roles/{id}/permissions",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/admin/roles/{}/permissions",
+      "role": "admin",
+      "group": "系统管理",
+      "notes": "分配权限",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 304
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0095",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/profile",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/profile",
+      "role": "leader",
+      "group": "用户管理",
+      "notes": "个人资料",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 311
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0096",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/leader/profile",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/profile",
+      "role": "leader",
+      "group": "用户管理",
+      "notes": "更新资料",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 312
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0097",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/creators",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/creators",
+      "role": "leader",
+      "group": "用户管理",
+      "notes": "我的达人列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 313
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0098",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/orders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/orders",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "订单列表（我创建的+下级达人的）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 316
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0099",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/orders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/orders",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "创建订单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 317
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0100",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/orders/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/orders/{}",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "订单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 318
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0101",
+      "surface": "public-bff",
+      "method": "PATCH",
+      "path": "/api/v1/leader/orders/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/orders/{}",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "仅授权范围内 draft 来源字段",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 319
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0102",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/orders/{id}/submit",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/orders/{}/submit",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "自己/下级范围 draft → pending",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 320
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0103",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/orders/{id}/cancel",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/orders/{}/cancel",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "自己/下级范围 pending/active → cancelled",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 321
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0104",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/orders/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/orders/stats",
+      "role": "leader",
+      "group": "订单管理",
+      "notes": "订单统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 322
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0105",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/settlements",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/settlements",
+      "role": "leader",
+      "group": "结算管理",
+      "notes": "我的结算单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 325
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0106",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/settlements/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/settlements/{}",
+      "role": "leader",
+      "group": "结算管理",
+      "notes": "结算单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 326
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0107",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/settlements/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/settlements/stats",
+      "role": "leader",
+      "group": "结算管理",
+      "notes": "结算统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 327
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0108",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/creators/{id}/settlements",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/creators/{}/settlements",
+      "role": "leader",
+      "group": "结算管理",
+      "notes": "达人结算单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 328
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0109",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/withdrawals",
+      "role": "leader",
+      "group": "提现管理",
+      "notes": "我的提现工单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 331
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0110",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/withdrawals",
+      "role": "leader",
+      "group": "提现管理",
+      "notes": "创建自己的提现草稿并冻结审批策略",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 332
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0111",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/withdrawals/{id}/submit",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/withdrawals/{}/submit",
+      "role": "leader",
+      "group": "提现管理",
+      "notes": "自己的 draft → pending_approval",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 333
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0112",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/withdrawals/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/withdrawals/{}",
+      "role": "leader",
+      "group": "提现管理",
+      "notes": "工单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 334
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0113",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/leader/withdrawals/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/withdrawals/{}",
+      "role": "leader",
+      "group": "提现管理",
+      "notes": "仅申请人软删无事实的 draft/pending_approval",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 335
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0114",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/zhihu/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/zhihu/plans",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "推广计划列表（我的+达人的）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 338
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0115",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/zhihu/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/zhihu/plans",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "创建推广计划",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 339
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0116",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/zhihu/plans/{}",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "计划详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 340
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0117",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/leader/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/zhihu/plans/{}",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "删除计划",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 341
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0118",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/zhihu/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/zhihu/compositions",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "推广作品列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 343
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0119",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/zhihu/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/zhihu/compositions",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "创建作品（仅官方 v2）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 344
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0120",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/zhihu/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/zhihu/compositions/{}",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "作品详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 345
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0121",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/leader/zhihu/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/zhihu/compositions/{}",
+      "role": "leader",
+      "group": "推广管理",
+      "notes": "删除作品",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 346
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0122",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/earnings",
+      "role": "leader",
+      "group": "数据中继（只读）",
+      "notes": "我的收益列表（中继后）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 349
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0123",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/earnings/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/earnings/stats",
+      "role": "leader",
+      "group": "数据中继（只读）",
+      "notes": "收益统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 350
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0124",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/creators/{id}/earnings",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/creators/{}/earnings",
+      "role": "leader",
+      "group": "数据中继（只读）",
+      "notes": "达人收益列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 351
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0125",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/projects",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/projects",
+      "role": "leader",
+      "group": "项目管理",
+      "notes": "我参与的项目列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 354
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0126",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/projects/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/projects/{}",
+      "role": "leader",
+      "group": "项目管理",
+      "notes": "项目详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 355
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0127",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/projects/{id}/members",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/projects/{}/members",
+      "role": "leader",
+      "group": "项目管理",
+      "notes": "项目成员",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 356
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0128",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/creative-tools",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/creative-tools",
+      "role": "leader",
+      "group": "创意工具",
+      "notes": "可用工具列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 359
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0129",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/leader/creative-tools/{id}/use",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/leader/creative-tools/{}/use",
+      "role": "leader",
+      "group": "创意工具",
+      "notes": "使用工具（Mock 付费）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 360
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0130",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/creative-tools/usage",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/creative-tools/usage",
+      "role": "leader",
+      "group": "创意工具",
+      "notes": "我的使用记录",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 361
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0131",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/dashboard/overview",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/dashboard/overview",
+      "role": "leader",
+      "group": "数据看板",
+      "notes": "总览数据",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 364
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0132",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/dashboard/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/dashboard/earnings",
+      "role": "leader",
+      "group": "数据看板",
+      "notes": "收益趋势",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 365
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0133",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/leader/dashboard/creators",
+      "pathKind": "static",
+      "shapePath": "/api/v1/leader/dashboard/creators",
+      "role": "leader",
+      "group": "数据看板",
+      "notes": "达人表现",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 366
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0134",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/profile",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/profile",
+      "role": "creator",
+      "group": "用户管理",
+      "notes": "个人资料",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 373
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0135",
+      "surface": "public-bff",
+      "method": "PUT",
+      "path": "/api/v1/creator/profile",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/profile",
+      "role": "creator",
+      "group": "用户管理",
+      "notes": "更新资料",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 374
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0136",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/orders",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/orders",
+      "role": "creator",
+      "group": "订单管理（Creator 只读）",
+      "notes": "我的订单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 377
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0137",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/orders/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/orders/{}",
+      "role": "creator",
+      "group": "订单管理（Creator 只读）",
+      "notes": "订单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 378
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0138",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/orders/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/orders/stats",
+      "role": "creator",
+      "group": "订单管理（Creator 只读）",
+      "notes": "订单统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 379
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0139",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/settlements",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/settlements",
+      "role": "creator",
+      "group": "结算管理",
+      "notes": "我的结算单列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 382
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0140",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/settlements/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/settlements/{}",
+      "role": "creator",
+      "group": "结算管理",
+      "notes": "结算单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 383
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0141",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/settlements/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/settlements/stats",
+      "role": "creator",
+      "group": "结算管理",
+      "notes": "结算统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 384
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0142",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/withdrawals",
+      "role": "creator",
+      "group": "提现管理",
+      "notes": "我的提现工单",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 387
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0143",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/creator/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/withdrawals",
+      "role": "creator",
+      "group": "提现管理",
+      "notes": "创建自己的提现草稿并冻结审批策略",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 388
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0144",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/creator/withdrawals/{id}/submit",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/withdrawals/{}/submit",
+      "role": "creator",
+      "group": "提现管理",
+      "notes": "自己的 draft → pending_approval",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 389
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0145",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/withdrawals/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/withdrawals/{}",
+      "role": "creator",
+      "group": "提现管理",
+      "notes": "工单详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 390
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0146",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/creator/withdrawals/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/withdrawals/{}",
+      "role": "creator",
+      "group": "提现管理",
+      "notes": "仅申请人软删无事实的 draft/pending_approval",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 391
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0147",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/zhihu/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/zhihu/plans",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "我的推广计划列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 394
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0148",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/creator/zhihu/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/zhihu/plans",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "创建推广计划",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 395
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0149",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/zhihu/plans/{}",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "计划详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 396
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0150",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/creator/zhihu/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/zhihu/plans/{}",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "删除计划",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 397
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0151",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/zhihu/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/zhihu/compositions",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "我的推广作品列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 399
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0152",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/creator/zhihu/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/zhihu/compositions",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "创建作品（仅官方 v2）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 400
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0153",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/zhihu/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/zhihu/compositions/{}",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "作品详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 401
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0154",
+      "surface": "public-bff",
+      "method": "DELETE",
+      "path": "/api/v1/creator/zhihu/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/zhihu/compositions/{}",
+      "role": "creator",
+      "group": "推广管理",
+      "notes": "删除作品",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 402
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0155",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/earnings",
+      "role": "creator",
+      "group": "数据中继（只读）",
+      "notes": "我的收益列表（二次分发后）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 405
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0156",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/earnings/stats",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/earnings/stats",
+      "role": "creator",
+      "group": "数据中继（只读）",
+      "notes": "收益统计",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 406
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0157",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/projects",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/projects",
+      "role": "creator",
+      "group": "项目管理",
+      "notes": "我参与的项目列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 409
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0158",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/projects/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/projects/{}",
+      "role": "creator",
+      "group": "项目管理",
+      "notes": "项目详情",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 410
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0159",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/creative-tools",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/creative-tools",
+      "role": "creator",
+      "group": "创意工具",
+      "notes": "可用工具列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 413
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0160",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/creator/creative-tools/{id}/use",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/creator/creative-tools/{}/use",
+      "role": "creator",
+      "group": "创意工具",
+      "notes": "使用工具（Mock 付费）",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 414
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0161",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/creative-tools/usage",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/creative-tools/usage",
+      "role": "creator",
+      "group": "创意工具",
+      "notes": "我的使用记录",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 415
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0162",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/dashboard/overview",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/dashboard/overview",
+      "role": "creator",
+      "group": "数据看板",
+      "notes": "总览数据",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 418
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0163",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/creator/dashboard/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/creator/dashboard/earnings",
+      "role": "creator",
+      "group": "数据看板",
+      "notes": "收益趋势",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 419
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0164",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/login",
+      "role": "public",
+      "group": "认证",
+      "notes": "用户登录",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 426
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0165",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/logout",
+      "role": "public",
+      "group": "认证",
+      "notes": "用户登出",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 427
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0166",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/refresh",
+      "role": "public",
+      "group": "认证",
+      "notes": "刷新 Token",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 428
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0167",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/me",
+      "role": "public",
+      "group": "认证",
+      "notes": "获取当前用户信息",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 429
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0168",
+      "surface": "public-bff",
+      "method": "POST",
+      "path": "/api/v1/auth/change-password",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/change-password",
+      "role": "public",
+      "group": "认证",
+      "notes": "修改密码",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 430
+      }
+    },
+    {
+      "candidateId": "A001-PUB-0169",
+      "surface": "public-bff",
+      "method": "GET",
+      "path": "/api/v1/meta/enums",
+      "pathKind": "static",
+      "shapePath": "/api/v1/meta/enums",
+      "role": "public",
+      "group": "元数据",
+      "notes": "枚举值列表",
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "2.2-public-bff",
+        "line": 433
+      }
+    },
+    {
+      "candidateId": "A001-UP-0001",
+      "surface": "upstream-adapter",
+      "method": "POST",
+      "path": "/popularize_plan",
+      "pathKind": "static",
+      "shapePath": "/popularize_plan",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1097
+      }
+    },
+    {
+      "candidateId": "A001-UP-0002",
+      "surface": "upstream-adapter",
+      "method": "POST",
+      "path": "/popularize_plans",
+      "pathKind": "static",
+      "shapePath": "/popularize_plans",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1098
+      }
+    },
+    {
+      "candidateId": "A001-UP-0003",
+      "surface": "upstream-adapter",
+      "method": "POST",
+      "path": "/popularize_composition/v2",
+      "pathKind": "static",
+      "shapePath": "/popularize_composition/v2",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1099
+      }
+    },
+    {
+      "candidateId": "A001-UP-0004",
+      "surface": "upstream-adapter",
+      "method": "POST",
+      "path": "/popularize_compositions/v2",
+      "pathKind": "static",
+      "shapePath": "/popularize_compositions/v2",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1100
+      }
+    },
+    {
+      "candidateId": "A001-UP-0005",
+      "surface": "upstream-adapter",
+      "method": "PUT",
+      "path": "/popularize_composition/v2/{composition_id}",
+      "pathKind": "parameterized",
+      "shapePath": "/popularize_composition/v2/{}",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1101
+      }
+    },
+    {
+      "candidateId": "A001-UP-0006",
+      "surface": "upstream-adapter",
+      "method": "GET",
+      "path": "/popularize_compositions",
+      "pathKind": "static",
+      "shapePath": "/popularize_compositions",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1102
+      }
+    },
+    {
+      "candidateId": "A001-UP-0007",
+      "surface": "upstream-adapter",
+      "method": "GET",
+      "path": "/data_report/real_time_data",
+      "pathKind": "static",
+      "shapePath": "/data_report/real_time_data",
+      "role": "adapter",
+      "group": "upstream-allowlist",
+      "notes": null,
+      "source": {
+        "file": "docs/重构文档/02-API接口契约.md",
+        "section": "7.1-upstream-adapter",
+        "line": 1103
+      }
+    }
+  ],
+  "unsupportedSyntax": []
+}

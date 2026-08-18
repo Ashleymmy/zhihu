@@ -1,0 +1,968 @@
+{
+  "schemaVersion": 1,
+  "generatorId": "A-001-INVENTORY",
+  "inputManifestSha256": "d52afe3ac7464f545719aeef2f51988d6fa44be0806f988880fdfd759a367468",
+  "records": [
+    {
+      "method": "DELETE",
+      "path": "/api/v1/callbacks/rules/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/callbacks/rules/{}",
+      "operationKey": "DELETE /api/v1/callbacks/rules/{id}",
+      "shapeKey": "DELETE /api/v1/callbacks/rules/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.del",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 16,
+        "column": 5
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/team/members/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/team/members/{}",
+      "operationKey": "DELETE /api/v1/team/members/{id}",
+      "shapeKey": "DELETE /api/v1/team/members/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.del",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/team.ts",
+        "line": 24,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/comic_drama/{dramaId}/episodes",
+      "pathKind": "parameterized",
+      "shapePath": "/api/alliance/api/comic_drama/{}/episodes",
+      "operationKey": "GET /api/alliance/api/comic_drama/{dramaId}/episodes",
+      "shapeKey": "GET /api/alliance/api/comic_drama/{}/episodes",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 449,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/comic_dramas",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/comic_dramas",
+      "operationKey": "GET /api/alliance/api/comic_dramas",
+      "shapeKey": "GET /api/alliance/api/comic_dramas",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 447,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/content_tag",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/content_tag",
+      "operationKey": "GET /api/alliance/api/content_tag",
+      "shapeKey": "GET /api/alliance/api/content_tag",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 457,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/get_agent_channels",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/get_agent_channels",
+      "operationKey": "GET /api/alliance/api/get_agent_channels",
+      "shapeKey": "GET /api/alliance/api/get_agent_channels",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 58,
+        "column": 27
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/get_batch_task_result/{batch_task_id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/alliance/api/get_batch_task_result/{}",
+      "operationKey": "GET /api/alliance/api/get_batch_task_result/{batch_task_id}",
+      "shapeKey": "GET /api/alliance/api/get_batch_task_result/{}",
+      "platformSurface": "alliance",
+      "helper": "zhihuHttp.get",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 253,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/intercept_words",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/intercept_words",
+      "operationKey": "GET /api/alliance/api/intercept_words",
+      "shapeKey": "GET /api/alliance/api/intercept_words",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 354,
+        "column": 9
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/online_sections",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/online_sections",
+      "operationKey": "GET /api/alliance/api/online_sections",
+      "shapeKey": "GET /api/alliance/api/online_sections",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 328,
+        "column": 25
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/popularize_tasks",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/popularize_tasks",
+      "operationKey": "GET /api/alliance/api/popularize_tasks",
+      "shapeKey": "GET /api/alliance/api/popularize_tasks",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 86,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/risk_words",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/risk_words",
+      "operationKey": "GET /api/alliance/api/risk_words",
+      "shapeKey": "GET /api/alliance/api/risk_words",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 397,
+        "column": 9
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/second_channels",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/second_channels",
+      "operationKey": "GET /api/alliance/api/second_channels",
+      "shapeKey": "GET /api/alliance/api/second_channels",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 60,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/vip/audio/contents",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/vip/audio/contents",
+      "operationKey": "GET /api/alliance/api/vip/audio/contents",
+      "shapeKey": "GET /api/alliance/api/vip/audio/contents",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 417,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/vip/audio/{section_id}/download",
+      "pathKind": "parameterized",
+      "shapePath": "/api/alliance/api/vip/audio/{}/download",
+      "operationKey": "GET /api/alliance/api/vip/audio/{section_id}/download",
+      "shapeKey": "GET /api/alliance/api/vip/audio/{}/download",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 419,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/vip/content/rule/labels",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/vip/content/rule/labels",
+      "operationKey": "GET /api/alliance/api/vip/content/rule/labels",
+      "shapeKey": "GET /api/alliance/api/vip/content/rule/labels",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 323,
+        "column": 20
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/vip/rule_content/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/alliance/api/vip/rule_content/{}",
+      "operationKey": "GET /api/alliance/api/vip/rule_content/{id}",
+      "shapeKey": "GET /api/alliance/api/vip/rule_content/{}",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 327,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/vip/rule_contents",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/vip/rule_contents",
+      "operationKey": "GET /api/alliance/api/vip/rule_contents",
+      "shapeKey": "GET /api/alliance/api/vip/rule_contents",
+      "platformSurface": "alliance",
+      "helper": "zhGet",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 325,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/me",
+      "operationKey": "GET /api/v1/auth/me",
+      "shapeKey": "GET /api/v1/auth/me",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/auth.ts",
+        "line": 9,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/callbacks/logs",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/logs",
+      "operationKey": "GET /api/v1/callbacks/logs",
+      "shapeKey": "GET /api/v1/callbacks/logs",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 27,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/callbacks/rules",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/rules",
+      "operationKey": "GET /api/v1/callbacks/rules",
+      "shapeKey": "GET /api/v1/callbacks/rules",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 7,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/callbacks/secret",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/secret",
+      "operationKey": "GET /api/v1/callbacks/secret",
+      "shapeKey": "GET /api/v1/callbacks/secret",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 20,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/channels",
+      "pathKind": "static",
+      "shapePath": "/api/v1/channels",
+      "operationKey": "GET /api/v1/channels",
+      "shapeKey": "GET /api/v1/channels",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/channels.ts",
+        "line": 7,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/compositions",
+      "operationKey": "GET /api/v1/compositions",
+      "shapeKey": "GET /api/v1/compositions",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/compositions.ts",
+        "line": 12,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/compositions/{}",
+      "operationKey": "GET /api/v1/compositions/{id}",
+      "shapeKey": "GET /api/v1/compositions/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/compositions.ts",
+        "line": 15,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/earnings",
+      "operationKey": "GET /api/v1/earnings",
+      "shapeKey": "GET /api/v1/earnings",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/earnings.ts",
+        "line": 10,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/earnings/summary",
+      "pathKind": "static",
+      "shapePath": "/api/v1/earnings/summary",
+      "operationKey": "GET /api/v1/earnings/summary",
+      "shapeKey": "GET /api/v1/earnings/summary",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/earnings.ts",
+        "line": 13,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/meta/enums",
+      "pathKind": "static",
+      "shapePath": "/api/v1/meta/enums",
+      "operationKey": "GET /api/v1/meta/enums",
+      "shapeKey": "GET /api/v1/meta/enums",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/meta.ts",
+        "line": 6,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/by-keyword",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/by-keyword",
+      "operationKey": "GET /api/v1/metrics/by-keyword",
+      "shapeKey": "GET /api/v1/metrics/by-keyword",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/metrics.ts",
+        "line": 20,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/overview",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/overview",
+      "operationKey": "GET /api/v1/metrics/overview",
+      "shapeKey": "GET /api/v1/metrics/overview",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/metrics.ts",
+        "line": 13,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/trend",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/trend",
+      "operationKey": "GET /api/v1/metrics/trend",
+      "shapeKey": "GET /api/v1/metrics/trend",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/metrics.ts",
+        "line": 17,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/plans",
+      "operationKey": "GET /api/v1/plans",
+      "shapeKey": "GET /api/v1/plans",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/plans.ts",
+        "line": 14,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}",
+      "operationKey": "GET /api/v1/plans/{id}",
+      "shapeKey": "GET /api/v1/plans/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/plans.ts",
+        "line": 17,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks",
+      "pathKind": "static",
+      "shapePath": "/api/v1/tasks",
+      "operationKey": "GET /api/v1/tasks",
+      "shapeKey": "GET /api/v1/tasks",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/tasks.ts",
+        "line": 6,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/team/members",
+      "pathKind": "static",
+      "shapePath": "/api/v1/team/members",
+      "operationKey": "GET /api/v1/team/members",
+      "shapeKey": "GET /api/v1/team/members",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/team.ts",
+        "line": 12,
+        "column": 5
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/withdrawals",
+      "operationKey": "GET /api/v1/withdrawals",
+      "shapeKey": "GET /api/v1/withdrawals",
+      "platformSurface": "standard-bff",
+      "helper": "http.get",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/withdrawals.ts",
+        "line": 6,
+        "column": 5
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/callbacks/rules/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/callbacks/rules/{}",
+      "operationKey": "PATCH /api/v1/callbacks/rules/{id}",
+      "shapeKey": "PATCH /api/v1/callbacks/rules/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.patch",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 13,
+        "column": 5
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/channels/{id}/owner",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/channels/{}/owner",
+      "operationKey": "PATCH /api/v1/channels/{id}/owner",
+      "shapeKey": "PATCH /api/v1/channels/{}/owner",
+      "platformSurface": "standard-bff",
+      "helper": "http.patch",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/channels.ts",
+        "line": 13,
+        "column": 5
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/compositions/{}",
+      "operationKey": "PATCH /api/v1/compositions/{id}",
+      "shapeKey": "PATCH /api/v1/compositions/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.patch",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/compositions.ts",
+        "line": 21,
+        "column": 5
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}",
+      "operationKey": "PATCH /api/v1/plans/{id}",
+      "shapeKey": "PATCH /api/v1/plans/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.patch",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/plans.ts",
+        "line": 23,
+        "column": 5
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/team/members/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/team/members/{}",
+      "operationKey": "PATCH /api/v1/team/members/{id}",
+      "shapeKey": "PATCH /api/v1/team/members/{}",
+      "platformSurface": "standard-bff",
+      "helper": "http.patch",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/team.ts",
+        "line": 18,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/basic/file_upload",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/basic/file_upload",
+      "operationKey": "POST /api/alliance/api/basic/file_upload",
+      "shapeKey": "POST /api/alliance/api/basic/file_upload",
+      "platformSurface": "alliance",
+      "helper": "zhPost",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 361,
+        "column": 12
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/content_tags",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/content_tags",
+      "operationKey": "POST /api/alliance/api/content_tags",
+      "shapeKey": "POST /api/alliance/api/content_tags",
+      "platformSurface": "alliance",
+      "helper": "zhPost",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 464,
+        "column": 12
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/intercept_words",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/intercept_words",
+      "operationKey": "POST /api/alliance/api/intercept_words",
+      "shapeKey": "POST /api/alliance/api/intercept_words",
+      "platformSurface": "alliance",
+      "helper": "zhPost",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 356,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/risk_words",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/risk_words",
+      "operationKey": "POST /api/alliance/api/risk_words",
+      "shapeKey": "POST /api/alliance/api/risk_words",
+      "platformSurface": "alliance",
+      "helper": "zhPost",
+      "basePath": "/api/alliance/api",
+      "source": {
+        "file": "platform/src/api/alliance.ts",
+        "line": 398,
+        "column": 39
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/change-password",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/change-password",
+      "operationKey": "POST /api/v1/auth/change-password",
+      "shapeKey": "POST /api/v1/auth/change-password",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/auth.ts",
+        "line": 15,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/login",
+      "operationKey": "POST /api/v1/auth/login",
+      "shapeKey": "POST /api/v1/auth/login",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/auth.ts",
+        "line": 6,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/logout",
+      "operationKey": "POST /api/v1/auth/logout",
+      "shapeKey": "POST /api/v1/auth/logout",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/auth.ts",
+        "line": 12,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/callbacks/rules",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/rules",
+      "operationKey": "POST /api/v1/callbacks/rules",
+      "shapeKey": "POST /api/v1/callbacks/rules",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 10,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/callbacks/secret/rotate",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/secret/rotate",
+      "operationKey": "POST /api/v1/callbacks/secret/rotate",
+      "shapeKey": "POST /api/v1/callbacks/secret/rotate",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/callbacks.ts",
+        "line": 23,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/channels/sync",
+      "pathKind": "static",
+      "shapePath": "/api/v1/channels/sync",
+      "operationKey": "POST /api/v1/channels/sync",
+      "shapeKey": "POST /api/v1/channels/sync",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/channels.ts",
+        "line": 10,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/compositions",
+      "operationKey": "POST /api/v1/compositions",
+      "shapeKey": "POST /api/v1/compositions",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/compositions.ts",
+        "line": 18,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/plans",
+      "operationKey": "POST /api/v1/plans",
+      "shapeKey": "POST /api/v1/plans",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/plans.ts",
+        "line": 20,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/plans/check-keyword",
+      "pathKind": "static",
+      "shapePath": "/api/v1/plans/check-keyword",
+      "operationKey": "POST /api/v1/plans/check-keyword",
+      "shapeKey": "POST /api/v1/plans/check-keyword",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/plans.ts",
+        "line": 29,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/plans/{id}/retry-sync",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}/retry-sync",
+      "operationKey": "POST /api/v1/plans/{id}/retry-sync",
+      "shapeKey": "POST /api/v1/plans/{}/retry-sync",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/plans.ts",
+        "line": 26,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks/sync",
+      "pathKind": "static",
+      "shapePath": "/api/v1/tasks/sync",
+      "operationKey": "POST /api/v1/tasks/sync",
+      "shapeKey": "POST /api/v1/tasks/sync",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/tasks.ts",
+        "line": 9,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/team/members",
+      "pathKind": "static",
+      "shapePath": "/api/v1/team/members",
+      "operationKey": "POST /api/v1/team/members",
+      "shapeKey": "POST /api/v1/team/members",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/team.ts",
+        "line": 15,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/team/members/{id}/reset-password",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/team/members/{}/reset-password",
+      "operationKey": "POST /api/v1/team/members/{id}/reset-password",
+      "shapeKey": "POST /api/v1/team/members/{}/reset-password",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/team.ts",
+        "line": 21,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/withdrawals",
+      "operationKey": "POST /api/v1/withdrawals",
+      "shapeKey": "POST /api/v1/withdrawals",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/withdrawals.ts",
+        "line": 9,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/withdrawals/{id}/approve",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/withdrawals/{}/approve",
+      "operationKey": "POST /api/v1/withdrawals/{id}/approve",
+      "shapeKey": "POST /api/v1/withdrawals/{}/approve",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/withdrawals.ts",
+        "line": 12,
+        "column": 5
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/withdrawals/{id}/reject",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/withdrawals/{}/reject",
+      "operationKey": "POST /api/v1/withdrawals/{id}/reject",
+      "shapeKey": "POST /api/v1/withdrawals/{}/reject",
+      "platformSurface": "standard-bff",
+      "helper": "http.post",
+      "basePath": "/api/v1",
+      "source": {
+        "file": "platform/src/api/withdrawals.ts",
+        "line": 15,
+        "column": 5
+      }
+    }
+  ],
+  "unsupportedSyntax": []
+}

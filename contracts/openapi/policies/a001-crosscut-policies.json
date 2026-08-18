@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "policyId": "A-001-CROSSCUT-TECHNICAL",
+  "policyVersion": "2026-08-18.r1",
+  "state": "target-reusable/not-operation-bound",
+  "envelope": {
+    "bffJson": {
+      "success": ["code", "message", "data", "requestId", "timestamp"],
+      "listMeta": ["page", "pageSize", "total"],
+      "error": ["code", "message", "details?", "requestId", "timestamp"]
+    },
+    "exceptionsRequireOperationDeclaration": ["health", "binary"]
+  },
+  "authentication": {
+    "accessToken": {
+      "scheme": "Bearer",
+      "header": "Authorization"
+    },
+    "refreshCookie": {
+      "secure": true,
+      "httpOnly": true,
+      "sameSite": "Lax",
+      "path": "/api/v1/auth"
+    },
+    "globalRoles": ["admin", "leader", "creator"],
+    "projectMemberRoles": ["owner", "admin", "member", "viewer"]
+  },
+  "projectScope": {
+    "source": ["authenticatedSubject", "project_members"],
+    "clientValuesDoNotGrantAuthority": ["X-Project-Id", "tokenClaim", "role"],
+    "pathAndHeaderProjectMustMatch": true,
+    "verifiedProjectIdPropagatesTo": ["sql", "cache", "queue", "export"]
+  },
+  "pagination": {
+    "defaults": {
+      "page": 1,
+      "pageSize": 20
+    },
+    "limits": {
+      "page": [1, 100],
+      "pageSize": [1, 100]
+    },
+    "sortOrder": ["asc", "desc"],
+    "sortBy": "operation-allowlist-only",
+    "stableTieBreaker": "id",
+    "emptyPage": {
+      "httpStatus": 200,
+      "data": [],
+      "metaTotalRequired": true
+    }
+  },
+  "idempotency": {
+    "safeMethods": ["GET", "HEAD", "OPTIONS"],
+    "idempotentMethods": ["PUT", "DELETE"],
+    "retryableMutationMethods": ["POST", "PATCH"],
+    "requiredHeader": "Idempotency-Key",
+    "keyScope": ["projectOrTenant", "actor", "operationId", "targetResource"],
+    "canonicalRequestHash": {
+      "algorithm": "SHA-256",
+      "encoding": "UTF-8",
+      "excludesHeaders": ["Idempotency-Key"],
+      "applicationJson": {
+        "canonicalization": "recursive-lexicographic-object-keys",
+        "arrayOrder": "preserved",
+        "contentType": "application/json"
+      },
+      "multipartFormData": {
+        "canonicalization": "lexicographic-field-name-and-file-part-order",
+        "fileDigest": "SHA-256",
+        "contentType": "multipart/form-data"
+      }
+    },
+    "replay": {
+      "sameKeySameHash": "return-original-status-body-requestId-timestamp",
+      "sameKeyDifferentHash": {
+        "code": 40910,
+        "zeroSideEffect": true
+      }
+    },
+    "versionConflict": {
+      "code": 40920,
+      "name": "VERSION_CONFLICT"
+    },
+    "retention": {
+      "nonFinanceMinimumHours": 24,
+      "financePurge": "prohibited-until-business-retention-decision"
+    }
+  },
+  "errorBaseline": {
+    "stages": [
+      "parser",
+      "auth",
+      "scope",
+      "permission",
+      "quota",
+      "upstream",
+      "internal"
+    ],
+    "unknownException": {
+      "code": 50000,
+      "upstreamBodyOrStack": "never-transmit"
+    },
+    "explicitNone": "only-operation-specific-error-not-global-baseline",
+    "financeGate": {
+      "code": 50310,
+      "failedGates": ["D-001-DECISION", "D-001-READINESS", "P0-008", "M6"]
+    }
+  },
+  "audit": {
+    "schemaVersion": 1,
+    "actorKinds": ["user", "system", "service"],
+    "methodEnum": [
+      "GET",
+      "HEAD",
+      "OPTIONS",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OTHER"
+    ],
+    "exactlyOnceKey": ["requestId", "eventKind"],
+    "appendOnly": true,
+    "sensitiveKeyMatching": "recursive-case-insensitive",
+    "prohibitedKeys": [
+      "token",
+      "cookie",
+      "authorization",
+      "signature",
+      "secret",
+      "password",
+      "rawBody",
+      "fileContent",
+      "upstreamRawResponse",
+      "idCard",
+      "bankAccount"
+    ],
+    "purge": "prohibited-until-retention-and-legal-hold-decision"
+  },
+  "sharedFixture": {
+    "required": [
+      "fixtureId",
+      "operationId",
+      "specTestId",
+      "actor",
+      "projectId",
+      "clock",
+      "request",
+      "response",
+      "expectedSideEffects",
+      "expectedAudit",
+      "redactionAssertions"
+    ],
+    "syntheticOnly": true,
+    "conformanceBoundary": "planned-static-only; real-route-evidence-is-A-001-CONFORMANCE"
+  },
+  "operationPolicyAssignment": {
+    "onlyReferenceAndPendingBusinessCoverage": true,
+    "cannotChangeFieldStatesOrMissingFields": true
+  }
+}

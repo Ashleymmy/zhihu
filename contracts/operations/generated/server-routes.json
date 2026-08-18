@@ -1,0 +1,818 @@
+{
+  "schemaVersion": 1,
+  "generatorId": "A-001-INVENTORY",
+  "inputManifestSha256": "d52afe3ac7464f545719aeef2f51988d6fa44be0806f988880fdfd759a367468",
+  "records": [
+    {
+      "method": "DELETE",
+      "path": "/api/v1/callbacks/rules/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/callbacks/rules/{}",
+      "operationKey": "DELETE /api/v1/callbacks/rules/{id}",
+      "shapeKey": "DELETE /api/v1/callbacks/rules/{}",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 49,
+        "column": 1
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}",
+      "operationKey": "DELETE /api/v1/plans/{id}",
+      "shapeKey": "DELETE /api/v1/plans/{}",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 85,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/data_report/real_time_data",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/data_report/real_time_data",
+      "operationKey": "GET /api/alliance/api/data_report/real_time_data",
+      "shapeKey": "GET /api/alliance/api/data_report/real_time_data",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 670,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/alliance/api/popularize_compositions",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/popularize_compositions",
+      "operationKey": "GET /api/alliance/api/popularize_compositions",
+      "shapeKey": "GET /api/alliance/api/popularize_compositions",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 666,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/me",
+      "operationKey": "GET /api/v1/auth/me",
+      "shapeKey": "GET /api/v1/auth/me",
+      "receiver": "authRouter",
+      "mount": "/api/v1/auth",
+      "source": {
+        "file": "server/src/routes/auth.ts",
+        "line": 22,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/callbacks/logs",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/logs",
+      "operationKey": "GET /api/v1/callbacks/logs",
+      "shapeKey": "GET /api/v1/callbacks/logs",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 67,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/callbacks/rules",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/rules",
+      "operationKey": "GET /api/v1/callbacks/rules",
+      "shapeKey": "GET /api/v1/callbacks/rules",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 29,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/callbacks/secret",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/secret",
+      "operationKey": "GET /api/v1/callbacks/secret",
+      "shapeKey": "GET /api/v1/callbacks/secret",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 57,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/channels",
+      "pathKind": "static",
+      "shapePath": "/api/v1/channels",
+      "operationKey": "GET /api/v1/channels",
+      "shapeKey": "GET /api/v1/channels",
+      "receiver": "channelsRouter",
+      "mount": "/api/v1/channels",
+      "source": {
+        "file": "server/src/routes/channels.ts",
+        "line": 13,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/compositions",
+      "operationKey": "GET /api/v1/compositions",
+      "shapeKey": "GET /api/v1/compositions",
+      "receiver": "compositionsRouter",
+      "mount": "/api/v1/compositions",
+      "source": {
+        "file": "server/src/routes/compositions.ts",
+        "line": 60,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/compositions/{id}/audit-status",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/compositions/{}/audit-status",
+      "operationKey": "GET /api/v1/compositions/{id}/audit-status",
+      "shapeKey": "GET /api/v1/compositions/{}/audit-status",
+      "receiver": "compositionsRouter",
+      "mount": "/api/v1/compositions",
+      "source": {
+        "file": "server/src/routes/compositions.ts",
+        "line": 88,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/earnings",
+      "pathKind": "static",
+      "shapePath": "/api/v1/earnings",
+      "operationKey": "GET /api/v1/earnings",
+      "shapeKey": "GET /api/v1/earnings",
+      "receiver": "earningsRouter",
+      "mount": "/api/v1/earnings",
+      "source": {
+        "file": "server/src/routes/earnings.ts",
+        "line": 12,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/earnings/summary",
+      "pathKind": "static",
+      "shapePath": "/api/v1/earnings/summary",
+      "operationKey": "GET /api/v1/earnings/summary",
+      "shapeKey": "GET /api/v1/earnings/summary",
+      "receiver": "earningsRouter",
+      "mount": "/api/v1/earnings",
+      "source": {
+        "file": "server/src/routes/earnings.ts",
+        "line": 20,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/meta/enums",
+      "pathKind": "static",
+      "shapePath": "/api/v1/meta/enums",
+      "operationKey": "GET /api/v1/meta/enums",
+      "shapeKey": "GET /api/v1/meta/enums",
+      "receiver": "metaRouter",
+      "mount": "/api/v1/meta",
+      "source": {
+        "file": "server/src/routes/meta.ts",
+        "line": 8,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/by-keyword",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/by-keyword",
+      "operationKey": "GET /api/v1/metrics/by-keyword",
+      "shapeKey": "GET /api/v1/metrics/by-keyword",
+      "receiver": "metricsRouter",
+      "mount": "/api/v1/metrics",
+      "source": {
+        "file": "server/src/routes/metrics.ts",
+        "line": 31,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/by-member",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/by-member",
+      "operationKey": "GET /api/v1/metrics/by-member",
+      "shapeKey": "GET /api/v1/metrics/by-member",
+      "receiver": "metricsRouter",
+      "mount": "/api/v1/metrics",
+      "source": {
+        "file": "server/src/routes/metrics.ts",
+        "line": 39,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/overview",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/overview",
+      "operationKey": "GET /api/v1/metrics/overview",
+      "shapeKey": "GET /api/v1/metrics/overview",
+      "receiver": "metricsRouter",
+      "mount": "/api/v1/metrics",
+      "source": {
+        "file": "server/src/routes/metrics.ts",
+        "line": 22,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/trend",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/trend",
+      "operationKey": "GET /api/v1/metrics/trend",
+      "shapeKey": "GET /api/v1/metrics/trend",
+      "receiver": "metricsRouter",
+      "mount": "/api/v1/metrics",
+      "source": {
+        "file": "server/src/routes/metrics.ts",
+        "line": 26,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/plans",
+      "operationKey": "GET /api/v1/plans",
+      "shapeKey": "GET /api/v1/plans",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 61,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}",
+      "operationKey": "GET /api/v1/plans/{id}",
+      "shapeKey": "GET /api/v1/plans/{}",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 75,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks",
+      "pathKind": "static",
+      "shapePath": "/api/v1/tasks",
+      "operationKey": "GET /api/v1/tasks",
+      "shapeKey": "GET /api/v1/tasks",
+      "receiver": "tasksRouter",
+      "mount": "/api/v1/tasks",
+      "source": {
+        "file": "server/src/routes/tasks.ts",
+        "line": 15,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tasks/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/tasks/{}",
+      "operationKey": "GET /api/v1/tasks/{id}",
+      "shapeKey": "GET /api/v1/tasks/{}",
+      "receiver": "tasksRouter",
+      "mount": "/api/v1/tasks",
+      "source": {
+        "file": "server/src/routes/tasks.ts",
+        "line": 31,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/team/members",
+      "pathKind": "static",
+      "shapePath": "/api/v1/team/members",
+      "operationKey": "GET /api/v1/team/members",
+      "shapeKey": "GET /api/v1/team/members",
+      "receiver": "teamRouter",
+      "mount": "/api/v1/team",
+      "source": {
+        "file": "server/src/routes/team.ts",
+        "line": 24,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/withdrawals",
+      "operationKey": "GET /api/v1/withdrawals",
+      "shapeKey": "GET /api/v1/withdrawals",
+      "receiver": "withdrawalsRouter",
+      "mount": "/api/v1/withdrawals",
+      "source": {
+        "file": "server/src/routes/withdrawals.ts",
+        "line": 20,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/healthz",
+      "pathKind": "static",
+      "shapePath": "/healthz",
+      "operationKey": "GET /healthz",
+      "shapeKey": "GET /healthz",
+      "receiver": "app",
+      "mount": "/",
+      "source": {
+        "file": "server/src/app.ts",
+        "line": 24,
+        "column": 3
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/callbacks/rules/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/callbacks/rules/{}",
+      "operationKey": "PATCH /api/v1/callbacks/rules/{id}",
+      "shapeKey": "PATCH /api/v1/callbacks/rules/{}",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 43,
+        "column": 1
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/channels/{id}/owner",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/channels/{}/owner",
+      "operationKey": "PATCH /api/v1/channels/{id}/owner",
+      "shapeKey": "PATCH /api/v1/channels/{}/owner",
+      "receiver": "channelsRouter",
+      "mount": "/api/v1/channels",
+      "source": {
+        "file": "server/src/routes/channels.ts",
+        "line": 26,
+        "column": 1
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/compositions/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/compositions/{}",
+      "operationKey": "PATCH /api/v1/compositions/{id}",
+      "shapeKey": "PATCH /api/v1/compositions/{}",
+      "receiver": "compositionsRouter",
+      "mount": "/api/v1/compositions",
+      "source": {
+        "file": "server/src/routes/compositions.ts",
+        "line": 80,
+        "column": 1
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/plans/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}",
+      "operationKey": "PATCH /api/v1/plans/{id}",
+      "shapeKey": "PATCH /api/v1/plans/{}",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 79,
+        "column": 1
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/team/members/{id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/team/members/{}",
+      "operationKey": "PATCH /api/v1/team/members/{id}",
+      "shapeKey": "PATCH /api/v1/team/members/{}",
+      "receiver": "teamRouter",
+      "mount": "/api/v1/team",
+      "source": {
+        "file": "server/src/routes/team.ts",
+        "line": 35,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/popularize_composition/v2",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/popularize_composition/v2",
+      "operationKey": "POST /api/alliance/api/popularize_composition/v2",
+      "shapeKey": "POST /api/alliance/api/popularize_composition/v2",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 647,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/popularize_compositions/v2",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/popularize_compositions/v2",
+      "operationKey": "POST /api/alliance/api/popularize_compositions/v2",
+      "shapeKey": "POST /api/alliance/api/popularize_compositions/v2",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 653,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/popularize_plan",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/popularize_plan",
+      "operationKey": "POST /api/alliance/api/popularize_plan",
+      "shapeKey": "POST /api/alliance/api/popularize_plan",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 634,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/alliance/api/popularize_plans",
+      "pathKind": "static",
+      "shapePath": "/api/alliance/api/popularize_plans",
+      "operationKey": "POST /api/alliance/api/popularize_plans",
+      "shapeKey": "POST /api/alliance/api/popularize_plans",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 640,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/change-password",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/change-password",
+      "operationKey": "POST /api/v1/auth/change-password",
+      "shapeKey": "POST /api/v1/auth/change-password",
+      "receiver": "authRouter",
+      "mount": "/api/v1/auth",
+      "source": {
+        "file": "server/src/routes/auth.ts",
+        "line": 35,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/login",
+      "operationKey": "POST /api/v1/auth/login",
+      "shapeKey": "POST /api/v1/auth/login",
+      "receiver": "authRouter",
+      "mount": "/api/v1/auth",
+      "source": {
+        "file": "server/src/routes/auth.ts",
+        "line": 14,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "pathKind": "static",
+      "shapePath": "/api/v1/auth/logout",
+      "operationKey": "POST /api/v1/auth/logout",
+      "shapeKey": "POST /api/v1/auth/logout",
+      "receiver": "authRouter",
+      "mount": "/api/v1/auth",
+      "source": {
+        "file": "server/src/routes/auth.ts",
+        "line": 28,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/callbacks/rules",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/rules",
+      "operationKey": "POST /api/v1/callbacks/rules",
+      "shapeKey": "POST /api/v1/callbacks/rules",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 37,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/callbacks/secret/rotate",
+      "pathKind": "static",
+      "shapePath": "/api/v1/callbacks/secret/rotate",
+      "operationKey": "POST /api/v1/callbacks/secret/rotate",
+      "shapeKey": "POST /api/v1/callbacks/secret/rotate",
+      "receiver": "callbacksRouter",
+      "mount": "/api/v1/callbacks",
+      "source": {
+        "file": "server/src/routes/callbacks.ts",
+        "line": 62,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/channels/sync",
+      "pathKind": "static",
+      "shapePath": "/api/v1/channels/sync",
+      "operationKey": "POST /api/v1/channels/sync",
+      "shapeKey": "POST /api/v1/channels/sync",
+      "receiver": "channelsRouter",
+      "mount": "/api/v1/channels",
+      "source": {
+        "file": "server/src/routes/channels.ts",
+        "line": 21,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/compositions",
+      "pathKind": "static",
+      "shapePath": "/api/v1/compositions",
+      "operationKey": "POST /api/v1/compositions",
+      "shapeKey": "POST /api/v1/compositions",
+      "receiver": "compositionsRouter",
+      "mount": "/api/v1/compositions",
+      "source": {
+        "file": "server/src/routes/compositions.ts",
+        "line": 68,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/compositions/batch",
+      "pathKind": "static",
+      "shapePath": "/api/v1/compositions/batch",
+      "operationKey": "POST /api/v1/compositions/batch",
+      "shapeKey": "POST /api/v1/compositions/batch",
+      "receiver": "compositionsRouter",
+      "mount": "/api/v1/compositions",
+      "source": {
+        "file": "server/src/routes/compositions.ts",
+        "line": 74,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/metrics/sync",
+      "pathKind": "static",
+      "shapePath": "/api/v1/metrics/sync",
+      "operationKey": "POST /api/v1/metrics/sync",
+      "shapeKey": "POST /api/v1/metrics/sync",
+      "receiver": "metricsRouter",
+      "mount": "/api/v1/metrics",
+      "source": {
+        "file": "server/src/routes/metrics.ts",
+        "line": 45,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/plans",
+      "pathKind": "static",
+      "shapePath": "/api/v1/plans",
+      "operationKey": "POST /api/v1/plans",
+      "shapeKey": "POST /api/v1/plans",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 69,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/plans/check-keyword",
+      "pathKind": "static",
+      "shapePath": "/api/v1/plans/check-keyword",
+      "operationKey": "POST /api/v1/plans/check-keyword",
+      "shapeKey": "POST /api/v1/plans/check-keyword",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 55,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/plans/{id}/retry-sync",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/plans/{}/retry-sync",
+      "operationKey": "POST /api/v1/plans/{id}/retry-sync",
+      "shapeKey": "POST /api/v1/plans/{}/retry-sync",
+      "receiver": "plansRouter",
+      "mount": "/api/v1/plans",
+      "source": {
+        "file": "server/src/routes/plans.ts",
+        "line": 93,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tasks/sync",
+      "pathKind": "static",
+      "shapePath": "/api/v1/tasks/sync",
+      "operationKey": "POST /api/v1/tasks/sync",
+      "shapeKey": "POST /api/v1/tasks/sync",
+      "receiver": "tasksRouter",
+      "mount": "/api/v1/tasks",
+      "source": {
+        "file": "server/src/routes/tasks.ts",
+        "line": 23,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/team/members",
+      "pathKind": "static",
+      "shapePath": "/api/v1/team/members",
+      "operationKey": "POST /api/v1/team/members",
+      "shapeKey": "POST /api/v1/team/members",
+      "receiver": "teamRouter",
+      "mount": "/api/v1/team",
+      "source": {
+        "file": "server/src/routes/team.ts",
+        "line": 29,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/team/members/{id}/disable",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/team/members/{}/disable",
+      "operationKey": "POST /api/v1/team/members/{id}/disable",
+      "shapeKey": "POST /api/v1/team/members/{}/disable",
+      "receiver": "teamRouter",
+      "mount": "/api/v1/team",
+      "source": {
+        "file": "server/src/routes/team.ts",
+        "line": 49,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/team/members/{id}/reset-password",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/team/members/{}/reset-password",
+      "operationKey": "POST /api/v1/team/members/{id}/reset-password",
+      "shapeKey": "POST /api/v1/team/members/{}/reset-password",
+      "receiver": "teamRouter",
+      "mount": "/api/v1/team",
+      "source": {
+        "file": "server/src/routes/team.ts",
+        "line": 44,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/withdrawals",
+      "pathKind": "static",
+      "shapePath": "/api/v1/withdrawals",
+      "operationKey": "POST /api/v1/withdrawals",
+      "shapeKey": "POST /api/v1/withdrawals",
+      "receiver": "withdrawalsRouter",
+      "mount": "/api/v1/withdrawals",
+      "source": {
+        "file": "server/src/routes/withdrawals.ts",
+        "line": 28,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/withdrawals/{id}/approve",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/withdrawals/{}/approve",
+      "operationKey": "POST /api/v1/withdrawals/{id}/approve",
+      "shapeKey": "POST /api/v1/withdrawals/{}/approve",
+      "receiver": "withdrawalsRouter",
+      "mount": "/api/v1/withdrawals",
+      "source": {
+        "file": "server/src/routes/withdrawals.ts",
+        "line": 35,
+        "column": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/withdrawals/{id}/reject",
+      "pathKind": "parameterized",
+      "shapePath": "/api/v1/withdrawals/{}/reject",
+      "operationKey": "POST /api/v1/withdrawals/{id}/reject",
+      "shapeKey": "POST /api/v1/withdrawals/{}/reject",
+      "receiver": "withdrawalsRouter",
+      "mount": "/api/v1/withdrawals",
+      "source": {
+        "file": "server/src/routes/withdrawals.ts",
+        "line": 41,
+        "column": 1
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/alliance/api/popularize_composition/v2/{composition_id}",
+      "pathKind": "parameterized",
+      "shapePath": "/api/alliance/api/popularize_composition/v2/{}",
+      "operationKey": "PUT /api/alliance/api/popularize_composition/v2/{composition_id}",
+      "shapeKey": "PUT /api/alliance/api/popularize_composition/v2/{}",
+      "receiver": "allianceRouter",
+      "mount": "/api/alliance/api",
+      "source": {
+        "file": "server/src/routes/alliance.ts",
+        "line": 660,
+        "column": 1
+      }
+    }
+  ],
+  "unsupportedSyntax": []
+}
