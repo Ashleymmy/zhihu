@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatorId": "A-001-INVENTORY",
-  "inputManifestSha256": "41daafb4aa94be719b3849a16baad73a76de1815883cef20abb45fd7576e6fde",
+  "inputManifestSha256": "191f84162a66558bec00a3312f2941d4bb4194f967d378a13309efda1ff3c6c8",
   "records": [
     {
       "method": "DELETE",

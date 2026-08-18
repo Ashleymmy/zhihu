@@ -607,7 +607,6 @@ function routeBindings(sourceFile: ts.SourceFile): RouterBinding[] {
         !routerImports.has(declaration.initializer.expression.text)
       )
         continue;
-      if (declaration.initializer.arguments.length !== 0) continue;
       bindings.push({ sourceFile, name, declaration });
     }
   }
@@ -616,15 +615,19 @@ function routeBindings(sourceFile: ts.SourceFile): RouterBinding[] {
 
 function routeImportBindings(sourceFile: ts.SourceFile): Map<string, string> {
   const result = new Map<string, string>();
+  const sourceDir = path.dirname(sourceFile.fileName);
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
     const moduleName = statement.moduleSpecifier.text;
-    if (!moduleName.startsWith('./routes/')) continue;
-    const modulePath = 'server/src/' + moduleName.slice('./'.length) + '.ts';
+    if (!moduleName.startsWith('./') && !moduleName.startsWith('../')) continue;
+    const resolvedPath = path.resolve(sourceDir, moduleName + '.ts');
+    const normalizedPath = resolvedPath.replace(/\\/g, '/');
+    if (!normalizedPath.includes('/server/src/routes/')) continue;
+    const relativePath = normalizedPath.substring(normalizedPath.indexOf('server/src/'));
     const clause = statement.importClause;
     if (!clause?.namedBindings || !ts.isNamedImports(clause.namedBindings)) continue;
     for (const element of clause.namedBindings.elements) {
-      result.set(element.name.text, modulePath);
+      result.set(element.name.text, relativePath);
     }
   }
   return result;
@@ -820,10 +823,37 @@ export function scanServerRoutes(repoRoot: string): ServerScan {
               unsupportedSource(sourceFile, node, repoRoot, 'computed-route-method', node.getText(sourceFile)),
             );
           } else if (property.name === 'use') {
-            if (node.arguments.length > 1) {
-              unsupportedSyntax.push(
-                unsupportedSource(sourceFile, node, repoRoot, 'nested-router', node.getText(sourceFile)),
-              );
+            if (node.arguments.length >= 2) {
+              const prefix = literalString(node.arguments[0]);
+              const childRouterName = identifierText(node.arguments[1]);
+              if (prefix === undefined || !childRouterName) {
+                unsupportedSyntax.push(
+                  unsupportedSource(sourceFile, node, repoRoot, 'dynamic-nested-mount', node.getText(sourceFile)),
+                );
+              } else {
+                try {
+                  const normalizedPrefix = normalizeServerRoutePath(prefix);
+                  const childImports = routeImportBindings(sourceFile);
+                  const relativeRoute = childImports.get(childRouterName);
+                  const childBinding = relativeRoute ? routerByFileAndName.get(relativeRoute + '|' + childRouterName) : undefined;
+                  if (!childBinding) {
+                    unsupportedSyntax.push(
+                      unsupportedSource(sourceFile, node, repoRoot, 'unproven-nested-router', childRouterName),
+                    );
+                  } else {
+                    const combinedPrefix = joinBase(mount.prefix, normalizedPrefix);
+                    if (mounts.some((m) => m.router === childBinding)) {
+                      unsupportedSyntax.push(
+                        unsupportedSource(sourceFile, node, repoRoot, 'multiple-nested-mount', childRouterName),
+                      );
+                    } else {
+                      mounts.push({ router: childBinding, prefix: combinedPrefix, source: location(sourceFile, node, repoRoot) });
+                    }
+                  }
+                } catch (error) {
+                  unsupportedSyntax.push(unsupportedSource(sourceFile, node, repoRoot, 'invalid-nested-mount', String(error)));
+                }
+              }
             }
           } else if (property.name === 'route') {
             unsupportedSyntax.push(
