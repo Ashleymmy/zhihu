@@ -31,7 +31,7 @@ export interface AuthUser {
   id: string
   username: string
   displayName: string
-  role: 'boss' | 'leader' | 'member'
+  role: 'admin' | 'leader' | 'creator'
   parentId: string | null
   phone: string | null
   mustChangePwd?: boolean
@@ -202,7 +202,7 @@ export interface KeywordMetricsReq extends PageReq {
 export type KeywordMetricsResp = PageResp<KeywordMetric>
 
 // ─── Team (团队成员) ───────────────────────────────────────────
-export type MemberRole = 'leader' | 'member'
+export type MemberRole = 'leader' | 'creator'
 
 export interface TeamMember {
   id:            string

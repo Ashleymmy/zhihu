@@ -25,7 +25,7 @@ export const fmtDate = (iso: string): string => iso.slice(5)
 
 /** role key → Chinese label */
 export const roleLabel = (role: string): string =>
-  ({ boss: 'Admin 管理员', leader: '团长 / 运营', member: 'KOC 达人' })[role] ?? role
+  ({ admin: 'Admin 管理员', leader: '团长 / 运营', creator: 'KOC 达人', boss: 'Admin 管理员', member: 'KOC 达人' })[role] ?? role
 
 /** plan status → Chinese label (backend: pending/active/paused/rejected/ended) */
 export const planStatusLabel = (s: string): string =>

@@ -28,8 +28,8 @@ export function canAccess(user: AuthUser | null, access?: AccessKey): boolean {
 }
 
 export function workspaceLabel(role?: AuthUser['role']): string {
-  if (role === 'boss') return 'Admin 管理后台'
+  if (role === 'admin') return 'Admin 管理后台'
   if (role === 'leader') return '团长 / 运营工作台'
-  if (role === 'member') return 'KOC 达人工作台'
+  if (role === 'creator') return 'KOC 达人工作台'
   return '运营平台'
 }

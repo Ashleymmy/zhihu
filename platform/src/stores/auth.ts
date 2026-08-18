@@ -12,8 +12,8 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isLoggedIn: (s) => !!s.token,
     role: (s) => s.user?.role,
-    isBoss: (s) => s.user?.role === 'boss',
-    isLeader: (s) => s.user?.role === 'leader' || s.user?.role === 'boss',
+    isBoss: (s) => s.user?.role === 'admin',
+    isLeader: (s) => s.user?.role === 'leader' || s.user?.role === 'admin',
     permissions: (s): string[] => s.user?.permissions ?? [],
     can: (s) => (permission: string): boolean =>
       s.user?.permissions?.includes(permission) ?? false,

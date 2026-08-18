@@ -9,7 +9,7 @@
     <div class="stat-row">
       <div class="stat-pill"><span class="sp-v">{{ members.length }}</span><span class="sp-l">成员总数</span></div>
       <div class="stat-pill"><span class="sp-v" style="color:var(--color-accent)">{{ members.filter(m=>m.role==='leader').length }}</span><span class="sp-l">团长 / 运营</span></div>
-      <div class="stat-pill"><span class="sp-v">{{ members.filter(m=>m.role==='member').length }}</span><span class="sp-l">KOC 达人</span></div>
+      <div class="stat-pill"><span class="sp-v">{{ members.filter(m=>m.role==='creator').length }}</span><span class="sp-l">KOC 达人</span></div>
       <div class="stat-pill"><span class="sp-v" style="color:var(--color-success)">{{ fmtFen(totalEarnings) }}</span><span class="sp-l">团队总收益</span></div>
     </div>
 
@@ -46,7 +46,7 @@
             <span style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--color-success)">{{ fmtFen(record.totalEarnings) }}</span>
           </template>
           <template v-if="column.key === 'actions'">
-            <div class="actions-cell" v-if="auth.isBoss || (auth.isLeader && record.role === 'member')">
+            <div class="actions-cell" v-if="auth.isBoss || (auth.isLeader && record.role === 'creator')">
               <button class="act-btn" @click="openEdit(record as TeamMember)">编辑</button>
               <a-popconfirm
                 title="重置后原密码立即失效，确认继续？"
@@ -79,10 +79,10 @@
         <a-form-item v-if="!editingId" label="角色" name="role" :rules="[{ required: true }]">
           <a-select v-model:value="form.role">
             <a-select-option v-if="auth.isBoss" value="leader">团长 / 运营（管理本组 KOC）</a-select-option>
-            <a-select-option value="member">KOC 达人（执行编词与回传）</a-select-option>
+            <a-select-option value="creator">KOC 达人（执行编词与回传）</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item v-if="!editingId && form.role === 'member' && leaders.length > 0" label="归属团长" name="parentId">
+        <a-form-item v-if="!editingId && form.role === 'creator' && leaders.length > 0" label="归属团长" name="parentId">
           <a-select v-model:value="form.parentId" placeholder="选择归属团长（可选）" allow-clear>
             <a-select-option v-for="l in leaders" :key="l.id" :value="l.id">{{ l.displayName }}</a-select-option>
           </a-select>
@@ -156,10 +156,10 @@ const resettingId = ref<string>()
 const showPasswordModal = ref(false)
 const temporaryUsername = ref('')
 const temporaryPassword = ref('')
-const form = ref({ displayName: '', username: '', role: 'member' as 'leader'|'member', parentId: undefined as string | undefined, channelId: undefined as string | undefined })
+const form = ref({ displayName: '', username: '', role: 'creator' as 'leader'|'creator', parentId: undefined as string | undefined, channelId: undefined as string | undefined })
 
 const roleFilters = [
-  { val: 'all', label: '全部' }, { val: 'leader', label: '团长' }, { val: 'member', label: '达人' },
+  { val: 'all', label: '全部' }, { val: 'leader', label: '团长' }, { val: 'creator', label: '达人' },
 ]
 
 const filtered = computed(() => members.value
@@ -172,7 +172,7 @@ const totalEarnings  = computed(() => members.value.reduce((s, m) => s + m.total
 
 function openCreate() {
   editingId.value = undefined
-  form.value = { displayName: '', username: '', role: 'member', parentId: undefined, channelId: undefined }
+  form.value = { displayName: '', username: '', role: 'creator', parentId: undefined, channelId: undefined }
   showModal.value = true
 }
 function openEdit(m: TeamMember) {
