@@ -1,4 +1,7 @@
-process.env.NODE_ENV = 'test';
+process.env.NODE_ENV ??= 'test';
+process.env.DB_HOST ??= '127.0.0.1';
+process.env.DB_PORT ??= '3306';
+process.env.DB_NAME ??= 'zhihu_koc_test';
 process.env.QUEUE_DRIVER = 'memory';
 process.env.JWT_SECRET = 'test_jwt_secret_that_is_longer_than_32_chars';
 process.env.ZHIHU_ACCESS_TOKEN = 'mock_access_token';

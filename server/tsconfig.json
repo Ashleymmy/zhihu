@@ -12,6 +12,14 @@
     "resolveJsonModule": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "vitest.testcontainers.config.ts",
+    "vitest.integration.config.ts",
+    "vitest.acceptance.config.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

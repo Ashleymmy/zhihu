@@ -23,10 +23,15 @@ describe('HTTP 基础契约', () => {
   it('普通账号不能访问仅管理员使用的知乎透传入口', async () => {
     const token = await signToken({ id: '1', role: 'member', parentId: '2', username: 'member', displayName: '成员' });
     const response = await request(createApp())
-      .get('/api/alliance/api/get_agent_channels')
+      .get('/api/alliance/api/popularize_compositions')
       .set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(403);
-    expect(response.body).toEqual({ code: 40301, data: null, message: '无权执行此操作' });
+    expect(response.body.code).toBe(40301);
+    expect(response.body.message).toBe('无权执行此操作');
+    expect(response.body.requestId).toEqual(expect.any(String));
+    expect(response.body.requestId).not.toBe('');
+    expect(Number.isSafeInteger(response.body.timestamp)).toBe(true);
+    expect(response.body).not.toHaveProperty('data');
   });
 
   it('未知接口返回统一 404', async () => {

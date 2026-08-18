@@ -15,4 +15,29 @@ describe('配置校验', () => {
     });
     expect(parsed.NODE_ENV).toBe('production');
   });
+
+  it('P0007-R1-CONFIG-001 only accepts the fixed Zhihu origin root', () => {
+    expect(parseEnvironment({ ZHIHU_API_BASE: 'https://open.zhihu.com' }).ZHIHU_API_BASE).toBe(
+      'https://open.zhihu.com',
+    );
+    expect(parseEnvironment({ ZHIHU_API_BASE: 'https://open.zhihu.com/' }).ZHIHU_API_BASE).toBe(
+      'https://open.zhihu.com',
+    );
+
+    for (const value of [
+      'http://open.zhihu.com',
+      'https://attacker.example',
+      'https://api.open.zhihu.com',
+      'https://open.zhihu.com:443',
+      'https://user@open.zhihu.com',
+      'https://open.zhihu.com/alliance/api',
+      'https://open.zhihu.com?target=attacker',
+      'https://open.zhihu.com#fragment',
+      'https://open.zhihu.com\\attacker.example',
+    ]) {
+      expect(() => parseEnvironment({ ZHIHU_API_BASE: value }), value).toThrow(
+        '知乎 API 地址必须固定为 https://open.zhihu.com',
+      );
+    }
+  });
 });

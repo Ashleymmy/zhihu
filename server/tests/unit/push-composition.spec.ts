@@ -62,6 +62,53 @@ describe('知乎推广作品同步', () => {
     mocks.rows.mockResolvedValue([item]);
   });
 
+  it('A003-PRECISION-002 sends a valid large string ID unchanged on v2 PUT', async () => {
+    const largeCompositionId = '90071992547409931234';
+    mocks.rows.mockResolvedValue([{ ...item, zhihu_composition_id: largeCompositionId }]);
+    mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+    mocks.zhihuPut.mockResolvedValue({ data: null });
+
+    await pushComposition({ compositionId: '1' });
+
+    expect(mocks.zhihuPut).toHaveBeenCalledWith(
+      `/alliance/api/popularize_composition/v2/${largeCompositionId}`,
+      expect.objectContaining({ plan_id: '2071265453767405652' }),
+    );
+    expect(mocks.zhihuPost).not.toHaveBeenCalled();
+  });
+
+  it('A003-PRECISION-002 fails invalid stored IDs locally with zero upstream calls', async () => {
+    const invalidIds = [
+      '',
+      '0',
+      '01',
+      '123456789012345678901',
+      '1/2',
+      '1%2F2',
+      '1.0',
+      '1e3',
+      new String('1') as unknown as string,
+    ];
+
+    for (const invalidId of invalidIds) {
+      mocks.dbQuery.mockReset();
+      mocks.rows.mockReset();
+      mocks.zhihuPost.mockReset();
+      mocks.zhihuPut.mockReset();
+      mocks.rows.mockResolvedValue([{ ...item, zhihu_composition_id: invalidId }]);
+      mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+      await pushComposition({ compositionId: '1' });
+
+      expect(mocks.zhihuPost, String(invalidId)).not.toHaveBeenCalled();
+      expect(mocks.zhihuPut, String(invalidId)).not.toHaveBeenCalled();
+      expect(mocks.dbQuery).toHaveBeenLastCalledWith(expect.stringContaining("sync_status = 'failed'"), [
+        '知乎同步失败，请稍后重试',
+        '1',
+      ]);
+    }
+  });
+
   it('成功时使用精确计划 ID 并保存精确作品 ID', async () => {
     mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
     mocks.zhihuPost.mockResolvedValue({ data: { composition_id: '2071266138193975100' } });
@@ -90,9 +137,9 @@ describe('知乎推广作品同步', () => {
     mocks.dbQuery.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
     await pushComposition({ compositionId: '1' });
     expect(mocks.zhihuPost).not.toHaveBeenCalled();
-    expect(mocks.dbQuery).toHaveBeenLastCalledWith(
-      expect.stringContaining("sync_status = 'failed'"),
-      ['推广计划尚未同步成功，请稍后重试', '1'],
-    );
+    expect(mocks.dbQuery).toHaveBeenLastCalledWith(expect.stringContaining("sync_status = 'failed'"), [
+      '推广计划尚未同步成功，请稍后重试',
+      '1',
+    ]);
   });
 });
