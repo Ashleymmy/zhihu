@@ -1,0 +1,55 @@
+# 开发环境 Docker Compose 配置
+# 只运行 MySQL 和 Redis，开发服务在本地启动
+# 使用方式：docker compose -f compose.dev.yaml up -d
+
+name: zhihu-koc-dev
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: zhihu_koc_dev
+      MYSQL_USER: zhihu_dev
+      MYSQL_PASSWORD: zhihu_dev_pass
+      MYSQL_ROOT_PASSWORD: root_dev_pass
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot_dev_pass --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - dev_network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "redis_dev_pass"]
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a redis_dev_pass ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - dev_network
+
+networks:
+  dev_network:
+    driver: bridge
+
+volumes:
+  mysql_dev_data:
+  redis_dev_data:
