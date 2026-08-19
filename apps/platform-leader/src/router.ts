@@ -13,9 +13,12 @@ export function createAppRouter() {
       },
       {
         path: '/',
-        name: 'home',
-        component: () => import('./views/HomeView.vue'),
+        component: () => import('./layouts/ShellLayout.vue'),
         meta: { requiresAuth: true },
+        children: [
+          { path: '', name: 'overview', component: () => import('./views/OverviewView.vue') },
+          { path: 'projects', name: 'projects', component: () => import('./views/ProjectsView.vue') },
+        ],
       },
       { path: '/:pathMatch(.*)*', redirect: '/' },
     ],
@@ -27,7 +30,7 @@ export function createAppRouter() {
     if (to.meta.requiresAuth !== false && !auth.loggedIn) {
       return { name: 'login', query: { redirect: to.fullPath } }
     }
-    if (to.name === 'login' && auth.loggedIn) return { name: 'home' }
+    if (to.name === 'login' && auth.loggedIn) return { name: 'overview' }
     return true
   })
 
