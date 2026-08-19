@@ -17,6 +17,9 @@ export function createAppRouter() {
         meta: { requiresAuth: true },
         children: [
           { path: '', name: 'overview', component: () => import('./views/OverviewView.vue') },
+          { path: 'plans', name: 'plans', component: () => import('./views/PlansView.vue') },
+          { path: 'earnings', name: 'earnings', component: () => import('./views/EarningsView.vue') },
+          { path: 'team', name: 'team', component: () => import('./views/TeamView.vue') },
           { path: 'projects', name: 'projects', component: () => import('./views/ProjectsView.vue') },
           { path: 'mcn', name: 'mcn', component: () => import('./views/McnView.vue') },
         ],

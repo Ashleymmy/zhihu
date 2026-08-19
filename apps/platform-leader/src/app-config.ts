@@ -4,4 +4,4 @@ import type { GlobalRole } from '@zhihu-koc/shared-contracts'
 export const APP_ROLE: GlobalRole = 'leader'
 
 /** 顶部导航（key 同路由 name 与 i18n nav.* key）。 */
-export const APP_NAV = ['overview', 'projects'] as const
+export const APP_NAV = ['overview', 'plans', 'earnings', 'team', 'projects'] as const
