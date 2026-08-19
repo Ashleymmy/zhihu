@@ -104,6 +104,28 @@ export interface TeamMember {
   createdAt: string
 }
 
+export interface ProjectDetail extends Project {
+  apiBaseUrl: string
+  signMethod: 'hmac_sha256' | 'oauth2'
+  configJson: Record<string, unknown> | null
+}
+
+export interface CreateProjectReq {
+  name: string
+  slug: string
+  apiBaseUrl: string
+  signMethod?: 'hmac_sha256' | 'oauth2'
+  configJson?: Record<string, unknown>
+}
+
+export interface UpdateProjectReq {
+  name?: string
+  apiBaseUrl?: string
+  signMethod?: 'hmac_sha256' | 'oauth2'
+  isEnabled?: boolean
+  configJson?: Record<string, unknown> | null
+}
+
 export interface AddProjectMemberReq {
   userId: string
   memberRole?: ProjectMemberRole

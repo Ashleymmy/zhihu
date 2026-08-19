@@ -49,6 +49,18 @@ export default {
     courseName: '课程名称',
     courseUrl: '课程链接（可选）',
     createdAt: '创建时间',
+    create: '新建项目',
+    edit: '编辑',
+    disable: '禁用',
+    confirmDisable: '确认禁用该项目？',
+    projectName: '项目名称',
+    slug: 'Slug（字母/数字/连字符）',
+    apiBaseUrl: 'API Base URL',
+    signMethod: '签名方式',
+    signMethods: {
+      hmac_sha256: 'HMAC-SHA256',
+      oauth2: 'OAuth2',
+    },
   },
   mcn: {
     accountKey: '账户标识',

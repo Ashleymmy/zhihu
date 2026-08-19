@@ -49,6 +49,18 @@ export default {
     courseName: 'Course name',
     courseUrl: 'Course URL (optional)',
     createdAt: 'Created',
+    create: 'New project',
+    edit: 'Edit',
+    disable: 'Disable',
+    confirmDisable: 'Disable this project?',
+    projectName: 'Project name',
+    slug: 'Slug (letters / digits / hyphens)',
+    apiBaseUrl: 'API base URL',
+    signMethod: 'Sign method',
+    signMethods: {
+      hmac_sha256: 'HMAC-SHA256',
+      oauth2: 'OAuth2',
+    },
   },
   mcn: {
     accountKey: 'Account key',

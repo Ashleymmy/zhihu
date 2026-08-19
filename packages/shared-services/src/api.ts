@@ -4,6 +4,7 @@ import type {
   ChangePasswordReq,
   CreateMemberReq,
   CreateMemberResp,
+  CreateProjectReq,
   CreateWithdrawalReq,
   EarningRecord,
   EarningsStatus,
@@ -18,11 +19,13 @@ import type {
   PlanListReq,
   Project,
   ProjectCourse,
+  ProjectDetail,
   ProjectMember,
   RefreshResp,
   TeamMember,
   TrendPoint,
   UpdatePlanReq,
+  UpdateProjectReq,
   Withdrawal,
   WithdrawalStatus,
 } from '@zhihu-koc/shared-contracts'
@@ -51,6 +54,10 @@ export function createMcnApi(http: HttpClient) {
 export function createProjectsApi(http: HttpClient) {
   return {
     list: () => http.get<Project[]>('/projects'),
+    create: (data: CreateProjectReq) => http.post<ProjectDetail>('/projects', data),
+    update: (projectId: string, data: UpdateProjectReq) =>
+      http.patch<ProjectDetail>(`/projects/${projectId}`, data),
+    disable: (projectId: string) => http.del<void>(`/projects/${projectId}`),
 
     listMembers: (projectId: string) => http.get<ProjectMember[]>(`/projects/${projectId}/members`),
     addMember: (projectId: string, data: AddProjectMemberReq) =>
