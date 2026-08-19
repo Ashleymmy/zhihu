@@ -6,6 +6,8 @@ export class AppError extends Error {
     public readonly httpStatus: number,
     public readonly code: number,
     message: string,
+    /** 附加到错误响应体的额外字段（如 50310 的 failedGates/requestId）。 */
+    public readonly extras?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -33,7 +35,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     return;
   }
   if (error instanceof AppError) {
-    res.status(error.httpStatus).json({ code: error.code, data: null, message: error.message });
+    res.status(error.httpStatus).json({ code: error.code, data: null, message: error.message, ...error.extras });
     return;
   }
   if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {

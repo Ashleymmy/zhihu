@@ -48,7 +48,16 @@ const users: Record<string, AuthUser> = {
   },
 };
 
-const gateResponse = { code: 50310, data: null, message: '资金链启动 Gate 未关闭' };
+const FINANCE_GATE_ORDER = ['D-001-DECISION', 'D-001-READINESS', 'P0-008', 'M6'];
+
+/** 50310 契约：精确 failedGates（非空、去重、稳定顺序）+ 单次拒绝审计所用的 requestId。 */
+function expectGateResponse(body: Record<string, unknown>) {
+  expect(body).toMatchObject({ code: 50310, data: null, message: '资金链启动 Gate 未关闭' });
+  expect(body.failedGates).toEqual(FINANCE_GATE_ORDER);
+  expect(typeof body.requestId).toBe('string');
+  expect(String(body.requestId).length).toBeGreaterThan(0);
+  expect(typeof body.timestamp).toBe('number');
+}
 
 function createWithdrawalsApp(): Express {
   const app = express();
@@ -122,7 +131,7 @@ describe('legacy 提现写路径 Gate', () => {
         .set('Authorization', authorization(token))
         .send({ amount: 10, payMethod: 'alipay', payAccount: 'a@example.com' });
       expect(response.status).toBe(503);
-      expect(response.body).toEqual(gateResponse);
+      expectGateResponse(response.body);
     }
     expectNoWriteServices();
   });
@@ -138,7 +147,7 @@ describe('legacy 提现写路径 Gate', () => {
 
     for (const response of responses) {
       expect(response.status).toBe(503);
-      expect(response.body).toEqual(gateResponse);
+      expectGateResponse(response.body);
     }
     expectNoWriteServices();
   });
@@ -171,7 +180,7 @@ describe('legacy 提现写路径 Gate', () => {
 
     for (const response of responses) {
       expect(response.status).toBe(503);
-      expect(response.body).toEqual(gateResponse);
+      expectGateResponse(response.body);
     }
     expectNoWriteServices();
   });
@@ -194,7 +203,7 @@ describe('legacy 提现写路径 Gate', () => {
 
     for (const response of gatedResponses) {
       expect(response.status).toBe(503);
-      expect(response.body).toEqual(gateResponse);
+      expectGateResponse(response.body);
     }
 
     const malformed = await request(app)
