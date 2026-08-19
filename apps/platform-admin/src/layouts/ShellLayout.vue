@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { RouterView, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import { AppShell, type NavGroup } from '@zhihu-koc/shared-components'
 import { APP_ROLE } from '../app-config'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
+
+const currentPath = computed(() => route.path)
 
 const navigation: NavGroup[] = [
   {
@@ -64,6 +68,10 @@ const roleLabels: Record<string, string> = {
   creator: '达人',
 }
 
+function onNavigate(path: string) {
+  router.push(path)
+}
+
 async function onLogout() {
   await auth.logout()
   await router.replace({ name: 'login' })
@@ -75,6 +83,8 @@ async function onLogout() {
     :groups="navigation"
     :user-name="auth.user?.displayName ?? '管理员'"
     :role-label="roleLabels[APP_ROLE] ?? APP_ROLE"
+    :current-path="currentPath"
+    @navigate="onNavigate"
     @logout="onLogout"
   >
     <RouterView />
