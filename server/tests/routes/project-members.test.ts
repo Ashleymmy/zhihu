@@ -150,4 +150,41 @@ describe('MCN 账户与项目成员：跨角色权限边界', () => {
     expect(res.status).toBe(404);
     expect(res.body.code).toBe(40403);
   });
+
+  it('admin 项目列表返回全量，不带成员角色', async () => {
+    dbMocks.rows.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM projects p')) {
+        expect(sql).not.toContain('JOIN project_members');
+        return [
+          { id: '1', name: '知乎', slug: 'zhihu', is_enabled: 1, created_at: new Date(), member_role: null },
+        ];
+      }
+      return [];
+    });
+    const res = await request(app)
+      .get('/api/v1/projects')
+      .set('Authorization', `Bearer ${await token('admin', '1')}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toMatchObject({ id: '1', slug: 'zhihu', isEnabled: true, memberRole: null });
+  });
+
+  it('creator 项目列表只查成员表关联的行，SQL 绑定 user_id', async () => {
+    dbMocks.rows.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('FROM projects p')) {
+        expect(sql).toContain('JOIN project_members');
+        expect(sql).toContain('left_at IS NULL');
+        expect(params).toEqual(['3']);
+        return [
+          { id: '1', name: '知乎', slug: 'zhihu', is_enabled: 1, created_at: new Date(), member_role: 'member' },
+        ];
+      }
+      return [];
+    });
+    const res = await request(app)
+      .get('/api/v1/projects')
+      .set('Authorization', `Bearer ${await token('creator', '3')}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].memberRole).toBe('member');
+  });
 });

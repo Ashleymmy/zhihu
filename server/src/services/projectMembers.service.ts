@@ -42,6 +42,39 @@ export async function assertProjectMembership(user: AuthUser, projectId: string)
   if (!found.length) throw new AppError(403, 40304, '无权访问该项目');
 }
 
+interface ProjectRow extends RowDataPacket {
+  id: string;
+  name: string;
+  slug: string;
+  is_enabled: number;
+  created_at: Date;
+  member_role: 'owner' | 'admin' | 'member' | 'viewer' | null;
+}
+
+/** 项目列表：admin 看全部；其余角色只看自己在 project_members 里的项目（行级过滤在 SQL 内绑定）。 */
+export async function listProjects(user: AuthUser) {
+  const projects =
+    user.role === 'admin'
+      ? await rows<ProjectRow>(
+          'SELECT p.id, p.name, p.slug, p.is_enabled, p.created_at, NULL AS member_role FROM projects p ORDER BY p.id',
+        )
+      : await rows<ProjectRow>(
+          `SELECT p.id, p.name, p.slug, p.is_enabled, p.created_at, pm.member_role
+           FROM projects p JOIN project_members pm ON pm.project_id = p.id
+           WHERE pm.user_id = ? AND pm.left_at IS NULL
+           ORDER BY p.id`,
+          [user.sub],
+        );
+  return projects.map((row) => ({
+    id: String(row.id),
+    name: row.name,
+    slug: row.slug,
+    isEnabled: Boolean(row.is_enabled),
+    createdAt: row.created_at,
+    memberRole: row.member_role,
+  }));
+}
+
 export async function listProjectMembers(user: AuthUser, projectId: string) {
   await assertProjectExists(projectId);
   await assertProjectMembership(user, projectId);

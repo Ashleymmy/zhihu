@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "generatorId": "A-001-INVENTORY",
-  "inputManifestSha256": "191f84162a66558bec00a3312f2941d4bb4194f967d378a13309efda1ff3c6c8",
+  "inputManifestSha256": "cbb155095fe4336aea36c175d1dd85252184d622b8318291dbc6b00cf765b9ed",
   "registrySha256": "2544b308c36dca5b50afe2cc042eebbb270fffbef8fe91cec99d7119e7999e1e",
   "artifactSha256": {
-    "docCandidates": "8fd6197adf538a90e37b031e42158962af0fd14ba450f81314053ada492e7df3",
-    "serverRoutes": "547ae9a1782c6fcfc8970573dc2c7369223537416bd8e3f741dc6923b4b8d641",
-    "platformCalls": "320dd361b14af701c15bf0f1c78632ed5345d31fb31edf02c330ebf0200ff129"
+    "docCandidates": "2fba2229aac14fd68c67ec34089453fccedae006baaa6c90ec033d204c679b29",
+    "serverRoutes": "2a59494a22598894db02789bfbd837da219fa0955a38d52e26edae8ded5a2253",
+    "platformCalls": "11c668c3afe9dd46d6820750fc2795a9d883b867bc62f9e6409333e978acc41b"
   },
   "declaredImplementedCount": 0,
   "derivedImplementedCount": 0,
@@ -43,10 +43,10 @@
     },
     "server": {
       "mounts": 15,
-      "callSites": 63,
-      "uniqueOperations": 63,
+      "callSites": 64,
+      "uniqueOperations": 64,
       "byMethod": {
-        "GET": 26,
+        "GET": 27,
         "POST": 27,
         "PUT": 1,
         "PATCH": 5,
@@ -55,7 +55,7 @@
         "OPTIONS": 0
       },
       "byPathKind": {
-        "static": 41,
+        "static": 42,
         "parameterized": 22,
         "wildcard": 0
       }
@@ -80,10 +80,10 @@
       }
     },
     "apiV1": {
-      "server": 55,
+      "server": 56,
       "platform": 41,
       "observedExact": 39,
-      "serverOnly": 16,
+      "serverOnly": 17,
       "platformOnly": 2
     }
   },
@@ -285,6 +285,7 @@
         "GET /api/v1/metrics/trend",
         "GET /api/v1/plans",
         "GET /api/v1/plans/{id}",
+        "GET /api/v1/projects",
         "GET /api/v1/projects/{projectId}/courses",
         "GET /api/v1/projects/{projectId}/members",
         "GET /api/v1/tasks",

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatorId": "A-001-INVENTORY",
-  "inputManifestSha256": "191f84162a66558bec00a3312f2941d4bb4194f967d378a13309efda1ff3c6c8",
+  "inputManifestSha256": "cbb155095fe4336aea36c175d1dd85252184d622b8318291dbc6b00cf765b9ed",
   "records": [
     {
       "method": "DELETE",
@@ -59,7 +59,7 @@
       "mount": "/api/v1/projects",
       "source": {
         "file": "server/src/routes/projects.ts",
-        "line": 32,
+        "line": 41,
         "column": 1
       }
     },
@@ -350,6 +350,21 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/projects",
+      "pathKind": "static",
+      "shapePath": "/api/v1/projects",
+      "operationKey": "GET /api/v1/projects",
+      "shapeKey": "GET /api/v1/projects",
+      "receiver": "projectsRouter",
+      "mount": "/api/v1/projects",
+      "source": {
+        "file": "server/src/routes/projects.ts",
+        "line": 25,
+        "column": 1
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/projects/{projectId}/courses",
       "pathKind": "parameterized",
       "shapePath": "/api/v1/projects/{}/courses",
@@ -374,7 +389,7 @@
       "mount": "/api/v1/projects",
       "source": {
         "file": "server/src/routes/projects.ts",
-        "line": 20,
+        "line": 29,
         "column": 1
       }
     },
@@ -824,7 +839,7 @@
       "mount": "/api/v1/projects",
       "source": {
         "file": "server/src/routes/projects.ts",
-        "line": 24,
+        "line": 33,
         "column": 1
       }
     },
