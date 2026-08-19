@@ -20,27 +20,34 @@ defineProps<{
 
 <style scoped>
 .finance-gate-banner {
-  padding: 12px 16px;
-  border: 1px solid #ffd591;
-  border-radius: 8px;
-  background: #fffbe6;
-  color: #613400;
+  padding: 15px 20px;
+  border: 1px solid var(--sun);
+  border-radius: var(--radius);
+  background: #f4e8c7;
+  color: #8b5d1e;
+  box-shadow: var(--shadow);
 }
 .finance-gate-banner__title {
   font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .finance-gate-banner__hint {
-  margin: 4px 0 0;
-  font-size: 13px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
 }
 .finance-gate-banner__gates {
-  margin: 8px 0 0;
-  font-size: 12px;
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
 }
 .finance-gate-banner__gates code {
   margin-right: 8px;
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 4px;
-  background: #fff1b8;
+  background: var(--white);
+  font-size: 10px;
+  letter-spacing: 0.05em;
 }
 </style>

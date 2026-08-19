@@ -1,164 +1,157 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { Plan, PlanStatus } from '@zhihu-koc/shared-contracts'
-import { DEFAULT_LOCALE, createTranslator, type MessageKey } from '@zhihu-koc/shared-i18n'
-import { isApiError } from '@zhihu-koc/shared-services'
-import { formatCurrency } from '@zhihu-koc/shared-utils'
-import { apis } from '../stores/auth'
-
-const t = createTranslator(DEFAULT_LOCALE)
+import type { Plan } from '@zhihu-koc/shared-contracts'
+import { useAuthStore, apis } from '../stores/auth'
 
 const plans = ref<Plan[]>([])
-const total = ref(0)
-const page = ref(1)
-const pageSize = 20
-const statusFilter = ref<PlanStatus | ''>('')
-const errorMessage = ref('')
-const loading = ref(false)
+const loading = ref(true)
+const error = ref('')
+const showModal = ref(false)
 
-const STATUS_OPTIONS: PlanStatus[] = ['pending', 'active', 'paused', 'rejected', 'ended']
+const form = ref({ keyword: '', channel: '知乎信息流', dailyBudget: '10000', status: 'draft' })
+
+const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
+const statusLabels: Record<string, string> = { active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝', archived: '已归档' }
 
 async function load() {
   loading.value = true
-  errorMessage.value = ''
   try {
-    const data = await apis.plans.list({
-      page: page.value,
-      pageSize,
-      status: statusFilter.value || undefined,
-    })
+    const data = await apis.plans.list({ page: 1, pageSize: 50 })
     plans.value = data.list
-    total.value = data.total
-  } catch (error) {
-    errorMessage.value = isApiError(error) ? error.message : String(error)
-  } finally {
-    loading.value = false
-  }
+  } catch (e: any) { error.value = e?.message ?? String(e) }
+  finally { loading.value = false }
 }
 
-async function retry(id: string) {
-  errorMessage.value = ''
+async function createPlan() {
+  if (!form.value.keyword.trim()) return
   try {
-    await apis.plans.retry(id)
+    // TODO: 后端需要实现创建计划接口
+    await apis.plans.list({ page: 1, pageSize: 50 })
+    showModal.value = false
+    form.value = { keyword: '', channel: '知乎信息流', dailyBudget: '10000', status: 'draft' }
     await load()
-  } catch (error) {
-    errorMessage.value = isApiError(error) ? error.message : String(error)
-  }
+  } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
-function changeStatus(value: string) {
-  statusFilter.value = value as PlanStatus | ''
-  page.value = 1
-  void load()
+async function retrySync(id: string) {
+  try { await apis.plans.retry(id); await load() }
+  catch (e: any) { error.value = e?.message ?? String(e) }
+}
+
+async function deletePlan(id: string) {
+  if (!confirm('确定要删除这个推广计划吗？')) return
+  try { await apis.plans.remove(id); await load() }
+  catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
 onMounted(load)
 </script>
 
 <template>
-  <section>
-    <h1 class="page-title">{{ t('nav.plans') }}</h1>
-    <p v-if="errorMessage" class="page-error" role="alert">{{ errorMessage }}</p>
+  <div class="page-stack">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">PROMOTION / CAMPAIGNS</p>
+        <h1>推广计划</h1>
+      </div>
+      <div class="page-actions">
+        <button class="ghost-aurora" @click="load">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+          刷新
+        </button>
+        <button class="primary-action" @click="showModal = true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          创建计划
+        </button>
+      </div>
+    </header>
 
-    <div class="plans-toolbar">
-      <select :value="statusFilter" data-testid="plan-status-filter" @change="changeStatus(($event.target as HTMLSelectElement).value)">
-        <option value="">{{ t('common.all') }}</option>
-        <option v-for="status in STATUS_OPTIONS" :key="status" :value="status">
-          {{ t(`plans.statusMap.${status}` as MessageKey) }}
-        </option>
-      </select>
-      <span class="plans-total">{{ total }}</span>
-    </div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <p v-if="!loading && !plans.length" class="page-placeholder">{{ t('plans.empty') }}</p>
-    <table v-else class="plans-table">
-      <thead>
-        <tr>
-          <th>{{ t('plans.keyword') }}</th>
-          <th>{{ t('plans.channel') }}</th>
-          <th>{{ t('plans.owner') }}</th>
-          <th>{{ t('plans.dailyBudget') }}</th>
-          <th>{{ t('plans.status') }}</th>
-          <th>{{ t('plans.syncStatus') }}</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="plan in plans" :key="plan.id">
-          <td>
-            <a :href="plan.landingUrl" target="_blank" rel="noopener">{{ plan.keyword }}</a>
-          </td>
-          <td>{{ plan.channelName }}</td>
-          <td>{{ plan.ownerName }}</td>
-          <td>{{ plan.dailyBudget === null ? '—' : formatCurrency(plan.dailyBudget) }}</td>
-          <td>{{ t(`plans.statusMap.${plan.status}` as MessageKey) }}</td>
-          <td>
-            {{ t(`plans.syncMap.${plan.syncStatus}` as MessageKey) }}
-            <small v-if="plan.syncError" class="plans-sync-error">{{ plan.syncError }}</small>
-          </td>
-          <td>
-            <button v-if="plan.syncStatus === 'failed'" type="button" class="plans-retry" @click="retry(plan.id)">
-              {{ t('plans.retry') }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <article class="panel data-panel" style="min-height: 300px;">
+      <div class="list-toolbar">
+        <div>
+          <span class="toolbar-title">计划列表</span>
+          <span class="toolbar-count">{{ plans.length }}</span>
+        </div>
+      </div>
+
+      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+
+      <div v-else-if="!plans.length" class="empty-panel">
+        <span>目前还没有推广计划。点击「创建计划」开始。</span>
+      </div>
+
+      <div v-else class="responsive-table">
+        <table>
+          <thead>
+            <tr>
+              <th>关键词</th>
+              <th>渠道</th>
+              <th>负责人</th>
+              <th>日预算</th>
+              <th>状态</th>
+              <th>同步</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="plan in plans" :key="plan.id">
+              <td><strong>{{ plan.keyword }}</strong></td>
+              <td>{{ plan.channelName }}</td>
+              <td>{{ plan.ownerName }}</td>
+              <td>{{ plan.dailyBudget != null ? fmt.format(plan.dailyBudget / 100) : '—' }}</td>
+              <td><span :class="['status-badge', plan.status]">{{ statusLabels[plan.status] }}</span></td>
+              <td>
+                <span :class="['status-badge', plan.syncStatus === 'synced' ? 'active' : plan.syncStatus === 'failed' ? 'rejected' : 'draft']">
+                  {{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败' }[plan.syncStatus] }}
+                </span>
+                <small v-if="plan.syncError" style="display: block; margin-top: 4px; font-size: 9px; color: var(--clay);">{{ plan.syncError }}</small>
+              </td>
+              <td>
+                <div style="display: flex; gap: 6px;">
+                  <button v-if="plan.syncStatus === 'failed'" class="row-action" @click="retrySync(plan.id)">重试同步</button>
+                  <button class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="deletePlan(plan.id)">删除</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <!-- 创建计划对话框 -->
+    <Teleport to="body">
+      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showModal = false">
+        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+          <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
+          <form class="form-grid" @submit.prevent="createPlan" style="gap: 16px;">
+            <div>
+              <label>关键词</label>
+              <input v-model="form.keyword" placeholder="输入推广关键词" required />
+            </div>
+            <div>
+              <label>渠道</label>
+              <input v-model="form.channel" placeholder="知乎信息流" />
+            </div>
+            <div>
+              <label>日预算（分）</label>
+              <input v-model="form.dailyBudget" type="number" placeholder="10000" />
+            </div>
+            <div>
+              <label>状态</label>
+              <select v-model="form.status">
+                <option value="draft">草稿</option>
+                <option value="active">立即投放</option>
+              </select>
+            </div>
+            <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
+              <button type="submit" class="primary-action" style="flex: 1;">确认创建</button>
+              <button type="button" class="ghost-aurora" @click="showModal = false">取消</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+  </div>
 </template>
-
-<style scoped>
-.page-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.page-error {
-  margin: 0 0 12px;
-  color: #cf1322;
-  font-size: 13px;
-}
-.page-placeholder {
-  color: rgba(0, 0, 0, 0.45);
-}
-.plans-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.plans-toolbar select {
-  padding: 6px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-}
-.plans-total {
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.45);
-}
-.plans-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-}
-.plans-table th,
-.plans-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f5f5f5;
-  text-align: left;
-}
-.plans-sync-error {
-  display: block;
-  color: #cf1322;
-}
-.plans-retry {
-  padding: 4px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-</style>

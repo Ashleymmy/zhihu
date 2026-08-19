@@ -24,11 +24,15 @@ const tone = computed(() => roleTone(props.role))
 .workspace-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 10px;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 600;
   line-height: 20px;
   white-space: nowrap;
+  font-family: var(--font-sans);
+  background: var(--white);
+  color: var(--ink);
 }
 </style>

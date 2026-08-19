@@ -1,594 +1,134 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import type { Project, ProjectCourse, ProjectDetail, ProjectMember, TeamMember } from '@zhihu-koc/shared-contracts'
-import { DEFAULT_LOCALE, createTranslator } from '@zhihu-koc/shared-i18n'
-import { isApiError } from '@zhihu-koc/shared-services'
-import { formatDate } from '@zhihu-koc/shared-utils'
-import { apis } from '../stores/auth'
-
-const t = createTranslator(DEFAULT_LOCALE)
+import { onMounted, ref } from 'vue'
+import type { Project } from '@zhihu-koc/shared-contracts'
+import { useAuthStore, apis } from '../stores/auth'
 
 const projects = ref<Project[]>([])
-const selected = ref<ProjectDetail | null>(null)
-const members = ref<ProjectMember[]>([])
-const courses = ref<ProjectCourse[]>([])
-const teamMembers = ref<TeamMember[]>([])
-const loading = ref(false)
-const errorMessage = ref('')
-
-// ── 新建项目表单 ───────────────────────────────────────────────
+const loading = ref(true)
+const error = ref('')
 const showCreate = ref(false)
-const createForm = ref({ name: '', slug: '', apiBaseUrl: '', signMethod: 'hmac_sha256' as 'hmac_sha256' | 'oauth2' })
+const form = ref({ name: '', slug: '', apiBaseUrl: '', signMethod: 'hmac_sha256' as const })
 const creating = ref(false)
+const selected = ref<Project | null>(null)
+const members = ref<any[]>([])
+const courses = ref<any[]>([])
 
-// ── 编辑项目表单 ───────────────────────────────────────────────
-const showEdit = ref(false)
-const editForm = ref({ name: '', apiBaseUrl: '', signMethod: 'hmac_sha256' as 'hmac_sha256' | 'oauth2' })
-const editing = ref(false)
-
-const newMemberId = ref('')
-const newCourseName = ref('')
-const newCourseUrl = ref('')
-
-const candidateUsers = computed(() =>
-  teamMembers.value.filter((user) => user.isActive && !members.value.some((m) => m.userId === user.id)),
-)
-
-function captureError(error: unknown) {
-  errorMessage.value = isApiError(error) ? error.message : String(error)
-}
-
-async function loadProjects() {
+async function load() {
   loading.value = true
-  errorMessage.value = ''
   try {
     projects.value = await apis.projects.list()
-    if (projects.value.length && !selected.value) await select(projects.value[0]!)
-  } catch (error) {
-    captureError(error)
-  } finally {
-    loading.value = false
-  }
+    if (projects.value.length && !selected.value) await selectProject(projects.value[0])
+  } catch (e: any) { error.value = e?.message ?? String(e) }
+  finally { loading.value = false }
 }
 
-async function select(project: Project) {
-  errorMessage.value = ''
+async function selectProject(p: Project) {
+  selected.value = p
   try {
-    const detail = await apis.projects.update(project.id, {}) as ProjectDetail
-    selected.value = detail
-    showEdit.value = false
-    ;[members.value, courses.value] = await Promise.all([
-      apis.projects.listMembers(project.id),
-      apis.projects.listCourses(project.id),
+    const [m, c] = await Promise.all([
+      apis.projects.listMembers(p.id),
+      apis.projects.listCourses(p.id),
     ])
-  } catch (error) {
-    // update with empty body returns current data; treat any error as a plain select
-    selected.value = project as unknown as ProjectDetail
-    captureError(error)
-  }
+    members.value = m
+    courses.value = c
+  } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
-// ── 新建项目 ──────────────────────────────────────────────────
-function openCreate() {
-  createForm.value = { name: '', slug: '', apiBaseUrl: '', signMethod: 'hmac_sha256' }
-  showCreate.value = true
-}
-
-async function submitCreate() {
-  if (!createForm.value.name.trim() || !createForm.value.slug.trim() || !createForm.value.apiBaseUrl.trim()) return
+async function createProject() {
+  if (!form.value.name.trim() || !form.value.slug.trim() || !form.value.apiBaseUrl.trim()) return
   creating.value = true
-  errorMessage.value = ''
   try {
-    const created = await apis.projects.create({
-      name: createForm.value.name.trim(),
-      slug: createForm.value.slug.trim(),
-      apiBaseUrl: createForm.value.apiBaseUrl.trim(),
-      signMethod: createForm.value.signMethod,
-    })
+    await apis.projects.create(form.value)
     showCreate.value = false
-    projects.value = await apis.projects.list()
-    await selectDetail(created)
-  } catch (error) {
-    captureError(error)
-  } finally {
-    creating.value = false
-  }
+    form.value = { name: '', slug: '', apiBaseUrl: '', signMethod: 'hmac_sha256' }
+    await load()
+  } catch (e: any) { error.value = e?.message ?? String(e) }
+  finally { creating.value = false }
 }
 
-// ── 编辑项目 ──────────────────────────────────────────────────
-function openEdit() {
-  if (!selected.value) return
-  editForm.value = {
-    name: selected.value.name,
-    apiBaseUrl: selected.value.apiBaseUrl ?? '',
-    signMethod: selected.value.signMethod ?? 'hmac_sha256',
-  }
-  showEdit.value = true
+async function deleteProject(id: string) {
+  if (!confirm('确定要禁用此项目？')) return
+  try { await apis.projects.disable(id); selected.value = null; await load() }
+  catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
-async function submitEdit() {
-  if (!selected.value) return
-  editing.value = true
-  errorMessage.value = ''
-  try {
-    const updated = await apis.projects.update(selected.value.id, {
-      name: editForm.value.name.trim(),
-      apiBaseUrl: editForm.value.apiBaseUrl.trim(),
-      signMethod: editForm.value.signMethod,
-    })
-    selected.value = updated
-    projects.value = await apis.projects.list()
-    showEdit.value = false
-  } catch (error) {
-    captureError(error)
-  } finally {
-    editing.value = false
-  }
-}
-
-// ── 禁用项目 ──────────────────────────────────────────────────
-async function disableProject() {
-  if (!selected.value || !confirm(t('projects.confirmDisable'))) return
-  errorMessage.value = ''
-  try {
-    await apis.projects.disable(selected.value.id)
-    projects.value = await apis.projects.list()
-    selected.value = null
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-async function selectDetail(project: Project | ProjectDetail) {
-  selected.value = project as ProjectDetail
-  showEdit.value = false
-  errorMessage.value = ''
-  try {
-    ;[members.value, courses.value] = await Promise.all([
-      apis.projects.listMembers(project.id),
-      apis.projects.listCourses(project.id),
-    ])
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-// ── 成员 ──────────────────────────────────────────────────────
-async function addMember() {
-  if (!selected.value || !newMemberId.value) return
-  try {
-    await apis.projects.addMember(selected.value.id, { userId: newMemberId.value })
-    newMemberId.value = ''
-    members.value = await apis.projects.listMembers(selected.value.id)
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-async function removeMember(userId: string) {
-  if (!selected.value) return
-  try {
-    await apis.projects.removeMember(selected.value.id, userId)
-    members.value = await apis.projects.listMembers(selected.value.id)
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-// ── 课程 ──────────────────────────────────────────────────────
-async function addCourse() {
-  if (!selected.value || !newCourseName.value.trim()) return
-  try {
-    await apis.projects.addCourse(selected.value.id, {
-      courseName: newCourseName.value.trim(),
-      courseUrl: newCourseUrl.value.trim() || undefined,
-    })
-    newCourseName.value = ''
-    newCourseUrl.value = ''
-    courses.value = await apis.projects.listCourses(selected.value.id)
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-async function removeCourse(courseId: string) {
-  if (!selected.value) return
-  try {
-    await apis.projects.removeCourse(selected.value.id, courseId)
-    courses.value = await apis.projects.listCourses(selected.value.id)
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-onMounted(async () => {
-  await loadProjects()
-  try {
-    teamMembers.value = await apis.team.listMembers()
-  } catch (error) {
-    captureError(error)
-  }
-})
+onMounted(load)
 </script>
 
 <template>
-  <section class="projects">
-    <h1 class="page-title">{{ t('nav.projects') }}</h1>
-    <p v-if="errorMessage" class="projects__error" role="alert">{{ errorMessage }}</p>
+  <div class="page-stack">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">PROJECTS / MANAGEMENT</p>
+        <h1>项目管理</h1>
+      </div>
+      <button class="primary-action" @click="showCreate = true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        创建项目
+      </button>
+    </header>
 
-    <!-- 新建项目表单 -->
-    <div v-if="showCreate" class="create-panel">
-      <h2>{{ t('projects.create') }}</h2>
-      <form class="create-panel__form" @submit.prevent="submitCreate">
-        <label>
-          {{ t('projects.projectName') }}
-          <input v-model="createForm.name" required maxlength="64" />
-        </label>
-        <label>
-          {{ t('projects.slug') }}
-          <input v-model="createForm.slug" required maxlength="32" pattern="[a-z0-9-]+" />
-        </label>
-        <label>
-          {{ t('projects.apiBaseUrl') }}
-          <input v-model="createForm.apiBaseUrl" required type="url" maxlength="255" />
-        </label>
-        <label>
-          {{ t('projects.signMethod') }}
-          <select v-model="createForm.signMethod">
-            <option value="hmac_sha256">{{ t('projects.signMethods.hmac_sha256') }}</option>
-            <option value="oauth2">{{ t('projects.signMethods.oauth2') }}</option>
-          </select>
-        </label>
-        <div class="create-panel__actions">
-          <button type="submit" :disabled="creating">{{ t('common.save') }}</button>
-          <button type="button" @click="showCreate = false">{{ t('common.cancel') }}</button>
-        </div>
-      </form>
-    </div>
-    <button v-else type="button" class="btn-primary" @click="openCreate">{{ t('projects.create') }}</button>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <div class="projects__layout">
-      <aside class="projects__list">
-        <p v-if="!loading && !projects.length" class="page-placeholder">{{ t('projects.empty') }}</p>
-        <button
-          v-for="project in projects"
-          :key="project.id"
-          type="button"
-          class="projects__item"
-          :class="{ 'projects__item--active': selected?.id === project.id }"
-          @click="selectDetail(project)"
-        >
-          <span>{{ project.name }}</span>
-          <small>{{ project.slug }}</small>
-          <small v-if="!project.isEnabled" class="projects__disabled">{{ t('projects.disabled') }}</small>
+    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: start;">
+      <aside style="display: flex; flex-direction: column; gap: 10px;">
+        <div v-if="!loading && !projects.length" style="color: var(--ink-soft); font-size: 12px; padding: 20px;">暂无项目</div>
+        <button v-for="p in projects" :key="p.id" type="button" :style="{ padding: '12px 14px', border: `1px solid ${selected?.id === p.id ? 'var(--forest)' : 'var(--line)'}`, borderRadius: 'var(--radius)', background: selected?.id === p.id ? 'var(--paper)' : 'var(--white)', textAlign: 'left', cursor: 'pointer', fontSize: '12px' }" @click="selectProject(p)">
+          <div style="font-weight: 600;">{{ p.name }}</div>
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft);">{{ p.slug }}</div>
         </button>
       </aside>
 
-      <div v-if="selected" class="projects__detail">
-        <!-- 项目元信息 + 操作 -->
-        <section class="panel">
-          <header class="panel__header">
-            <h2>{{ selected.name }} <small>{{ selected.slug }}</small></h2>
-            <div class="panel__header-actions">
-              <button v-if="!showEdit" type="button" @click="openEdit">{{ t('projects.edit') }}</button>
-              <button
-                v-if="selected.isEnabled"
-                type="button"
-                class="btn-danger"
-                @click="disableProject"
-              >{{ t('projects.disable') }}</button>
-            </div>
-          </header>
+      <div v-if="selected" style="display: flex; flex-direction: column; gap: 20px;">
+        <article class="panel" style="padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="margin: 0; font-size: 18px;">{{ selected.name }} <small style="font-weight: normal; color: var(--ink-soft); font-size: 11px; font-family: var(--font-mono);">{{ selected.slug }}</small></h2>
+            <button class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="deleteProject(selected.id)">禁用项目</button>
+          </div>
+          <div style="font-size: 11px; color: var(--ink-soft);">状态：<span :class="['status-badge', selected.isEnabled ? 'active' : 'ended']">{{ selected.isEnabled ? '启用' : '已禁用' }}</span></div>
+        </article>
 
-          <!-- 行内编辑表单 -->
-          <form v-if="showEdit" class="edit-form" @submit.prevent="submitEdit">
-            <label>
-              {{ t('projects.projectName') }}
-              <input v-model="editForm.name" required maxlength="64" />
-            </label>
-            <label>
-              {{ t('projects.apiBaseUrl') }}
-              <input v-model="editForm.apiBaseUrl" required type="url" maxlength="255" />
-            </label>
-            <label>
-              {{ t('projects.signMethod') }}
-              <select v-model="editForm.signMethod">
-                <option value="hmac_sha256">{{ t('projects.signMethods.hmac_sha256') }}</option>
-                <option value="oauth2">{{ t('projects.signMethods.oauth2') }}</option>
-              </select>
-            </label>
-            <div class="edit-form__actions">
-              <button type="submit" :disabled="editing">{{ t('common.save') }}</button>
-              <button type="button" @click="showEdit = false">{{ t('common.cancel') }}</button>
+        <article class="panel" style="padding: 20px;">
+          <h2 style="margin: 0 0 14px; font-size: 16px;">成员（{{ members.length }}）</h2>
+          <div v-if="!members.length" style="color: var(--ink-soft); font-size: 12px;">暂无成员</div>
+          <div v-for="m in members" :key="m.userId" style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--paper-deep); font-size: 12px;">
+            <span>{{ m.displayName ?? m.username ?? m.userId }}</span>
+            <span class="status-badge draft">{{ m.memberRole }}</span>
+          </div>
+        </article>
+
+        <article class="panel" style="padding: 20px;">
+          <h2 style="margin: 0 0 14px; font-size: 16px;">课程（{{ courses.length }}）</h2>
+          <div v-if="!courses.length" style="color: var(--ink-soft); font-size: 12px;">暂无课程</div>
+          <div v-for="c in courses" :key="c.id" style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--paper-deep); font-size: 12px;">
+            <span>{{ c.courseName }}</span>
+            <a v-if="c.courseUrl" :href="c.courseUrl" target="_blank" style="color: var(--forest); font-size: 10px;">查看</a>
+          </div>
+        </article>
+      </div>
+      <div v-else-if="projects.length" style="color: var(--ink-soft); font-size: 12px; padding: 40px; text-align: center;">选择一个项目查看详情</div>
+    </div>
+
+    <!-- 创建对话框 -->
+    <Teleport to="body">
+      <div v-if="showCreate" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showCreate = false">
+        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+          <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建项目</h2>
+          <form class="form-grid" @submit.prevent="createProject" style="gap: 16px;">
+            <div><label>项目名称</label><input v-model="form.name" required maxlength="64" /></div>
+            <div><label>Slug</label><input v-model="form.slug" required maxlength="32" pattern="[a-z0-9-]+" /></div>
+            <div class="full-span"><label>API Base URL</label><input v-model="form.apiBaseUrl" required type="url" maxlength="255" /></div>
+            <div>
+              <label>签名方式</label>
+              <select v-model="form.signMethod"><option value="hmac_sha256">HMAC SHA256</option><option value="oauth2">OAuth2</option></select>
+            </div>
+            <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
+              <button type="submit" class="primary-action" :disabled="creating" style="flex: 1;">{{ creating ? '创建中...' : '确认创建' }}</button>
+              <button type="button" class="ghost-aurora" @click="showCreate = false">取消</button>
             </div>
           </form>
-        </section>
-
-        <!-- 成员 -->
-        <section class="panel">
-          <header class="panel__header">
-            <h2>{{ t('nav.members') }}</h2>
-            <form class="panel__form" @submit.prevent="addMember">
-              <select v-model="newMemberId" data-testid="member-select">
-                <option value="" disabled>{{ t('projects.memberPlaceholder') }}</option>
-                <option v-for="user in candidateUsers" :key="user.id" :value="user.id">
-                  {{ user.displayName }}（{{ user.username }}）
-                </option>
-              </select>
-              <button type="submit" :disabled="!newMemberId">{{ t('projects.addMember') }}</button>
-            </form>
-          </header>
-          <p v-if="!members.length" class="page-placeholder">{{ t('projects.membersEmpty') }}</p>
-          <table v-else class="panel__table">
-            <thead>
-              <tr>
-                <th>{{ t('auth.username') }}</th>
-                <th>{{ t('projects.memberRole') }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="member in members" :key="member.userId">
-                <td>{{ member.displayName ?? member.username ?? member.userId }}</td>
-                <td>{{ member.memberRole }}</td>
-                <td class="panel__actions">
-                  <button type="button" @click="removeMember(member.userId)">{{ t('projects.removeMember') }}</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <!-- 课程 -->
-        <section class="panel">
-          <header class="panel__header">
-            <h2>{{ t('nav.courses') }}</h2>
-            <form class="panel__form" @submit.prevent="addCourse">
-              <input v-model="newCourseName" :placeholder="t('projects.courseName')" data-testid="course-name" />
-              <input v-model="newCourseUrl" :placeholder="t('projects.courseUrl')" data-testid="course-url" />
-              <button type="submit" :disabled="!newCourseName.trim()">{{ t('projects.addCourse') }}</button>
-            </form>
-          </header>
-          <p v-if="!courses.length" class="page-placeholder">{{ t('projects.coursesEmpty') }}</p>
-          <table v-else class="panel__table">
-            <thead>
-              <tr>
-                <th>{{ t('projects.courseName') }}</th>
-                <th>URL</th>
-                <th>{{ t('projects.createdAt') }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="course in courses" :key="course.id">
-                <td>{{ course.courseName }}</td>
-                <td>
-                  <a v-if="course.courseUrl" :href="course.courseUrl" target="_blank" rel="noopener">{{
-                    course.courseUrl
-                  }}</a>
-                  <span v-else>—</span>
-                </td>
-                <td>{{ formatDate(course.createdAt) }}</td>
-                <td class="panel__actions">
-                  <button type="button" @click="removeCourse(course.id)">{{ t('projects.removeCourse') }}</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+        </div>
       </div>
-      <p v-else class="page-placeholder">{{ t('projects.selectHint') }}</p>
-    </div>
-  </section>
+    </Teleport>
+  </div>
 </template>
-
-<style scoped>
-.page-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.page-placeholder {
-  color: rgba(0, 0, 0, 0.45);
-}
-.projects__error {
-  margin: 0 0 12px;
-  color: #cf1322;
-  font-size: 13px;
-}
-.btn-primary {
-  margin-bottom: 12px;
-  padding: 6px 16px;
-  border: none;
-  border-radius: 6px;
-  background: #1677ff;
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-}
-.btn-danger {
-  border: 1px solid #ffa39e;
-  background: #fff;
-  color: #cf1322;
-}
-.create-panel {
-  margin-bottom: 16px;
-  padding: 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 8px;
-  background: #fafafa;
-}
-.create-panel h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
-}
-.create-panel__form,
-.edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 480px;
-}
-.create-panel__form label,
-.edit-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-}
-.create-panel__form input,
-.create-panel__form select,
-.edit-form input,
-.edit-form select {
-  padding: 6px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-}
-.create-panel__actions,
-.edit-form__actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
-.create-panel__actions button,
-.edit-form__actions button {
-  padding: 6px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.create-panel__actions button[type='submit'],
-.edit-form__actions button[type='submit'] {
-  border: none;
-  background: #1677ff;
-  color: #fff;
-}
-.create-panel__actions button[type='button'],
-.edit-form__actions button[type='button'] {
-  border: 1px solid #d9d9d9;
-  background: #fff;
-  color: rgba(0, 0, 0, 0.65);
-}
-.create-panel__actions button:disabled,
-.edit-form__actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.projects__layout {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 16px;
-  align-items: start;
-}
-.projects__list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.projects__item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-.projects__item--active {
-  border-color: #1677ff;
-}
-.projects__item small {
-  color: rgba(0, 0, 0, 0.45);
-}
-.projects__disabled {
-  color: #cf1322;
-}
-.projects__detail {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.panel {
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fff;
-}
-.panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.panel__header h2 {
-  margin: 0;
-  font-size: 15px;
-}
-.panel__header h2 small {
-  font-weight: normal;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
-  margin-left: 6px;
-}
-.panel__header-actions {
-  display: flex;
-  gap: 8px;
-}
-.panel__header-actions button {
-  padding: 4px 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-.panel__form {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.panel__form input,
-.panel__form select {
-  padding: 6px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-}
-.panel__form button {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: #1677ff;
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-}
-.panel__form button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.panel__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.panel__table th,
-.panel__table td {
-  padding: 8px;
-  border-bottom: 1px solid #f5f5f5;
-  text-align: left;
-}
-.panel__actions button {
-  padding: 4px 10px;
-  border: 1px solid #ffa39e;
-  border-radius: 6px;
-  background: #fff;
-  color: #cf1322;
-  font-size: 12px;
-  cursor: pointer;
-}
-</style>

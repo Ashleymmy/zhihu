@@ -18,22 +18,35 @@ defineProps<{
 .stat-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fff;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: var(--shadow);
+  min-height: 118px;
+  transition: all 0.16s ease;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 rgba(32, 41, 35, 0.13);
 }
 .stat-card__label {
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.45);
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
 }
 .stat-card__value {
-  font-size: 22px;
+  font-size: 29px;
   font-weight: 600;
+  font-family: var(--font-display);
+  letter-spacing: -0.065em;
+  color: var(--ink);
 }
 .stat-card__hint {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  font-size: 11px;
+  color: var(--moss);
 }
 </style>

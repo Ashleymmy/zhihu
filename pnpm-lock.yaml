@@ -29,6 +29,9 @@ importers:
       '@zhihu-koc/shared-services':
         specifier: workspace:*
         version: link:../../packages/shared-services
+      '@zhihu-koc/shared-tokens':
+        specifier: workspace:*
+        version: link:../../packages/shared-tokens
       '@zhihu-koc/shared-utils':
         specifier: workspace:*
         version: link:../../packages/shared-utils
@@ -75,6 +78,9 @@ importers:
       '@zhihu-koc/shared-services':
         specifier: workspace:*
         version: link:../../packages/shared-services
+      '@zhihu-koc/shared-tokens':
+        specifier: workspace:*
+        version: link:../../packages/shared-tokens
       '@zhihu-koc/shared-utils':
         specifier: workspace:*
         version: link:../../packages/shared-utils
@@ -121,6 +127,9 @@ importers:
       '@zhihu-koc/shared-services':
         specifier: workspace:*
         version: link:../../packages/shared-services
+      '@zhihu-koc/shared-tokens':
+        specifier: workspace:*
+        version: link:../../packages/shared-tokens
       '@zhihu-koc/shared-utils':
         specifier: workspace:*
         version: link:../../packages/shared-utils
@@ -209,6 +218,12 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9
+
+  packages/shared-tokens:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
 
   packages/shared-utils:
     devDependencies:
