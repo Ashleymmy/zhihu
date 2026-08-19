@@ -114,3 +114,133 @@ export interface AddProjectCourseReq {
   courseUrl?: string
   displayOrder?: number
 }
+
+export type PlanStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'ended'
+export type SyncStatus = 'local' | 'syncing' | 'synced' | 'failed'
+
+export interface Plan {
+  id: string
+  taskId: string
+  channelId: string
+  channelName: string
+  secondChannelId: string | null
+  keyword: string
+  landingUrl: string
+  popularizeType: number
+  name: string | null
+  /** 分 */
+  dailyBudget: number | null
+  startDate: string | null
+  endDate: string | null
+  ownerId: string
+  ownerName: string
+  status: PlanStatus
+  syncStatus: SyncStatus
+  syncError: string | null
+  zhihuPlanId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlanListReq extends PageReq {
+  taskId?: string
+  channelId?: string
+  keyword?: string
+  status?: PlanStatus
+}
+
+export interface UpdatePlanReq {
+  keyword?: string
+  landingUrl?: string
+  name?: string | null
+  dailyBudget?: number | null
+}
+
+export interface MetricsOverview {
+  totalImpressions: number
+  totalClicks: number
+  totalConversions: number
+  /** 分 */
+  totalSpend: number
+  /** 分 */
+  totalEarnings: number
+  /** 0–1 */
+  ctr: number
+  /** 0–1 */
+  cvr: number
+  /** 分 */
+  cpc: number
+}
+
+export interface TrendPoint {
+  date: string
+  impressions: number
+  clicks: number
+  conversions: number
+  /** 分 */
+  spend: number
+  /** 分 */
+  earnings: number
+}
+
+export type EarningsStatus = 'pending' | 'confirmed' | 'paid'
+
+export interface EarningRecord {
+  id: string
+  date: string
+  planId: string
+  keyword: string
+  channelId: string
+  channelName: string
+  ownerId: string
+  ownerName: string
+  /** 分 */
+  amount: number
+  status: EarningsStatus
+}
+
+export interface EarningsSummary {
+  /** 分 */
+  pending: number
+  /** 分 */
+  confirmed: number
+  /** 分 */
+  paid: number
+  /** 分 */
+  total: number
+}
+
+export type WithdrawalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Withdrawal {
+  id: string
+  /** 分 */
+  amount: number
+  payMethod: 'alipay' | 'wechat'
+  payAccount: string
+  status: WithdrawalStatus
+  remark: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateWithdrawalReq {
+  /** 分 */
+  amount: number
+  payMethod: 'alipay' | 'wechat'
+  payAccount: string
+}
+
+export interface CreateMemberReq {
+  username: string
+  displayName: string
+  phone?: string | null
+  role?: 'leader' | 'creator'
+  parentId?: string | null
+}
+
+export interface CreateMemberResp {
+  id: string
+  username: string
+  temporaryPassword: string
+}
