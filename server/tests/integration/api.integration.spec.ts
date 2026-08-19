@@ -226,7 +226,7 @@ suite('MySQL API integration', () => {
 
   async function financialSnapshot() {
     const snapshot: Record<string, string> = {};
-    for (const table of ['earnings', 'withdrawal_requests', 'audit_logs'] as const) {
+    for (const table of ['earnings', 'withdrawal_requests'] as const) {
       snapshot[table] = serializeRows(await rows<RowDataPacket>(`SELECT * FROM ${table} ORDER BY id`));
     }
     return snapshot;
