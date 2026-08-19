@@ -6,9 +6,11 @@ import type {
   LoginResp,
   McnAccount,
   MeResp,
+  Project,
   ProjectCourse,
   ProjectMember,
   RefreshResp,
+  TeamMember,
 } from '@zhihu-koc/shared-contracts'
 import type { HttpClient } from './http'
 
@@ -34,6 +36,8 @@ export function createMcnApi(http: HttpClient) {
 
 export function createProjectsApi(http: HttpClient) {
   return {
+    list: () => http.get<Project[]>('/projects'),
+
     listMembers: (projectId: string) => http.get<ProjectMember[]>(`/projects/${projectId}/members`),
     addMember: (projectId: string, data: AddProjectMemberReq) =>
       http.post<ProjectMember>(`/projects/${projectId}/members`, data),
@@ -48,10 +52,17 @@ export function createProjectsApi(http: HttpClient) {
   }
 }
 
+export function createTeamApi(http: HttpClient) {
+  return {
+    listMembers: () => http.get<TeamMember[]>('/team/members'),
+  }
+}
+
 export interface ApiBundle {
   auth: ReturnType<typeof createAuthApi>
   mcn: ReturnType<typeof createMcnApi>
   projects: ReturnType<typeof createProjectsApi>
+  team: ReturnType<typeof createTeamApi>
 }
 
 export function createApis(http: HttpClient): ApiBundle {
@@ -59,5 +70,6 @@ export function createApis(http: HttpClient): ApiBundle {
     auth: createAuthApi(http),
     mcn: createMcnApi(http),
     projects: createProjectsApi(http),
+    team: createTeamApi(http),
   }
 }

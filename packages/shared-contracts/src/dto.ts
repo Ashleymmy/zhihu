@@ -81,6 +81,29 @@ export interface ProjectCourse {
   updatedAt: string
 }
 
+export interface Project {
+  id: string
+  name: string
+  slug: string
+  isEnabled: boolean
+  createdAt: string
+  /** 非 admin 视角下自己的项目内角色；admin 全量列表为 null。 */
+  memberRole: ProjectMemberRole | null
+}
+
+export interface TeamMember {
+  id: string
+  username: string
+  role: GlobalRole
+  parentId: string | null
+  displayName: string
+  phone: string | null
+  isActive: boolean
+  mustChangePwd: boolean
+  lastLoginAt: string | null
+  createdAt: string
+}
+
 export interface AddProjectMemberReq {
   userId: string
   memberRole?: ProjectMemberRole
