@@ -1,214 +1,118 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { CreateMemberResp, TeamMember } from '@zhihu-koc/shared-contracts'
-import { DEFAULT_LOCALE, createTranslator } from '@zhihu-koc/shared-i18n'
-import { isApiError } from '@zhihu-koc/shared-services'
-import { formatDateTime } from '@zhihu-koc/shared-utils'
-import { APP_ROLE } from '../app-config'
-import { apis } from '../stores/auth'
-
-const t = createTranslator(DEFAULT_LOCALE)
+import type { TeamMember, CreateMemberResp } from '@zhihu-koc/shared-contracts'
+import { useAuthStore, apis } from '../stores/auth'
 
 const members = ref<TeamMember[]>([])
-const errorMessage = ref('')
+const loading = ref(true)
+const error = ref('')
+const showCreate = ref(false)
+const form = ref({ username: '', displayName: '', role: 'creator' as 'leader' | 'creator' })
 const created = ref<CreateMemberResp | null>(null)
 const resetResult = ref<{ id: string; temporaryPassword: string } | null>(null)
 
-const username = ref('')
-const displayName = ref('')
-const role = ref<'leader' | 'creator'>('creator')
-const submitting = ref(false)
-
-// admin 可选建团长/达人；leader 端只能建达人（服务端同样强制）
-const roleOptions = APP_ROLE === 'admin' ? (['leader', 'creator'] as const) : (['creator'] as const)
-
-function captureError(error: unknown) {
-  errorMessage.value = isApiError(error) ? error.message : String(error)
-}
-
 async function load() {
-  try {
-    members.value = await apis.team.listMembers()
-  } catch (error) {
-    captureError(error)
-  }
+  loading.value = true
+  try { members.value = await apis.team.listMembers() }
+  catch (e: any) { error.value = e?.message ?? String(e) }
+  finally { loading.value = false }
 }
 
-async function create() {
-  if (!username.value.trim() || !displayName.value.trim() || submitting.value) return
-  submitting.value = true
-  errorMessage.value = ''
-  created.value = null
+async function createMember() {
+  if (!form.value.username.trim() || !form.value.displayName.trim()) return
   try {
-    created.value = await apis.team.createMember({
-      username: username.value.trim(),
-      displayName: displayName.value.trim(),
-      role: role.value,
-    })
-    username.value = ''
-    displayName.value = ''
+    created.value = await apis.team.createMember(form.value)
+    showCreate.value = false
+    form.value = { username: '', displayName: '', role: 'creator' }
     await load()
-  } catch (error) {
-    captureError(error)
-  } finally {
-    submitting.value = false
-  }
+  } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
 async function resetPassword(id: string) {
-  errorMessage.value = ''
-  resetResult.value = null
   try {
-    const result = await apis.team.resetPassword(id)
-    resetResult.value = { id, temporaryPassword: result.temporaryPassword }
-  } catch (error) {
-    captureError(error)
-  }
+    const r = await apis.team.resetPassword(id)
+    resetResult.value = { id, temporaryPassword: r.temporaryPassword }
+  } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
-async function disable(id: string) {
-  errorMessage.value = ''
-  try {
-    await apis.team.disableMember(id)
-    await load()
-  } catch (error) {
-    captureError(error)
-  }
+async function disableMember(id: string) {
+  if (!confirm('确定禁用此成员？')) return
+  try { await apis.team.disableMember(id); await load() }
+  catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
 onMounted(load)
 </script>
 
 <template>
-  <section>
-    <h1 class="page-title">{{ t('nav.team') }}</h1>
-    <p v-if="errorMessage" class="page-error" role="alert">{{ errorMessage }}</p>
-
-    <form class="team-form" @submit.prevent="create">
-      <input v-model="username" :placeholder="t('auth.username')" data-testid="team-username" />
-      <input v-model="displayName" :placeholder="t('team.displayName')" data-testid="team-display-name" />
-      <select v-model="role" data-testid="team-role">
-        <option v-for="option in roleOptions" :key="option" :value="option">
-          {{ t(`workspace.${option}`) }}
-        </option>
-      </select>
-      <button type="submit" :disabled="submitting || !username.trim() || !displayName.trim()">
-        {{ t('team.create') }}
+  <div class="page-stack">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">TEAM / MEMBERS</p>
+        <h1>用户管理</h1>
+      </div>
+      <button class="primary-action" @click="showCreate = true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        添加成员
       </button>
-    </form>
+    </header>
 
-    <p v-if="created" class="team-secret" data-testid="temporary-password">
-      {{ t('team.temporaryPassword') }}：<code>{{ created.temporaryPassword }}</code>（{{ created.username }}）
-    </p>
-    <p v-if="resetResult" class="team-secret">
-      {{ t('team.temporaryPassword') }}：<code>{{ resetResult.temporaryPassword }}</code>
-    </p>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <p v-if="!members.length" class="page-placeholder">{{ t('team.empty') }}</p>
-    <table v-else class="team-table">
-      <thead>
-        <tr>
-          <th>{{ t('auth.username') }}</th>
-          <th>{{ t('team.displayName') }}</th>
-          <th>{{ t('team.role') }}</th>
-          <th>{{ t('team.lastLogin') }}</th>
-          <th>{{ t('plans.status') }}</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="member in members" :key="member.id">
-          <td>{{ member.username }}</td>
-          <td>{{ member.displayName }}</td>
-          <td>{{ t(`workspace.${member.role}`) }}</td>
-          <td>{{ formatDateTime(member.lastLoginAt) }}</td>
-          <td>{{ member.isActive ? t('team.statusActive') : t('team.statusDisabled') }}</td>
-          <td class="team-actions">
-            <button type="button" @click="resetPassword(member.id)">{{ t('team.resetPwd') }}</button>
-            <button v-if="member.isActive" type="button" class="team-actions__danger" @click="disable(member.id)">
-              {{ t('team.disable') }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <div v-if="created" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 11px; font-family: var(--font-mono); color: #59645d;">
+      创建成功！临时密码：<strong>{{ created.temporaryPassword }}</strong>（{{ created.username }}）
+    </div>
+    <div v-if="resetResult" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 11px; font-family: var(--font-mono); color: #59645d;">
+      重置密码：<strong>{{ resetResult.temporaryPassword }}</strong>
+    </div>
+
+    <article class="panel data-panel" style="min-height: 300px;">
+      <div class="list-toolbar">
+        <span class="toolbar-title">成员列表</span>
+        <span class="toolbar-count">{{ members.length }}</span>
+      </div>
+      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-else-if="!members.length" class="empty-panel"><span>暂无成员。</span></div>
+      <div v-else class="responsive-table">
+        <table>
+          <thead><tr><th>用户名</th><th>显示名</th><th>角色</th><th>最后登录</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="m in members" :key="m.id">
+              <td style="font-family: var(--font-mono); font-size: 10px;">{{ m.username }}</td>
+              <td><strong>{{ m.displayName }}</strong></td>
+              <td><span class="status-badge draft">{{ m.role }}</span></td>
+              <td style="font-size: 10px; color: var(--ink-soft);">{{ m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleDateString('zh-CN') : '—' }}</td>
+              <td><span :class="['status-badge', m.isActive ? 'active' : 'ended']">{{ m.isActive ? '活跃' : '已禁用' }}</span></td>
+              <td>
+                <div style="display: flex; gap: 6px;">
+                  <button class="row-action" @click="resetPassword(m.id)">重置密码</button>
+                  <button v-if="m.isActive" class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="disableMember(m.id)">禁用</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <Teleport to="body">
+      <div v-if="showCreate" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showCreate = false">
+        <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+          <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">添加成员</h2>
+          <form class="form-grid" @submit.prevent="createMember" style="gap: 16px;">
+            <div><label>用户名</label><input v-model="form.username" required /></div>
+            <div><label>显示名</label><input v-model="form.displayName" required /></div>
+            <div>
+              <label>角色</label>
+              <select v-model="form.role"><option value="leader">团长</option><option value="creator">达人</option></select>
+            </div>
+            <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
+              <button type="submit" class="primary-action" style="flex: 1;">确认创建</button>
+              <button type="button" class="ghost-aurora" @click="showCreate = false">取消</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+  </div>
 </template>
-
-<style scoped>
-.page-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.page-error {
-  margin: 0 0 12px;
-  color: #cf1322;
-  font-size: 13px;
-}
-.page-placeholder {
-  color: rgba(0, 0, 0, 0.45);
-}
-.team-form {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.team-form input,
-.team-form select {
-  padding: 6px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-}
-.team-form button {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: #1677ff;
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-}
-.team-form button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.team-secret {
-  margin: 0 0 12px;
-  padding: 8px 12px;
-  border: 1px solid #ffd591;
-  border-radius: 6px;
-  background: #fffbe6;
-  font-size: 13px;
-}
-.team-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-}
-.team-table th,
-.team-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f5f5f5;
-  text-align: left;
-}
-.team-actions {
-  display: flex;
-  gap: 8px;
-}
-.team-actions button {
-  padding: 4px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-.team-actions__danger {
-  border-color: #ffa39e !important;
-  color: #cf1322;
-}
-</style>

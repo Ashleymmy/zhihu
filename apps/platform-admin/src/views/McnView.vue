@@ -1,131 +1,82 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { McnAccount } from '@zhihu-koc/shared-contracts'
-import { DEFAULT_LOCALE, createTranslator, type MessageKey } from '@zhihu-koc/shared-i18n'
-import { isApiError } from '@zhihu-koc/shared-services'
-import { formatDate } from '@zhihu-koc/shared-utils'
-import { apis } from '../stores/auth'
-
-const t = createTranslator(DEFAULT_LOCALE)
+import { useAuthStore, apis } from '../stores/auth'
 
 const accounts = ref<McnAccount[]>([])
-const errorMessage = ref('')
-const accountKey = ref('')
-const accountName = ref('')
-const submitting = ref(false)
+const loading = ref(true)
+const error = ref('')
+const showModal = ref(false)
+const form = ref({ accountKey: '', accountName: '' })
 
 async function load() {
-  try {
-    accounts.value = await apis.mcn.list()
-  } catch (error) {
-    errorMessage.value = isApiError(error) ? error.message : String(error)
-  }
+  loading.value = true
+  try { accounts.value = await apis.mcn.list() }
+  catch (e: any) { error.value = e?.message ?? String(e) }
+  finally { loading.value = false }
 }
 
-async function create() {
-  if (!accountKey.value.trim() || !accountName.value.trim() || submitting.value) return
-  submitting.value = true
-  errorMessage.value = ''
+async function createAccount() {
+  if (!form.value.accountKey.trim() || !form.value.accountName.trim()) return
   try {
-    await apis.mcn.create({ accountKey: accountKey.value.trim(), accountName: accountName.value.trim() })
-    accountKey.value = ''
-    accountName.value = ''
+    await apis.mcn.create(form.value)
+    showModal.value = false
+    form.value = { accountKey: '', accountName: '' }
     await load()
-  } catch (error) {
-    errorMessage.value = isApiError(error) ? error.message : String(error)
-  } finally {
-    submitting.value = false
-  }
+  } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
 onMounted(load)
 </script>
 
 <template>
-  <section>
-    <h1 class="page-title">{{ t('nav.mcn') }}</h1>
-    <p v-if="errorMessage" class="mcn__error" role="alert">{{ errorMessage }}</p>
-
-    <form class="mcn__form" @submit.prevent="create">
-      <input v-model="accountKey" :placeholder="t('mcn.accountKey')" data-testid="mcn-key" />
-      <input v-model="accountName" :placeholder="t('mcn.accountName')" data-testid="mcn-name" />
-      <button type="submit" :disabled="submitting || !accountKey.trim() || !accountName.trim()">
-        {{ t('mcn.create') }}
+  <div class="page-stack">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">MCN / ACCOUNTS</p>
+        <h1>MCN 管理</h1>
+      </div>
+      <button class="primary-action" @click="showModal = true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        添加 MCN
       </button>
-    </form>
+    </header>
 
-    <p v-if="!accounts.length" class="page-placeholder">{{ t('mcn.empty') }}</p>
-    <table v-else class="mcn__table">
-      <thead>
-        <tr>
-          <th>{{ t('mcn.accountKey') }}</th>
-          <th>{{ t('mcn.accountName') }}</th>
-          <th>{{ t('projects.createdAt') }}</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="account in accounts" :key="account.id">
-          <td><code>{{ account.accountKey }}</code></td>
-          <td>{{ account.accountName }}</td>
-          <td>{{ formatDate(account.createdAt) }}</td>
-          <td>{{ t(`mcn.status.${account.status}` as MessageKey) }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+
+    <article class="panel data-panel" style="min-height: 300px;">
+      <div class="list-toolbar"><span class="toolbar-title">MCN 账号</span><span class="toolbar-count">{{ accounts.length }}</span></div>
+      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-else-if="!accounts.length" class="empty-panel"><span>暂无 MCN 账号。</span></div>
+      <div v-else class="responsive-table">
+        <table>
+          <thead><tr><th>账号 Key</th><th>账号名称</th><th>状态</th><th>创建时间</th></tr></thead>
+          <tbody>
+            <tr v-for="a in accounts" :key="a.id">
+              <td style="font-family: var(--font-mono); font-size: 10px;">{{ a.accountKey }}</td>
+              <td><strong>{{ a.accountName }}</strong></td>
+              <td><span :class="['status-badge', a.status === 'active' ? 'active' : 'ended']">{{ { active: '活跃', suspended: '已暂停', archived: '已归档' }[a.status] }}</span></td>
+              <td style="font-size: 10px; color: var(--ink-soft);">{{ new Date(a.createdAt).toLocaleDateString('zh-CN') }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <Teleport to="body">
+      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showModal = false">
+        <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+          <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">添加 MCN 账号</h2>
+          <form class="form-grid" @submit.prevent="createAccount" style="gap: 16px;">
+            <div><label>账号 Key</label><input v-model="form.accountKey" required /></div>
+            <div><label>账号名称</label><input v-model="form.accountName" required /></div>
+            <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
+              <button type="submit" class="primary-action" style="flex: 1;">确认添加</button>
+              <button type="button" class="ghost-aurora" @click="showModal = false">取消</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+  </div>
 </template>
-
-<style scoped>
-.page-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-.page-placeholder {
-  color: rgba(0, 0, 0, 0.45);
-}
-.mcn__error {
-  margin: 0 0 12px;
-  color: #cf1322;
-  font-size: 13px;
-}
-.mcn__form {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.mcn__form input {
-  padding: 6px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-}
-.mcn__form button {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: #1677ff;
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-}
-.mcn__form button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.mcn__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-}
-.mcn__table th,
-.mcn__table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f5f5f5;
-  text-align: left;
-}
-</style>
