@@ -1,42 +1,63 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
-import { AppShell, type ShellNavItem } from '@zhihu-koc/shared-components'
-import { DEFAULT_LOCALE, createTranslator, type MessageKey } from '@zhihu-koc/shared-i18n'
-import { APP_NAV, APP_ROLE } from '../app-config'
+import { RouterView, useRouter } from 'vue-router'
+import { AppShell, type NavGroup } from '@zhihu-koc/shared-components'
+import { APP_ROLE } from '../app-config'
 import { useAuthStore } from '../stores/auth'
 
-const t = createTranslator(DEFAULT_LOCALE)
 const auth = useAuthStore()
-const route = useRoute()
 const router = useRouter()
 
-const navItems = computed<ShellNavItem[]>(() =>
-  APP_NAV.map((key) => ({ key, label: t(`nav.${key}` as MessageKey) })),
-)
-const activeKey = computed(() => String(route.name ?? ''))
+const navigation: NavGroup[] = [
+  {
+    label: '运营',
+    items: [
+      { key: 'dashboard', label: '数据看板', path: '/dashboard' },
+      { key: 'plans', label: '推广计划', path: '/plans' },
+      { key: 'analytics', label: '数据分析', path: '/analytics' },
+    ],
+  },
+  {
+    label: '业务',
+    items: [
+      { key: 'orders', label: '我的订单', path: '/orders' },
+      { key: 'settlements', label: '结算中心', path: '/settlements' },
+      { key: 'earnings', label: '收益结算', path: '/earnings' },
+    ],
+  },
+  {
+    label: '推广',
+    items: [
+      { key: 'keywords', label: '关键词回传', path: '/keywords' },
+      { key: 'projects', label: '项目管理', path: '/projects' },
+      { key: 'zhihu-story', label: '知乎故事', path: '/zhihu-story' },
+    ],
+  },
+  {
+    label: '增值',
+    items: [
+      { key: 'knowledge', label: '我的课堂', path: '/knowledge' },
+      { key: 'creative-tools', label: '创意工具坊', path: '/creative-tools' },
+    ],
+  },
+  {
+    label: '团队',
+    items: [
+      { key: 'team', label: '达人管理', path: '/team' },
+      { key: 'mcn', label: 'MCN管理', path: '/mcn' },
+    ],
+  },
+]
+
+const roleLabels: Record<string, string> = { admin: '管理员', leader: '团长', creator: '达人' }
 
 async function onLogout() {
   await auth.logout()
   await router.replace({ name: 'login' })
 }
-
-function onNavigate(key: string) {
-  void router.push({ name: key })
-}
 </script>
 
 <template>
-  <AppShell
-    :role="APP_ROLE"
-    :workspace-label="t(`workspace.${APP_ROLE}`)"
-    :user-name="auth.user?.displayName ?? ''"
-    :logout-label="t('auth.logout')"
-    :nav-items="navItems"
-    :active-key="activeKey"
-    @navigate="onNavigate"
-    @logout="onLogout"
-  >
+  <AppShell :groups="navigation" :user-name="auth.user?.displayName ?? '团长'" :role-label="roleLabels[APP_ROLE] ?? APP_ROLE" @logout="onLogout">
     <RouterView />
   </AppShell>
 </template>

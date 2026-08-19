@@ -15,6 +15,7 @@
     "@zhihu-koc/shared-contracts": "workspace:*",
     "@zhihu-koc/shared-i18n": "workspace:*",
     "@zhihu-koc/shared-services": "workspace:*",
+    "@zhihu-koc/shared-tokens": "workspace:*",
     "@zhihu-koc/shared-utils": "workspace:*",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",

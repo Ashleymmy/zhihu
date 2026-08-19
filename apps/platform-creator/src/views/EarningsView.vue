@@ -192,97 +192,149 @@ onMounted(load)
 
 <style scoped>
 .page-title {
-  margin: 0 0 12px;
-  font-size: 18px;
+  margin: 0 0 18px;
+  font-size: 26px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--ink);
 }
 .page-error {
-  margin: 0 0 12px;
-  color: #cf1322;
-  font-size: 13px;
+  margin: 0 0 16px;
+  padding: 12px;
+  background: #f1ded9;
+  color: #964639;
+  font-size: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--clay);
 }
 .page-placeholder {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 .earnings-banner {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .earnings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
 }
 .panel {
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fff;
-  margin-bottom: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
 }
 .panel h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
+  margin: 0 0 16px;
+  font-size: 21px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--ink);
 }
 .panel__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 11px;
+  min-width: 660px;
 }
-.panel__table th,
-.panel__table td {
-  padding: 8px;
-  border-bottom: 1px solid #f5f5f5;
+.panel__table th {
+  padding: 13px 22px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.panel__table td {
+  padding: 15px 22px;
+  border-bottom: 1px solid var(--paper-deep);
+  text-align: left;
+  color: var(--ink);
 }
 .withdraw-form {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 .withdraw-form input,
 .withdraw-form select {
-  padding: 6px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 12px;
+  background: var(--white);
+  min-height: 38px;
+  flex: 1;
+  min-width: 140px;
 }
 .withdraw-form button {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: #1677ff;
-  color: #fff;
-  font-size: 13px;
+  padding: 10px 18px;
+  border: 1px solid var(--forest);
+  border-radius: var(--radius);
+  background: var(--forest);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: 2px 2px 0 #b8c2b7;
+}
+.withdraw-form button:hover {
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0 #b8c2b7;
+}
+.withdraw-form button:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 #b8c2b7;
 }
 .withdraw-remark {
   display: block;
-  color: rgba(0, 0, 0, 0.45);
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 10px;
 }
 .withdraw-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 .withdraw-actions input {
-  width: 120px;
-  padding: 4px 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 12px;
+  width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 11px;
+  background: var(--white);
 }
 .withdraw-actions button {
-  padding: 4px 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  font-size: 11px;
   cursor: pointer;
+  transition: all 0.16s ease;
+}
+.withdraw-actions button:hover {
+  border-color: var(--forest);
+  color: var(--forest);
 }
 .withdraw-actions__danger {
-  border-color: #ffa39e !important;
-  color: #cf1322;
+  border-color: var(--clay) !important;
+  color: var(--clay) !important;
+}
+.withdraw-actions__danger:hover {
+  background: #f1ded9;
 }
 </style>

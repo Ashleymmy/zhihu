@@ -9,17 +9,24 @@ export function createAppRouter() {
         path: '/login',
         name: 'login',
         component: () => import('./views/LoginView.vue'),
-        meta: { requiresAuth: false },
+        meta: { requiresAuth: false, title: '登录' },
       },
       {
         path: '/',
         component: () => import('./layouts/ShellLayout.vue'),
         meta: { requiresAuth: true },
         children: [
-          { path: '', name: 'overview', component: () => import('./views/OverviewView.vue') },
-          { path: 'plans', name: 'plans', component: () => import('./views/PlansView.vue') },
-          { path: 'earnings', name: 'earnings', component: () => import('./views/EarningsView.vue') },
-          { path: 'projects', name: 'projects', component: () => import('./views/ProjectsView.vue') },
+          { path: '', redirect: '/dashboard' },
+          { path: 'dashboard', name: 'dashboard', component: () => import('./views/DashboardView.vue'), meta: { title: '数据看板' } },
+          { path: 'orders', name: 'orders', component: () => import('./views/OrdersView.vue'), meta: { title: '订单管理' } },
+          { path: 'settlements', name: 'settlements', component: () => import('./views/SettlementView.vue'), meta: { title: '结算中心' } },
+          { path: 'plans', name: 'plans', component: () => import('./views/PlansView.vue'), meta: { title: '推广计划' } },
+          { path: 'keywords', name: 'keywords', component: () => import('./views/KeywordsView.vue'), meta: { title: '关键词回传' } },
+          { path: 'projects', name: 'projects', component: () => import('./views/ProjectsView.vue'), meta: { title: '项目管理' } },
+          { path: 'zhihu-story', name: 'zhihu-story', component: () => import('./views/ZhihuStoryView.vue'), meta: { title: '知乎故事' } },
+          { path: 'earnings', name: 'earnings', component: () => import('./views/EarningsView.vue'), meta: { title: '收益结算' } },
+          { path: 'creative-tools', name: 'creative-tools', component: () => import('./views/CreativeToolsView.vue'), meta: { title: '创意工具坊' } },
+          { path: 'knowledge', name: 'knowledge', component: () => import('./views/KnowledgePayView.vue'), meta: { title: '我的课堂' } },
         ],
       },
       { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -32,7 +39,7 @@ export function createAppRouter() {
     if (to.meta.requiresAuth !== false && !auth.loggedIn) {
       return { name: 'login', query: { redirect: to.fullPath } }
     }
-    if (to.name === 'login' && auth.loggedIn) return { name: 'overview' }
+    if (to.name === 'login' && auth.loggedIn) return { name: 'dashboard' }
     return true
   })
 

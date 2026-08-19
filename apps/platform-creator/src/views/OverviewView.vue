@@ -63,42 +63,68 @@ onMounted(async () => {
 
 <style scoped>
 .page-title {
-  margin: 0 0 12px;
-  font-size: 18px;
+  margin: 0 0 18px;
+  font-size: 26px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--ink);
 }
 .page-error {
-  margin: 0 0 12px;
-  color: #cf1322;
-  font-size: 13px;
+  margin: 0 0 16px;
+  padding: 12px;
+  background: #f1ded9;
+  color: #964639;
+  font-size: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--clay);
 }
 .page-placeholder {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
 }
 .panel {
-  padding: 16px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fff;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: var(--shadow);
 }
 .panel h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
+  margin: 0 0 16px;
+  font-size: 21px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--ink);
 }
 .panel__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 11px;
+  min-width: 600px;
 }
-.panel__table th,
-.panel__table td {
-  padding: 8px;
-  border-bottom: 1px solid #f5f5f5;
+.panel__table th {
+  padding: 13px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.panel__table td {
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--paper-deep);
+  text-align: left;
+  color: var(--ink);
 }
 </style>
