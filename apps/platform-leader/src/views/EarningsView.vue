@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { EarningRecord, EarningsSummary, Withdrawal } from '@zhihu-koc/shared-contracts'
 import { DEFAULT_LOCALE, createTranslator, type MessageKey } from '@zhihu-koc/shared-i18n'
 import { isApiError, type ApiError } from '@zhihu-koc/shared-services'
-import { FinanceGateBanner, StatCard } from '@zhihu-koc/shared-components'
+import { FinanceGateBanner, StatCard, DonutChart, LineChart } from '@zhihu-koc/shared-components'
 import { formatCurrency, formatDate } from '@zhihu-koc/shared-utils'
 import { APP_ROLE } from '../app-config'
 import { apis } from '../stores/auth'
@@ -18,6 +18,27 @@ const financeGate = ref<ApiError | null>(null)
 
 const canApprove = APP_ROLE === 'admin'
 const canApply = APP_ROLE !== 'admin'
+
+/* ===== 图表数据 ===== */
+const statusSlices = computed(() => {
+  if (!summary.value) return []
+  return [
+    { label: '待确认', value: summary.value.pending, color: '#b98a2f' },
+    { label: '已确认', value: summary.value.confirmed, color: '#e66b3a' },
+    { label: '已支付', value: summary.value.paid, color: '#5d7668' },
+  ]
+})
+
+const dailySeries = computed(() => {
+  const byDate = new Map<string, number>()
+  for (const e of earnings.value) {
+    const day = ((e as any).settleDate ?? e.date ?? '').slice(5, 10)
+    if (!day) continue
+    byDate.set(day, (byDate.get(day) ?? 0) + Number(e.amount) / 100)
+  }
+  const days = [...byDate.keys()].sort()
+  return { labels: days, points: days.map((d) => byDate.get(d) ?? 0) }
+})
 
 const applyAmountYuan = ref('')
 const applyMethod = ref<'alipay' | 'wechat'>('alipay')
@@ -109,6 +130,18 @@ onMounted(load)
       <StatCard :label="t('earnings.summaryPaid')" :value="formatCurrency(summary.paid)" />
       <StatCard :label="t('earnings.summaryTotal')" :value="formatCurrency(summary.total)" />
     </div>
+
+    <section v-if="summary" class="panel">
+      <h2>收益构成与趋势</h2>
+      <div class="earnings-charts">
+        <DonutChart :slices="statusSlices" center-label="总额(分)" />
+        <div class="earnings-trend">
+          <p class="chart-caption">按结算日期的收益分布（元）</p>
+          <LineChart v-if="dailySeries.labels.length" :labels="dailySeries.labels" :series="[{ label: '收益', points: dailySeries.points }]" :height="180" />
+          <p v-else class="page-placeholder">暂无收益记录</p>
+        </div>
+      </div>
+    </section>
 
     <section class="panel">
       <h2>{{ t('nav.earnings') }}</h2>
@@ -214,6 +247,23 @@ onMounted(load)
 }
 .earnings-banner {
   margin-bottom: 20px;
+}
+.earnings-charts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 28px;
+  align-items: center;
+}
+.earnings-trend { min-width: 0; }
+.chart-caption {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+@media (max-width: 900px) {
+  .earnings-charts { grid-template-columns: 1fr; }
 }
 .earnings-grid {
   display: grid;

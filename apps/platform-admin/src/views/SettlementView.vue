@@ -57,6 +57,11 @@ function ruleText(r: PricingRule) {
 
 /* ===== 结算批次 ===== */
 const batches = ref<SettlementBatch[]>([])
+
+/** 批次金额以元存储（DECIMAL(14,4)），直接按数值比较 */
+const maxBatchTotal = () => Math.max(1e-9, ...batches.value.map((b) => Number(b.totalSource)))
+function barWidth(v: string) { return `${Math.max(1.5, (Number(v) / maxBatchTotal()) * 100)}%` }
+function fen2yuan(v: string) { return `¥${Number(v).toFixed(2)}` }
 const showBatchForm = ref(false)
 const batchSubmitting = ref(false)
 const batchMode = ref<'manual' | 'xlsx'>('manual')
@@ -190,6 +195,26 @@ onMounted(load)
             </tr>
           </tbody>
         </table>
+      </div>
+    </article>
+
+    <!-- 批次资金分布 -->
+    <article v-if="batches.length" class="panel" style="padding: 22px;">
+      <p class="section-index quiet">批次资金分布</p>
+      <h2 class="workspace-title" style="font-size: 20px; margin-bottom: 16px;">来源金额 → 分发金额</h2>
+      <div class="batch-bars">
+        <div v-for="b in batches" :key="b.id" class="batch-bar-row">
+          <span class="batch-bar-label">{{ b.title }}</span>
+          <div class="batch-bar-track">
+            <div class="batch-bar source" :style="{ width: barWidth(b.totalSource) }" />
+            <div class="batch-bar relay" :style="{ width: barWidth(b.totalRelay) }" />
+          </div>
+          <span class="batch-bar-value">{{ fen2yuan(b.totalSource) }} / {{ fen2yuan(b.totalRelay) }}</span>
+        </div>
+      </div>
+      <div class="batch-legend">
+        <span><i style="background: var(--ink);" /> 来源金额</span>
+        <span><i style="background: var(--clay);" /> 分发金额（达人+团长）</span>
       </div>
     </article>
 

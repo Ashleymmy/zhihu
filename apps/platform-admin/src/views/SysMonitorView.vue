@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { AccountMonitorItem } from '@zhihu-koc/shared-contracts'
+import { BarChart } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()
 const rows = ref<AccountMonitorItem[]>([])
 const loading = ref(true)
 const error = ref('')
+
+/** 近 7 日操作量条形图 */
+const chartItems = computed(() =>
+  rows.value
+    .map((r) => ({ label: r.displayName || r.username, value: Number(r.actionCount7d ?? 0) }))
+    .filter((i) => i.value > 0)
+    .sort((a, b) => b.value - a.value),
+)
 
 function fmt(value: string | null) {
   if (!value) return '—'
@@ -36,6 +45,12 @@ onMounted(load)
     </header>
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+
+    <article class="panel" style="padding: 22px; margin-bottom: 18px;">
+      <p class="section-index quiet">活跃度分布</p>
+      <h2 class="workspace-title" style="font-size: 20px; margin: 4px 0 14px;">近 7 日操作量</h2>
+      <BarChart :items="chartItems" color="#e66b3a" :max-items="8" />
+    </article>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">

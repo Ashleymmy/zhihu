@@ -42,11 +42,11 @@ export async function listAuditActions() {
 export async function accountMonitor() {
   return rows(
     `SELECT u.id, u.username, u.display_name, u.role, u.is_active, u.last_login_at,
-            s.action_count_7d, s.last_action, s.last_action_at
+            s.actionCount7d, s.last_action, s.last_action_at
      FROM users u
      LEFT JOIN (
        SELECT user_id,
-              COUNT(*) AS action_count_7d,
+              COUNT(*) AS actionCount7d,
               MAX(created_at) AS last_action_at,
               SUBSTRING_INDEX(GROUP_CONCAT(action ORDER BY created_at DESC), ',', 1) AS last_action
        FROM audit_logs

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { DbTableStat } from '@zhihu-koc/shared-contracts'
+import { BarChart } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -51,6 +52,13 @@ onMounted(load)
 
     <section class="workspace-grid">
       <div class="min-w-0">
+        <article class="panel" style="padding: 22px; margin-bottom: 18px;">
+          <p class="section-index quiet">体积分布</p>
+          <div style="margin-top: 12px;">
+            <BarChart :items="tables.map(t => ({ label: t.tableName, value: t.dataMb, hint: ' MB' }))" color="#20292f" :max-items="8" />
+          </div>
+        </article>
+
         <article class="panel data-panel" style="min-height: 300px;">
           <div class="list-toolbar">
             <span class="toolbar-title">表体积概览</span>

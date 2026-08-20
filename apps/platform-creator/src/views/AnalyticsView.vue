@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import type { TrendPoint } from '@zhihu-koc/shared-contracts'
+import { LineChart } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
 
 const trend = ref<TrendPoint[]>([])
@@ -61,18 +62,15 @@ onMounted(load)
             <h2>流量转化趋势</h2>
           </div>
         </header>
-        <div v-if="trend.length" style="display: flex; align-items: end; gap: 6px; height: 220px; padding: 20px 0;">
-          <div v-for="point in trend" :key="point.date" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end;">
-            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--ink-soft);">{{ fmt.format(point.impressions) }}</span>
-            <div :style="{ width: '100%', maxWidth: '40px', height: `${(point.impressions / maxImpressions) * 160}px`, background: 'var(--forest)', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease' }" />
-            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--ink-soft);">{{ point.date.slice(5) }}</span>
-          </div>
-        </div>
-        <div class="chart-legend">
-          <span><i class="cyan" /> 曝光</span>
-          <span><i class="indigo" /> 点击</span>
-          <span><i class="violet" /> 转化</span>
-        </div>
+        <LineChart
+          v-if="trend.length"
+          :labels="trend.map(p => p.date.slice(5))"
+          :series="[
+            { label: '曝光', points: trend.map(p => p.impressions) },
+            { label: '点击', color: '#5d7668', points: trend.map(p => p.clicks) },
+            { label: '转化', color: '#b98a2f', points: trend.map(p => p.conversions) },
+          ]"
+        />
       </article>
 
       <!-- 明细表格 -->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { MetricsOverview, Plan, TrendPoint } from '@zhihu-koc/shared-contracts'
-import { RouteTrace } from '@zhihu-koc/shared-components'
+import { RouteTrace, LineChart } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -108,15 +108,15 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
         <div style="margin-top: 40px;">
           <p class="section-index quiet">03 / 一周信号</p>
           <h2 class="workspace-title">投放数据按天沉淀</h2>
-          <div v-if="trend.length" class="signal-list">
-            <div v-for="point in trend" :key="point.date" class="signal-row">
-              <span class="signal-date">{{ point.date.slice(5) }}</span>
-              <div class="signal-track">
-                <div :style="{ width: `${Math.min(100, (point.impressions / (overview?.totalImpressions || 1)) * 100 * 7)}%` }" />
-              </div>
-              <span class="signal-value">{{ f(point.impressions) }}</span>
-            </div>
-          </div>
+          <LineChart
+            v-if="trend.length"
+            :labels="trend.map(p => p.date.slice(5))"
+            :series="[
+              { label: '曝光', points: trend.map(p => p.impressions) },
+              { label: '点击', color: '#5d7668', points: trend.map(p => p.clicks) },
+              { label: '转化', color: '#b98a2f', points: trend.map(p => p.conversions) },
+            ]"
+          />
           <div v-else class="empty-panel">
             <span>NO SIGNAL YET</span>
             <strong>第一条计划，会从这里留下数据痕迹。</strong>
