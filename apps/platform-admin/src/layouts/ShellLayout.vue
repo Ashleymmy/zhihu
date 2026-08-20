@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
-import { AppShell, type NavGroup } from '@zhihu-koc/shared-components'
+import { AppShell, type NavGroup, type ShellAnnouncement } from '@zhihu-koc/shared-components'
 import { APP_ROLE } from '../app-config'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
 const currentPath = computed(() => route.path)
+
+const announcements = ref<ShellAnnouncement[]>([])
+onMounted(async () => {
+  try { announcements.value = await apis.announcements.active() } catch { /* 公告加载失败不阻塞工作台 */ }
+})
 
 const navigation: NavGroup[] = [
   {
@@ -84,6 +89,7 @@ async function onLogout() {
     :user-name="auth.user?.displayName ?? '管理员'"
     :role-label="roleLabels[APP_ROLE] ?? APP_ROLE"
     :current-path="currentPath"
+    :announcements="announcements"
     @navigate="onNavigate"
     @logout="onLogout"
   >

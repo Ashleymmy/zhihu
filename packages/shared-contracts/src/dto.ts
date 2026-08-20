@@ -217,6 +217,56 @@ export interface CreateSettlementBatchReq {
   items: Array<{ creatorId: string; sourceAmount: string; note?: string | null }>
 }
 
+/* ===== 系统工具 ===== */
+
+export interface AuditLogItem {
+  id: string
+  action: string
+  resourceType: string
+  resourceId: string | null
+  detailJson: Record<string, unknown> | null
+  ip: string | null
+  createdAt: string
+  operatorUsername: string | null
+  operatorName: string | null
+}
+
+export interface AccountMonitorItem {
+  id: string
+  username: string
+  displayName: string
+  role: string
+  isActive: boolean
+  lastLoginAt: string | null
+  actionCount7d: number | null
+  lastAction: string | null
+  lastActionAt: string | null
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  content: string
+  status: 'published' | 'offline'
+  createdAt: string
+  updatedAt?: string
+  createdByName?: string | null
+}
+
+export interface DbTableStat {
+  tableName: string
+  tableRows: number
+  dataMb: number
+}
+
+export interface SiteInfo {
+  node: string
+  uptimeSec: number
+  zhihuApiBase: string
+  zhihuCredentialMode: 'real' | 'mock'
+  sync: { channels: string | null; tasks: string | null; metrics: string | null }
+}
+
 /* ===== 知乎故事子模块 ===== */
 
 /** 推广作品（compositions 表）；mediaType 为 KOC视频号/KOC抖音 等媒体枚举字符串 */

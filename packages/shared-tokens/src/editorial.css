@@ -760,6 +760,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .row-action.danger { border-color: var(--clay); color: var(--clay-deep); }
 .row-action.danger:hover { border-color: var(--clay-deep); background: rgba(230, 107, 58, 0.08); }
 
+/* ===== 系统公告条 ===== */
+.announce-stack { display: grid; gap: 8px; margin-bottom: 18px; }
+.announce-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--clay);
+  border-radius: 2px;
+  background: var(--white);
+  font-size: 12px;
+}
+.announce-tag { color: var(--clay); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; flex-shrink: 0; }
+.announce-bar strong { font-weight: 600; flex-shrink: 0; }
+.announce-body { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.announce-close { border: 0; background: transparent; color: var(--ink-soft); font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0; }
+.announce-close:hover { color: var(--ink); }
+
 /* ===== 纸面操作台：签名元素 ===== */
 
 /* 二级页返回一级页的入口 */

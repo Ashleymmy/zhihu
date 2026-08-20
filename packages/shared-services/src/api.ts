@@ -9,6 +9,11 @@ import type {
   CreatePricingRuleReq,
   PricingRule,
   SettlementBatch,
+  AccountMonitorItem,
+  Announcement,
+  AuditLogItem,
+  DbTableStat,
+  SiteInfo,
   ChangePasswordReq,
   Composition,
   CreateMemberReq,
@@ -144,6 +149,14 @@ export function createMetricsApi(http: HttpClient) {
   return {
     overview: () => http.get<MetricsOverview>('/metrics/overview'),
     trend: (params: { from?: string; to?: string } = {}) => http.get<TrendPoint[]>('/metrics/trend', params),
+    sync: () => http.post<{ jobId: string; status: string }>('/metrics/sync'),
+  }
+}
+
+export function createChannelsApi(http: HttpClient) {
+  return {
+    list: (params: { page?: number; pageSize?: number } = {}) => http.get<PageResp<Record<string, unknown>>>('/channels', params),
+    sync: () => http.post<{ jobId: string; status: string }>('/channels/sync'),
   }
 }
 
@@ -217,6 +230,32 @@ export function createZhihuStoryApi(http: HttpClient) {
   }
 }
 
+/* ===== 系统工具与公告 ===== */
+
+export function createAdminToolsApi(http: HttpClient) {
+  return {
+    /** 操作日志 */
+    auditLogs: (params: { page?: number; pageSize?: number; action?: string; username?: string; from?: string; to?: string } = {}) =>
+      http.get<PageResp<AuditLogItem>>('/audit-logs', params),
+    auditActions: () => http.get<Array<{ action: string }>>('/audit-logs/actions'),
+    /** 子账号行为监控 */
+    monitor: () => http.get<AccountMonitorItem[]>('/admin-tools/monitor'),
+    /** 数据库表统计 */
+    dbStats: () => http.get<DbTableStat[]>('/admin-tools/db-stats'),
+    auditCleanup: (days: number) => http.post<{ deleted: number }>('/admin-tools/audit-cleanup', { days }),
+    siteInfo: () => http.get<SiteInfo>('/admin-tools/site-info'),
+  }
+}
+
+export function createAnnouncementsApi(http: HttpClient) {
+  return {
+    list: () => http.get<Announcement[]>('/announcements'),
+    active: () => http.get<Array<Pick<Announcement, 'id' | 'title' | 'content' | 'createdAt'>>>('/announcements/active'),
+    create: (data: { title: string; content: string }) => http.post<{ id: string }>('/announcements', data),
+    setStatus: (id: string, status: 'published' | 'offline') => http.post<void>(`/announcements/${id}/status`, { status }),
+  }
+}
+
 export interface ApiBundle {
   auth: ReturnType<typeof createAuthApi>
   mcn: ReturnType<typeof createMcnApi>
@@ -224,10 +263,13 @@ export interface ApiBundle {
   team: ReturnType<typeof createTeamApi>
   plans: ReturnType<typeof createPlansApi>
   metrics: ReturnType<typeof createMetricsApi>
+  channels: ReturnType<typeof createChannelsApi>
   earnings: ReturnType<typeof createEarningsApi>
   withdrawals: ReturnType<typeof createWithdrawalsApi>
   story: ReturnType<typeof createZhihuStoryApi>
   finance: ReturnType<typeof createFinanceApi>
+  adminTools: ReturnType<typeof createAdminToolsApi>
+  announcements: ReturnType<typeof createAnnouncementsApi>
 }
 
 export function createApis(http: HttpClient): ApiBundle {
@@ -238,9 +280,12 @@ export function createApis(http: HttpClient): ApiBundle {
     team: createTeamApi(http),
     plans: createPlansApi(http),
     metrics: createMetricsApi(http),
+    channels: createChannelsApi(http),
     earnings: createEarningsApi(http),
     withdrawals: createWithdrawalsApi(http),
     story: createZhihuStoryApi(http),
     finance: createFinanceApi(http),
+    adminTools: createAdminToolsApi(http),
+    announcements: createAnnouncementsApi(http),
   }
 }

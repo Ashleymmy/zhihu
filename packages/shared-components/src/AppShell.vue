@@ -12,11 +12,18 @@ export interface NavGroup {
   items: NavItem[]
 }
 
+export interface ShellAnnouncement {
+  id: string
+  title: string
+  content: string
+}
+
 const props = defineProps<{
   groups: NavGroup[]
   userName: string
   roleLabel: string
   currentPath: string
+  announcements?: ShellAnnouncement[]
 }>()
 
 const emit = defineEmits<{
@@ -30,8 +37,7 @@ const searchQuery = ref('')
 const openGroups = ref<Set<number>>(new Set(props.groups.map((_, i) => i)))
 
 /** 拍平导航，为每个条目分配全局序号（01 / 02 / ...） */
-const flatItems = computed(() =>
-  props.groups.flatMap((group) =>
+const flatItems = computed(() =>  props.groups.flatMap((group) =>
     group.items.map((item) => ({ ...item, group: group.label })),
   ),
 )
@@ -44,6 +50,17 @@ const currentIndex = computed(() => {
   const idx = flatItems.value.findIndex((item) => item.key === currentItem.value?.key)
   return idx >= 0 ? String(idx + 1).padStart(2, '0') : '01'
 })
+
+/* 公告：本会话内可关闭 */
+const dismissedAnnouncements = ref<Set<string>>(new Set())
+const visibleAnnouncements = computed(() =>
+  (props.announcements ?? []).filter((a) => !dismissedAnnouncements.value.has(a.id)),
+)
+function dismissAnnouncement(id: string) {
+  const next = new Set(dismissedAnnouncements.value)
+  next.add(id)
+  dismissedAnnouncements.value = next
+}
 
 const searchResults = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -142,7 +159,17 @@ const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
           </button>
         </div>
       </header>
-      <main class="studio-page"><slot /></main>
+      <main class="studio-page">
+        <div v-if="visibleAnnouncements.length" class="announce-stack">
+          <div v-for="a in visibleAnnouncements" :key="a.id" class="announce-bar">
+            <span class="announce-tag">公告</span>
+            <strong>{{ a.title }}</strong>
+            <span class="announce-body">{{ a.content }}</span>
+            <button type="button" class="announce-close" @click="dismissAnnouncement(a.id)">×</button>
+          </div>
+        </div>
+        <slot />
+      </main>
     </section>
 
     <!-- ⌘K 快速导航 -->

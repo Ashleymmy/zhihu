@@ -53,6 +53,11 @@ export function createAppRouter() {
           { path: 'analytics', name: 'analytics', component: () => import('./views/AnalyticsView.vue'), meta: { title: '数据分析' } },
           // ── 系统工具 ──
           { path: 'system', name: 'system', component: () => import('./views/SystemToolsView.vue'), meta: { title: '系统工具' } },
+          { path: 'system/data', name: 'system-data', component: () => import('./views/SysDataView.vue'), meta: { title: '数据处理与授权' } },
+          { path: 'system/monitor', name: 'system-monitor', component: () => import('./views/SysMonitorView.vue'), meta: { title: '子账号监控' } },
+          { path: 'system/db', name: 'system-db', component: () => import('./views/SysDbView.vue'), meta: { title: '数据库维护' } },
+          { path: 'system/announcements', name: 'system-announcements', component: () => import('./views/SysAnnouncementsView.vue'), meta: { title: '系统公告' } },
+          { path: 'system/site', name: 'system-site', component: () => import('./views/SysSiteView.vue'), meta: { title: '站点维护' } },
           { path: 'audit-log', name: 'audit-log', component: () => import('./views/AuditLogView.vue'), meta: { title: '审计日志' } },
           // ── 收益 ──
           { path: 'earnings', name: 'earnings', component: () => import('./views/EarningsView.vue'), meta: { title: '收益结算' } },
