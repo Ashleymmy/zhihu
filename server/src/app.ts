@@ -14,6 +14,7 @@ import { projectsRouter } from './routes/projects';
 import { tasksRouter } from './routes/tasks';
 import { teamRouter } from './routes/team';
 import { storyItemsRouter } from './routes/story-items';
+import { relayRouter } from './routes/relay';
 import { zhihuContentRouter } from './routes/zhihu-content';
 import { withdrawalsRouter } from './routes/withdrawals';
 import { errorHandler, notFound } from './middleware/errors';
@@ -41,6 +42,7 @@ export function createApp() {
   app.use('/api/v1/tasks', tasksRouter);
   app.use('/api/v1/callbacks', callbacksRouter);
   app.use('/api/v1/story-items', storyItemsRouter);
+  app.use('/api/v1/finance', relayRouter);
   app.use('/api/v1/zhihu-content', zhihuContentRouter);
 
   /* ===== 营销门户与转化落地页（静态站点，公开访问）===== */

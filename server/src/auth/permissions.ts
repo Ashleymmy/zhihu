@@ -25,6 +25,7 @@ export const ALL_PERMISSIONS = [
   'withdraw.apply',
   'withdraw.approve',
   'project.manage',
+  'finance.relay',
   'audit.view',
 ] as const;
 

@@ -141,6 +141,82 @@ export interface MyTeamResp {
   memberCount: number
 }
 
+/* ===== 财务中继：定价规则与结算批次 ===== */
+
+export interface PricingRule {
+  id: string
+  targetUserId: string | null
+  targetUsername: string | null
+  targetName: string | null
+  targetRole: 'leader' | 'creator'
+  method: 'fixed' | 'percentage'
+  unitPrice: string | null
+  percentage: string | null
+  status: 'active' | 'disabled'
+  priority: number
+  effectiveFrom: string
+  createdAt: string
+}
+
+export interface CreatePricingRuleReq {
+  targetUserId?: string | null
+  targetRole: 'leader' | 'creator'
+  method: 'fixed' | 'percentage'
+  unitPrice?: string | null
+  percentage?: string | null
+  priority?: number
+}
+
+export interface SettlementBatch {
+  id: string
+  title: string
+  periodStart: string
+  periodEnd: string
+  status: 'draft' | 'approved' | 'cancelled'
+  totalSource: string
+  totalRelay: string
+  approvedAt: string | null
+  createdAt: string
+}
+
+export interface SettlementItem {
+  id: string
+  creatorId: string
+  creatorUsername: string
+  creatorName: string
+  sourceAmount: string
+  note: string | null
+}
+
+export interface RelayLog {
+  id: string
+  itemId: string
+  earningId: string | null
+  userId: string
+  receiverName: string
+  receiverUsername: string
+  role: 'leader' | 'creator'
+  ruleId: string | null
+  method: string
+  unitPrice: string | null
+  percentage: string | null
+  sourceAmount: string
+  relayAmount: string
+  createdAt: string
+}
+
+export interface SettlementBatchDetail extends SettlementBatch {
+  items: SettlementItem[]
+  logs: RelayLog[]
+}
+
+export interface CreateSettlementBatchReq {
+  title: string
+  periodStart: string
+  periodEnd: string
+  items: Array<{ creatorId: string; sourceAmount: string; note?: string | null }>
+}
+
 /* ===== 知乎故事子模块 ===== */
 
 /** 推广作品（compositions 表）；mediaType 为 KOC视频号/KOC抖音 等媒体枚举字符串 */

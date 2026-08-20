@@ -2,6 +2,13 @@ import type {
   AddProjectCourseReq,
   AddProjectMemberReq,
   ApplyTeamReq,
+  SettlementItem,
+  SettlementBatchDetail,
+  RelayLog,
+  CreateSettlementBatchReq,
+  CreatePricingRuleReq,
+  PricingRule,
+  SettlementBatch,
   ChangePasswordReq,
   Composition,
   CreateMemberReq,
@@ -78,6 +85,19 @@ export function createProjectsApi(http: HttpClient) {
       http.post<ProjectCourse>(`/projects/${projectId}/courses`, data),
     removeCourse: (projectId: string, courseId: string) =>
       http.del<void>(`/projects/${projectId}/courses/${courseId}`),
+  }
+}
+
+export function createFinanceApi(http: HttpClient) {
+  return {
+    listRules: () => http.get<PricingRule[]>('/finance/rules'),
+    createRule: (data: CreatePricingRuleReq) => http.post<{ id: string }>('/finance/rules', data),
+    disableRule: (id: string) => http.post<void>(`/finance/rules/${id}/disable`),
+    listBatches: () => http.get<SettlementBatch[]>('/finance/batches'),
+    getBatch: (id: string) => http.get<SettlementBatchDetail>(`/finance/batches/${id}`),
+    createBatch: (data: CreateSettlementBatchReq) => http.post<{ id: string }>('/finance/batches', data),
+    approveBatch: (id: string) => http.post<void>(`/finance/batches/${id}/approve`),
+    cancelBatch: (id: string) => http.post<void>(`/finance/batches/${id}/cancel`),
   }
 }
 
@@ -199,6 +219,7 @@ export interface ApiBundle {
   earnings: ReturnType<typeof createEarningsApi>
   withdrawals: ReturnType<typeof createWithdrawalsApi>
   story: ReturnType<typeof createZhihuStoryApi>
+  finance: ReturnType<typeof createFinanceApi>
 }
 
 export function createApis(http: HttpClient): ApiBundle {
@@ -212,5 +233,6 @@ export function createApis(http: HttpClient): ApiBundle {
     earnings: createEarningsApi(http),
     withdrawals: createWithdrawalsApi(http),
     story: createZhihuStoryApi(http),
+    finance: createFinanceApi(http),
   }
 }
