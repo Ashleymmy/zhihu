@@ -1,0 +1,1 @@
+ALTER TABLE `campaigns` MODIFY COLUMN `externalSubmissionState` enum('none','submitting','created','uncertain','failed') NOT NULL DEFAULT 'none';

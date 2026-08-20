@@ -1,0 +1,73 @@
+/**
+ * 纸面操作台设计提醒：暖白纸面承载长时阅读，石墨文字组织层级，信号橙只用于行动与风险。
+ * 使用细线、克制阴影与编辑式留白；避免大圆角、炫目渐变及多余装饰。
+ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "DM Serif Display", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --background: oklch(0.968 0.006 78);
+  --foreground: oklch(0.267 0.016 230);
+  --card: oklch(0.985 0.004 78);
+  --card-foreground: oklch(0.267 0.016 230);
+  --popover: oklch(0.985 0.004 78);
+  --popover-foreground: oklch(0.267 0.016 230);
+  --primary: oklch(0.267 0.016 230);
+  --primary-foreground: oklch(0.968 0.006 78);
+  --secondary: oklch(0.92 0.008 80);
+  --secondary-foreground: oklch(0.38 0.014 230);
+  --muted: oklch(0.938 0.007 80);
+  --muted-foreground: oklch(0.52 0.011 230);
+  --accent: oklch(0.91 0.01 78);
+  --accent-foreground: oklch(0.267 0.016 230);
+  --destructive: oklch(0.58 0.195 29);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.865 0.008 78);
+  --input: oklch(0.865 0.008 78);
+  --ring: oklch(0.58 0.13 44);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { background: #f7f5f1; }
+  body { @apply bg-background text-foreground; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+  button, input { font: inherit; }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [type="button"]:not(:disabled), [type="submit"]:not(:disabled), [type="reset"]:not(:disabled), a[href] { @apply cursor-pointer; }
+  ::selection { background: #e9b095; color: #20292f; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button, a, input { transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+}

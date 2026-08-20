@@ -1,0 +1,24 @@
+.aurora-app {
+  display: flex;
+  width: 100%;
+}
+
+.aurora-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.oauth-note {
+  width: 100%;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.oauth-note:hover {
+  border-color: rgba(143, 163, 255, .55);
+  background: rgba(70, 79, 148, .3);
+}
+
+.oauth-note:active {
+  transform: scale(.98);
+}
