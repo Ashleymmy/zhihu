@@ -46,7 +46,7 @@ onMounted(load)
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar"><span class="toolbar-title">MCN 账号</span><span class="toolbar-count">{{ accounts.length }}</span></div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!accounts.length" class="empty-panel"><span>暂无 MCN 账号。</span></div>
       <div v-else class="responsive-table">
         <table>

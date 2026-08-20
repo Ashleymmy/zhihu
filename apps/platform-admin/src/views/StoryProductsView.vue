@@ -49,7 +49,7 @@ onMounted(load)
         <span class="toolbar-title">产品列表</span>
         <span class="toolbar-count">{{ products.length }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!products.length" class="empty-panel"><span>暂无产品数据。产品维度来自知乎同步的推广任务。</span></div>
       <div v-else class="responsive-table">
         <table>

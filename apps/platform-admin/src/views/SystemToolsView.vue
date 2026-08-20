@@ -20,7 +20,7 @@ const tools = [
     </header>
 
     <div class="tools-grid">
-      <router-link v-for="t in tools" :key="t.path" :to="t.path" class="tool-card">
+      <router-link v-for="(t, i) in tools" :key="t.path" v-reveal="i * 45" :to="t.path" class="tool-card">
         <p class="tool-code">{{ t.code }}</p>
         <h3>{{ t.title }}</h3>
         <p class="tool-desc">{{ t.desc }}</p>

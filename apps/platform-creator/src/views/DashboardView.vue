@@ -58,7 +58,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
     </header>
 
     <!-- 指标带：1px 分隔线，无卡片 -->
-    <section v-if="overview" class="metric-band">
+    <section v-if="overview" v-reveal class="metric-band">
       <div class="metric-cell">
         <p>曝光</p>
         <strong>{{ f(overview.totalImpressions) }}</strong>
@@ -82,7 +82,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
     </section>
 
     <!-- 主工作区：队列 + 右侧运行摘要 -->
-    <section class="workspace-grid">
+    <section v-reveal="80" class="workspace-grid">
       <div class="min-w-0">
         <p class="section-index">02 / 计划队列</p>
         <h2 class="workspace-title">接下来要推进的计划</h2>
@@ -150,7 +150,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
     </section>
 
     <!-- 加载/错误状态 -->
-    <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+    <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
   </div>
 </template>

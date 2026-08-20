@@ -68,7 +68,7 @@ onMounted(load)
         <span class="toolbar-title">截流词列表</span>
         <span class="toolbar-count">{{ total }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!items.length" class="empty-panel"><span>暂无截流词记录。提交举报需在知乎侧关联作品与截图，如需请联系统管理员。</span></div>
       <div v-else class="responsive-table">
         <table>

@@ -59,7 +59,7 @@ onMounted(load)
         <span class="toolbar-title">公告列表</span>
         <span class="toolbar-count">{{ announcements.length }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!announcements.length" class="empty-panel"><span>还没有公告。点击「发布公告」开始。</span></div>
       <div v-else class="queue-list">
         <div v-for="a in announcements" :key="a.id" class="campaign-row" style="align-items: flex-start; padding: 14px 22px;">

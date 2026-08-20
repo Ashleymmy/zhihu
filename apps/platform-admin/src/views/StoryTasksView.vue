@@ -62,7 +62,7 @@ onMounted(load)
         <span class="toolbar-title">任务列表</span>
         <span class="toolbar-count">{{ total }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!tasks.length" class="empty-panel"><span>暂无推广任务。任务由管理员从知乎侧同步。</span></div>
       <div v-else class="responsive-table">
         <table>

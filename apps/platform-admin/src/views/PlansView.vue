@@ -82,7 +82,7 @@ onMounted(load)
         </div>
       </div>
 
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
 
       <div v-else-if="!plans.length" class="empty-panel">
         <span>目前还没有推广计划。点击「创建计划」开始。</span>

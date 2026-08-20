@@ -65,6 +65,9 @@ const arcs = computed(() => {
 .donut-chart { display: flex; align-items: center; gap: 18px; }
 .donut-wrap { position: relative; flex-shrink: 0; }
 .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 2px; }
+.donut-chart circle[stroke-dasharray] { animation: donut-sweep 0.6s var(--ease-out, ease) both; }
+@keyframes donut-sweep { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .donut-chart circle { animation: none !important; } }
 .donut-center strong { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.03em; }
 .donut-center span { color: var(--ink-soft); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; }
 .donut-legend { display: grid; gap: 8px; }

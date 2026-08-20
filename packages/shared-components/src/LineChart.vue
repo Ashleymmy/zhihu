@@ -62,9 +62,9 @@ function fmtTick(v: number) {
       </g>
       <text v-for="(label, i) in labels" :key="i" :x="x(i)" :y="height - 8" text-anchor="middle" fill="#8a9196" style="font-family: var(--font-mono); font-size: 10px;">{{ label }}</text>
       <template v-for="(s, si) in series" :key="s.label">
-        <path :d="areaFor(s.points)" :fill="s.color ?? palette[si % palette.length]" fill-opacity="0.06" />
-        <path :d="pathFor(s.points)" :stroke="s.color ?? palette[si % palette.length]" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round" />
-        <circle v-for="(p, i) in s.points" :key="i" :cx="x(i)" :cy="y(p)" r="2.2" :fill="s.color ?? palette[si % palette.length]" />
+        <path class="line-area" :d="areaFor(s.points)" :fill="s.color ?? palette[si % palette.length]" fill-opacity="0.06" />
+        <path class="line-path" :d="pathFor(s.points)" :stroke="s.color ?? palette[si % palette.length]" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round" pathLength="1" />
+        <circle v-for="(p, i) in s.points" :key="i" class="line-point" :style="{ animationDelay: `${i * 45}ms` }" :cx="x(i)" :cy="y(p)" r="2.2" :fill="s.color ?? palette[si % palette.length]" />
       </template>
     </svg>
     <div class="line-chart-legend">
@@ -78,4 +78,13 @@ function fmtTick(v: number) {
 .line-chart-legend { display: flex; gap: 16px; }
 .line-chart-legend span { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; }
 .line-chart-legend i { width: 8px; height: 2px; }
+.line-path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: line-draw 0.7s var(--ease-out, ease) 0.05s forwards; }
+.line-area { opacity: 0; animation: line-area-in 0.5s ease 0.45s forwards; }
+.line-point { opacity: 0; animation: point-in 0.25s ease-out forwards; transform-origin: center; transform-box: fill-box; }
+@keyframes line-draw { to { stroke-dashoffset: 0; } }
+@keyframes line-area-in { to { opacity: 1; } }
+@keyframes point-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .line-path, .line-area, .line-point { animation: none !important; opacity: 1; stroke-dashoffset: 0; }
+}
 </style>

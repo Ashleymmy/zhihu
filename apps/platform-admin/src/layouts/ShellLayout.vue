@@ -93,6 +93,10 @@ async function onLogout() {
     @navigate="onNavigate"
     @logout="onLogout"
   >
-    <RouterView />
+    <RouterView v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" :key="route.path" />
+      </Transition>
+    </RouterView>
   </AppShell>
 </template>

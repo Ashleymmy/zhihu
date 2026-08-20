@@ -251,7 +251,7 @@ onMounted(load)
           <span class="toolbar-count">{{ earningsTotal }}</span>
         </div>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!earnings.length" class="empty-panel">
         <span>暂无结算记录。</span>
       </div>

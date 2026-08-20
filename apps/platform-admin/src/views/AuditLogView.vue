@@ -140,7 +140,7 @@ onMounted(async () => {
         <span class="toolbar-title">操作记录</span>
         <span class="toolbar-count">{{ total }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!logs.length" class="empty-panel"><span>没有符合条件的记录。</span></div>
       <div v-else class="responsive-table">
         <table>

@@ -68,6 +68,10 @@ async function onLogout() {
 <template>
   <AppShell :groups="navigation" :user-name="auth.user?.displayName ?? '团长'" :role-label="roleLabels[APP_ROLE] ?? APP_ROLE" :current-path="currentPath"
     :announcements="announcements" @navigate="onNavigate" @logout="onLogout">
-    <RouterView />
+    <RouterView v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" :key="route.path" />
+      </Transition>
+    </RouterView>
   </AppShell>
 </template>

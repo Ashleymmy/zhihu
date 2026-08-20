@@ -57,7 +57,7 @@ onMounted(load)
         <span class="toolbar-title">账号行为</span>
         <span class="toolbar-count">{{ rows.length }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else class="responsive-table">
         <table>
           <thead><tr><th>账号</th><th>角色</th><th>状态</th><th>最后登录</th><th>近 7 日操作</th><th>最近动作</th></tr></thead>

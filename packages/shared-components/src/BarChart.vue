@@ -43,7 +43,9 @@ function fmt(v: number) {
 .bar-row { display: grid; grid-template-columns: minmax(90px, 140px) 1fr minmax(56px, auto); align-items: center; gap: 10px; }
 .bar-label { overflow: hidden; color: var(--ink-soft); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .bar-track { height: 8px; background: var(--paper-deep); }
-.bar-fill { height: 100%; min-width: 2px; transition: width 0.3s ease; }
+.bar-fill { height: 100%; min-width: 2px; transform-origin: left; animation: bar-grow 0.55s var(--ease-out, ease) both; }
+@keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .bar-fill { animation: none; } }
 .bar-value { color: var(--ink); font-family: var(--font-mono); font-size: 10px; text-align: right; }
 .bar-value small { color: var(--ink-soft); margin-left: 4px; }
 .bar-empty { margin: 0; padding: 12px 0; color: var(--ink-soft); font-size: 11px; text-align: center; }

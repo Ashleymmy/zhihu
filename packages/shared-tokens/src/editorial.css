@@ -760,6 +760,73 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .row-action.danger { border-color: var(--clay); color: var(--clay-deep); }
 .row-action.danger:hover { border-color: var(--clay-deep); background: rgba(230, 107, 58, 0.08); }
 
+/* ===== 动效基座：克制的过渡与滚动显现 ===== */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-fast: 150ms;
+  --dur-med: 240ms;
+}
+
+/* 页面切换：淡入 + 轻幅上移 */
+.page-enter-active { transition: opacity 0.24s var(--ease-out), transform 0.24s var(--ease-out); }
+.page-leave-active { transition: opacity 0.14s ease-out, transform 0.14s ease-out; }
+.page-enter-from { opacity: 0; transform: translateY(10px); }
+.page-leave-to { opacity: 0; transform: translateY(-4px); }
+
+/* 滚动显现（v-reveal 指令）：默认上移 12px 淡入，可用 v-reveal:delay 分拍 */
+.reveal-init { opacity: 0; transform: translateY(12px); }
+.reveal-in { opacity: 1; transform: none; transition: opacity 0.32s var(--ease-out), transform 0.32s var(--ease-out); }
+
+/* 加载骨架屏：纸面上的微光扫过 */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--paper-deep);
+}
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(251, 250, 247, 0.75), transparent);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+  content: "";
+}
+@keyframes skeleton-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.skeleton-row { display: grid; gap: 10px; padding: 14px 22px; }
+.skeleton-row .skeleton { height: 12px; }
+.skeleton-row .skeleton:nth-child(2) { width: 72%; }
+.skeleton-row .skeleton:nth-child(3) { width: 44%; }
+
+/* 卡片/按钮悬停微调（统一，不再各处发散） */
+.panel { transition: border-color var(--dur-fast) ease; }
+.panel:hover { border-color: #c9c6bf; }
+.metric-cell { transition: background var(--dur-fast) ease; }
+.metric-cell:hover { background: rgba(239, 237, 232, 0.5); }
+
+/* 表格行 hover 轻微浮起 */
+.responsive-table tbody tr { transition: background var(--dur-fast) ease; }
+.responsive-table tbody tr:hover { background: rgba(239, 237, 232, 0.45); }
+
+/* 状态徽标：待处理类的轻呼吸提示 */
+.status-badge.paused { animation: badge-breathe 2.6s ease-in-out infinite; }
+@keyframes badge-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+
+/* 对话框进出 */
+.dialog-overlay { animation: overlay-in 0.18s ease-out both; }
+.dialog-card { animation: dialog-in 0.22s var(--ease-out) both; }
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
+
+/* 尊重减少动效偏好：全部收敛 */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active, .page-leave-active,
+  .reveal-init, .reveal-in,
+  .status-badge.paused { animation: none !important; transition: none !important; }
+  .reveal-init { opacity: 1; transform: none; }
+  .skeleton::after { animation: none; }
+  .page-enter-active, .page-leave-active { transition: none !important; }
+}
+
 /* ===== 系统公告条 ===== */
 .announce-stack { display: grid; gap: 8px; margin-bottom: 18px; }
 .announce-bar {

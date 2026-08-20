@@ -89,7 +89,7 @@ onMounted(load)
         <span class="toolbar-title">{{ config.title }}列表</span>
         <span class="toolbar-count">{{ items.length }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 200px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!items.length" class="empty-panel"><span>还没有内容。点击「{{ config.action }}」开始。</span></div>
       <div v-else class="queue-list">
         <div v-for="item in items" :key="item.id" class="campaign-row">
