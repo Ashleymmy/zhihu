@@ -64,8 +64,8 @@ onMounted(load)
     </article>
 
     <Teleport to="body">
-      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showModal = false">
-        <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showModal = false">
+        <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">添加 MCN 账号</h2>
           <form class="form-grid" @submit.prevent="createAccount" style="gap: 16px;">
             <div><label>账号 Key</label><input v-model="form.accountKey" required /></div>

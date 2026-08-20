@@ -72,7 +72,7 @@ onMounted(load)
                 <span v-for="et in rule.eventTypes" :key="et" class="event-tag" style="margin-right: 4px;">{{ eventTypeLabels[et] || et }}</span>
               </td>
               <td><span :class="['status-badge', rule.isActive ? 'active' : 'ended']">{{ rule.isActive ? '启用' : '停用' }}</span></td>
-              <td><button class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="deleteRule(rule.id)">删除</button></td>
+              <td><button class="row-action danger" @click="deleteRule(rule.id)">删除</button></td>
             </tr>
           </tbody>
         </table>
@@ -81,8 +81,8 @@ onMounted(load)
 
     <!-- 创建对话框 -->
     <Teleport to="body">
-      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showModal = false">
-        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showModal = false">
+        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">添加回传规则</h2>
           <form class="form-grid" @submit.prevent="createRule" style="gap: 16px;">
             <div class="full-span">

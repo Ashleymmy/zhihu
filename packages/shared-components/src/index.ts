@@ -1,6 +1,7 @@
 export { default as WorkspaceBadge } from './WorkspaceBadge.vue'
 export { default as FinanceGateBanner } from './FinanceGateBanner.vue'
 export { default as AppShell } from './AppShell.vue'
+export { default as RouteTrace } from './RouteTrace.vue'
 export { default as StatCard } from './StatCard.vue'
-export type { ShellNavItem } from './AppShell.vue'
+export type { NavItem, NavGroup } from './AppShell.vue'
 export * from './role-tone'

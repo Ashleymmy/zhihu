@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export interface NavItem {
   key: string
@@ -25,7 +25,33 @@ const emit = defineEmits<{
 }>()
 
 const mobileOpen = ref(false)
+const searchOpen = ref(false)
+const searchQuery = ref('')
 const openGroups = ref<Set<number>>(new Set(props.groups.map((_, i) => i)))
+
+/** 拍平导航，为每个条目分配全局序号（01 / 02 / ...） */
+const flatItems = computed(() =>
+  props.groups.flatMap((group) =>
+    group.items.map((item) => ({ ...item, group: group.label })),
+  ),
+)
+
+const currentItem = computed(() =>
+  flatItems.value.find((item) => isActive(item.path)) ?? flatItems.value[0],
+)
+
+const currentIndex = computed(() => {
+  const idx = flatItems.value.findIndex((item) => item.key === currentItem.value?.key)
+  return idx >= 0 ? String(idx + 1).padStart(2, '0') : '01'
+})
+
+const searchResults = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return flatItems.value
+  return flatItems.value.filter((item) =>
+    `${item.label}${item.group}${item.path}`.toLowerCase().includes(q),
+  )
+})
 
 function toggleGroup(index: number) {
   if (openGroups.value.has(index)) openGroups.value.delete(index)
@@ -35,11 +61,35 @@ function toggleGroup(index: number) {
 function handleNav(path: string) {
   emit('navigate', path)
   mobileOpen.value = false
+  searchOpen.value = false
+  searchQuery.value = ''
 }
 
 function isActive(path: string) {
   return props.currentPath === path || props.currentPath.startsWith(path + '/')
 }
+
+function openSearch() {
+  searchQuery.value = ''
+  searchOpen.value = true
+}
+
+function onSearchKeydown(event: KeyboardEvent) {
+  const first = searchResults.value[0]
+  if (event.key === 'Enter' && first) {
+    handleNav(first.path)
+  }
+}
+
+function onGlobalKeydown(event: KeyboardEvent) {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    searchOpen.value ? (searchOpen.value = false) : openSearch()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 
 const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
 </script>
@@ -49,7 +99,7 @@ const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
     <aside class="studio-nav">
       <div class="studio-brand">
         <span class="studio-mark">O</span>
-        <div><strong>OPC</strong><span>OPERATIONS</span></div>
+        <div><strong>OPC</strong><span>Desk / {{ roleLabel }}</span></div>
       </div>
       <nav class="studio-nav-scroll">
         <div v-for="(group, gi) in groups" :key="group.label" class="studio-nav-group">
@@ -82,20 +132,50 @@ const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
           <button type="button" class="menu-toggle" @click="mobileOpen = !mobileOpen">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <div><span class="crumb">{{ roleLabel }}</span><h1>{{ $slots.header?.() ?? '' }}</h1></div>
+          <span class="crumb">{{ currentItem?.label ?? roleLabel }} / {{ currentIndex }}</span>
         </div>
         <div class="header-controls">
-          <div class="quiet-search">
+          <button type="button" class="quiet-search" @click="openSearch">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <input type="text" placeholder="搜索..." />
-          </div>
-          <button type="button" class="notification-button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-            <i />
+            <span>搜索</span>
+            <kbd>⌘K</kbd>
           </button>
         </div>
       </header>
       <main class="studio-page"><slot /></main>
     </section>
+
+    <!-- ⌘K 快速导航 -->
+    <div v-if="searchOpen" class="quicknav-overlay" @click.self="searchOpen = false">
+      <div class="quicknav-panel" role="dialog" aria-label="快速导航">
+        <div class="quicknav-input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="搜索页面或功能"
+            autofocus
+            @keydown="onSearchKeydown"
+            @keydown.esc="searchOpen = false"
+          />
+        </div>
+        <div class="quicknav-list">
+          <p class="quicknav-caption">{{ searchQuery ? '匹配页面' : '全部页面' }}</p>
+          <template v-if="searchResults.length">
+            <button
+              v-for="item in searchResults"
+              :key="item.key"
+              type="button"
+              class="quicknav-item"
+              @click="handleNav(item.path)"
+            >
+              <span>{{ item.label }}</span>
+              <small>{{ item.group }}</small>
+            </button>
+          </template>
+          <p v-else class="quicknav-empty">没有匹配记录。</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

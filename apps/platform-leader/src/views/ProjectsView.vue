@@ -17,7 +17,8 @@ async function load() {
   loading.value = true
   try {
     projects.value = await apis.projects.list()
-    if (projects.value.length && !selected.value) await selectProject(projects.value[0])
+    const first = projects.value[0]
+    if (first && !selected.value) await selectProject(first)
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }
@@ -83,7 +84,7 @@ onMounted(load)
         <article class="panel" style="padding: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h2 style="margin: 0; font-size: 18px;">{{ selected.name }} <small style="font-weight: normal; color: var(--ink-soft); font-size: 11px; font-family: var(--font-mono);">{{ selected.slug }}</small></h2>
-            <button class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="deleteProject(selected.id)">禁用项目</button>
+            <button class="row-action danger" @click="deleteProject(selected.id)">禁用项目</button>
           </div>
           <div style="font-size: 11px; color: var(--ink-soft);">状态：<span :class="['status-badge', selected.isEnabled ? 'active' : 'ended']">{{ selected.isEnabled ? '启用' : '已禁用' }}</span></div>
         </article>
@@ -111,8 +112,8 @@ onMounted(load)
 
     <!-- 创建对话框 -->
     <Teleport to="body">
-      <div v-if="showCreate" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showCreate = false">
-        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+      <div v-if="showCreate" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showCreate = false">
+        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建项目</h2>
           <form class="form-grid" @submit.prevent="createProject" style="gap: 16px;">
             <div><label>项目名称</label><input v-model="form.name" required maxlength="64" /></div>

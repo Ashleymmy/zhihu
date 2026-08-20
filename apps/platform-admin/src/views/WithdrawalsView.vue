@@ -69,7 +69,7 @@ onMounted(load)
                 <div v-if="w.status === 'pending'" style="display: flex; gap: 6px; align-items: center;">
                   <button class="row-action" @click="approve(w.id)">通过</button>
                   <input v-model="remark" placeholder="驳回理由" style="width: 120px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 10px;" />
-                  <button class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="reject(w.id)">驳回</button>
+                  <button class="row-action danger" @click="reject(w.id)">驳回</button>
                 </div>
               </td>
             </tr>

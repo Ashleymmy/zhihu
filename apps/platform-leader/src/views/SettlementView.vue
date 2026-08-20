@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import type { EarningRecord } from '@zhihu-koc/shared-contracts'
 import { useAuthStore, apis } from '../stores/auth'
 
 const loading = ref(true)
 const error = ref('')
-const earnings = ref<any[]>([])
+const earnings = ref<EarningRecord[]>([])
 const total = ref(0)
 
 async function load() {

@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import type { Plan } from '@zhihu-koc/shared-contracts'
 import { useAuthStore, apis } from '../stores/auth'
+
+const route = useRoute()
+/** 从知乎故事聚合页进入（/zhihu-story/plans）时显示返回入口 */
+const fromStoryHub = route.path.startsWith('/zhihu-story')
 
 const plans = ref<Plan[]>([])
 const loading = ref(true)
@@ -49,6 +54,7 @@ onMounted(load)
 
 <template>
   <div class="page-stack">
+    <router-link v-if="fromStoryHub" to="/zhihu-story" class="back-link">← 返回知乎故事</router-link>
     <header class="page-header">
       <div>
         <p class="eyebrow">PROMOTION / CAMPAIGNS</p>
@@ -111,7 +117,7 @@ onMounted(load)
               <td>
                 <div style="display: flex; gap: 6px;">
                   <button v-if="plan.syncStatus === 'failed'" class="row-action" @click="retrySync(plan.id)">重试同步</button>
-                  <button class="row-action" style="color: var(--clay); border-color: var(--clay);" @click="deletePlan(plan.id)">删除</button>
+                  <button class="row-action danger" @click="deletePlan(plan.id)">删除</button>
                 </div>
               </td>
             </tr>
@@ -122,8 +128,8 @@ onMounted(load)
 
     <!-- 创建计划对话框 -->
     <Teleport to="body">
-      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(23, 53, 46, 0.58); backdrop-filter: blur(3px);" @click.self="showModal = false">
-        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--ink); border-radius: 8px; background: var(--white); box-shadow: 7px 8px 0 rgba(23, 53, 46, 0.34);">
+      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showModal = false">
+        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
           <form class="form-grid" @submit.prevent="createPlan" style="gap: 16px;">
             <div>

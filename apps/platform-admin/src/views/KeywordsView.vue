@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import type { Plan } from '@zhihu-koc/shared-contracts'
 import { useAuthStore, apis } from '../stores/auth'
 
-const plans = ref<any[]>([])
+const plans = ref<Plan[]>([])
 const loading = ref(true)
 const error = ref('')
 const showForm = ref(false)
@@ -121,7 +122,7 @@ onMounted(load)
             <tr v-for="p in plans" :key="p.id">
               <td><strong>{{ p.keyword }}</strong></td>
               <td>{{ p.channelName }}</td>
-              <td><span :class="['status-badge', p.status]">{{ { active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束' }[p.status] }}</span></td>
+              <td><span :class="['status-badge', p.status]">{{ { pending: '待审核', active: '投放中', paused: '已暂停', rejected: '已拒绝', ended: '已结束' }[p.status] }}</span></td>
               <td><span :class="['status-badge', p.syncStatus === 'synced' ? 'active' : 'draft']">{{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败' }[p.syncStatus] }}</span></td>
             </tr>
           </tbody>
