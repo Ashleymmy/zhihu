@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { allianceRouter } from './routes/alliance';
 import { authRouter } from './routes/auth';
 import { callbacksRouter } from './routes/callbacks';
@@ -45,7 +44,7 @@ export function createApp() {
   app.use('/api/v1/zhihu-content', zhihuContentRouter);
 
   /* ===== 营销门户与转化落地页（静态站点，公开访问）===== */
-  const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
+  const publicDir = path.resolve(__dirname, '../public');
   const portalDir = path.join(publicDir, 'portal');
   const landingDir = path.join(publicDir, 'landing');
   app.get('/', (_req, res) => res.redirect('/portal/'));
