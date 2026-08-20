@@ -53,7 +53,7 @@ interface XmlToken {
 const REQUIRED_PARTS = ['[Content_Types].xml', '_rels/.rels', 'xl/workbook.xml', 'xl/_rels/workbook.xml.rels'] as const;
 
 const ALLOWED_PART_PATTERN =
-  /^(?:\[Content_Types\]\.xml|_rels\/\.rels|xl\/workbook\.xml|xl\/_rels\/workbook\.xml\.rels|xl\/worksheets\/sheet[1-9][0-9]*\.xml|docProps\/(?:app|core|custom)\.xml|xl\/styles\.xml|xl\/sharedStrings\.xml|xl\/theme\/theme[1-9][0-9]*\.xml|xl\/tables\/table[1-9][0-9]*\.xml|xl\/worksheets\/_rels\/sheet[1-9][0-9]*\.xml\.rels)$/u;
+  /^(?:\[Content_Types\]\.xml|_rels\/\.rels|xl\/workbook\.xml|xl\/_rels\/workbook\.xml\.rels|xl\/worksheets\/sheet[1-9][0-9]*\.xml|docProps\/(?:app|core|custom)\.xml|xl\/styles\.xml|xl\/sharedStrings\.xml|xl\/metadata\.xml|xl\/theme\/theme[1-9][0-9]*\.xml|xl\/tables\/table[1-9][0-9]*\.xml|xl\/worksheets\/_rels\/sheet[1-9][0-9]*\.xml\.rels)$/u;
 
 const ACTIVE_PART_PATTERN =
   /(?:\.bin$|vbaProject|activeX|oleObject|embeddings|externalLinks|connections|queryTables|customUI|_xmlsignatures|origin\.sigs|macro|dialog)/iu;
@@ -65,6 +65,7 @@ const CONTENT_TYPE_ALLOWLIST = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml',
   'application/vnd.openxmlformats-officedocument.theme+xml',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml',
   'application/vnd.openxmlformats-officedocument.extended-properties+xml',
@@ -77,6 +78,7 @@ const RELATIONSHIP_TYPES = Object.freeze({
   worksheet: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
   styles: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles',
   sharedStrings: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings',
+  sheetMetadata: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata',
   theme: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme',
   table: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/table',
   core: 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties',
@@ -564,7 +566,9 @@ function parseContentTypes(parts: ReadonlyMap<string, string>): void {
       if (
         !extension ||
         !contentType ||
-        !/^(?:xml|rels)$/iu.test(extension) ||
+        // 真实 Excel/SheetJS 文件常声明图片等资源的 Default 类型；扩展名声明本身不构成部件，
+        // 真正的部件仍受 ALLOWED_PART_PATTERN 与 ACTIVE_PART_PATTERN 约束
+        !/^(?:xml|rels|png|jpe?g|gif|bmp|tiff?|emf|wmf|vml|bin|data|pdf)$/iu.test(extension) ||
         defaults.has(extension.toLowerCase()) ||
         (extension.toLowerCase() === 'rels' &&
           contentType !== 'application/vnd.openxmlformats-package.relationships+xml') ||
@@ -610,7 +614,9 @@ function parseContentTypes(parts: ReadonlyMap<string, string>): void {
                     ? 'application/vnd.openxmlformats-officedocument.theme+xml'
                     : /^xl\/tables\/table[1-9][0-9]*\.xml$/u.test(name)
                       ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml'
-                      : name === 'docProps/app.xml'
+                      : name === 'xl/metadata.xml'
+                        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml'
+                        : name === 'docProps/app.xml'
                         ? 'application/vnd.openxmlformats-officedocument.extended-properties+xml'
                         : name === 'docProps/core.xml'
                           ? 'application/vnd.openxmlformats-package.core-properties+xml'

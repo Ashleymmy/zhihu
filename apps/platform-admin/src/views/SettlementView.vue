@@ -59,8 +59,10 @@ function ruleText(r: PricingRule) {
 const batches = ref<SettlementBatch[]>([])
 const showBatchForm = ref(false)
 const batchSubmitting = ref(false)
+const batchMode = ref<'manual' | 'xlsx'>('manual')
 const batchForm = ref({ title: '', periodStart: '', periodEnd: '' })
 const batchItems = ref<Array<{ creatorId: string; sourceAmount: string; note: string }>>([{ creatorId: '', sourceAmount: '', note: '' }])
+const xlsxFile = ref<File | null>(null)
 const detail = ref<SettlementBatchDetail | null>(null)
 const acting = ref(false)
 
@@ -82,19 +84,29 @@ function addItem() {
 async function submitBatch() {
   error.value = ''
   if (!batchForm.value.title.trim() || !batchForm.value.periodStart || !batchForm.value.periodEnd) { error.value = '请完整填写批次信息'; return }
-  const items = batchItems.value.filter((i) => i.creatorId && i.sourceAmount.trim())
-  if (!items.length) { error.value = '至少添加一条明细'; return }
   batchSubmitting.value = true
   try {
-    await apis.finance.createBatch({
-      title: batchForm.value.title.trim(),
-      periodStart: batchForm.value.periodStart,
-      periodEnd: batchForm.value.periodEnd,
-      items: items.map((i) => ({ creatorId: i.creatorId, sourceAmount: i.sourceAmount.trim(), note: i.note.trim() || null })),
-    })
+    if (batchMode.value === 'xlsx') {
+      if (!xlsxFile.value) { error.value = '请选择 XLSX 文件'; batchSubmitting.value = false; return }
+      await apis.finance.importBatch(xlsxFile.value, {
+        title: batchForm.value.title.trim(),
+        periodStart: batchForm.value.periodStart,
+        periodEnd: batchForm.value.periodEnd,
+      })
+    } else {
+      const items = batchItems.value.filter((i) => i.creatorId && i.sourceAmount.trim())
+      if (!items.length) { error.value = '至少添加一条明细'; batchSubmitting.value = false; return }
+      await apis.finance.createBatch({
+        title: batchForm.value.title.trim(),
+        periodStart: batchForm.value.periodStart,
+        periodEnd: batchForm.value.periodEnd,
+        items: items.map((i) => ({ creatorId: i.creatorId, sourceAmount: i.sourceAmount.trim(), note: i.note.trim() || null })),
+      })
+    }
     showBatchForm.value = false
     batchForm.value = { title: '', periodStart: '', periodEnd: '' }
     batchItems.value = [{ creatorId: '', sourceAmount: '', note: '' }]
+    xlsxFile.value = null
     await loadBatches()
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { batchSubmitting.value = false }
@@ -316,6 +328,18 @@ onMounted(load)
               </div>
             </div>
             <div class="form-field">
+              <label>登记方式</label>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" :class="batchMode === 'manual' ? 'primary-action' : 'row-action'" @click="batchMode = 'manual'">手工明细</button>
+                <button type="button" :class="batchMode === 'xlsx' ? 'primary-action' : 'row-action'" @click="batchMode = 'xlsx'">上传 XLSX</button>
+              </div>
+            </div>
+            <div v-if="batchMode === 'xlsx'" class="form-field">
+              <label>结算单文件</label>
+              <input type="file" accept=".xlsx" @change="xlsxFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+              <small style="color: var(--ink-soft); font-size: 10px;">模板：表头包含「达人用户名」「来源金额」两列（可选「备注」），每行一条达人归属金额。</small>
+            </div>
+            <div v-else class="form-field">
               <label>明细（来源金额归属到达人）</label>
               <div v-for="(item, i) in batchItems" :key="i" style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <select v-model="item.creatorId" style="flex: 2;">

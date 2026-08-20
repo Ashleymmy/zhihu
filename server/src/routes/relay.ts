@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware';
 import { requirePermission } from '../auth/permissions';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { ok } from '../utils/response';
+import { XLSX_MAX_BYTES } from '../zhihu/allianceXlsx';
 import {
   approveBatch,
   cancelBatch,
@@ -12,9 +14,21 @@ import {
   createRule,
   disableRule,
   getBatch,
+  importBatch,
   listBatches,
   listRules,
 } from '../services/relay.service';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: XLSX_MAX_BYTES + 1, files: 1, fields: 4 },
+}).single('file');
+
+const importMeta = z.object({
+  title: z.string().trim().min(1).max(128),
+  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
 
 const id = z.string().regex(/^\d+$/);
 const money = z.string().regex(/^\d+(\.\d{1,4})?$/, '金额必须是最多 4 位小数的非负数字符串');
@@ -75,6 +89,15 @@ relayRouter.post(
   '/batches',
   validateBody(batchInput),
   asyncHandler(async (req, res) => ok(res, await createBatch(req.user, req.body, req.ip), 201)),
+);
+relayRouter.post(
+  '/batches/import',
+  upload,
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new Error('缺少上传文件');
+    const meta = importMeta.parse(req.body);
+    ok(res, await importBatch(req.user, req.file, meta, req.ip), 201);
+  }),
 );
 relayRouter.post(
   '/batches/:id/approve',

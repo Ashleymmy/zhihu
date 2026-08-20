@@ -249,7 +249,8 @@ export type AllianceOperationKey =
   | 'GET /intercept_words'
   | 'GET /risk_words'
   | 'GET /content_tag'
-  | 'GET /popularize_tasks';
+  | 'GET /popularize_tasks'
+  | 'GET /get_agent_channels';
 
 export interface AllianceSignatureProfile extends SignatureProfile {
   readonly mode: 'signed' | 'token-only';
@@ -287,6 +288,7 @@ export const ALLIANCE_SIGNATURE_PROFILES: Record<AllianceOperationKey, AllianceS
   'GET /risk_words': signedProfile('offset', 'limit'),
   'GET /content_tag': signedProfile(),
   'GET /popularize_tasks': signedProfile('offset', 'limit'),
+  'GET /get_agent_channels': signedProfile('offset', 'limit'),
 });
 
 export const ALLIANCE_SUCCESS_MESSAGES: Record<AllianceOperationKey, string> = Object.freeze({
@@ -306,6 +308,7 @@ export const ALLIANCE_SUCCESS_MESSAGES: Record<AllianceOperationKey, string> = O
   'GET /risk_words': '风险词列表获取成功',
   'GET /content_tag': '内容标签获取成功',
   'GET /popularize_tasks': '推广任务获取成功',
+  'GET /get_agent_channels': '渠道列表获取成功',
 });
 
 export interface AllianceListMeta {
@@ -678,6 +681,7 @@ export const ALLIANCE_OPERATION_CONTRACTS: Record<AllianceOperationKey, Alliance
   'GET /risk_words': contentQueryContract('GET /risk_words'),
   'GET /content_tag': contentQueryContract('GET /content_tag'),
   'GET /popularize_tasks': contentQueryContract('GET /popularize_tasks'),
+  'GET /get_agent_channels': contentQueryContract('GET /get_agent_channels'),
 });
 
 function operationKey(endpoint: AllianceEndpoint): AllianceOperationKey {

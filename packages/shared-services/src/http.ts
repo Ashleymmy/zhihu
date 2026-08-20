@@ -26,6 +26,8 @@ export interface HttpClientOptions {
 export interface HttpClient {
   get<T>(url: string, params?: object): Promise<T>
   post<T>(url: string, data?: unknown): Promise<T>
+  /** multipart 上传（FormData），axios 会自动带上 boundary */
+  postForm<T>(url: string, form: FormData): Promise<T>
   put<T>(url: string, data?: unknown): Promise<T>
   patch<T>(url: string, data?: unknown): Promise<T>
   del<T>(url: string): Promise<T>
@@ -134,6 +136,8 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
   return {
     get: (url, params) => request({ method: 'GET', url, params }),
     post: (url, data) => request({ method: 'POST', url, data }),
+    postForm: (url, form) =>
+      request({ method: 'POST', url, data: form, headers: { 'Content-Type': 'multipart/form-data' } }),
     put: (url, data) => request({ method: 'PUT', url, data }),
     patch: (url, data) => request({ method: 'PATCH', url, data }),
     del: (url) => request({ method: 'DELETE', url }),

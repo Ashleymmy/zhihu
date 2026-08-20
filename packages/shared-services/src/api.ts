@@ -96,6 +96,14 @@ export function createFinanceApi(http: HttpClient) {
     listBatches: () => http.get<SettlementBatch[]>('/finance/batches'),
     getBatch: (id: string) => http.get<SettlementBatchDetail>(`/finance/batches/${id}`),
     createBatch: (data: CreateSettlementBatchReq) => http.post<{ id: string }>('/finance/batches', data),
+    importBatch: (file: File, meta: { title: string; periodStart: string; periodEnd: string }) => {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('title', meta.title)
+      form.append('periodStart', meta.periodStart)
+      form.append('periodEnd', meta.periodEnd)
+      return http.postForm<{ id: string; imported: number }>('/finance/batches/import', form)
+    },
     approveBatch: (id: string) => http.post<void>(`/finance/batches/${id}/approve`),
     cancelBatch: (id: string) => http.post<void>(`/finance/batches/${id}/cancel`),
   }

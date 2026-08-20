@@ -1,8 +1,10 @@
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import * as XLSX from 'xlsx';
 import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
 import { AuthUser } from '../types';
 import { writeAudit } from './audit.service';
+import { validateAllianceXlsx, AllianceXlsxValidationError, type AllianceUploadFile } from '../zhihu/allianceXlsx';
 
 /* ===== 类型 ===== */
 
@@ -190,8 +192,11 @@ export async function approveBatch(user: AuthUser, id: string, ip?: string) {
     if (batch.status !== 'draft') throw new AppError(422, 42214, '只有草稿状态的批次可以审批');
 
     const [items] = await connection.query<ItemRow[]>(
-      `SELECT i.*, u.parent_id, u.role AS creator_role
-       FROM settlement_items i JOIN users u ON u.id = i.creator_id WHERE i.batch_id = ?`,
+      `SELECT i.*, u.parent_id, p.role AS parent_role
+       FROM settlement_items i
+       JOIN users u ON u.id = i.creator_id
+       LEFT JOIN users p ON p.id = u.parent_id
+       WHERE i.batch_id = ?`,
       [id],
     );
     if (!items.length) throw new AppError(422, 42215, '批次没有任何明细行');
@@ -217,8 +222,9 @@ export async function approveBatch(user: AuthUser, id: string, ip?: string) {
       });
       totalRelay += creatorResult.amount;
 
-      // 团长收益：按达人归属（parent_id 指向团长）
-      if (item.parent_id) {
+      // 团长收益：仅当归属上级确实是团长角色时计提（parent 是 admin 等不走团长规则）
+      const parentRole = (item as ItemRow & { parent_role?: string | null }).parent_role;
+      if (item.parent_id && parentRole === 'leader') {
         const leaderRule = await matchRule('leader', String(item.parent_id));
         if (leaderRule) {
           const leaderResult = applyRule(sourceMicro, leaderRule);
@@ -291,4 +297,93 @@ export async function cancelBatch(user: AuthUser, id: string, ip?: string) {
       connection,
     );
   });
+}
+
+/* ===== XLSX 结算批次导入适配器（D-001 来源入口，可替换为官方结算 API）===== */
+
+const USERNAME_HEADERS = ['达人用户名', '用户名', '达人', '账号', 'username'];
+const AMOUNT_HEADERS = ['来源金额', '结算金额', '金额', '收益金额', 'amount'];
+const NOTE_HEADERS = ['备注', '说明', 'note'];
+
+function findColumn(headers: string[], candidates: string[]): number {
+  const normalized = headers.map((h) => h.trim().toLowerCase());
+  for (const c of candidates) {
+    const idx = normalized.indexOf(c.toLowerCase());
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function parseAmountCell(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).replace(/[¥￥,\s]/g, '');
+  if (!/^\d+(\.\d{1,4})?$/.test(text)) return null;
+  return text;
+}
+
+/** 上传 XLSX 创建草稿批次。模板：表头含「达人用户名 + 来源金额（+可选备注）」，每行一条达人归属金额。 */
+export async function importBatch(
+  user: AuthUser,
+  file: AllianceUploadFile,
+  meta: { title: string; periodStart: string; periodEnd: string },
+  ip?: string,
+) {
+  try {
+    await validateAllianceXlsx(file);
+  } catch (error) {
+    if (error instanceof AllianceXlsxValidationError) throw new AppError(422, 42216, '上传文件不符合要求：仅接受合法的 .xlsx 文件');
+    throw error;
+  }
+
+  const workbook = XLSX.read(file.buffer as Buffer, { type: 'buffer', dense: true });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new AppError(422, 42217, 'XLSX 中没有任何工作表');
+  const rows2d = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, raw: true, defval: null });
+  if (!rows2d.length) throw new AppError(422, 42217, 'XLSX 内容为空');
+
+  // 定位表头行（前 5 行内找到用户名列与金额列）
+  let headerRow = -1;
+  let colUser = -1;
+  let colAmount = -1;
+  let colNote = -1;
+  for (let i = 0; i < Math.min(5, rows2d.length); i++) {
+    const cells = (rows2d[i] ?? []).map((c) => (c === null ? '' : String(c)));
+    const u = findColumn(cells, USERNAME_HEADERS);
+    const a = findColumn(cells, AMOUNT_HEADERS);
+    if (u !== -1 && a !== -1) {
+      headerRow = i;
+      colUser = u;
+      colAmount = a;
+      colNote = findColumn(cells, NOTE_HEADERS);
+      break;
+    }
+  }
+  if (headerRow === -1) {
+    throw new AppError(422, 42217, '未找到表头：需要包含「达人用户名」和「来源金额」两列（可选「备注」）');
+  }
+
+  const items: Array<{ creatorId: string; sourceAmount: string; note?: string | null }> = [];
+  const problems: string[] = [];
+  for (let i = headerRow + 1; i < rows2d.length; i++) {
+    const rowNum = i + 1; // 1-based，与 Excel 行号一致
+    const row = rows2d[i] ?? [];
+    const username = String(row[colUser] ?? '').trim();
+    const amount = parseAmountCell(row[colAmount]);
+    if (!username && amount === null) continue; // 跳过整行空白
+    if (!username) { problems.push(`第 ${rowNum} 行：用户名为空`); continue; }
+    if (amount === null) { problems.push(`第 ${rowNum} 行：金额「${row[colAmount]}」不是合法数字`); continue; }
+    const [creator] = await rows<RowDataPacket & { id: string; is_active: number; role: string }>(
+      "SELECT id, is_active, role FROM users WHERE username = ? AND role = 'creator' LIMIT 1",
+      [username],
+    );
+    if (!creator) { problems.push(`第 ${rowNum} 行：达人账号「${username}」不存在`); continue; }
+    if (!creator.is_active) { problems.push(`第 ${rowNum} 行：达人账号「${username}」已停用`); continue; }
+    const note = colNote !== -1 ? String(row[colNote] ?? '').trim() || null : null;
+    items.push({ creatorId: String(creator.id), sourceAmount: amount, note });
+  }
+  if (problems.length) throw new AppError(422, 42217, `导入校验未通过：${problems.slice(0, 5).join('；')}${problems.length > 5 ? ` 等 ${problems.length} 处` : ''}`);
+  if (!items.length) throw new AppError(422, 42217, 'XLSX 中没有可导入的明细行');
+
+  const created = await createBatch(user, { title: meta.title, periodStart: meta.periodStart, periodEnd: meta.periodEnd, items }, ip);
+  return { ...created, imported: items.length };
 }
