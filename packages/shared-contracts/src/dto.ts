@@ -104,6 +104,94 @@ export interface TeamMember {
   createdAt: string
 }
 
+export type TeamApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+export interface TeamApplication {
+  id: string
+  creatorId: string
+  creatorName: string
+  creatorUsername: string
+  leaderId: string
+  leaderName: string
+  message: string | null
+  status: TeamApplicationStatus
+  createdAt: string
+  handledAt: string | null
+}
+
+export interface ApplyTeamReq {
+  leaderUsername: string
+  message?: string
+}
+
+/** 达人可申请的团长选项 */
+export interface LeaderOption {
+  id: string
+  username: string
+  displayName: string
+  memberCount: number
+}
+
+/** 达人当前所属团队；未入团为 null */
+export interface MyTeamResp {
+  leaderId: string
+  leaderUsername: string
+  leaderName: string
+  leaderActive: boolean
+  memberCount: number
+}
+
+/* ===== 知乎故事子模块 ===== */
+
+/** 推广作品（compositions 表）；mediaType 为 KOC视频号/KOC抖音 等媒体枚举字符串 */
+export interface Composition {
+  id: string
+  planId: string
+  ownerId: string
+  mediaType: string
+  mediaAccount: string
+  compositionType: number
+  compositionSubType: number
+  title: string | null
+  promoUrl: string
+  releaseTime: string | null
+  status: 'pending' | 'active' | 'rejected' | 'ended'
+  rejectReason: string | null
+  syncStatus: 'local' | 'syncing' | 'synced' | 'failed'
+  keyword?: string
+  channelName?: string
+  createdAt: string
+}
+
+/** 推广任务（tasks 表，知乎侧同步） */
+export interface ZhihuTask {
+  id: string
+  projectId: string
+  zhihuTaskId: string
+  name: string
+  popularizeType: number | null
+  settleType: string | null
+  unitPrice: number | null
+  startTime: string | null
+  endTime: string | null
+  status: string | null
+  syncedAt: string
+}
+
+export type StoryItemType = 'salt_pick' | 'comment_watch' | 'risk_report' | 'media' | 'tag' | 'product' | 'asset'
+
+export interface StoryItem {
+  id: string
+  type: StoryItemType
+  title: string
+  url: string | null
+  note: string | null
+  status: 'active' | 'archived'
+  ownerId: string
+  ownerName?: string
+  createdAt: string
+}
+
 export interface ProjectDetail extends Project {
   apiBaseUrl: string
   signMethod: 'hmac_sha256' | 'oauth2'

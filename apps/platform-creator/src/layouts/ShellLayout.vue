@@ -44,8 +44,8 @@ const navigation: NavGroup[] = [
   {
     label: '账户',
     items: [
-      { key: 'team', label: '个人信息', path: '/team' },
-      { key: 'mcn', label: '申请入团', path: '/mcn' },
+      { key: 'profile', label: '个人信息', path: '/profile' },
+      { key: 'join-team', label: '申请入团', path: '/join-team' },
     ],
   },
 ]
