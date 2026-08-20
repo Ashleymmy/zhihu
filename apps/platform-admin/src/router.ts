@@ -33,6 +33,16 @@ export function createAppRouter() {
           // ── 项目管理 ──
           { path: 'projects', name: 'projects', component: () => import('./views/ProjectsView.vue'), meta: { title: '项目管理' } },
           { path: 'zhihu-story', name: 'zhihu-story', component: () => import('./views/ZhihuStoryView.vue'), meta: { title: '知乎故事' } },
+{ path: 'zhihu-story/plans', name: 'story-plans', component: () => import('./views/PlansView.vue'), meta: { title: '推广计划' } },
+          { path: 'zhihu-story/works', name: 'story-works', component: () => import('./views/StoryWorksView.vue'), meta: { title: '作品管理' } },
+          { path: 'zhihu-story/tasks', name: 'story-tasks', component: () => import('./views/StoryTasksView.vue'), meta: { title: '任务列表' } },
+          { path: 'zhihu-story/salt', name: 'story-salt', component: () => import('./views/StorySaltView.vue'), meta: { title: '盐选榜单' } },
+          { path: 'zhihu-story/comments', name: 'story-comments', component: () => import('./views/StoryInterceptView.vue'), meta: { title: '评论截流' } },
+          { path: 'zhihu-story/risk', name: 'story-risk', component: () => import('./views/StoryRiskView.vue'), meta: { title: '风险举报' } },
+          { path: 'zhihu-story/media', name: 'story-media', component: () => import('./views/StoryMediaView.vue'), meta: { title: '有声书漫画' } },
+          { path: 'zhihu-story/tags', name: 'story-tags', component: () => import('./views/StoryTagView.vue'), meta: { title: '内容标签' } },
+          { path: 'zhihu-story/products', name: 'story-products', component: () => import('./views/StoryProductsView.vue'), meta: { title: '产品库' } },
+          { path: 'zhihu-story/assets', name: 'story-assets', component: () => import('./views/StoryModuleView.vue'), meta: { title: '素材库', storyModule: 'assets' } },
           // ── 知识付费 ──
           { path: 'knowledge', name: 'knowledge', component: () => import('./views/KnowledgePayView.vue'), meta: { title: '知识付费' } },
           // ── 账户管理 ──

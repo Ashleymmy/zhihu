@@ -18,12 +18,15 @@ export const ALLIANCE_QUOTA_OPERATION_KEYS = Object.freeze([
   'GET /data_report/daily_data',
 ] satisfies readonly AllianceOperationKey[]);
 
+/** 配额只覆盖经联盟代理网关的端点；内容域只读端点（盐选/榜单等）不进配额 */
+export type AllianceQuotaOperationKey = (typeof ALLIANCE_QUOTA_OPERATION_KEYS)[number];
+
 const operationKeySet = new Set<string>(ALLIANCE_QUOTA_OPERATION_KEYS);
 const reservationIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 
 export interface AllianceQuotaPolicy {
   readonly dailyBudget: number;
-  readonly costs: Readonly<Record<AllianceOperationKey, number>>;
+  readonly costs: Readonly<Record<AllianceQuotaOperationKey, number>>;
 }
 
 export interface AllianceQuotaReservation {
@@ -260,7 +263,7 @@ export function loadAllianceQuotaPolicy(environment: NodeJS.ProcessEnv = process
   return parseAllianceQuotaPolicy(supplied[0]);
 }
 
-export function isAllianceQuotaOperationKey(value: unknown): value is AllianceOperationKey {
+export function isAllianceQuotaOperationKey(value: unknown): value is AllianceQuotaOperationKey {
   return typeof value === 'string' && operationKeySet.has(value);
 }
 

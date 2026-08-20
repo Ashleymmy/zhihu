@@ -241,7 +241,15 @@ export type AllianceOperationKey =
   | 'PUT /popularize_composition/v2/{composition_id}'
   | 'GET /popularize_compositions'
   | 'GET /data_report/real_time_data'
-  | 'GET /data_report/daily_data';
+  | 'GET /data_report/daily_data'
+  | 'GET /vip/content/rule/labels'
+  | 'GET /vip/rule_contents'
+  | 'GET /vip/audio/contents'
+  | 'GET /comic_dramas'
+  | 'GET /intercept_words'
+  | 'GET /risk_words'
+  | 'GET /content_tag'
+  | 'GET /popularize_tasks';
 
 export interface AllianceSignatureProfile extends SignatureProfile {
   readonly mode: 'signed' | 'token-only';
@@ -271,6 +279,14 @@ export const ALLIANCE_SIGNATURE_PROFILES: Record<AllianceOperationKey, AllianceS
   'GET /popularize_compositions': signedProfile('offset', 'limit'),
   'GET /data_report/real_time_data': tokenOnlyProfile,
   'GET /data_report/daily_data': tokenOnlyProfile,
+  'GET /vip/content/rule/labels': signedProfile(),
+  'GET /vip/rule_contents': signedProfile('offset', 'limit'),
+  'GET /vip/audio/contents': signedProfile('offset', 'limit'),
+  'GET /comic_dramas': signedProfile('offset', 'limit'),
+  'GET /intercept_words': signedProfile('offset', 'limit'),
+  'GET /risk_words': signedProfile('offset', 'limit'),
+  'GET /content_tag': signedProfile(),
+  'GET /popularize_tasks': signedProfile('offset', 'limit'),
 });
 
 export const ALLIANCE_SUCCESS_MESSAGES: Record<AllianceOperationKey, string> = Object.freeze({
@@ -282,6 +298,14 @@ export const ALLIANCE_SUCCESS_MESSAGES: Record<AllianceOperationKey, string> = O
   'GET /popularize_compositions': '作品列表获取成功',
   'GET /data_report/real_time_data': '实时数据获取成功',
   'GET /data_report/daily_data': '每日数据获取成功',
+  'GET /vip/content/rule/labels': '榜单列表获取成功',
+  'GET /vip/rule_contents': '榜单内容获取成功',
+  'GET /vip/audio/contents': '有声书列表获取成功',
+  'GET /comic_dramas': '漫剧剧目获取成功',
+  'GET /intercept_words': '评论截流词获取成功',
+  'GET /risk_words': '风险词列表获取成功',
+  'GET /content_tag': '内容标签获取成功',
+  'GET /popularize_tasks': '推广任务获取成功',
 });
 
 export interface AllianceListMeta {
@@ -537,6 +561,32 @@ function parseWith(schema: ZodTypeAny, value: unknown): Record<string, unknown> 
   return schema.parse(value) as Record<string, unknown>;
 }
 
+/** 内容域查询端点的透传 schema：参数已在自家路由层用 zod 校验过，这里只做形状收敛 */
+const contentQuerySchema = z
+  .record(z.union([z.string(), z.number()]))
+  .transform((value) => {
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) out[key] = String(child);
+    return out;
+  });
+
+/** 内容域（§2.7-2.13）透传契约：不落库、不改写，上游响应原样下发 */
+function contentQueryContract(key: AllianceOperationKey): AllianceOperationContract {
+  return {
+    ingressSchema: contentQuerySchema,
+    upstreamRequestSchema: contentQuerySchema,
+    signatureProfile: ALLIANCE_SIGNATURE_PROFILES[key],
+    message: ALLIANCE_SUCCESS_MESSAGES[key],
+    parseIngress: (input: unknown) => parseWith(contentQuerySchema, input),
+    toUpstream: (ingress: Record<string, unknown>) => ingress,
+    projectSuccess: (upstream: unknown, _ingress: Record<string, unknown>) => ({
+      data: upstream,
+      clientData: upstream,
+      message: ALLIANCE_SUCCESS_MESSAGES[key],
+    }),
+  };
+}
+
 export const ALLIANCE_OPERATION_CONTRACTS: Record<AllianceOperationKey, AllianceOperationContract> = Object.freeze({
   'POST /popularize_plan': {
     ingressSchema: planIngressSchema,
@@ -619,6 +669,15 @@ export const ALLIANCE_OPERATION_CONTRACTS: Record<AllianceOperationKey, Alliance
     projectSuccess: (upstream, _ingress) =>
       projectDaily(upstream, ALLIANCE_SUCCESS_MESSAGES['GET /data_report/daily_data']),
   },
+  /* ===== 知乎故事内容域（§2.7-2.13）：透传查询，上游响应原样下发 ===== */
+  'GET /vip/content/rule/labels': contentQueryContract('GET /vip/content/rule/labels'),
+  'GET /vip/rule_contents': contentQueryContract('GET /vip/rule_contents'),
+  'GET /vip/audio/contents': contentQueryContract('GET /vip/audio/contents'),
+  'GET /comic_dramas': contentQueryContract('GET /comic_dramas'),
+  'GET /intercept_words': contentQueryContract('GET /intercept_words'),
+  'GET /risk_words': contentQueryContract('GET /risk_words'),
+  'GET /content_tag': contentQueryContract('GET /content_tag'),
+  'GET /popularize_tasks': contentQueryContract('GET /popularize_tasks'),
 });
 
 function operationKey(endpoint: AllianceEndpoint): AllianceOperationKey {
