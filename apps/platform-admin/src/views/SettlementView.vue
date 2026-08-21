@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { EarningRecord, PricingRule, SettlementBatch, SettlementBatchDetail, TeamMember } from '@zhihu-koc/shared-contracts'
+import { APP_ROLE } from '../app-config'
 import { apis } from '../stores/auth'
 
 const loading = ref(true)
@@ -56,6 +57,9 @@ function ruleText(r: PricingRule) {
 }
 
 /* ===== 结算批次 ===== */
+/** 定价与批次是 Admin 专属；团长/达人只看自己的收益记录 */
+const isAdmin = APP_ROLE === 'admin'
+
 const batches = ref<SettlementBatch[]>([])
 
 /** 批次金额以元存储（DECIMAL(14,4)），直接按数值比较 */
@@ -144,7 +148,7 @@ async function cancelBatch(id: string) {
 async function load() {
   loading.value = true
   try {
-    const [e] = await Promise.all([apis.earnings.list({ page: 1, pageSize: 50 }), loadRules(), loadBatches()])
+    const [e] = await Promise.all([apis.earnings.list({ page: 1, pageSize: 50 }), ...(isAdmin ? [loadRules(), loadBatches()] : [])])
     earnings.value = e.list
     earningsTotal.value = e.total
   } catch (e: any) { error.value = e?.message ?? String(e) }
@@ -165,8 +169,8 @@ onMounted(load)
     <header class="page-header">
       <div>
         <p class="section-index">01 / 结算管理</p>
-        <h1>结算与定价</h1>
-        <p>Admin 对下游账号定价：登记结算批次、按定价规则中继分配、写入各账号收益。</p>
+        <h1>{{ isAdmin ? '结算与定价' : '结算中心' }}</h1>
+        <p>{{ isAdmin ? 'Admin 对下游账号定价：登记结算批次、按定价规则中继分配、写入各账号收益。' : '查看你的收益结算记录与到账状态。定价由平台统一配置。' }}</p>
       </div>
       <button class="row-action" @click="load">刷新</button>
     </header>
@@ -174,7 +178,7 @@ onMounted(load)
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 定价规则 -->
-    <article class="panel data-panel">
+    <article v-if="isAdmin"  class="panel data-panel">
       <div class="list-toolbar">
         <span class="toolbar-title">定价规则</span>
         <span class="toolbar-count">{{ rules.filter(r => r.status === 'active').length }} 生效中</span>
@@ -199,7 +203,7 @@ onMounted(load)
     </article>
 
     <!-- 批次资金分布 -->
-    <article v-if="batches.length" class="panel" style="padding: 22px;">
+    <article v-if="isAdmin && batches.length" class="panel" style="padding: 22px;">
       <p class="section-index quiet">批次资金分布</p>
       <h2 class="workspace-title" style="font-size: 20px; margin-bottom: 16px;">来源金额 → 分发金额</h2>
       <div class="batch-bars">
@@ -219,7 +223,7 @@ onMounted(load)
     </article>
 
     <!-- 结算批次 -->
-    <article class="panel data-panel">
+    <article v-if="isAdmin"  class="panel data-panel">
       <div class="list-toolbar">
         <span class="toolbar-title">结算批次</span>
         <span class="toolbar-count">{{ batches.length }}</span>
