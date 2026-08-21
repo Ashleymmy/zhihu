@@ -5,6 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./tests/support/env.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**'],
     restoreMocks: true,
     clearMocks: true,
     testTimeout: 15_000,

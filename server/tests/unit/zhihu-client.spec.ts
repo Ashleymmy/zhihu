@@ -49,6 +49,14 @@ const server = setupServer(
     outboundRequests.push(`${request.method} ${new URL(request.url).pathname}`);
     return HttpResponse.json({ data: { composition_id: '2071266138193975100' } });
   }),
+  http.get('https://open.zhihu.com/alliance/api/get_agent_channels', ({ request }) => {
+    outboundRequests.push(`${request.method} ${new URL(request.url).pathname}`);
+    return HttpResponse.json({ success: true, data: [], msg: 'ok' });
+  }),
+  http.get('https://open.zhihu.com/alliance/api/popularize_tasks', ({ request }) => {
+    outboundRequests.push(`${request.method} ${new URL(request.url).pathname}`);
+    return HttpResponse.json({ success: true, data: { items: [] }, msg: 'ok' });
+  }),
   http.get('https://open.zhihu.com/alliance/api/data_report/real_time_data', ({ request }) => {
     outboundRequests.push(`${request.method} ${new URL(request.url).pathname}`);
     const url = new URL(request.url);
@@ -116,20 +124,18 @@ describe('知乎后台 Client', () => {
     expect(outboundRequests).toEqual([]);
   });
 
-  it('P0007-R1-JOB-001 rejects all three legacy Job paths before signing or egress', async () => {
-    for (const path of [
-      '/alliance/api/get_agent_channels',
-      '/alliance/api/popularize_tasks',
-      'https://attacker.example/alliance/api/popularize_plan',
-    ]) {
-      await expect(zhihuGet(path)).rejects.toMatchObject({
-        httpStatus: 502,
-        code: 50002,
-        message: '知乎服务暂时不可用，请稍后重试',
-      });
+  it('P0007-R1-JOB-001 渠道/任务同步端点已注册，仅拒绝绝对 URL 与未注册路径', async () => {
+    // 已注册端点：允许签名并发出真实请求（同步任务依赖）
+    await expect(zhihuGet('/alliance/api/get_agent_channels')).resolves.toBeDefined();
+    await expect(zhihuGet('/alliance/api/popularize_tasks')).resolves.toBeDefined();
+    expect(outboundRequests).toEqual([
+      'GET /alliance/api/get_agent_channels',
+      'GET /alliance/api/popularize_tasks',
+    ]);
+    // 绝对 URL 与未注册路径仍必须在签名前拒绝
+    for (const path of ['https://attacker.example/alliance/api/popularize_plan', '/alliance/api/unknown_endpoint']) {
+      await expect(zhihuGet(path)).rejects.toMatchObject({ httpStatus: 502, code: 50002 });
     }
-    expect(signing.inject).not.toHaveBeenCalled();
-    expect(outboundRequests).toEqual([]);
   });
 
   it('maps unknown upstream errors without exposing the upstream message', async () => {

@@ -246,7 +246,7 @@ function findRepoRoot(start: string): string {
     if (
       fs.existsSync(path.join(current, DOC_FILE)) &&
       fs.existsSync(path.join(current, 'server', 'package.json')) &&
-      fs.existsSync(path.join(current, 'platform', 'tsconfig.json'))
+      fs.existsSync(path.join(current, 'apps', 'platform-admin', 'tsconfig.json'))
     ) {
       return current;
     }

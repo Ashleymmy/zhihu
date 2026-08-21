@@ -59,7 +59,6 @@ function detailText(log: AuditLogItem) {
 async function load() {
   loading.value = true
   error.value = ''
-  error.value = ''
   try {
     const data = await apis.adminTools.auditLogs({
       page: page.value,

@@ -25,7 +25,6 @@ function topicText(topic: AudioContent['topic']) {
 async function load() {
   loading.value = true
   error.value = ''
-  error.value = ''
   try {
     if (tab.value === 'audio') audios.value = unwrap(await apis.story.audioContents({ limit: 50 }))
     else comics.value = unwrap(await apis.story.comicDramas({ limit: 50 }))
