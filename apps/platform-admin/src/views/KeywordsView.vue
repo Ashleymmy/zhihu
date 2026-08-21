@@ -11,6 +11,7 @@ const form = ref({ keyword: '', targetUrl: '', eventType: 'impression' })
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const data = await apis.plans.list({ page: 1, pageSize: 100 })
     plans.value = data.list

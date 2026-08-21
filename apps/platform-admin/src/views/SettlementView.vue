@@ -147,6 +147,7 @@ async function cancelBatch(id: string) {
 /* ===== 收益记录 ===== */
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const [e] = await Promise.all([apis.earnings.list({ page: 1, pageSize: 50 }), ...(isAdmin ? [loadRules(), loadBatches()] : [])])
     earnings.value = e.list

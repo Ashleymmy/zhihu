@@ -20,6 +20,7 @@ const statusClass: Record<number, string> = { 1: 'paused', 2: 'rejected', 3: 'ac
 async function load() {
   loading.value = true
   error.value = ''
+  error.value = ''
   try {
     const resp: any = await apis.story.riskWords({
       type: typeFilter.value,

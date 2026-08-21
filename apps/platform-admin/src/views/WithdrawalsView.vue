@@ -11,6 +11,7 @@ const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY',
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const data = await apis.withdrawals.list({ page: 1, pageSize: 50 })
     withdrawals.value = data.list

@@ -40,6 +40,7 @@ const syncLabels: Record<string, string> = { local: '本地', syncing: '同步�
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const data = await apis.story.listWorks({ page: 1, pageSize: 100, status: statusFilter.value || undefined })
     works.value = data.list

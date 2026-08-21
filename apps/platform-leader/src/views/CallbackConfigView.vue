@@ -12,6 +12,7 @@ const eventTypeLabels: Record<string, string> = { impression: '曝光', click: '
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     // TODO: 后端需要实现回传规则接口
     rules.value = []

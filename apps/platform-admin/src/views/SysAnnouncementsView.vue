@@ -13,6 +13,7 @@ const form = ref({ title: '', content: '' })
 
 async function load() {
   loading.value = true
+  error.value = ''
   try { announcements.value = await apis.announcements.list() }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }

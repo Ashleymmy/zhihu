@@ -18,6 +18,7 @@ const resetting = ref(false)
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const [m, a] = await Promise.all([
       apis.team.listMembers(),

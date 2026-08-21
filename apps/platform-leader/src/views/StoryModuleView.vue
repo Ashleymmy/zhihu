@@ -33,6 +33,7 @@ const form = ref({ title: '', url: '', note: '' })
 
 async function load() {
   loading.value = true
+  error.value = ''
   try { items.value = await apis.story.listItems(config.value.type) }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }

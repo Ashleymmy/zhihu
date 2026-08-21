@@ -14,6 +14,7 @@ const cleanupResult = ref('')
 
 async function load() {
   loading.value = true
+  error.value = ''
   try { tables.value = await apis.adminTools.dbStats() }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }

@@ -11,6 +11,7 @@ const error = ref('')
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const resp = await apis.story.listTasks({ page: 1, pageSize: 100 })
     const map = new Map<string, ProductRow>()

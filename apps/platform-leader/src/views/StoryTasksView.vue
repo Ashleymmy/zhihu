@@ -24,6 +24,7 @@ async function syncNow() {
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const data = await apis.story.listTasks({ page: 1, pageSize: 100, keyword: keyword.value.trim() || undefined, status: statusFilter.value || undefined })
     tasks.value = data.list

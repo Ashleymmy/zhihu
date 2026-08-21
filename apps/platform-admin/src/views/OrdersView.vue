@@ -12,6 +12,7 @@ const statusLabels: Record<string, string> = { active: '投放中', paused: '已
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const data = await apis.plans.list({ page: 1, pageSize: 100, status: statusFilter.value as any || undefined })
     plans.value = data.list

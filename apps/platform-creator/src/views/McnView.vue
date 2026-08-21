@@ -11,6 +11,7 @@ const form = ref({ accountKey: '', accountName: '' })
 
 async function load() {
   loading.value = true
+  error.value = ''
   try { accounts.value = await apis.mcn.list() }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }

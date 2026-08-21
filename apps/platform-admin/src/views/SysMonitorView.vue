@@ -24,6 +24,7 @@ function fmt(value: string | null) {
 
 async function load() {
   loading.value = true
+  error.value = ''
   try { rows.value = await apis.adminTools.monitor() }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }

@@ -15,6 +15,7 @@ const courses = ref<any[]>([])
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     projects.value = await apis.projects.list()
     const first = projects.value[0]

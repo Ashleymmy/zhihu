@@ -20,6 +20,7 @@ function fmtUptime(sec: number) {
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     info.value = await apis.adminTools.siteInfo()
     // 项目列表不含 configJson，当前值从提现校验逻辑同源处不可读，输入框留空表示“保持现状”

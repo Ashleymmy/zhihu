@@ -20,6 +20,7 @@ const maxImpressions = computed(() => Math.max(...trend.value.map(t => t.impress
 async function load() {
   loading.value = true
   error.value = ''
+  error.value = ''
   try {
     const params: any = {}
     if (dateFrom.value) params.from = dateFrom.value
