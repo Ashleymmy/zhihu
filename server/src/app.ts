@@ -50,7 +50,8 @@ export function createApp() {
   app.use('/api/v1/zhihu-content', zhihuContentRouter);
 
   /* ===== 营销门户与转化落地页（静态站点，公开访问）===== */
-  const publicDir = path.resolve(__dirname, '../public');
+  // 静态资源以进程工作目录为锚（dev 与生产 dist 下均为 server/）
+  const publicDir = path.resolve(process.cwd(), 'public');
   const portalDir = path.join(publicDir, 'portal');
   const landingDir = path.join(publicDir, 'landing');
   app.get('/', (_req, res) => res.redirect('/portal/'));
@@ -70,6 +71,21 @@ export function createApp() {
       `</svg>`,
     );
   });
+
+  /* ===== 三端工作台（生产模式：由后端托管各端构建产物）===== */
+  // 三端以子路径挂载：/admin/、/leader/、/creator/；各端 vite base 与之对应
+  const spaMounts: Array<[string, string]> = [
+    ['admin', 'platform-admin'],
+    ['leader', 'platform-leader'],
+    ['creator', 'platform-creator'],
+  ];
+  const appsRoot = path.resolve(process.cwd(), '../apps');
+  for (const [mount, dir] of spaMounts) {
+    const distDir = path.join(appsRoot, dir, 'dist');
+    app.use(`/${mount}`, express.static(distDir));
+    // SPA 回退：非文件请求一律回 index.html
+    app.get(`/${mount}/*`, (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
+  }
 
   app.use(notFound);
   app.use(errorHandler);

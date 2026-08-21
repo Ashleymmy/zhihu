@@ -21,6 +21,7 @@
     "contract:registry:lint": "tsx scripts/contracts/operation-inventory.ts lint",
     "test:contract-registry": "vitest run --dir tests/unit operation-registry.spec.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "migrate:prod": "node dist/scripts/migrate.js",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""

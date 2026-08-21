@@ -9,6 +9,8 @@
     "dev:leader": "turbo run dev --filter=platform-leader",
     "dev:creator": "turbo run dev --filter=platform-creator",
     "build": "turbo run build",
+    "build:prod": "pnpm -r build && npm --prefix server ci && npm --prefix server run build",
+    "start": "npm --prefix server run migrate:prod && npm --prefix server run start",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test:unit": "turbo run test:unit",

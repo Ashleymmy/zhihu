@@ -15,11 +15,11 @@ import {
   X,
 } from "lucide-react";
 
-// 三端登录入口（开发环境端口；部署时替换为正式域名）
+// 三端登录入口（生产同源子路径；本地联调时改为 http://localhost:530X/login）
 const LOGIN_ENTRIES = [
-  { key: "leader", label: "我是团长", code: "LEADER / 01", desc: "团队运营与成员管理", url: "http://localhost:5302/login" },
-  { key: "creator", label: "我是达人", code: "CREATOR / 02", desc: "推广执行与收益查看", url: "http://localhost:5303/login" },
-  { key: "admin", label: "通行证", code: "ADMIN / 00", desc: "系统管理员总控台", url: "http://localhost:5301/login" },
+  { key: "leader", label: "我是团长", code: "LEADER / 01", desc: "团队运营与成员管理", url: "/leader/login" },
+  { key: "creator", label: "我是达人", code: "CREATOR / 02", desc: "推广执行与收益查看", url: "/creator/login" },
+  { key: "admin", label: "通行证", code: "ADMIN / 00", desc: "系统管理员总控台", url: "/admin/login" },
 ];
 
 const navigation = [
