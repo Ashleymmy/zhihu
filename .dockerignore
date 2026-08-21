@@ -1,0 +1,22 @@
+# Docker 构建上下文瘦身
+.git
+.claude
+.turbo
+.workflow
+node_modules
+**/node_modules
+**/dist
+!server/public
+docs
+_archive
+prototypes
+# 原型目录体量大且运行时不需要（产物已提交在 server/public）
+营销门户页
+落地页
+*.zip
+*.png
+*.md
+!README.md
+.env
+.env.*
+!.env.docker.example

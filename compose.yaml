@@ -1,5 +1,8 @@
 name: zhihu-koc
 
+# 生产环境：docker compose --env-file .env.docker up -d
+# 首次部署：cp .env.docker.example .env.docker 并填写所有必填项
+
 services:
   mysql:
     image: mysql:8.0
@@ -42,10 +45,11 @@ services:
     networks:
       - app_network
 
-  server:
-    image: zhihu-koc-server:${IMAGE_TAG:-latest}
+  # 全栈一体：后端 API + 门户/落地页 + 三端工作台（/admin /leader /creator）
+  app:
+    image: zhihu-koc:${IMAGE_TAG:-latest}
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     init: true
@@ -62,6 +66,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:?请在 .env.docker 中设置 REDIS_PASSWORD}@redis:6379
       QUEUE_DRIVER: bull
       TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${WEB_PORT:-80}:3000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -78,29 +84,6 @@ services:
       retries: 12
       start_period: 30s
     stop_grace_period: 30s
-    networks:
-      - app_network
-
-  platform:
-    image: zhihu-koc-platform:${IMAGE_TAG:-latest}
-    build:
-      context: ./platform
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: /api/v1
-    restart: unless-stopped
-    init: true
-    ports:
-      - "${WEB_PORT:-80}:8080"
-    depends_on:
-      server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
     networks:
       - app_network
 
