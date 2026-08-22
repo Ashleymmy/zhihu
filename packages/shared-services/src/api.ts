@@ -152,6 +152,8 @@ export function createPlansApi(http: HttpClient) {
       endDate?: string | null
       ownerId?: string
     }) => http.post<Plan>('/plans', data),
+    checkKeyword: (channelId: string, keyword: string) =>
+      http.post<{ available: boolean }>('/plans/check-keyword', { channelId, keyword }),
     update: (id: string, data: UpdatePlanReq) => http.put<Plan>(`/plans/${id}`, data),
     remove: (id: string) => http.del<void>(`/plans/${id}`),
     retry: (id: string) => http.post<Plan>(`/plans/${id}/retry-sync`),
