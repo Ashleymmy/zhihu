@@ -446,6 +446,23 @@ export interface EarningsSummary {
   total: number
 }
 
+/* ===== 回传配置 ===== */
+
+export interface CallbackRule {
+  id: string
+  planId: string | null
+  planName: string | null
+  callbackUrl: string
+  eventsJson: string[]
+  status: 'active' | 'inactive'
+  createdAt: string
+}
+
+export interface CallbackSecret {
+  lastFour: string
+  rotatedAt: string
+}
+
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected'
 
 export interface Withdrawal {

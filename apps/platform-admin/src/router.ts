@@ -48,7 +48,6 @@ export function createAppRouter() {
           // ── 账户管理 ──
           { path: 'team', name: 'team', component: () => import('./views/TeamView.vue'), meta: { title: '用户管理' } },
           { path: 'mcn', name: 'mcn', component: () => import('./views/McnView.vue'), meta: { title: 'MCN管理' } },
-          { path: 'sub-accounts', name: 'sub-accounts', component: () => import('./views/SubAccountView.vue'), meta: { title: '子账号管理' } },
           // ── 数据分析 ──
           { path: 'analytics', name: 'analytics', component: () => import('./views/AnalyticsView.vue'), meta: { title: '数据分析' } },
           // ── 系统工具 ──

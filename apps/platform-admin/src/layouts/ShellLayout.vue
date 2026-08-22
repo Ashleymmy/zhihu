@@ -55,7 +55,6 @@ const navigation: NavGroup[] = [
     items: [
       { key: 'team', label: '用户管理', path: '/team' },
       { key: 'mcn', label: 'MCN管理', path: '/mcn' },
-      { key: 'sub-accounts', label: '子账号管理', path: '/sub-accounts' },
     ],
   },
   {

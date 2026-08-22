@@ -1,4 +1,6 @@
 import type {
+  CallbackRule,
+  CallbackSecret,
   AddProjectCourseReq,
   AddProjectMemberReq,
   ApplyTeamReq,
@@ -194,6 +196,18 @@ export function createWithdrawalsApi(http: HttpClient) {
   }
 }
 
+export function createCallbacksApi(http: HttpClient) {
+  return {
+    listRules: (params: { page?: number; pageSize?: number } = {}) =>
+      http.get<PageResp<CallbackRule>>('/callbacks/rules', params),
+    createRule: (data: { planId: string; callbackUrl: string; events: string[] }) =>
+      http.post<CallbackRule>('/callbacks/rules', data),
+    deleteRule: (id: string) => http.del<void>(`/callbacks/rules/${id}`),
+    getSecret: () => http.get<CallbackSecret>('/callbacks/secret'),
+    rotateSecret: () => http.post<CallbackSecret>('/callbacks/secret/rotate'),
+  }
+}
+
 export function createZhihuStoryApi(http: HttpClient) {
   return {
     /** 作品管理（compositions） */
@@ -285,6 +299,7 @@ export interface ApiBundle {
   finance: ReturnType<typeof createFinanceApi>
   adminTools: ReturnType<typeof createAdminToolsApi>
   announcements: ReturnType<typeof createAnnouncementsApi>
+  callbacks: ReturnType<typeof createCallbacksApi>
 }
 
 export function createApis(http: HttpClient): ApiBundle {
@@ -302,5 +317,6 @@ export function createApis(http: HttpClient): ApiBundle {
     finance: createFinanceApi(http),
     adminTools: createAdminToolsApi(http),
     announcements: createAnnouncementsApi(http),
+    callbacks: createCallbacksApi(http),
   }
 }

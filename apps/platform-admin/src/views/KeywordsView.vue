@@ -6,8 +6,6 @@ import { useAuthStore, apis } from '../stores/auth'
 const plans = ref<Plan[]>([])
 const loading = ref(true)
 const error = ref('')
-const showForm = ref(false)
-const form = ref({ keyword: '', targetUrl: '', eventType: 'impression' })
 
 async function load() {
   loading.value = true
@@ -17,16 +15,6 @@ async function load() {
     plans.value = data.list
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
-}
-
-async function bindKeyword() {
-  if (!form.value.keyword.trim() || !form.value.targetUrl.trim()) return
-  try {
-    // TODO: 后端需要实现关键词绑定接口
-    showForm.value = false
-    form.value = { keyword: '', targetUrl: '', eventType: 'impression' }
-    await load()
-  } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
 onMounted(load)
@@ -40,10 +28,7 @@ onMounted(load)
         <h1>关键词回传</h1>
         <p style="max-width: 520px; margin: 6px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.7;">绑定推广词条并配置回传事件，让内容、投放和转化在同一条链路中发生。</p>
       </div>
-      <button class="primary-action" @click="showForm = !showForm">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-        绑定词条
-      </button>
+
     </header>
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
@@ -76,45 +61,13 @@ onMounted(load)
       </article>
     </section>
 
-    <!-- 绑定表单 -->
-    <article v-if="showForm" class="panel form-panel">
-      <header>
-        <div class="panel-icon cyan">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-        </div>
-        <h2>绑定推广词条</h2>
-      </header>
-      <form class="form-grid" @submit.prevent="bindKeyword">
-        <div>
-          <label>关键词</label>
-          <input v-model="form.keyword" placeholder="输入推广关键词" required />
-        </div>
-        <div>
-          <label>目标 URL</label>
-          <input v-model="form.targetUrl" placeholder="https://www.zhihu.com/..." required />
-        </div>
-        <div>
-          <label>事件类型</label>
-          <select v-model="form.eventType">
-            <option value="impression">曝光</option>
-            <option value="click">点击</option>
-            <option value="conversion">转化</option>
-          </select>
-        </div>
-        <div class="form-submit">
-          <button type="submit" class="primary-action">确认绑定</button>
-          <button type="button" class="ghost-aurora" @click="showForm = false">取消</button>
-        </div>
-      </form>
-    </article>
-
     <!-- 已绑定列表 -->
     <article class="panel data-panel" style="min-height: 200px;">
       <div class="list-toolbar">
         <span class="toolbar-title">已绑定词条</span>
         <span class="toolbar-count">{{ plans.length }}</span>
       </div>
-      <div v-if="loading" style="display: grid; min-height: 160px; place-content: center; color: var(--ink-soft); font-size: 12px;">加载中...</div>
+      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!plans.length" class="empty-panel"><span>还没有绑定任何词条。</span></div>
       <div v-else class="responsive-table">
         <table>
