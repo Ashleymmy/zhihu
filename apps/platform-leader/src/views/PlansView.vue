@@ -13,7 +13,12 @@ const loading = ref(true)
 const error = ref('')
 const showModal = ref(false)
 
-const form = ref({ keyword: '', channel: '知乎信息流', dailyBudget: '10000', status: 'draft' })
+interface ChannelOption { id: string; zhihuChannelId: string; name: string }
+interface TaskOption { id: string; zhihuTaskId: string; name: string }
+
+const channels = ref<ChannelOption[]>([])
+const tasks = ref<TaskOption[]>([])
+const form = ref({ keyword: '', taskId: '', channelId: '', landingUrl: '', name: '', dailyBudget: '10000' })
 
 const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
 const statusLabels: Record<string, string> = { active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝', archived: '已归档' }
@@ -28,13 +33,38 @@ async function load() {
   finally { loading.value = false }
 }
 
+async function openCreate() {
+  showModal.value = true
+  if (!channels.value.length || !tasks.value.length) {
+    try {
+      const [c, t] = await Promise.all([
+        apis.channels.list({ page: 1, pageSize: 100 }),
+        apis.story.listTasks({ page: 1, pageSize: 100 }),
+      ])
+      channels.value = c.list as unknown as ChannelOption[]
+      tasks.value = t.list as TaskOption[]
+    } catch { /* 下拉加载失败不阻塞打开 */ }
+  }
+}
+
 async function createPlan() {
-  if (!form.value.keyword.trim()) return
+  error.value = ''
+  if (!form.value.keyword.trim() || !form.value.taskId || !form.value.channelId || !form.value.landingUrl.trim()) {
+    error.value = '请完整填写任务、渠道、关键词和推广链接'
+    return
+  }
   try {
-    // TODO: 后端需要实现创建计划接口
-    await apis.plans.list({ page: 1, pageSize: 50 })
+    await apis.plans.create({
+      taskId: form.value.taskId,
+      channelId: form.value.channelId,
+      keyword: form.value.keyword.trim(),
+      landingUrl: form.value.landingUrl.trim(),
+      popularizeType: 0,
+      name: form.value.name.trim() || null,
+      dailyBudget: form.value.dailyBudget ? Number(form.value.dailyBudget) : null,
+    })
     showModal.value = false
-    form.value = { keyword: '', channel: '知乎信息流', dailyBudget: '10000', status: 'draft' }
+    form.value = { keyword: '', taskId: '', channelId: '', landingUrl: '', name: '', dailyBudget: '10000' }
     await load()
   } catch (e: any) { error.value = e?.message ?? String(e) }
 }
@@ -66,7 +96,7 @@ onMounted(load)
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
           刷新
         </button>
-        <button class="primary-action" @click="showModal = true">
+        <button class="primary-action" @click="openCreate">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           创建计划
         </button>
@@ -133,24 +163,37 @@ onMounted(load)
         <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
           <form class="form-grid" @submit.prevent="createPlan" style="gap: 16px;">
-            <div>
-              <label>关键词</label>
-              <input v-model="form.keyword" placeholder="输入推广关键词" required />
+            <div class="full-span">
+              <label>推广任务</label>
+              <select v-model="form.taskId" required>
+                <option value="" disabled>选择推广任务</option>
+                <option v-for="t in tasks" :key="t.id" :value="t.zhihuTaskId">{{ t.name }}（{{ t.zhihuTaskId }}）</option>
+              </select>
+              <small v-if="!tasks.length" style="color: var(--ink-soft);">暂无任务，请先在「系统工具 → 数据处理」同步任务</small>
+            </div>
+            <div class="full-span">
+              <label>推广渠道</label>
+              <select v-model="form.channelId" required>
+                <option value="" disabled>选择推广渠道</option>
+                <option v-for="c in channels" :key="c.id" :value="c.zhihuChannelId">{{ c.name }}（{{ c.zhihuChannelId }}）</option>
+              </select>
             </div>
             <div>
-              <label>渠道</label>
-              <input v-model="form.channel" placeholder="知乎信息流" />
+              <label>关键词</label>
+              <input v-model="form.keyword" placeholder="用户搜索这个词会命中你的内容" required />
+              <small style="color: var(--ink-soft);">不能包含"推荐/小说"等通用词根，需独特词</small>
             </div>
             <div>
               <label>日预算（分）</label>
               <input v-model="form.dailyBudget" type="number" placeholder="10000" />
             </div>
-            <div>
-              <label>状态</label>
-              <select v-model="form.status">
-                <option value="draft">草稿</option>
-                <option value="active">立即投放</option>
-              </select>
+            <div class="full-span">
+              <label>推广链接</label>
+              <input v-model="form.landingUrl" type="url" placeholder="https://www.zhihu.com/..." required />
+            </div>
+            <div class="full-span">
+              <label>计划名称（可选）</label>
+              <input v-model="form.name" placeholder="便于识别的内部名称" />
             </div>
             <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
               <button type="submit" class="primary-action" style="flex: 1;">确认创建</button>

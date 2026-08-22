@@ -17,6 +17,7 @@ interface PlanRow extends RowDataPacket {
   id: string;
   owner_id: string;
   channel_id: string;
+  channel_name: string | null;
   keyword: string;
   zhihu_plan_id: string | null;
   sync_status: string;
@@ -134,7 +135,7 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM plans p WHERE ${clause}`, bindings);
   const list = await rows<PlanRow>(
-    `SELECT p.* FROM plans p WHERE ${clause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+    `SELECT p.*, c.name AS channel_name FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id WHERE ${clause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list: list.map(publicPlan), total: Number(count?.total ?? 0), page, pageSize };
@@ -142,7 +143,7 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
 
 export async function getPlan(user: AuthUser, id: string) {
   const scope = scopeFilter(user, 'p.owner_id');
-  const [plan] = await rows<PlanRow>(`SELECT p.* FROM plans p WHERE p.id = ? AND ${scope.clause} LIMIT 1`, [
+  const [plan] = await rows<PlanRow>(`SELECT p.*, c.name AS channel_name FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id WHERE p.id = ? AND ${scope.clause} LIMIT 1`, [
     id,
     ...scope.bindings,
   ]);

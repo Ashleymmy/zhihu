@@ -139,9 +139,22 @@ export function createPlansApi(http: HttpClient) {
   return {
     list: (params: PlanListReq = {}) => http.get<PageResp<Plan>>('/plans', params),
     get: (id: string) => http.get<Plan>(`/plans/${id}`),
+    create: (data: {
+      taskId: string
+      channelId: string
+      secondChannelId?: string | null
+      keyword: string
+      landingUrl: string
+      popularizeType: number
+      name?: string | null
+      dailyBudget?: number | null
+      startDate?: string | null
+      endDate?: string | null
+      ownerId?: string
+    }) => http.post<Plan>('/plans', data),
     update: (id: string, data: UpdatePlanReq) => http.put<Plan>(`/plans/${id}`, data),
     remove: (id: string) => http.del<void>(`/plans/${id}`),
-    retry: (id: string) => http.post<Plan>(`/plans/${id}/retry`),
+    retry: (id: string) => http.post<Plan>(`/plans/${id}/retry-sync`),
   }
 }
 
