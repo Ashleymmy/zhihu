@@ -4,6 +4,7 @@ import { requireAuth } from '../auth/middleware';
 import { requirePermission } from '../auth/permissions';
 import { asyncHandler } from '../middleware/errors';
 import { blockLegacyWithdrawalWrites } from '../middleware/financeGate';
+import { sensitiveWriteLimit } from '../middleware/apiRateLimit';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { approveWithdrawal, createWithdrawal, listWithdrawals, rejectWithdrawal } from '../services/earnings.service';
 import { paginationSchema } from '../utils/pagination';
@@ -27,6 +28,7 @@ withdrawalsRouter.get(
 );
 withdrawalsRouter.post(
   '/',
+  sensitiveWriteLimit,
   requirePermission('withdraw.apply'),
   blockLegacyWithdrawalWrites,
   validateBody(create),
@@ -34,6 +36,7 @@ withdrawalsRouter.post(
 );
 withdrawalsRouter.post(
   '/:id/approve',
+  sensitiveWriteLimit,
   requirePermission('withdraw.approve'),
   blockLegacyWithdrawalWrites,
   asyncHandler(async (req, res) => ok(res, await approveWithdrawal(req.user, id.parse(req.params.id), req.ip))),

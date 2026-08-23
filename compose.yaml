@@ -87,6 +87,59 @@ services:
     networks:
       - app_network
 
+  # 数据库每日备份（凌晨 3 点，保留 14 天）
+  backup:
+    image: mysql:8.0
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env.docker}
+    entrypoint: |
+      sh -c '
+        apk add --no-cache dcron >/dev/null 2>&1 || true
+        echo "0 3 * * * mysqldump -h mysql -u root -p\"$$MYSQL_ROOT_PASSWORD\" --single-transaction --routines --triggers $$MYSQL_DATABASE | gzip > /backups/zhihu-koc-\$$(date +\%Y\%m\%d).sql.gz && find /backups -name \"*.sql.gz\" -mtime +14 -delete" > /etc/crontabs/root
+        crond -f -l 2
+      '
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # Prometheus 指标采集
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - app_network
+
+  # Grafana 监控面板
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?请在 .env.docker 中设置 GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./deploy/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./deploy/grafana-dashboard.json:/var/lib/grafana/dashboards/zhihu-koc.json:ro
+    ports:
+      - "${GRAFANA_PORT:-3100}:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - app_network
+
 networks:
   app_network:
     driver: bridge
@@ -94,3 +147,6 @@ networks:
 volumes:
   mysql_data:
   redis_data:
+  backup_data:
+  prometheus_data:
+  grafana_data:

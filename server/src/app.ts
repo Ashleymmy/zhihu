@@ -20,16 +20,25 @@ import { zhihuContentRouter } from './routes/zhihu-content';
 import { withdrawalsRouter } from './routes/withdrawals';
 import { errorHandler, notFound } from './middleware/errors';
 import { registerJobs } from './jobs';
+import { pinoHttp } from 'pino-http';
+import { httpLoggerOptions } from './utils/logger';
+import { metricsHandler, metricsMiddleware } from './utils/metrics';
+import { apiRateLimit } from './middleware/apiRateLimit';
 
 export function createApp() {
   registerJobs();
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  // 结构化请求日志 + Prometheus 指标
+  app.use(pinoHttp(httpLoggerOptions));
+  app.use(metricsMiddleware);
+  app.get('/metrics', metricsHandler);
   app.use('/api/alliance/api', allianceRouter); // 知乎联盟 API 透传必须先于全局 JSON parser
   app.use(express.json({ limit: '1mb' }));
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1', apiRateLimit());
   app.use('/api/v1/mcn-accounts', mcnRouter);
   app.use('/api/v1/projects', projectsRouter);
   app.use('/api/v1/meta', metaRouter);

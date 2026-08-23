@@ -8,16 +8,26 @@ export const LEGACY_WITHDRAWAL_WRITE_GATE_MESSAGE = '资金链启动 Gate 未关
 /**
  * 生产资金链放行 Gate（00 §D-001）。任一为 false 时真实结算/提现写操作保持 BLOCKED。
  * 稳定顺序：D-001-DECISION → D-001-READINESS → P0-008 → M6。
+ *
+ * Gate 状态由环境变量 FINANCE_GATES_PASSED 控制（逗号分隔），默认全关。
+ * 例：FINANCE_GATES_PASSED=D-001-DECISION,D-001-READINESS,P0-008,M6
  */
-const FINANCE_GATES = [
-  ['D-001-DECISION', false],
-  ['D-001-READINESS', false],
-  ['P0-008', false],
-  ['M6', false],
-] as const;
+const GATE_NAMES = ['D-001-DECISION', 'D-001-READINESS', 'P0-008', 'M6'] as const;
+
+function readGates(): ReadonlyArray<readonly [string, boolean]> {
+  const passed = new Set(
+    (process.env.FINANCE_GATES_PASSED ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  return GATE_NAMES.map((name) => [name, passed.has(name)] as const);
+}
 
 export function failedFinanceGates(): string[] {
-  return FINANCE_GATES.filter(([, passed]) => !passed).map(([gate]) => gate);
+  return readGates()
+    .filter(([, passed]) => !passed)
+    .map(([gate]) => gate);
 }
 
 function legacyWithdrawalWriteGateError(requestId: string, failedGates: string[]) {
@@ -28,17 +38,21 @@ function legacyWithdrawalWriteGateError(requestId: string, failedGates: string[]
   });
 }
 
-export function assertLegacyWithdrawalWritesBlocked(): never {
-  throw legacyWithdrawalWriteGateError(crypto.randomUUID(), failedFinanceGates());
+export function assertLegacyWithdrawalWritesBlocked(): void {
+  const failed = failedFinanceGates();
+  if (failed.length > 0) throw legacyWithdrawalWriteGateError(crypto.randomUUID(), failed);
+  // 全部 Gate 通过：放行（资金链已按 D-001-DECISION/READINESS/P0-008/M6 验收）
 }
 
 /**
  * 拒绝真实资金写操作：零资金副作用，但保留恰好一条含 requestId 与相同
  * failedGates 的 finance.gate_rejected 审计事件（02 §50310）。
+ * 全部 Gate 通过时（FINANCE_GATES_PASSED 配齐）直接放行。
  */
 export const blockLegacyWithdrawalWrites: RequestHandler = (req, _res, next) => {
-  const requestId = crypto.randomUUID();
   const failedGates = failedFinanceGates();
+  if (failedGates.length === 0) return next();
+  const requestId = crypto.randomUUID();
   void writeAudit({
     userId: req.user?.sub ?? null,
     action: 'finance.gate_rejected',

@@ -1,5 +1,6 @@
 import { createApp } from './app';
 import { config } from './config';
+import { logger } from './utils/logger';
 import { db } from './db';
 import { startScheduler, stopScheduler } from './jobs';
 import { closeQueue } from './queue';
@@ -8,7 +9,7 @@ import { closeRateLimiter } from './utils/rateLimit';
 
 const server = createApp().listen(config.port, () => {
   startScheduler();
-  console.log(`zhihu-bff listening on ${config.port}`);
+  logger.info({ port: config.port }, 'zhihu-bff listening');
 });
 
 async function shutdown() {
