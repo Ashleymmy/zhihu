@@ -1,19 +1,19 @@
 name: zhihu-koc
 
-# 生产环境：docker compose --env-file .env.docker up -d
-# 首次部署：cp .env.docker.example .env.docker 并填写所有必填项
+# 生产环境：docker compose up -d（.env 会被自动读取）
+# 首次部署：cp .env.docker.example .env 并填写所有必填项（.env 会被 compose 自动读取）
 
 services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-.env.docker}
+      - ${ENV_FILE:-.env}
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:?请在 .env.docker 中设置 MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER:?请在 .env.docker 中设置 MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env.docker 中设置 MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env.docker 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?请在 .env 中设置 MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER:?请在 .env 中设置 MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
       TZ: ${TZ:-Asia/Shanghai}
     command:
       - --character-set-server=utf8mb4
@@ -33,7 +33,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-.env.docker}
+      - ${ENV_FILE:-.env}
     command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
     volumes:
       - redis_data:/data
@@ -54,16 +54,16 @@ services:
     restart: unless-stopped
     init: true
     env_file:
-      - ${ENV_FILE:-.env.docker}
+      - ${ENV_FILE:-.env}
     environment:
       NODE_ENV: production
       PORT: 3000
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_NAME: ${MYSQL_DATABASE:?请在 .env.docker 中设置 MYSQL_DATABASE}
-      DB_USER: ${MYSQL_USER:?请在 .env.docker 中设置 MYSQL_USER}
-      DB_PASS: ${MYSQL_PASSWORD:?请在 .env.docker 中设置 MYSQL_PASSWORD}
-      REDIS_URL: redis://:${REDIS_PASSWORD:?请在 .env.docker 中设置 REDIS_PASSWORD}@redis:6379
+      DB_NAME: ${MYSQL_DATABASE:?请在 .env 中设置 MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER:?请在 .env 中设置 MYSQL_USER}
+      DB_PASS: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}@redis:6379
       QUEUE_DRIVER: bull
       TZ: ${TZ:-Asia/Shanghai}
     ports:
@@ -92,7 +92,7 @@ services:
     image: mysql:8.0
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-.env.docker}
+      - ${ENV_FILE:-.env}
     entrypoint: |
       sh -c '
         apk add --no-cache dcron >/dev/null 2>&1 || true
@@ -126,7 +126,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?请在 .env.docker 中设置 GRAFANA_PASSWORD}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?请在 .env 中设置 GRAFANA_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: 'false'
     volumes:
       - grafana_data:/var/lib/grafana
