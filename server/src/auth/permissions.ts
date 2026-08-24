@@ -4,6 +4,7 @@ import { Role } from '../types';
 
 export const ALL_PERMISSIONS = [
   'plan.create',
+  'catalog.sync',
   'plan.edit',
   'plan.delete',
   'keyword.bind',
@@ -34,6 +35,7 @@ export type Permission = (typeof ALL_PERMISSIONS)[number];
 const rolePermissions: Record<Role, readonly Permission[]> = {
   admin: ALL_PERMISSIONS,
   leader: [
+    'catalog.sync',
     'plan.create',
     'plan.edit',
     'plan.delete',
@@ -52,6 +54,7 @@ const rolePermissions: Record<Role, readonly Permission[]> = {
     'withdraw.apply',
   ],
   creator: [
+    'catalog.sync',
     'plan.create',
     'plan.edit',
     'plan.delete',

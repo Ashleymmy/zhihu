@@ -20,7 +20,7 @@ channelsRouter.get(
 );
 channelsRouter.post(
   '/sync',
-  requirePermission('project.manage'),
+  requirePermission('catalog.sync'),
   asyncHandler(async (req, res) => ok(res, await requestChannelSync(req.user), 202)),
 );
 channelsRouter.patch(

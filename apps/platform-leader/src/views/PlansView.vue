@@ -81,6 +81,19 @@ function pickChannel(c: ChannelOption) {
   if (form.value.keyword.trim()) onKeywordInput()
 }
 
+/** 渠道/任务目录同步（需要时可手动触发，通常每天自动跑一次） */
+const syncingCatalog = ref(false)
+const catalogSyncedAt = ref('')
+async function syncCatalog() {
+  syncingCatalog.value = true
+  error.value = ''
+  try {
+    await Promise.all([apis.channels.sync(), apis.story.syncTasks()])
+    catalogSyncedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    setTimeout(() => { syncingCatalog.value = false }, 6000)
+  } catch (e: any) { error.value = e?.message ?? String(e); syncingCatalog.value = false }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -157,6 +170,10 @@ onMounted(load)
         <h1>推广计划</h1>
       </div>
       <div class="page-actions">
+        <button class="ghost-aurora" :disabled="syncingCatalog" @click="syncCatalog">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
+          {{ syncingCatalog ? '同步中...' : '同步渠道/任务' }}
+        </button>
         <button class="ghost-aurora" @click="load">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
           刷新

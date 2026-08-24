@@ -22,7 +22,7 @@ tasksRouter.get(
 );
 tasksRouter.post(
   '/sync',
-  requirePermission('project.manage'),
+  requirePermission('catalog.sync'),
   validateQuery(syncQuery),
   asyncHandler(async (req, res) =>
     ok(res, await requestTaskSync(req.user, req.query.channelId as string | undefined), 202),
