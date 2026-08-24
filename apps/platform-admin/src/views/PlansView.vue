@@ -84,14 +84,32 @@ function pickChannel(c: ChannelOption) {
 /** 渠道/任务目录同步（需要时可手动触发，通常每天自动跑一次） */
 const syncingCatalog = ref(false)
 const catalogSyncedAt = ref('')
+const catalogMessage = ref('')
 async function syncCatalog() {
   syncingCatalog.value = true
   error.value = ''
+  catalogMessage.value = '同步任务已提交，正在从知乎拉取…'
   try {
     await Promise.all([apis.channels.sync(), apis.story.syncTasks()])
-    catalogSyncedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    setTimeout(() => { syncingCatalog.value = false }, 6000)
-  } catch (e: any) { error.value = e?.message ?? String(e); syncingCatalog.value = false }
+    // 同步是异步任务：等待执行后刷新目录与计划，并给出数量反馈
+    setTimeout(async () => {
+      try {
+        const [c, t] = await Promise.all([
+          apis.channels.list({ page: 1, pageSize: 100 }),
+          apis.story.listTasks({ page: 1, pageSize: 100 }),
+        ])
+        channels.value = c.list as unknown as ChannelOption[]
+        tasks.value = t.list as TaskOption[]
+        catalogMessage.value = `同步完成：${channels.value.length} 个渠道、${tasks.value.length} 个任务可用`
+        await load()
+      } catch { catalogMessage.value = '同步已提交，下拉数据稍后自动更新' }
+      syncingCatalog.value = false
+    }, 6000)
+  } catch (e: any) {
+    error.value = e?.message ?? String(e)
+    catalogMessage.value = ''
+    syncingCatalog.value = false
+  }
 }
 
 async function load() {
@@ -114,7 +132,7 @@ async function openCreate() {  showModal.value = true
       ])
       channels.value = c.list as unknown as ChannelOption[]
       tasks.value = t.list as TaskOption[]
-    } catch { /* 下拉加载失败不阻塞打开 */ }
+    } catch (e: any) { error.value = '渠道/任务目录加载失败：' + (e?.message ?? String(e)) }
   }
 }
 
@@ -186,6 +204,7 @@ onMounted(load)
     </header>
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="catalogMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 11px; color: var(--moss);">{{ catalogMessage }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">

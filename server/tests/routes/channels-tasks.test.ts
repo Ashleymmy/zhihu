@@ -48,12 +48,11 @@ describe('渠道与任务路由：权限边界', () => {
     expect(res.status).toBe(200);
   });
 
-  it('POST /channels/sync creator 被拒绝（403）', async () => {
+  it('POST /channels/sync creator 也允许（catalog.sync 下放）', async () => {
     const res = await request(app)
       .post('/api/v1/channels/sync')
       .set('Authorization', `Bearer ${await token('creator', '4')}`);
-    expect(res.status).toBe(403);
-    expect(dbMocks.withTransaction).not.toHaveBeenCalled();
+    expect(res.status).toBe(202);
   });
 
   it('POST /channels/sync admin 触达服务层（返回 202）', async () => {
@@ -93,11 +92,11 @@ describe('渠道与任务路由：权限边界', () => {
     expect(res.status).toBe(200);
   });
 
-  it('POST /tasks/sync creator 被拒绝（403）', async () => {
+  it('POST /tasks/sync creator 也允许（catalog.sync 下放）', async () => {
     const res = await request(app)
       .post('/api/v1/tasks/sync')
       .set('Authorization', `Bearer ${await token('creator', '4')}`);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(202);
   });
 
   it('GET /tasks/:id 不存在返回 404', async () => {

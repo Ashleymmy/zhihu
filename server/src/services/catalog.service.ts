@@ -9,22 +9,10 @@ import { writeAudit } from './audit.service';
 interface CountRow extends RowDataPacket {
   total: number;
 }
-export function channelVisibility(user: AuthUser) {
-  if (user.role === 'creator') {
-    return {
-      clause:
-        "(c.owner_id=? OR c.owner_id=? OR EXISTS (SELECT 1 FROM plans p WHERE p.channel_id=c.zhihu_channel_id AND p.owner_id=? AND p.status<>'ended'))",
-      bindings: [user.sub, user.parentId, user.sub],
-    };
-  }
-  if (user.role === 'leader') {
-    const scope = scopeFilter(user, 'p.owner_id');
-    return {
-      clause: `(c.owner_id IN (SELECT id FROM users WHERE parent_id=? OR id=?) OR EXISTS (SELECT 1 FROM plans p WHERE p.channel_id=c.zhihu_channel_id AND ${scope.clause} AND p.status<>'ended'))`,
-      bindings: [user.sub, user.sub, ...scope.bindings],
-    };
-  }
-  return { clause: '1=1', bindings: [] };
+export function channelVisibility(_user: AuthUser) {
+  // 渠道是本知乎账号的共享基础设施：所有登录用户可读（密钥永不下发，仅返回目录字段）。
+  // 若未来引入多账号（多租户）再恢复按归属的可见性收敛。
+  return { clause: '1=1', bindings: [] as unknown[] };
 }
 export async function listChannels(user: AuthUser, query: Record<string, unknown>) {
   const page = Number(query.page ?? 1),

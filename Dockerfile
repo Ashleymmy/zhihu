@@ -57,4 +57,4 @@ USER node
 EXPOSE 3000
 
 # 启动即迁移，再起服务
-CMD ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
+CMD ["sh", "-c", "node dist/scripts/migrate.js && node dist/scripts/bootstrap.js && exec node dist/src/index.js"]
