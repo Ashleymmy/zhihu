@@ -6,11 +6,11 @@ import { sensitiveWriteLimit } from '../middleware/apiRateLimit';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody, validateQuery } from '../middleware/validate';
 import {
-  applyWithdrawal,
-  cancelWithdrawal,
-  decideWithdrawal,
-  listWithdrawals,
-  reviewWithdrawal,
+  cancelAppeal,
+  decideAppeal,
+  listAppeals,
+  reviewAppeal,
+  submitAppeal,
 } from '../services/finance-approvals.service';
 import { paginationSchema } from '../utils/pagination';
 import { ok, okList } from '../utils/response';
@@ -20,66 +20,65 @@ const list = paginationSchema.extend({
   status: z.enum(['pending', 'leader_approved', 'approved', 'rejected', 'cancelled']).optional(),
 });
 const create = z.object({
-  amount: z.number().positive(),
-  payMethod: z.enum(['alipay', 'wechat']),
-  payAccount: z.string().min(1).max(128),
+  kind: z.enum(['补款', '扣款', '结算异议', '其他']),
+  title: z.string().trim().min(1).max(128),
+  content: z.string().trim().min(1).max(2000),
+  evidence: z.string().trim().max(2000).nullable().optional(),
 });
 const review = z.object({
   action: z.enum(['approve', 'reject']),
   remark: z.string().trim().max(512).nullable().optional(),
 });
+const decide = review.extend({
+  adjustAmount: z.number().int().min(-100000000).max(100000000).nullable().optional(),
+});
 
-export const withdrawalsRouter = Router();
-withdrawalsRouter.use(requireAuth);
+export const appealsRouter = Router();
+appealsRouter.use(requireAuth);
 
-/** 列表（按角色分流） */
-withdrawalsRouter.get(
+appealsRouter.get(
   '/',
   validateQuery(list),
   asyncHandler(async (req, res) => {
-    const data = await listWithdrawals(req.user, req.query);
+    const data = await listAppeals(req.user, req.query);
     okList(res, data.list, data.total, data.page, data.pageSize);
   }),
 );
 
-/** 成员/团长提交提现申请（自动风控标记） */
-withdrawalsRouter.post(
+/** 成员提交财务申诉 */
+appealsRouter.post(
   '/',
   sensitiveWriteLimit,
-  requirePermission('withdraw.apply'),
   validateBody(create),
-  asyncHandler(async (req, res) => ok(res, await applyWithdrawal(req.user, req.body, req.ip), 201)),
+  asyncHandler(async (req, res) => ok(res, await submitAppeal(req.user, req.body, req.ip), 201)),
 );
 
-/** 成员撤销（初审前） */
-withdrawalsRouter.post(
+appealsRouter.post(
   '/:id/cancel',
   asyncHandler(async (req, res) => {
-    await cancelWithdrawal(req.user, id.parse(req.params.id), req.ip);
+    await cancelAppeal(req.user, id.parse(req.params.id), req.ip);
     ok(res, null);
   }),
 );
 
-/** 团长初审 */
-withdrawalsRouter.post(
+appealsRouter.post(
   '/:id/review',
   sensitiveWriteLimit,
   requirePermission('withdraw.review'),
   validateBody(review),
   asyncHandler(async (req, res) => {
-    await reviewWithdrawal(req.user, id.parse(req.params.id), req.body.action, req.body.remark ?? null, req.ip);
+    await reviewAppeal(req.user, id.parse(req.params.id), req.body.action, req.body.remark ?? null, req.ip);
     ok(res, null);
   }),
 );
 
-/** 管理员终审 + 放款 */
-withdrawalsRouter.post(
+appealsRouter.post(
   '/:id/decide',
   sensitiveWriteLimit,
   requirePermission('withdraw.approve'),
-  validateBody(review),
+  validateBody(decide),
   asyncHandler(async (req, res) => {
-    await decideWithdrawal(req.user, id.parse(req.params.id), req.body.action, req.body.remark ?? null, req.ip);
+    await decideAppeal(req.user, id.parse(req.params.id), req.body.action, req.body.remark ?? null, req.body.adjustAmount ?? null, req.ip);
     ok(res, null);
   }),
 );

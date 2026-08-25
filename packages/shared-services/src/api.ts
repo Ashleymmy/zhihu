@@ -1,4 +1,7 @@
 import type {
+  Appeal,
+  AppealKind,
+  AppealStatus,
   CallbackRule,
   CallbackSecret,
   AddProjectCourseReq,
@@ -190,9 +193,29 @@ export function createWithdrawalsApi(http: HttpClient) {
     list: (params: { page?: number; pageSize?: number; status?: WithdrawalStatus } = {}) =>
       http.get<PageResp<Withdrawal>>('/withdrawals', params),
     /** 财务链未开放时服务端以 50310 拒绝（failedGates 透传到 ApiError）。 */
-    apply: (data: CreateWithdrawalReq) => http.post<Withdrawal>('/withdrawals', data),
-    approve: (id: string) => http.post<Withdrawal>(`/withdrawals/${id}/approve`),
-    reject: (id: string, remark: string) => http.post<Withdrawal>(`/withdrawals/${id}/reject`, { remark }),
+    apply: (data: CreateWithdrawalReq) => http.post<{ id: string; status: WithdrawalStatus; riskFlags: string[] }>('/withdrawals', data),
+    /** 成员撤销（初审前） */
+    cancel: (id: string) => http.post<void>(`/withdrawals/${id}/cancel`),
+    /** 团长初审 */
+    review: (id: string, action: 'approve' | 'reject', remark?: string) =>
+      http.post<void>(`/withdrawals/${id}/review`, { action, remark }),
+    /** 管理员终审 */
+    decide: (id: string, action: 'approve' | 'reject', remark?: string) =>
+      http.post<void>(`/withdrawals/${id}/decide`, { action, remark }),
+  }
+}
+
+export function createAppealsApi(http: HttpClient) {
+  return {
+    list: (params: { page?: number; pageSize?: number; status?: AppealStatus } = {}) =>
+      http.get<PageResp<Appeal>>('/appeals', params),
+    submit: (data: { kind: AppealKind; title: string; content: string; evidence?: string | null }) =>
+      http.post<{ id: string }>('/appeals', data),
+    cancel: (id: string) => http.post<void>(`/appeals/${id}/cancel`),
+    review: (id: string, action: 'approve' | 'reject', remark?: string) =>
+      http.post<void>(`/appeals/${id}/review`, { action, remark }),
+    decide: (id: string, action: 'approve' | 'reject', remark?: string, adjustAmount?: number | null) =>
+      http.post<void>(`/appeals/${id}/decide`, { action, remark, adjustAmount }),
   }
 }
 
@@ -295,6 +318,7 @@ export interface ApiBundle {
   channels: ReturnType<typeof createChannelsApi>
   earnings: ReturnType<typeof createEarningsApi>
   withdrawals: ReturnType<typeof createWithdrawalsApi>
+  appeals: ReturnType<typeof createAppealsApi>
   story: ReturnType<typeof createZhihuStoryApi>
   finance: ReturnType<typeof createFinanceApi>
   adminTools: ReturnType<typeof createAdminToolsApi>
@@ -313,6 +337,7 @@ export function createApis(http: HttpClient): ApiBundle {
     channels: createChannelsApi(http),
     earnings: createEarningsApi(http),
     withdrawals: createWithdrawalsApi(http),
+    appeals: createAppealsApi(http),
     story: createZhihuStoryApi(http),
     finance: createFinanceApi(http),
     adminTools: createAdminToolsApi(http),

@@ -19,6 +19,8 @@ export function createAppRouter() {
           { path: '', redirect: '/dashboard' },
           { path: 'dashboard', name: 'dashboard', component: () => import('./views/DashboardView.vue'), meta: { title: '数据看板' } },
           { path: 'orders', name: 'orders', component: () => import('./views/OrdersView.vue'), meta: { title: '订单管理' } },
+          { path: 'withdrawals', name: 'withdrawals', component: () => import('./views/WithdrawalsView.vue'), meta: { title: '提现审批' } },
+          { path: 'appeals', name: 'appeals', component: () => import('./views/AppealsView.vue'), meta: { title: '财务申诉' } },
           { path: 'settlements', name: 'settlements', component: () => import('./views/SettlementView.vue'), meta: { title: '结算中心' } },
           { path: 'plans', name: 'plans', component: () => import('./views/PlansView.vue'), meta: { title: '推广计划' } },
           { path: 'keywords', name: 'keywords', component: () => import('./views/KeywordsView.vue'), meta: { title: '关键词回传' } },

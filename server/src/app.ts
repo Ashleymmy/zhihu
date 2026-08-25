@@ -18,6 +18,7 @@ import { relayRouter } from './routes/relay';
 import { adminToolsRouter, announcementsRouter, auditLogsRouter } from './routes/admin-tools';
 import { zhihuContentRouter } from './routes/zhihu-content';
 import { withdrawalsRouter } from './routes/withdrawals';
+import { appealsRouter } from './routes/appeals';
 import { errorHandler, notFound } from './middleware/errors';
 import { registerJobs } from './jobs';
 import { pinoHttp } from 'pino-http';
@@ -48,6 +49,7 @@ export function createApp() {
   app.use('/api/v1/compositions', compositionsRouter);
   app.use('/api/v1/earnings', earningsRouter);
   app.use('/api/v1/withdrawals', withdrawalsRouter);
+  app.use('/api/v1/appeals', appealsRouter);
   app.use('/api/v1/channels', channelsRouter);
   app.use('/api/v1/tasks', tasksRouter);
   app.use('/api/v1/callbacks', callbacksRouter);

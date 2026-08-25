@@ -23,6 +23,7 @@ export function createAppRouter() {
           { path: 'orders', name: 'orders', component: () => import('./views/OrdersView.vue'), meta: { title: '订单管理' } },
           // ── 结算管理 ──
           { path: 'settlements', name: 'settlements', component: () => import('./views/SettlementView.vue'), meta: { title: '结算管理' } },
+          { path: 'appeals', name: 'appeals', component: () => import('./views/AppealsView.vue'), meta: { title: '财务申诉' } },
           { path: 'withdrawals', name: 'withdrawals', component: () => import('./views/WithdrawalsView.vue'), meta: { title: '提现审批' } },
           // ── 推广管理 ──
           { path: 'plans', name: 'plans', component: () => import('./views/PlansView.vue'), meta: { title: '推广计划' } },

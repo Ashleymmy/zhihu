@@ -24,6 +24,7 @@ export const ALL_PERMISSIONS = [
   'earning.view_team',
   'earning.view_all',
   'withdraw.apply',
+  'withdraw.review',
   'withdraw.approve',
   'project.manage',
   'finance.relay',
@@ -52,6 +53,7 @@ const rolePermissions: Record<Role, readonly Permission[]> = {
     'earning.view_self',
     'earning.view_team',
     'withdraw.apply',
+    'withdraw.review',
   ],
   creator: [
     'catalog.sync',

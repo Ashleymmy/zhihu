@@ -31,6 +31,7 @@ const navigation: NavGroup[] = [
       { key: 'orders', label: '订单管理', path: '/orders' },
       { key: 'settlements', label: '结算管理', path: '/settlements' },
       { key: 'withdrawals', label: '提现审批', path: '/withdrawals' },
+      { key: 'appeals', label: '财务申诉', path: '/appeals' },
       { key: 'earnings', label: '收益结算', path: '/earnings' },
     ],
   },

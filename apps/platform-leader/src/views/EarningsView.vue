@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { EarningRecord, EarningsSummary, Withdrawal } from '@zhihu-koc/shared-contracts'
+import type { EarningRecord, EarningsSummary } from '@zhihu-koc/shared-contracts'
 import { DEFAULT_LOCALE, createTranslator, type MessageKey } from '@zhihu-koc/shared-i18n'
 import { isApiError, type ApiError } from '@zhihu-koc/shared-services'
 import { FinanceGateBanner, StatCard, DonutChart, LineChart } from '@zhihu-koc/shared-components'
@@ -12,12 +12,9 @@ const t = createTranslator(DEFAULT_LOCALE)
 
 const summary = ref<EarningsSummary | null>(null)
 const earnings = ref<EarningRecord[]>([])
-const withdrawals = ref<Withdrawal[]>([])
 const errorMessage = ref('')
 const financeGate = ref<ApiError | null>(null)
 
-const canApprove = APP_ROLE === 'admin'
-const canApply = APP_ROLE !== 'admin'
 
 /* ===== 图表数据 ===== */
 const statusSlices = computed(() => {
@@ -40,10 +37,6 @@ const dailySeries = computed(() => {
   return { labels: days, points: days.map((d) => byDate.get(d) ?? 0) }
 })
 
-const applyAmountYuan = ref('')
-const applyMethod = ref<'alipay' | 'wechat'>('alipay')
-const applyAccount = ref('')
-const rejectRemark = ref('')
 
 function captureError(error: unknown) {
   if (isApiError(error) && error.code === 50310) {
@@ -56,56 +49,15 @@ function captureError(error: unknown) {
 
 async function load() {
   try {
-    ;[summary.value, earnings.value, withdrawals.value] = await Promise.all([
+    ;[summary.value, earnings.value] = await Promise.all([
       apis.earnings.summary(),
       apis.earnings.list({ pageSize: 20 }).then((data) => data.list),
-      apis.withdrawals.list({ pageSize: 20 }).then((data) => data.list),
     ])
   } catch (error) {
     captureError(error)
   }
 }
 
-async function apply() {
-  const yuan = Number(applyAmountYuan.value)
-  if (!Number.isFinite(yuan) || yuan <= 0 || !applyAccount.value.trim()) return
-  errorMessage.value = ''
-  financeGate.value = null
-  try {
-    await apis.withdrawals.apply({
-      amount: Math.round(yuan * 100),
-      payMethod: applyMethod.value,
-      payAccount: applyAccount.value.trim(),
-    })
-    await load()
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-async function approve(id: string) {
-  errorMessage.value = ''
-  financeGate.value = null
-  try {
-    await apis.withdrawals.approve(id)
-    await load()
-  } catch (error) {
-    captureError(error)
-  }
-}
-
-async function reject(id: string) {
-  if (!rejectRemark.value.trim()) return
-  errorMessage.value = ''
-  financeGate.value = null
-  try {
-    await apis.withdrawals.reject(id, rejectRemark.value.trim())
-    rejectRemark.value = ''
-    await load()
-  } catch (error) {
-    captureError(error)
-  }
-}
 
 onMounted(load)
 </script>
@@ -172,53 +124,8 @@ onMounted(load)
 
     <section class="panel">
       <h2>{{ t('withdrawals.title') }}</h2>
-
-      <form v-if="canApply" class="withdraw-form" @submit.prevent="apply">
-        <input v-model="applyAmountYuan" :placeholder="t('withdrawals.amount')" data-testid="withdraw-amount" />
-        <select v-model="applyMethod">
-          <option value="alipay">{{ t('withdrawals.methodMap.alipay') }}</option>
-          <option value="wechat">{{ t('withdrawals.methodMap.wechat') }}</option>
-        </select>
-        <input v-model="applyAccount" :placeholder="t('withdrawals.payAccount')" data-testid="withdraw-account" />
-        <button type="submit" data-testid="withdraw-apply">{{ t('withdrawals.apply') }}</button>
-      </form>
-
-      <p v-if="!withdrawals.length" class="page-placeholder">{{ t('withdrawals.empty') }}</p>
-      <table v-else class="panel__table">
-        <thead>
-          <tr>
-            <th>{{ t('earnings.amount') }}</th>
-            <th>{{ t('withdrawals.payMethod') }}</th>
-            <th>{{ t('withdrawals.payAccount') }}</th>
-            <th>{{ t('plans.status') }}</th>
-            <th>{{ t('projects.createdAt') }}</th>
-            <th v-if="canApprove"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in withdrawals" :key="item.id">
-            <td>{{ formatCurrency(item.amount) }}</td>
-            <td>{{ t(`withdrawals.methodMap.${item.payMethod}` as MessageKey) }}</td>
-            <td>{{ item.payAccount }}</td>
-            <td>
-              {{ t(`withdrawals.statusMap.${item.status}` as MessageKey) }}
-              <small v-if="item.remark" class="withdraw-remark">{{ item.remark }}</small>
-            </td>
-            <td>{{ formatDate(item.createdAt) }}</td>
-            <td v-if="canApprove" class="withdraw-actions">
-              <template v-if="item.status === 'pending'">
-                <button type="button" data-testid="withdraw-approve" @click="approve(item.id)">
-                  {{ t('withdrawals.approve') }}
-                </button>
-                <input v-model="rejectRemark" :placeholder="t('withdrawals.rejectRemark')" />
-                <button type="button" class="withdraw-actions__danger" @click="reject(item.id)">
-                  {{ t('withdrawals.reject') }}
-                </button>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <p class="page-placeholder">提现申请与审批已迁移至「提现审批」页（二级审批：团长初审 → 管理员终审放款）。</p>
+      <router-link to="/withdrawals" class="withdraw-link">前往提现审批 →</router-link>
     </section>
   </section>
 </template>
@@ -387,4 +294,5 @@ onMounted(load)
 .withdraw-actions__danger:hover {
   background: #f1ded9;
 }
+.withdraw-link { display: inline-block; margin-top: 8px; color: var(--clay-deep); font-size: 12px; font-weight: 600; }
 </style>

@@ -463,7 +463,7 @@ export interface CallbackSecret {
   rotatedAt: string
 }
 
-export type WithdrawalStatus = 'pending' | 'approved' | 'rejected'
+export type WithdrawalStatus = 'pending' | 'leader_approved' | 'approved' | 'rejected' | 'cancelled'
 
 export interface Withdrawal {
   id: string
@@ -473,8 +473,40 @@ export interface Withdrawal {
   payAccount: string
   status: WithdrawalStatus
   remark: string | null
+  leaderRemark: string | null
+  /** 自动风控标记：high_freq / new_account_large / zero_data_large */
+  riskFlags: string[] | null
+  applicantUsername: string
+  applicantName: string
+  leaderName: string | null
+  leaderHandledAt: string | null
+  handledAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/* ===== 财务申诉（二级审批）===== */
+
+export type AppealStatus = 'pending' | 'leader_approved' | 'approved' | 'rejected' | 'cancelled'
+export type AppealKind = '补款' | '扣款' | '结算异议' | '其他'
+
+export interface Appeal {
+  id: string
+  kind: AppealKind
+  title: string
+  content: string
+  evidence: string | null
+  status: AppealStatus
+  remark: string | null
+  leaderRemark: string | null
+  /** 终审调账金额（分，正=补发，负=扣款） */
+  adjustAmount: number | null
+  applicantUsername: string
+  applicantName: string
+  leaderName: string | null
+  leaderHandledAt: string | null
+  handledAt: string | null
+  createdAt: string
 }
 
 export interface CreateWithdrawalReq {
