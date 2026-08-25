@@ -107,7 +107,7 @@ onMounted(async () => {
       <button class="row-action" @click="exportLogs">导出 CSV</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel" style="padding: 20px;">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
@@ -156,19 +156,19 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="log in logs" :key="log.id">
-              <td style="font-size: 10px; color: var(--ink-soft); font-family: var(--font-mono);">{{ new Date(log.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft); font-family: var(--font-mono);">{{ new Date(log.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</td>
               <td><strong>{{ log.operatorName ?? log.operatorUsername ?? '系统' }}</strong></td>
               <td><span class="status-badge draft">{{ actionLabel(log.action) }}</span></td>
-              <td style="font-family: var(--font-mono); font-size: 10px;">{{ log.resourceType }}{{ log.resourceId ? ` #${log.resourceId}` : '' }}</td>
-              <td style="font-size: 11px; color: var(--ink-soft); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ detailText(log) }}</td>
-              <td style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft);">{{ log.ip ?? '—' }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px;">{{ log.resourceType }}{{ log.resourceId ? ` #${log.resourceId}` : '' }}</td>
+              <td style="font-size: 13px; color: var(--ink-soft); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ detailText(log) }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft);">{{ log.ip ?? '—' }}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div v-if="total > 50" style="display: flex; justify-content: center; gap: 10px; padding: 14px; border-top: 1px solid var(--line);">
         <button class="row-action" :disabled="page <= 1" @click="page--; load()">上一页</button>
-        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); align-self: center;">{{ page }} / {{ Math.ceil(total / 50) }}</span>
+        <span style="font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); align-self: center;">{{ page }} / {{ Math.ceil(total / 50) }}</span>
         <button class="row-action" :disabled="page * 50 >= total" @click="page++; load()">下一页</button>
       </div>
     </article>

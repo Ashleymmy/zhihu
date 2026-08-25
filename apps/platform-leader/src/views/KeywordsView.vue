@@ -46,7 +46,7 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 路径说明 -->
     <section class="workflow-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -56,7 +56,7 @@ onMounted(load)
         </div>
         <p class="eyebrow" style="margin-bottom: 4px;">01</p>
         <h3 style="margin: 0 0 4px; font-size: 14px;">词条</h3>
-        <p style="margin: 0; font-size: 11px; color: var(--ink-soft);">绑定推广关键词</p>
+        <p style="margin: 0; font-size: 13px; color: var(--ink-soft);">绑定推广关键词</p>
       </article>
       <article class="panel" style="padding: 20px; text-align: center;">
         <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--forest); background: #dbe9db; margin: 0 auto 12px;">
@@ -64,7 +64,7 @@ onMounted(load)
         </div>
         <p class="eyebrow" style="margin-bottom: 4px;">02</p>
         <h3 style="margin: 0 0 4px; font-size: 14px;">知乎内容</h3>
-        <p style="margin: 0; font-size: 11px; color: var(--ink-soft);">关联知乎推广内容</p>
+        <p style="margin: 0; font-size: 13px; color: var(--ink-soft);">关联知乎推广内容</p>
       </article>
       <article class="panel" style="padding: 20px; text-align: center;">
         <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--clay); background: #f1ded9; margin: 0 auto 12px;">
@@ -72,7 +72,7 @@ onMounted(load)
         </div>
         <p class="eyebrow" style="margin-bottom: 4px;">03</p>
         <h3 style="margin: 0 0 4px; font-size: 14px;">回传事件</h3>
-        <p style="margin: 0; font-size: 11px; color: var(--ink-soft);">配置转化回传</p>
+        <p style="margin: 0; font-size: 13px; color: var(--ink-soft);">配置转化回传</p>
       </article>
     </section>
 

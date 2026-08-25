@@ -53,7 +53,7 @@ onMounted(load)
       <button class="primary-action" @click="showCreate = true">发布公告</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">

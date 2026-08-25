@@ -42,7 +42,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -70,13 +70,13 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="plan in plans" :key="plan.id">
-              <td><strong style="font-family: var(--font-mono); font-size: 10px;">{{ plan.id.slice(0, 8) }}</strong></td>
+              <td><strong style="font-family: var(--font-mono); font-size: 12px;">{{ plan.id.slice(0, 8) }}</strong></td>
               <td>{{ plan.keyword }}</td>
               <td>{{ plan.channelName }}</td>
               <td>{{ plan.ownerName }}</td>
               <td>{{ plan.dailyBudget != null ? fmt.format(plan.dailyBudget / 100) : '—' }}</td>
               <td><span :class="['status-badge', plan.status]">{{ statusLabels[plan.status] }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ new Date(plan.createdAt).toLocaleDateString('zh-CN') }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ new Date(plan.createdAt).toLocaleDateString('zh-CN') }}</td>
             </tr>
           </tbody>
         </table>

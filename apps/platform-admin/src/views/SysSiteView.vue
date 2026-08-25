@@ -60,8 +60,8 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="message" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 11px; color: var(--moss);">{{ message }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="message" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ message }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
@@ -70,7 +70,7 @@ onMounted(load)
           <div class="info-grid">
             <div class="info-item"><span>Node 版本</span><strong>{{ info?.node ?? '—' }}</strong></div>
             <div class="info-item"><span>运行时长</span><strong>{{ info ? fmtUptime(info.uptimeSec) : '—' }}</strong></div>
-            <div class="info-item"><span>知乎 API</span><strong style="font-family: var(--font-mono); font-size: 11px;">{{ info?.zhihuApiBase ?? '—' }}</strong></div>
+            <div class="info-item"><span>知乎 API</span><strong style="font-family: var(--font-mono); font-size: 13px;">{{ info?.zhihuApiBase ?? '—' }}</strong></div>
             <div class="info-item">
               <span>凭证模式</span>
               <span :class="['status-badge', info?.zhihuCredentialMode === 'real' ? 'active' : 'ended']">{{ info?.zhihuCredentialMode === 'real' ? '真实凭证' : 'Mock' }}</span>
@@ -85,7 +85,7 @@ onMounted(load)
         <div class="rail-form">
           <label>最低提现金额（元）</label>
           <input v-model="minAmount" type="number" min="0" step="0.01" />
-          <small style="color: var(--ink-soft); font-size: 10px;">达人/团长发起提现的最低金额门槛，保存在项目配置中。</small>
+          <small style="color: var(--ink-soft); font-size: 12px;">达人/团长发起提现的最低金额门槛，保存在项目配置中。</small>
           <button class="primary-action" :disabled="saving" @click="saveMinAmount">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </aside>
@@ -97,8 +97,8 @@ onMounted(load)
 .info-grid { display: grid; gap: 0; margin-top: 12px; }
 .info-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .info-item:last-child { border-bottom: 0; }
-.info-item span { color: #737a80; font-size: 11px; }
+.info-item span { color: #737a80; font-size: 13px; }
 .info-item strong { font-size: 12px; font-weight: 500; }
 .rail-form { display: grid; gap: 10px; }
-.rail-form label { color: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.rail-form label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 </style>

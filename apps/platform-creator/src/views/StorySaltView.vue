@@ -58,7 +58,7 @@ onMounted(loadBoards)
       </select>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -73,9 +73,9 @@ onMounted(loadBoards)
           <tbody>
             <tr v-for="c in contents" :key="c.id">
               <td><strong>{{ c.title }}</strong></td>
-              <td style="font-size: 11px;">{{ c.contentType || '—' }}</td>
-              <td style="font-size: 11px;">{{ c.bayesFirstCategory || '—' }}</td>
-              <td style="font-size: 11px;">{{ c.theme || '—' }}</td>
+              <td style="font-size: 13px;">{{ c.contentType || '—' }}</td>
+              <td style="font-size: 13px;">{{ c.bayesFirstCategory || '—' }}</td>
+              <td style="font-size: 13px;">{{ c.theme || '—' }}</td>
               <td><span v-if="c.rCmdConsumeValue" class="status-badge paused">{{ c.rCmdConsumeValue }}</span><span v-else style="color: var(--ink-soft);">—</span></td>
               <td><a v-if="c.url" :href="c.url" target="_blank" class="row-action" style="text-decoration: none;">打开</a></td>
             </tr>

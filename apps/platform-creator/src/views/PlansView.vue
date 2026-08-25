@@ -203,8 +203,8 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="catalogMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 11px; color: var(--moss);">{{ catalogMessage }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="catalogMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ catalogMessage }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -244,7 +244,7 @@ onMounted(load)
                 <span :class="['status-badge', plan.syncStatus === 'synced' ? 'active' : plan.syncStatus === 'failed' ? 'rejected' : 'draft']">
                   {{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败' }[plan.syncStatus] }}
                 </span>
-                <small v-if="plan.syncError" style="display: block; margin-top: 4px; font-size: 9px; color: var(--clay);">{{ plan.syncError }}</small>
+                <small v-if="plan.syncError" style="display: block; margin-top: 4px; font-size: 11px; color: var(--clay);">{{ plan.syncError }}</small>
               </td>
               <td>
                 <div style="display: flex; gap: 6px;">
@@ -384,6 +384,6 @@ onMounted(load)
 .picker-option:last-child { border-bottom: 0; }
 .picker-option:hover { background: var(--paper-deep); }
 .picker-option strong { font-size: 12px; font-weight: 500; }
-.picker-meta { color: #7b8286; font-family: var(--font-mono); font-size: 10px; }
-.picker-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 11px; }
+.picker-meta { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
+.picker-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 13px; }
 </style>

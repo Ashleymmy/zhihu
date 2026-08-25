@@ -176,7 +176,7 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 定价规则 -->
     <article v-if="isAdmin"  class="panel data-panel">
@@ -192,9 +192,9 @@ onMounted(load)
           <tbody>
             <tr v-for="r in rules" :key="r.id">
               <td><strong>{{ r.targetName ? `${r.targetName}（${r.targetUsername}）` : (r.targetRole === 'leader' ? '全部团长' : '全部达人') }}</strong></td>
-              <td style="font-size: 11px;">{{ r.method === 'fixed' ? '固定单价' : '按比例' }}</td>
-              <td style="font-family: var(--font-mono); font-size: 11px;">{{ ruleText(r) }}</td>
-              <td style="font-family: var(--font-mono); font-size: 10px;">{{ r.priority }}</td>
+              <td style="font-size: 13px;">{{ r.method === 'fixed' ? '固定单价' : '按比例' }}</td>
+              <td style="font-family: var(--font-mono); font-size: 13px;">{{ ruleText(r) }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px;">{{ r.priority }}</td>
               <td><span :class="['status-badge', r.status === 'active' ? 'active' : 'ended']">{{ r.status === 'active' ? '生效中' : '已停用' }}</span></td>
               <td><button v-if="r.status === 'active'" class="row-action" @click="disableRule(r.id)">停用</button></td>
             </tr>
@@ -237,9 +237,9 @@ onMounted(load)
           <tbody>
             <tr v-for="b in batches" :key="b.id">
               <td><strong>{{ b.title }}</strong></td>
-              <td style="font-size: 11px;">{{ fmtDate(b.periodStart) }} ~ {{ fmtDate(b.periodEnd) }}</td>
-              <td style="font-family: var(--font-mono); font-size: 11px;">{{ yuan(b.totalSource) }}</td>
-              <td style="font-family: var(--font-mono); font-size: 11px;">{{ yuan(b.totalRelay) }}</td>
+              <td style="font-size: 13px;">{{ fmtDate(b.periodStart) }} ~ {{ fmtDate(b.periodEnd) }}</td>
+              <td style="font-family: var(--font-mono); font-size: 13px;">{{ yuan(b.totalSource) }}</td>
+              <td style="font-family: var(--font-mono); font-size: 13px;">{{ yuan(b.totalRelay) }}</td>
               <td><span :class="['status-badge', batchBadge[b.status]]">{{ batchStatus[b.status] }}</span></td>
               <td><button class="row-action" @click="openDetail(b.id)">详情</button></td>
             </tr>
@@ -367,7 +367,7 @@ onMounted(load)
             <div v-if="batchMode === 'xlsx'" class="form-field">
               <label>结算单文件</label>
               <input type="file" accept=".xlsx" @change="xlsxFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
-              <small style="color: var(--ink-soft); font-size: 10px;">模板：表头包含「达人用户名」「来源金额」两列（可选「备注」），每行一条达人归属金额。</small>
+              <small style="color: var(--ink-soft); font-size: 12px;">模板：表头包含「达人用户名」「来源金额」两列（可选「备注」），每行一条达人归属金额。</small>
             </div>
             <div v-else class="form-field">
               <label>明细（来源金额归属到达人）</label>
@@ -405,25 +405,25 @@ onMounted(load)
             </p>
             <p class="section-index quiet" style="margin-bottom: 8px;">明细</p>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-              <thead><tr style="text-align: left;"><th style="padding: 6px 0; font-size: 10px; color: var(--ink-soft);">达人</th><th style="font-size: 10px; color: var(--ink-soft);">来源金额</th><th style="font-size: 10px; color: var(--ink-soft);">备注</th></tr></thead>
+              <thead><tr style="text-align: left;"><th style="padding: 6px 0; font-size: 12px; color: var(--ink-soft);">达人</th><th style="font-size: 12px; color: var(--ink-soft);">来源金额</th><th style="font-size: 12px; color: var(--ink-soft);">备注</th></tr></thead>
               <tbody>
                 <tr v-for="i in detail.items" :key="i.id" style="border-top: 1px solid var(--paper-deep);">
                   <td style="padding: 8px 0; font-size: 12px;">{{ i.creatorName }}（{{ i.creatorUsername }}）</td>
-                  <td style="font-family: var(--font-mono); font-size: 11px;">{{ yuan(i.sourceAmount) }}</td>
-                  <td style="font-size: 11px; color: var(--ink-soft);">{{ i.note || '—' }}</td>
+                  <td style="font-family: var(--font-mono); font-size: 13px;">{{ yuan(i.sourceAmount) }}</td>
+                  <td style="font-size: 13px; color: var(--ink-soft);">{{ i.note || '—' }}</td>
                 </tr>
               </tbody>
             </table>
             <template v-if="detail.logs.length">
               <p class="section-index quiet" style="margin-bottom: 8px;">中继计算快照</p>
               <table style="width: 100%; border-collapse: collapse;">
-                <thead><tr style="text-align: left;"><th style="padding: 6px 0; font-size: 10px; color: var(--ink-soft);">接收方</th><th style="font-size: 10px; color: var(--ink-soft);">角色</th><th style="font-size: 10px; color: var(--ink-soft);">命中规则</th><th style="font-size: 10px; color: var(--ink-soft);">收益金额</th></tr></thead>
+                <thead><tr style="text-align: left;"><th style="padding: 6px 0; font-size: 12px; color: var(--ink-soft);">接收方</th><th style="font-size: 12px; color: var(--ink-soft);">角色</th><th style="font-size: 12px; color: var(--ink-soft);">命中规则</th><th style="font-size: 12px; color: var(--ink-soft);">收益金额</th></tr></thead>
                 <tbody>
                   <tr v-for="l in detail.logs" :key="l.id" style="border-top: 1px solid var(--paper-deep);">
                     <td style="padding: 8px 0; font-size: 12px;">{{ l.receiverName }}（{{ l.receiverUsername }}）</td>
-                    <td style="font-size: 11px;">{{ l.role === 'leader' ? '团长' : '达人' }}</td>
-                    <td style="font-family: var(--font-mono); font-size: 10px;">{{ l.ruleId ? `#${l.ruleId} ${l.method}` : '直通' }}</td>
-                    <td style="font-family: var(--font-mono); font-size: 11px;"><strong>{{ yuan(l.relayAmount) }}</strong></td>
+                    <td style="font-size: 13px;">{{ l.role === 'leader' ? '团长' : '达人' }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px;">{{ l.ruleId ? `#${l.ruleId} ${l.method}` : '直通' }}</td>
+                    <td style="font-family: var(--font-mono); font-size: 13px;"><strong>{{ yuan(l.relayAmount) }}</strong></td>
                   </tr>
                 </tbody>
               </table>

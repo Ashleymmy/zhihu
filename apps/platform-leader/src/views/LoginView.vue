@@ -82,7 +82,7 @@ async function submit() {
             </div>
           </div>
 
-          <p v-if="errorMessage" style="margin: 16px 0 0; padding: 10px 14px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius);" role="alert">
+          <p v-if="errorMessage" style="margin: 16px 0 0; padding: 10px 14px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius);" role="alert">
             {{ errorMessage }}
           </p>
 

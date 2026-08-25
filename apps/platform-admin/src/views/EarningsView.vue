@@ -166,7 +166,7 @@ onMounted(load)
   margin: 0 0 10px;
   color: var(--ink-soft);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
 }
 @media (max-width: 900px) {
@@ -196,7 +196,7 @@ onMounted(load)
 .panel__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 13px;
   min-width: 660px;
 }
 .panel__table th {
@@ -204,7 +204,7 @@ onMounted(load)
   background: var(--paper);
   border-bottom: 1px solid var(--line);
   text-align: left;
-  font-size: 9px;
+  font-size: 11px;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -258,7 +258,7 @@ onMounted(load)
   display: block;
   margin-top: 4px;
   color: var(--ink-soft);
-  font-size: 10px;
+  font-size: 12px;
 }
 .withdraw-actions {
   display: flex;
@@ -271,7 +271,7 @@ onMounted(load)
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 13px;
   background: var(--white);
 }
 .withdraw-actions button {
@@ -279,7 +279,7 @@ onMounted(load)
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--white);
-  font-size: 11px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.16s ease;
 }

@@ -70,24 +70,24 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <div style="display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: start;">
       <aside style="display: flex; flex-direction: column; gap: 10px;">
         <div v-if="!loading && !projects.length" style="color: var(--ink-soft); font-size: 12px; padding: 20px;">暂无项目</div>
         <button v-for="p in projects" :key="p.id" type="button" :style="{ padding: '12px 14px', border: `1px solid ${selected?.id === p.id ? 'var(--forest)' : 'var(--line)'}`, borderRadius: 'var(--radius)', background: selected?.id === p.id ? 'var(--paper)' : 'var(--white)', textAlign: 'left', cursor: 'pointer', fontSize: '12px' }" @click="selectProject(p)">
           <div style="font-weight: 600;">{{ p.name }}</div>
-          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft);">{{ p.slug }}</div>
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft);">{{ p.slug }}</div>
         </button>
       </aside>
 
       <div v-if="selected" style="display: flex; flex-direction: column; gap: 20px;">
         <article class="panel" style="padding: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h2 style="margin: 0; font-size: 18px;">{{ selected.name }} <small style="font-weight: normal; color: var(--ink-soft); font-size: 11px; font-family: var(--font-mono);">{{ selected.slug }}</small></h2>
+            <h2 style="margin: 0; font-size: 18px;">{{ selected.name }} <small style="font-weight: normal; color: var(--ink-soft); font-size: 13px; font-family: var(--font-mono);">{{ selected.slug }}</small></h2>
             <button class="row-action danger" @click="deleteProject(selected.id)">禁用项目</button>
           </div>
-          <div style="font-size: 11px; color: var(--ink-soft);">状态：<span :class="['status-badge', selected.isEnabled ? 'active' : 'ended']">{{ selected.isEnabled ? '启用' : '已禁用' }}</span></div>
+          <div style="font-size: 13px; color: var(--ink-soft);">状态：<span :class="['status-badge', selected.isEnabled ? 'active' : 'ended']">{{ selected.isEnabled ? '启用' : '已禁用' }}</span></div>
         </article>
 
         <article class="panel" style="padding: 20px;">
@@ -104,7 +104,7 @@ onMounted(load)
           <div v-if="!courses.length" style="color: var(--ink-soft); font-size: 12px;">暂无课程</div>
           <div v-for="c in courses" :key="c.id" style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--paper-deep); font-size: 12px;">
             <span>{{ c.courseName }}</span>
-            <a v-if="c.courseUrl" :href="c.courseUrl" target="_blank" style="color: var(--forest); font-size: 10px;">查看</a>
+            <a v-if="c.courseUrl" :href="c.courseUrl" target="_blank" style="color: var(--forest); font-size: 12px;">查看</a>
           </div>
         </article>
       </div>

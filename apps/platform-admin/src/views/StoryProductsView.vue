@@ -43,7 +43,7 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -58,7 +58,7 @@ onMounted(load)
           <tbody>
             <tr v-for="p in products" :key="p.name">
               <td><strong>{{ p.name }}</strong></td>
-              <td style="font-family: var(--font-mono); font-size: 11px;">{{ p.taskCount }}</td>
+              <td style="font-family: var(--font-mono); font-size: 13px;">{{ p.taskCount }}</td>
               <td><span v-for="s in p.statuses" :key="s" class="status-badge draft" style="margin-right: 6px;">{{ s }}</span></td>
             </tr>
           </tbody>

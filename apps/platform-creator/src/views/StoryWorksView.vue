@@ -104,7 +104,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -118,10 +118,10 @@ onMounted(load)
           <thead><tr><th>标题</th><th>所属计划</th><th>媒体账号</th><th>分类</th><th>状态</th><th>同步</th></tr></thead>
           <tbody>
             <tr v-for="w in works" :key="w.id">
-              <td><strong>{{ w.title || '未命名作品' }}</strong><br /><a :href="w.promoUrl" target="_blank" style="color: var(--ink-soft); font-size: 10px;">{{ w.promoUrl.slice(0, 48) }}</a></td>
-              <td style="font-size: 11px;">{{ w.keyword ?? '—' }}</td>
-              <td style="font-size: 11px;">{{ w.mediaType }}<br /><small style="color: var(--ink-soft);">{{ w.mediaAccount }}</small></td>
-              <td style="font-size: 11px;">{{ TYPE_OPTIONS.find(t => t.value === w.compositionType)?.label ?? '其他' }} / {{ SUB_TYPES.find(s => s.value === w.compositionSubType)?.label ?? '—' }}</td>
+              <td><strong>{{ w.title || '未命名作品' }}</strong><br /><a :href="w.promoUrl" target="_blank" style="color: var(--ink-soft); font-size: 12px;">{{ w.promoUrl.slice(0, 48) }}</a></td>
+              <td style="font-size: 13px;">{{ w.keyword ?? '—' }}</td>
+              <td style="font-size: 13px;">{{ w.mediaType }}<br /><small style="color: var(--ink-soft);">{{ w.mediaAccount }}</small></td>
+              <td style="font-size: 13px;">{{ TYPE_OPTIONS.find(t => t.value === w.compositionType)?.label ?? '其他' }} / {{ SUB_TYPES.find(s => s.value === w.compositionSubType)?.label ?? '—' }}</td>
               <td><span :class="['status-badge', w.status]">{{ statusLabels[w.status] ?? w.status }}</span></td>
               <td><span :class="['status-badge', w.syncStatus === 'synced' ? 'active' : w.syncStatus === 'failed' ? 'rejected' : 'draft']">{{ syncLabels[w.syncStatus] ?? w.syncStatus }}</span></td>
             </tr>

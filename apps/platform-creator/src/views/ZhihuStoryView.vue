@@ -78,10 +78,10 @@ onMounted(async () => {
 .hub-card:hover { border-color: var(--ink); transform: translateY(-1px); }
 
 .hub-card-head { display: flex; align-items: baseline; justify-content: space-between; }
-.hub-index { color: var(--clay); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; }
+.hub-index { color: var(--clay); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.16em; }
 .hub-count { font-family: var(--font-display); font-size: 26px; letter-spacing: -0.03em; }
 .hub-card h3 { margin: 0; font-size: 15px; font-weight: 600; }
-.hub-card p { margin: 0; flex: 1; color: var(--ink-soft); font-size: 11px; line-height: 1.6; }
-.hub-enter { margin-top: 6px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; }
+.hub-card p { margin: 0; flex: 1; color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+.hub-enter { margin-top: 6px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; }
 .hub-card:hover .hub-enter { color: var(--clay); }
 </style>

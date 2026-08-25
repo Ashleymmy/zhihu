@@ -56,7 +56,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -71,12 +71,12 @@ onMounted(load)
           <tbody>
             <tr v-for="t in tasks" :key="t.id">
               <td><strong>{{ t.name }}</strong></td>
-              <td style="font-family: var(--font-mono); font-size: 10px;">{{ t.zhihuTaskId }}</td>
-              <td style="font-family: var(--font-mono); font-size: 10px;">{{ t.unitPrice != null ? `¥${t.unitPrice}` : '—' }}</td>
-              <td style="font-size: 11px;">{{ fmtTime(t.startTime) }}</td>
-              <td style="font-size: 11px;">{{ fmtTime(t.endTime) }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px;">{{ t.zhihuTaskId }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px;">{{ t.unitPrice != null ? `¥${t.unitPrice}` : '—' }}</td>
+              <td style="font-size: 13px;">{{ fmtTime(t.startTime) }}</td>
+              <td style="font-size: 13px;">{{ fmtTime(t.endTime) }}</td>
               <td><span class="status-badge draft">{{ t.status ?? '未知' }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ fmtTime(t.syncedAt) }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ fmtTime(t.syncedAt) }}</td>
             </tr>
           </tbody>
         </table>

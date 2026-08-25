@@ -50,7 +50,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
@@ -80,8 +80,8 @@ onMounted(load)
           <input v-model="pwdForm.newPassword" type="password" autocomplete="new-password" placeholder="至少 8 位" />
           <label>确认新密码</label>
           <input v-model="pwdForm.confirm" type="password" autocomplete="new-password" />
-          <p v-if="pwdError" style="margin: 0; color: var(--clay-deep); font-size: 11px;">{{ pwdError }}</p>
-          <p v-if="pwdMessage" style="margin: 0; color: var(--moss); font-size: 11px;">{{ pwdMessage }}</p>
+          <p v-if="pwdError" style="margin: 0; color: var(--clay-deep); font-size: 13px;">{{ pwdError }}</p>
+          <p v-if="pwdMessage" style="margin: 0; color: var(--moss); font-size: 13px;">{{ pwdMessage }}</p>
           <button type="submit" class="primary-action" :disabled="pwdSubmitting">{{ pwdSubmitting ? '提交中...' : '更新密码' }}</button>
         </form>
       </aside>
@@ -92,8 +92,8 @@ onMounted(load)
 <style scoped>
 .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 16px; border-top: 1px solid var(--line); }
 .profile-item { display: grid; gap: 4px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.profile-item span { color: #737a80; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; }
+.profile-item span { color: #737a80; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; }
 .profile-item strong { font-size: 13px; font-weight: 500; }
 .rail-form { display: grid; gap: 10px; }
-.rail-form label { color: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.rail-form label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 </style>

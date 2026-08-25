@@ -57,7 +57,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -73,9 +73,9 @@ onMounted(load)
             <tbody>
               <tr v-for="(a, i) in audios" :key="i">
                 <td><strong>{{ a.title }}</strong></td>
-                <td style="font-size: 11px;">{{ a.contentType || '—' }}</td>
-                <td style="font-size: 11px;">{{ topicText(a.topic) }}</td>
-                <td style="font-family: var(--font-mono); font-size: 10px;">{{ a.episodes ?? '—' }}</td>
+                <td style="font-size: 13px;">{{ a.contentType || '—' }}</td>
+                <td style="font-size: 13px;">{{ topicText(a.topic) }}</td>
+                <td style="font-family: var(--font-mono); font-size: 12px;">{{ a.episodes ?? '—' }}</td>
                 <td><a v-if="a.audioBookUrl" :href="a.audioBookUrl" target="_blank" class="row-action" style="text-decoration: none;">打开</a></td>
               </tr>
             </tbody>
@@ -90,7 +90,7 @@ onMounted(load)
             <tbody>
               <tr v-for="c in comics" :key="c.dramaId">
                 <td><strong>{{ c.title }}</strong></td>
-                <td style="font-family: var(--font-mono); font-size: 10px;">{{ c.dramaId }}</td>
+                <td style="font-family: var(--font-mono); font-size: 12px;">{{ c.dramaId }}</td>
                 <td><a v-if="c.storyUrl" :href="c.storyUrl" target="_blank" class="row-action" style="text-decoration: none;">打开</a></td>
               </tr>
             </tbody>

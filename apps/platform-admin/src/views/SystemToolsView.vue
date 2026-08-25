@@ -40,7 +40,7 @@ const tools = [
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .tool-card:hover { border-color: var(--ink); transform: translateY(-1px); }
-.tool-code { margin: 0 0 10px; color: var(--clay); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; }
+.tool-code { margin: 0 0 10px; color: var(--clay); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.16em; }
 .tool-card h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 17px; }
 .tool-desc { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
 @media (max-width: 900px) { .tools-grid { grid-template-columns: 1fr; } }

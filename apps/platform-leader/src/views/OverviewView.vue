@@ -114,7 +114,7 @@ onMounted(async () => {
   background: var(--paper);
   border-bottom: 1px solid var(--line);
   text-align: left;
-  font-size: 9px;
+  font-size: 11px;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;

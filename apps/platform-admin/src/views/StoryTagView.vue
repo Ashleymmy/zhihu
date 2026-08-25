@@ -47,11 +47,11 @@ async function query() {
         </div>
       </div>
 
-      <div v-if="error" style="margin-top: 12px; padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+      <div v-if="error" style="margin-top: 12px; padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
       <div v-if="result" style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
         <div v-for="(value, key) in result" :key="key" class="panel" style="padding: 16px;">
-          <p style="margin: 0; color: #737a80; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;">{{ key }}</p>
+          <p style="margin: 0; color: #737a80; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em;">{{ key }}</p>
           <strong style="display: block; margin-top: 6px; font-size: 15px;">{{ value || '—' }}</strong>
         </div>
       </div>

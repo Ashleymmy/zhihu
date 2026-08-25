@@ -49,7 +49,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
 
@@ -85,7 +85,7 @@ onMounted(load)
             <thead><tr><th>日期</th><th>曝光</th><th>点击</th><th>转化</th><th>消耗</th><th>收益</th></tr></thead>
             <tbody>
               <tr v-for="point in trend" :key="point.date">
-                <td style="font-family: var(--font-mono); font-size: 10px;">{{ point.date }}</td>
+                <td style="font-family: var(--font-mono); font-size: 12px;">{{ point.date }}</td>
                 <td><strong>{{ fmt.format(point.impressions) }}</strong></td>
                 <td><strong>{{ fmt.format(point.clicks) }}</strong></td>
                 <td><strong>{{ fmt.format(point.conversions) }}</strong></td>

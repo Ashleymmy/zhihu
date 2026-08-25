@@ -48,8 +48,8 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="cleanupResult" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 11px; color: var(--moss);">{{ cleanupResult }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="cleanupResult" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ cleanupResult }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
@@ -71,9 +71,9 @@ onMounted(load)
               <thead><tr><th>表名</th><th>行数（估算）</th><th>体积 (MB)</th></tr></thead>
               <tbody>
                 <tr v-for="t in tables" :key="t.tableName">
-                  <td style="font-family: var(--font-mono); font-size: 11px;">{{ t.tableName }}</td>
-                  <td style="font-family: var(--font-mono); font-size: 11px;">{{ t.tableRows.toLocaleString() }}</td>
-                  <td style="font-family: var(--font-mono); font-size: 11px;">{{ t.dataMb }}</td>
+                  <td style="font-family: var(--font-mono); font-size: 13px;">{{ t.tableName }}</td>
+                  <td style="font-family: var(--font-mono); font-size: 13px;">{{ t.tableRows.toLocaleString() }}</td>
+                  <td style="font-family: var(--font-mono); font-size: 13px;">{{ t.dataMb }}</td>
                 </tr>
               </tbody>
             </table>
@@ -96,7 +96,7 @@ onMounted(load)
             </select>
             <button class="row-action danger" :disabled="cleaning" @click="runCleanup">{{ cleaning ? '清理中...' : '立即清理' }}</button>
           </div>
-          <small style="color: var(--ink-soft); font-size: 10px;">仅清理操作日志，不影响业务数据。清理动作本身会记录审计。</small>
+          <small style="color: var(--ink-soft); font-size: 12px;">仅清理操作日志，不影响业务数据。清理动作本身会记录审计。</small>
         </div>
       </aside>
     </section>
@@ -105,5 +105,5 @@ onMounted(load)
 
 <style scoped>
 .rail-form { display: grid; gap: 10px; }
-.rail-form label { color: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.rail-form label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 </style>

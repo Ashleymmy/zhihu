@@ -83,7 +83,7 @@ onMounted(load)
       <button class="primary-action" @click="showCreate = true">{{ config.action }}</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -99,7 +99,7 @@ onMounted(load)
             <small>{{ item.note || '—' }}</small>
           </div>
           <a v-if="item.url" :href="item.url" target="_blank" class="row-action" style="text-decoration: none;">查看链接</a>
-          <small style="color: var(--ink-soft); font-size: 10px;">{{ item.ownerName ?? '' }} · {{ new Date(item.createdAt).toLocaleDateString('zh-CN') }}</small>
+          <small style="color: var(--ink-soft); font-size: 12px;">{{ item.ownerName ?? '' }} · {{ new Date(item.createdAt).toLocaleDateString('zh-CN') }}</small>
           <button v-if="item.ownerId === auth.user?.id || auth.user?.role === 'admin'" class="row-action" @click="archive(item)">归档</button>
           <button v-if="item.ownerId === auth.user?.id || auth.user?.role === 'admin'" class="row-action danger" @click="remove(item)">删除</button>
         </div>

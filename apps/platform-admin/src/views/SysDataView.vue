@@ -62,8 +62,8 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="message" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 11px; color: var(--moss);">{{ message }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="message" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ message }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
@@ -94,7 +94,7 @@ onMounted(load)
           <p><span>凭证模式</span>
             <span :class="['status-badge', info?.zhihuCredentialMode === 'real' ? 'active' : 'ended']">{{ info?.zhihuCredentialMode === 'real' ? '真实凭证' : 'Mock' }}</span>
           </p>
-          <p><span>运行环境</span><strong style="font-family: var(--font-mono); font-size: 11px;">Node {{ info?.node ?? '—' }}</strong></p>
+          <p><span>运行环境</span><strong style="font-family: var(--font-mono); font-size: 13px;">Node {{ info?.node ?? '—' }}</strong></p>
         </div>
         <button class="row-action" style="margin-top: 14px;" @click="exportEarnings">导出收益明细 CSV</button>
       </aside>
@@ -108,9 +108,9 @@ onMounted(load)
 .sync-row:last-child { border-bottom: 0; }
 .sync-row div { display: grid; gap: 3px; }
 .sync-row strong { font-size: 13px; }
-.sync-row small { color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; }
+.sync-row small { color: var(--ink-soft); font-family: var(--font-mono); font-size: 12px; }
 .auth-card { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--line); }
 .auth-card p { display: flex; align-items: center; justify-content: space-between; margin: 0; }
-.auth-card span { color: #737a80; font-size: 11px; }
+.auth-card span { color: #737a80; font-size: 13px; }
 .auth-card strong { font-size: 12px; font-weight: 500; }
 </style>

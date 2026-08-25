@@ -141,12 +141,12 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <div v-if="created" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 11px; font-family: var(--font-mono); color: #59645d;">
+    <div v-if="created" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 13px; font-family: var(--font-mono); color: #59645d;">
       创建成功！临时密码：<strong>{{ created.temporaryPassword }}</strong>（{{ created.username }}）
     </div>
-    <div v-if="resetResult" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 11px; font-family: var(--font-mono); color: #59645d;">
+    <div v-if="resetResult" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 13px; font-family: var(--font-mono); color: #59645d;">
       <template v-if="resetResult.temporaryPassword">已生成临时密码：<strong>{{ resetResult.temporaryPassword }}</strong>（成员下次登录需修改）</template>
       <template v-else>密码已更新为自定义密码。</template>
     </div>
@@ -161,16 +161,16 @@ onMounted(load)
           <thead><tr><th>申请人</th><th>留言</th><th>申请时间</th><th>状态</th><th>操作</th></tr></thead>
           <tbody>
             <tr v-for="a in applications" :key="a.id">
-              <td><strong>{{ a.creatorName }}</strong> <small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px;">{{ a.creatorUsername }}</small></td>
+              <td><strong>{{ a.creatorName }}</strong> <small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 12px;">{{ a.creatorUsername }}</small></td>
               <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ a.message || '—' }}</td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ new Date(a.createdAt).toLocaleDateString('zh-CN') }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ new Date(a.createdAt).toLocaleDateString('zh-CN') }}</td>
               <td><span :class="['status-badge', a.status === 'approved' ? 'active' : a.status === 'rejected' ? 'rejected' : a.status === 'cancelled' ? 'ended' : 'paused']">{{ { pending: '待审批', approved: '已通过', rejected: '已驳回', cancelled: '已撤回' }[a.status] }}</span></td>
               <td>
                 <div v-if="a.status === 'pending'" style="display: flex; gap: 6px;">
                   <button class="row-action" @click="reviewApplication(a.id, 'approve')">通过</button>
                   <button class="row-action danger" @click="reviewApplication(a.id, 'reject')">驳回</button>
                 </div>
-                <span v-else style="color: var(--ink-soft); font-size: 10px;">已处理</span>
+                <span v-else style="color: var(--ink-soft); font-size: 12px;">已处理</span>
               </td>
             </tr>
           </tbody>
@@ -186,7 +186,7 @@ onMounted(load)
           批量删除（{{ selected.size }}）
         </button>
       </div>
-      <div v-if="deleteResult" style="padding: 10px 22px; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: 11px;">{{ deleteResult }}</div>
+      <div v-if="deleteResult" style="padding: 10px 22px; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: 13px;">{{ deleteResult }}</div>
       <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       <div v-else-if="!members.length" class="empty-panel"><span>暂无成员。</span></div>
       <div v-else class="responsive-table">
@@ -197,10 +197,10 @@ onMounted(load)
               <td>
                 <input v-if="m.role !== 'admin' && m.id !== auth.user?.id" type="checkbox" :checked="selected.has(m.id)" @change="toggleSelect(m.id)" />
               </td>
-              <td style="font-family: var(--font-mono); font-size: 10px;">{{ m.username }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px;">{{ m.username }}</td>
               <td><strong>{{ m.displayName }}</strong></td>
               <td><span class="status-badge draft">{{ m.role }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleDateString('zh-CN') : '—' }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleDateString('zh-CN') : '—' }}</td>
               <td><span :class="['status-badge', m.isActive ? 'active' : 'ended']">{{ m.isActive ? '活跃' : '已禁用' }}</span></td>
               <td>
                 <div style="display: flex; gap: 6px;">
@@ -245,7 +245,7 @@ onMounted(load)
             <div>
               <label>自定义密码</label>
               <input v-model="resetForm.password" type="text" minlength="8" maxlength="128" placeholder="留空则自动生成临时密码" autocomplete="off" />
-              <small style="display: block; margin-top: 6px; color: var(--ink-soft); font-size: 10px;">至少 8 位。留空时系统生成临时密码，成员下次登录需修改。</small>
+              <small style="display: block; margin-top: 6px; color: var(--ink-soft); font-size: 12px;">至少 8 位。留空时系统生成临时密码，成员下次登录需修改。</small>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 8px;">
               <button type="submit" class="primary-action" :disabled="resetting" style="flex: 1;">{{ resetting ? '提交中...' : '确认重置' }}</button>

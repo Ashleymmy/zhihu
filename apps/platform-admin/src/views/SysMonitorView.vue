@@ -45,7 +45,7 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel" style="padding: 22px; margin-bottom: 18px;">
       <p class="section-index quiet">活跃度分布</p>
@@ -64,12 +64,12 @@ onMounted(load)
           <thead><tr><th>账号</th><th>角色</th><th>状态</th><th>最后登录</th><th>近 7 日操作</th><th>最近动作</th></tr></thead>
           <tbody>
             <tr v-for="r in rows" :key="r.id">
-              <td><strong>{{ r.displayName }}</strong> <small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px;">{{ r.username }}</small></td>
+              <td><strong>{{ r.displayName }}</strong> <small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 12px;">{{ r.username }}</small></td>
               <td><span class="status-badge draft">{{ r.role }}</span></td>
               <td><span :class="['status-badge', r.isActive ? 'active' : 'ended']">{{ r.isActive ? '活跃' : '已禁用' }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ fmt(r.lastLoginAt) }}</td>
-              <td style="font-family: var(--font-mono); font-size: 11px;">{{ r.actionCount7d ?? 0 }}</td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ r.lastAction ? `${r.lastAction} · ${fmt(r.lastActionAt)}` : '—' }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ fmt(r.lastLoginAt) }}</td>
+              <td style="font-family: var(--font-mono); font-size: 13px;">{{ r.actionCount7d ?? 0 }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ r.lastAction ? `${r.lastAction} · ${fmt(r.lastActionAt)}` : '—' }}</td>
             </tr>
           </tbody>
         </table>

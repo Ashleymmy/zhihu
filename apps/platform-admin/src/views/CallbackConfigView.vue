@@ -87,7 +87,7 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 密钥管理 -->
     <article class="panel" style="padding: 20px;">
@@ -115,8 +115,8 @@ onMounted(load)
           <thead><tr><th>所属计划</th><th>回传 URL</th><th>事件类型</th><th>状态</th><th>操作</th></tr></thead>
           <tbody>
             <tr v-for="rule in rules" :key="rule.id">
-              <td style="font-size: 11px;">{{ rule.planName ?? '—' }}</td>
-              <td style="font-family: var(--font-mono); font-size: 10px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ rule.callbackUrl }}</td>
+              <td style="font-size: 13px;">{{ rule.planName ?? '—' }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ rule.callbackUrl }}</td>
               <td>
                 <span v-for="et in rule.eventsJson" :key="et" class="event-tag" style="margin-right: 4px;">{{ eventTypeLabels[et] || et }}</span>
               </td>

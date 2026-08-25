@@ -113,8 +113,8 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="submitMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 11px; color: var(--moss);">{{ submitMessage }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="submitMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ submitMessage }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
@@ -206,7 +206,7 @@ onMounted(load)
 
 <style scoped>
 .campaign-row > div:first-child { display: grid; min-width: 0; flex: 1; }
-.campaign-row > div:first-child small { overflow: hidden; color: var(--ink-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.campaign-row > div:first-child small { overflow: hidden; color: var(--ink-soft); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
 .team-card { display: flex; align-items: center; gap: 14px; padding: 18px 20px; }
 .team-avatar {
@@ -222,10 +222,10 @@ onMounted(load)
 }
 .team-meta { display: grid; flex: 1; min-width: 0; }
 .team-meta strong { font-size: 14px; }
-.team-meta small { color: #7b8286; font-family: var(--font-mono); font-size: 10px; }
+.team-meta small { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
 
 .rail-form { display: grid; gap: 10px; }
-.rail-form label { color: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.rail-form label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 .rail-form textarea { resize: vertical; }
 
 .leader-picker { position: relative; }
@@ -261,7 +261,7 @@ onMounted(load)
 .leader-option:last-child { border-bottom: 0; }
 .leader-option:hover { background: var(--paper-deep); }
 .leader-option strong { font-size: 12px; font-weight: 500; }
-.leader-meta { color: #7b8286; font-family: var(--font-mono); font-size: 10px; }
+.leader-meta { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
 
-.leader-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 11px; }
+.leader-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 13px; }
 </style>

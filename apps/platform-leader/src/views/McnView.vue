@@ -43,7 +43,7 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar"><span class="toolbar-title">MCN 账号</span><span class="toolbar-count">{{ accounts.length }}</span></div>
@@ -54,10 +54,10 @@ onMounted(load)
           <thead><tr><th>账号 Key</th><th>账号名称</th><th>状态</th><th>创建时间</th></tr></thead>
           <tbody>
             <tr v-for="a in accounts" :key="a.id">
-              <td style="font-family: var(--font-mono); font-size: 10px;">{{ a.accountKey }}</td>
+              <td style="font-family: var(--font-mono); font-size: 12px;">{{ a.accountKey }}</td>
               <td><strong>{{ a.accountName }}</strong></td>
               <td><span :class="['status-badge', a.status === 'active' ? 'active' : 'ended']">{{ { active: '活跃', suspended: '已暂停', archived: '已归档' }[a.status] }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ new Date(a.createdAt).toLocaleDateString('zh-CN') }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ new Date(a.createdAt).toLocaleDateString('zh-CN') }}</td>
             </tr>
           </tbody>
         </table>

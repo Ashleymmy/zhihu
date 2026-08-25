@@ -192,7 +192,7 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 成员：申请提现 -->
     <article v-if="canApply" class="panel" style="padding: 22px;">
@@ -239,7 +239,7 @@ onMounted(load)
             <label>纳税人识别号</label>
             <input v-model="taxId" placeholder="统一社会信用代码" />
           </div>
-          <p style="grid-column: 1 / -1; margin: 0; color: var(--ink-soft); font-size: 10px;">对公转账（bank_transfer），提交后请在记录中上传发票，管理员核对后放款。</p>
+          <p style="grid-column: 1 / -1; margin: 0; color: var(--ink-soft); font-size: 12px;">对公转账（bank_transfer），提交后请在记录中上传发票，管理员核对后放款。</p>
         </template>
         <button type="submit" class="primary-action" :disabled="applying" style="align-self: end;">{{ applying ? '提交中...' : '提交申请' }}</button>
       </form>
@@ -260,7 +260,7 @@ onMounted(load)
             <small v-if="w.riskFlags?.length" style="color: var(--clay-deep);">⚠ {{ w.riskFlags.map(f => riskLabels[f] ?? f).join('、') }}</small>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <input v-model="remark" placeholder="驳回原因（驳回时必填）" style="width: 160px; font-size: 11px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px;" />
+            <input v-model="remark" placeholder="驳回原因（驳回时必填）" style="width: 160px; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px;" />
             <button class="row-action" :disabled="acting" @click="review(w.id, 'approve')">通过</button>
             <button class="row-action danger" :disabled="acting" @click="review(w.id, 'reject')">驳回</button>
           </div>
@@ -283,7 +283,7 @@ onMounted(load)
             <small v-if="w.riskFlags?.length" style="color: var(--clay-deep);">⚠ {{ w.riskFlags.map(f => riskLabels[f] ?? f).join('、') }}</small>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <input v-model="remark" placeholder="驳回原因（驳回时必填）" style="width: 160px; font-size: 11px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px;" />
+            <input v-model="remark" placeholder="驳回原因（驳回时必填）" style="width: 160px; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px;" />
             <button class="row-action" :disabled="acting" @click="decide(w.id, 'approve')">终审放款</button>
             <button class="row-action danger" :disabled="acting" @click="decide(w.id, 'reject')">驳回</button>
           </div>
@@ -296,7 +296,7 @@ onMounted(load)
       <div class="list-toolbar">
         <span class="toolbar-title">{{ canApply ? '我的申请记录' : '全部提现记录' }}</span>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <select v-model="statusFilter" style="font-size: 11px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 2px;">
+          <select v-model="statusFilter" style="font-size: 13px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 2px;">
             <option value="">全部状态</option>
             <option v-for="(label, key) in statusLabels" :key="key" :value="key">{{ label }}</option>
           </select>
@@ -310,26 +310,26 @@ onMounted(load)
           <thead><tr><th>申请人</th><th>金额</th><th>收款</th><th>状态</th><th>初审</th><th>发票</th><th>时间</th><th>操作</th></tr></thead>
           <tbody>
             <tr v-for="w in filteredList" :key="w.id">
-              <td><strong>{{ w.applicantName }}</strong><br /><small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 9px;">{{ w.applicantUsername }}</small></td>
-              <td style="font-family: var(--font-mono); font-size: 11px;">{{ fen2yuan(w.amount) }}<small v-if="w.riskFlags?.length" style="display: block; color: var(--clay-deep); font-size: 9px;">⚠ 风控</small></td>
-              <td style="font-size: 10px;">{{ w.payMethod === 'alipay' ? '支付宝' : '微信' }}<br /><small style="color: var(--ink-soft);">{{ w.payAccount }}</small></td>
+              <td><strong>{{ w.applicantName }}</strong><br /><small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 11px;">{{ w.applicantUsername }}</small></td>
+              <td style="font-family: var(--font-mono); font-size: 13px;">{{ fen2yuan(w.amount) }}<small v-if="w.riskFlags?.length" style="display: block; color: var(--clay-deep); font-size: 11px;">⚠ 风控</small></td>
+              <td style="font-size: 12px;">{{ w.payMethod === 'alipay' ? '支付宝' : '微信' }}<br /><small style="color: var(--ink-soft);">{{ w.payAccount }}</small></td>
               <td><span :class="['status-badge', statusClass[w.status]]">{{ statusLabels[w.status] }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ w.leaderName ?? '—' }}{{ w.leaderRemark ? `（${w.leaderRemark}）` : '' }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ w.leaderName ?? '—' }}{{ w.leaderRemark ? `（${w.leaderRemark}）` : '' }}</td>
               <td>
                 <template v-if="w.settleType === 'corporate'">
                   <div v-if="w.invoiceName" style="display: flex; gap: 6px; align-items: center;">
-                    <span class="status-badge active" style="font-size: 9px;">已上传</span>
-                    <button class="row-action" style="font-size: 10px;" @click="downloadInvoice(w.id, w.invoiceName!)">下载</button>
+                    <span class="status-badge active" style="font-size: 11px;">已上传</span>
+                    <button class="row-action" style="font-size: 12px;" @click="downloadInvoice(w.id, w.invoiceName!)">下载</button>
                   </div>
                   <div v-else-if="w.applicantUsername === auth.user?.username && w.status !== 'approved' && w.status !== 'cancelled'" style="display: flex; gap: 6px; align-items: center;">
-                    <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" style="font-size: 10px; width: 130px;" @change="invoiceFiles[w.id] = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+                    <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" style="font-size: 12px; width: 130px;" @change="invoiceFiles[w.id] = ($event.target as HTMLInputElement).files?.[0] ?? null" />
                     <button class="row-action" :disabled="uploadingInvoice === w.id" @click="uploadInvoice(w.id)">{{ uploadingInvoice === w.id ? '...' : '上传' }}</button>
                   </div>
-                  <span v-else class="status-badge paused" style="font-size: 9px;">未上传</span>
+                  <span v-else class="status-badge paused" style="font-size: 11px;">未上传</span>
                 </template>
-                <span v-else style="color: var(--ink-soft); font-size: 10px;">—</span>
+                <span v-else style="color: var(--ink-soft); font-size: 12px;">—</span>
               </td>
-              <td style="font-size: 10px; color: var(--ink-soft); font-family: var(--font-mono);">{{ new Date(w.createdAt).toLocaleDateString('zh-CN') }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft); font-family: var(--font-mono);">{{ new Date(w.createdAt).toLocaleDateString('zh-CN') }}</td>
               <td>
                 <div style="display: flex; gap: 6px;">
                   <button class="row-action" @click="openStatement(w.id)">结算单</button>
@@ -406,22 +406,22 @@ onMounted(load)
 .statement-card { width: min(640px, 94vw); }
 .statement-body { padding: 28px; color: var(--ink); }
 .st-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
-.st-brand { margin: 0 0 4px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; color: var(--ink-soft); }
+.st-brand { margin: 0 0 4px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--ink-soft); }
 .st-head h2 { margin: 0; font-family: var(--font-display); font-size: 26px; letter-spacing: -0.03em; }
-.st-no { margin: 0; font-family: var(--font-mono); font-size: 11px; color: var(--clay); }
+.st-no { margin: 0; font-family: var(--font-mono); font-size: 13px; color: var(--clay); }
 .st-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; padding: 14px 0; }
 .st-item { display: grid; gap: 3px; }
-.st-item span { font-size: 10px; color: var(--ink-soft); font-family: var(--font-mono); }
+.st-item span { font-size: 12px; color: var(--ink-soft); font-family: var(--font-mono); }
 .st-item strong { font-size: 13px; font-weight: 600; }
 .st-amount { font-family: var(--font-display); font-size: 20px; color: var(--clay-deep); }
 .st-section { padding: 12px 0; border-top: 1px solid var(--line); }
-.st-sec-title { margin: 0 0 8px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--clay); }
+.st-sec-title { margin: 0 0 8px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.14em; color: var(--clay); }
 .st-line { margin: 0; font-size: 12px; }
 .st-timeline { display: grid; gap: 8px; }
 .st-step { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .st-step i { width: 6px; height: 6px; background: var(--clay); flex-shrink: 0; }
-.st-step b { margin-left: auto; font-family: var(--font-mono); font-size: 10px; font-weight: 400; color: var(--ink-soft); }
-.st-foot { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 10px; color: var(--ink-soft); }
+.st-step b { margin-left: auto; font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+.st-foot { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); }
 @media print {
   body * { visibility: hidden; }
   #statement-print, #statement-print * { visibility: visible; }

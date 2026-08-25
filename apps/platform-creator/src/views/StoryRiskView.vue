@@ -68,7 +68,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 11px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -83,10 +83,10 @@ onMounted(load)
           <tbody>
             <tr v-for="(w, i) in items" :key="i">
               <td><strong>{{ w.keyword }}</strong></td>
-              <td style="font-size: 11px;">{{ w.riskType === 1 ? '截流词' : w.riskType === 2 ? '搬运词' : '—' }}</td>
-              <td style="font-size: 11px;">{{ w.channel || '—' }}</td>
+              <td style="font-size: 13px;">{{ w.riskType === 1 ? '截流词' : w.riskType === 2 ? '搬运词' : '—' }}</td>
+              <td style="font-size: 13px;">{{ w.channel || '—' }}</td>
               <td><span :class="['status-badge', statusClass[w.status ?? 1]]">{{ statusLabels[w.status ?? 1] ?? '审核中' }}</span></td>
-              <td style="font-size: 10px; color: var(--ink-soft);">{{ w.validedAt || '—' }}</td>
+              <td style="font-size: 12px; color: var(--ink-soft);">{{ w.validedAt || '—' }}</td>
             </tr>
           </tbody>
         </table>

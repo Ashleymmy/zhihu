@@ -208,7 +208,7 @@ function getStatusClass(status: string) {
     <article class="panel" style="padding: 20px;">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
         <div class="form-field">
-          <label style="font-size: 11px; color: var(--ink-soft); margin-bottom: 6px;">课程状态</label>
+          <label style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">课程状态</label>
           <select v-model="selectedStatus" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); font-size: 12px;">
             <option value="">全部状态</option>
             <option value="online">已上架</option>
@@ -217,14 +217,14 @@ function getStatusClass(status: string) {
           </select>
         </div>
         <div class="form-field">
-          <label style="font-size: 11px; color: var(--ink-soft); margin-bottom: 6px;">课程分类</label>
+          <label style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">课程分类</label>
           <select v-model="selectedCategory" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); font-size: 12px;">
             <option value="">全部分类</option>
             <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
           </select>
         </div>
         <div class="form-field">
-          <label style="font-size: 11px; color: var(--ink-soft); margin-bottom: 6px;">搜索</label>
+          <label style="font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">搜索</label>
           <input
             v-model="searchQuery"
             placeholder="搜索课程标题、讲师..."
