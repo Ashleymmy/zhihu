@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
@@ -30,11 +32,27 @@ export const RISK_FLAGS = {
 
 /* ===== 提现申请（成员提交，自动风控标记；团长申请跳过初审直达终审）===== */
 
+export interface ApplyWithdrawalInput {
+  amount: number;
+  settleType: 'personal' | 'corporate';
+  payMethod: 'alipay' | 'wechat' | 'bank_transfer';
+  payAccount: string;
+  companyName?: string;
+  bankName?: string;
+  bankAccount?: string;
+  taxId?: string;
+}
+
 export async function applyWithdrawal(
   user: AuthUser,
-  input: { amount: number; payMethod: 'alipay' | 'wechat'; payAccount: string },
+  input: ApplyWithdrawalInput,
   ip?: string,
 ) {
+  if (input.settleType === 'corporate') {
+    if (!input.companyName?.trim() || !input.bankName?.trim() || !input.bankAccount?.trim() || !input.taxId?.trim()) {
+      throw new AppError(422, 42200, '对公结算必须完整填写公司名称、开户行、银行账号和纳税人识别号');
+    }
+  }
   return withTransaction(async (connection) => {
     await connection.query('SELECT id FROM users WHERE id=? FOR UPDATE', [user.sub]);
 
@@ -73,8 +91,18 @@ export async function applyWithdrawal(
     const initialStatus = user.role === 'leader' ? 'leader_approved' : 'pending';
 
     const [result] = await connection.query<ResultSetHeader>(
-      'INSERT INTO withdrawal_requests (user_id, amount, pay_method, pay_account, status, risk_flags) VALUES (?,?,?,?,?,?)',
-      [user.sub, input.amount, input.payMethod, input.payAccount, initialStatus, flags.length ? JSON.stringify(flags) : null],
+      `INSERT INTO withdrawal_requests
+        (user_id, amount, pay_method, pay_account, status, risk_flags, settle_type, company_name, bank_name, bank_account, tax_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        user.sub, input.amount, input.payMethod, input.payAccount, initialStatus,
+        flags.length ? JSON.stringify(flags) : null,
+        input.settleType,
+        input.settleType === 'corporate' ? input.companyName!.trim() : null,
+        input.settleType === 'corporate' ? input.bankName!.trim() : null,
+        input.settleType === 'corporate' ? input.bankAccount!.trim() : null,
+        input.settleType === 'corporate' ? input.taxId!.trim() : null,
+      ],
     );
     await writeAudit(
       {
@@ -335,4 +363,119 @@ export async function listAppeals(user: AuthUser, query: Record<string, unknown>
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list, total: Number(count?.total ?? 0), page, pageSize };
+}
+
+/* ===== 发票上传与下载 ===== */
+
+const INVOICE_DIR = path.resolve(process.cwd(), 'uploads/invoices');
+const INVOICE_MAX_BYTES = 5 * 1024 * 1024;
+const INVOICE_TYPES: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+};
+
+/** 上传发票（对公提现的申请人在放款前上传；可覆盖重传） */
+export async function uploadInvoice(
+  user: AuthUser,
+  id: string,
+  file: { originalname?: unknown; mimetype?: unknown; size?: number; buffer?: unknown },
+  ip?: string,
+) {
+  const ext = INVOICE_TYPES[String(file.mimetype ?? '')];
+  if (!ext) throw new AppError(422, 42216, '发票只支持 JPG / PNG / WebP 图片或 PDF 文件');
+  if (!Buffer.isBuffer(file.buffer) || file.buffer.length === 0) throw new AppError(422, 42216, '发票文件为空');
+  if (file.buffer.length > INVOICE_MAX_BYTES) throw new AppError(422, 42217, '发票文件不能超过 5MB');
+
+  const [item] = await rows<WithdrawalRow & { settle_type: string; status: string; user_id: string }>(
+    'SELECT id, user_id, settle_type, status FROM withdrawal_requests WHERE id = ? LIMIT 1',
+    [id],
+  ) as unknown as [(WithdrawalRow & { settle_type: string }) | undefined];
+  if (!item) throw new AppError(404, 40401, '提现申请不存在');
+  if (String(item.user_id) !== user.sub) throw new AppError(403, 40301, '只能给自己的申请上传发票');
+  if (item.settle_type !== 'corporate') throw new AppError(422, 42200, '只有对公结算的申请需要上传发票');
+  if (item.status === 'approved' || item.status === 'cancelled') throw new AppError(409, 40903, '该申请已完结，不能再上传发票');
+
+  fs.mkdirSync(INVOICE_DIR, { recursive: true });
+  const safeName = `wd-${id}${ext}`;
+  const fullPath = path.join(INVOICE_DIR, safeName);
+  fs.writeFileSync(fullPath, file.buffer);
+
+  const originalName = String(file.originalname ?? `invoice${ext}`).slice(0, 255);
+  await withTransaction(async (connection) => {
+    await connection.query(
+      'UPDATE withdrawal_requests SET invoice_path = ?, invoice_name = ?, invoice_uploaded_at = NOW() WHERE id = ?',
+      [safeName, originalName, id],
+    );
+    await writeAudit(
+      { userId: user.sub, action: 'withdraw.invoice_upload', resourceType: 'withdrawal', resourceId: id, detail: { name: originalName, size: (file.buffer as Buffer).length }, ip },
+      connection,
+    );
+  });
+  return { name: originalName };
+}
+
+/** 读取发票（申请人本人 / 其团长 / 管理员） */
+export async function getInvoice(user: AuthUser, id: string) {
+  const [item] = await rows<WithdrawalRow & { settle_type: string; invoice_path: string | null; invoice_name: string | null; applicant_parent: string | null }>(
+    `SELECT w.id, w.user_id, w.settle_type, w.invoice_path, w.invoice_name, u.parent_id AS applicant_parent
+     FROM withdrawal_requests w JOIN users u ON u.id = w.user_id WHERE w.id = ? LIMIT 1`,
+    [id],
+  ) as unknown as [(WithdrawalRow & { settle_type: string; invoice_path: string | null; invoice_name: string | null; applicant_parent: string | null }) | undefined];
+  if (!item || !item.invoice_path) throw new AppError(404, 40401, '该申请没有上传发票');
+  const allowed =
+    String(item.user_id) === user.sub ||
+    user.role === 'admin' ||
+    (user.role === 'leader' && String(item.applicant_parent) === user.sub);
+  if (!allowed) throw new AppError(403, 40301, '无权查看该发票');
+
+  const fullPath = path.join(INVOICE_DIR, path.basename(item.invoice_path));
+  if (!fullPath.startsWith(INVOICE_DIR) || !fs.existsSync(fullPath)) throw new AppError(404, 40401, '发票文件不存在');
+  return { path: fullPath, name: item.invoice_name ?? item.invoice_path };
+}
+
+/* ===== 结算单 ===== */
+
+export async function getStatement(user: AuthUser, id: string) {
+  const [item] = await rows<RowDataPacket & Record<string, unknown>>(
+    `SELECT w.*, u.username AS applicant_username, u.display_name AS applicant_name,
+            lu.username AS leader_username, lu.display_name AS leader_name,
+            hu.display_name AS handled_by_name
+     FROM withdrawal_requests w
+     JOIN users u ON u.id = w.user_id
+     LEFT JOIN users lu ON lu.id = w.leader_id
+     LEFT JOIN users hu ON hu.id = w.handled_by
+     WHERE w.id = ? LIMIT 1`,
+    [id],
+  ) as unknown as [(RowDataPacket & Record<string, unknown>) | undefined];
+  if (!item) throw new AppError(404, 40401, '提现申请不存在');
+  const [parent] = await rows<RowDataPacket & { applicant_parent: string | null }>(
+    'SELECT parent_id AS applicant_parent FROM users WHERE id = ? LIMIT 1',
+    [item.user_id],
+  ) as unknown as [{ applicant_parent: string | null } | undefined];
+  const allowed =
+    String(item.user_id) === user.sub ||
+    user.role === 'admin' ||
+    (user.role === 'leader' && String(parent?.applicant_parent) === user.sub);
+  if (!allowed) throw new AppError(403, 40301, '无权查看该结算单');
+
+  return {
+    statementNo: `WD-${String(item.id).padStart(8, '0')}`,
+    amount: item.amount,
+    status: item.status,
+    settleType: item.settle_type,
+    payMethod: item.pay_method,
+    payAccount: item.pay_account,
+    corporate: item.settle_type === 'corporate'
+      ? { companyName: item.company_name, bankName: item.bank_name, bankAccount: item.bank_account, taxId: item.tax_id }
+      : null,
+    applicant: { username: item.applicant_username, name: item.applicant_name },
+    leader: item.leader_id ? { name: item.leader_name, remark: item.leader_remark, at: item.leader_handled_at } : null,
+    final: item.handled_by ? { name: item.handled_by_name, remark: item.remark, at: item.handled_at } : null,
+    riskFlags: item.risk_flags,
+    invoice: item.invoice_name ? { name: item.invoice_name, uploadedAt: item.invoice_uploaded_at } : null,
+    createdAt: item.created_at,
+    issuedAt: new Date().toISOString(),
+  };
 }

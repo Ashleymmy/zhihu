@@ -469,8 +469,15 @@ export interface Withdrawal {
   id: string
   /** 分 */
   amount: number
-  payMethod: 'alipay' | 'wechat'
+  settleType: 'personal' | 'corporate'
+  payMethod: 'alipay' | 'wechat' | 'bank_transfer'
   payAccount: string
+  companyName: string | null
+  bankName: string | null
+  bankAccount: string | null
+  taxId: string | null
+  invoiceName: string | null
+  invoiceUploadedAt: string | null
   status: WithdrawalStatus
   remark: string | null
   leaderRemark: string | null
@@ -483,6 +490,24 @@ export interface Withdrawal {
   handledAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** 提现结算单 */
+export interface WithdrawalStatement {
+  statementNo: string
+  amount: number
+  status: WithdrawalStatus
+  settleType: 'personal' | 'corporate'
+  payMethod: string
+  payAccount: string
+  corporate: { companyName: string; bankName: string; bankAccount: string; taxId: string } | null
+  applicant: { username: string; name: string }
+  leader: { name: string; remark: string | null; at: string } | null
+  final: { name: string; remark: string | null; at: string } | null
+  riskFlags: string[] | null
+  invoice: { name: string; uploadedAt: string } | null
+  createdAt: string
+  issuedAt: string
 }
 
 /* ===== 财务申诉（二级审批）===== */
@@ -512,7 +537,7 @@ export interface Appeal {
 export interface CreateWithdrawalReq {
   /** 分 */
   amount: number
-  payMethod: 'alipay' | 'wechat'
+  payMethod: 'alipay' | 'wechat' | 'bank_transfer'
   payAccount: string
 }
 

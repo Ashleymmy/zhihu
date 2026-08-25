@@ -31,6 +31,7 @@ export interface HttpClient {
   put<T>(url: string, data?: unknown): Promise<T>
   patch<T>(url: string, data?: unknown): Promise<T>
   del<T>(url: string): Promise<T>
+  getBlob(url: string): Promise<Blob>
   tokens: TokenStore
   /** 主动刷新 Access Token；并发调用会共享同一次请求。 */
   refresh(): Promise<boolean>
@@ -135,6 +136,10 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
 
   return {
     get: (url, params) => request({ method: 'GET', url, params }),
+    getBlob: async (url) => {
+      const response = await instance.request<Blob>({ method: 'GET', url, responseType: 'blob' })
+      return response.data
+    },
     post: (url, data) => request({ method: 'POST', url, data }),
     postForm: (url, form) =>
       request({ method: 'POST', url, data: form, headers: { 'Content-Type': 'multipart/form-data' } }),

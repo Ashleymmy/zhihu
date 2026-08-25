@@ -51,6 +51,7 @@ import type {
   UpdatePlanReq,
   UpdateProjectReq,
   Withdrawal,
+  WithdrawalStatement,
   WithdrawalStatus,
   ZhihuTask,
 } from '@zhihu-koc/shared-contracts'
@@ -193,7 +194,22 @@ export function createWithdrawalsApi(http: HttpClient) {
     list: (params: { page?: number; pageSize?: number; status?: WithdrawalStatus } = {}) =>
       http.get<PageResp<Withdrawal>>('/withdrawals', params),
     /** 财务链未开放时服务端以 50310 拒绝（failedGates 透传到 ApiError）。 */
-    apply: (data: CreateWithdrawalReq) => http.post<{ id: string; status: WithdrawalStatus; riskFlags: string[] }>('/withdrawals', data),
+    apply: (data: CreateWithdrawalReq & {
+      settleType?: 'personal' | 'corporate'
+      companyName?: string
+      bankName?: string
+      bankAccount?: string
+      taxId?: string
+    }) => http.post<{ id: string; status: WithdrawalStatus; riskFlags: string[] }>('/withdrawals', data),
+    /** 上传发票（对公申请） */
+    uploadInvoice: (id: string, file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return http.postForm<{ name: string }>(`/withdrawals/${id}/invoice`, form)
+    },
+    /** 结算单数据 */
+    statement: (id: string) => http.get<WithdrawalStatement>(`/withdrawals/${id}/statement`),
+    downloadInvoice: (id: string) => http.getBlob(`/withdrawals/${id}/invoice`),
     /** 成员撤销（初审前） */
     cancel: (id: string) => http.post<void>(`/withdrawals/${id}/cancel`),
     /** 团长初审 */
