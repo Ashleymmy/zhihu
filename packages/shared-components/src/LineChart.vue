@@ -58,9 +58,9 @@ function fmtTick(v: number) {
     <svg :viewBox="`0 0 ${W} ${height}`" preserveAspectRatio="none" style="width: 100%; height: 100%; display: block;">
       <g v-for="t in gridTicks" :key="t.y">
         <line :x1="PAD.left" :y1="t.y" :x2="W - PAD.right" :y2="t.y" stroke="#dedbd4" stroke-width="1" :stroke-dasharray="t.value === 0 ? '' : '3 4'" />
-        <text :x="PAD.left - 8" :y="t.y + 3" text-anchor="end" fill="#8a9196" style="font-family: var(--font-mono); font-size: 10px;">{{ fmtTick(t.value) }}</text>
+        <text :x="PAD.left - 8" :y="t.y + 3" text-anchor="end" fill="#8a9196" style="font-family: var(--font-mono); font-size: 12px;">{{ fmtTick(t.value) }}</text>
       </g>
-      <text v-for="(label, i) in labels" :key="i" :x="x(i)" :y="height - 8" text-anchor="middle" fill="#8a9196" style="font-family: var(--font-mono); font-size: 10px;">{{ label }}</text>
+      <text v-for="(label, i) in labels" :key="i" :x="x(i)" :y="height - 8" text-anchor="middle" fill="#8a9196" style="font-family: var(--font-mono); font-size: 12px;">{{ label }}</text>
       <template v-for="(s, si) in series" :key="s.label">
         <path class="line-area" :d="areaFor(s.points)" :fill="s.color ?? palette[si % palette.length]" fill-opacity="0.06" />
         <path class="line-path" :d="pathFor(s.points)" :stroke="s.color ?? palette[si % palette.length]" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round" pathLength="1" />
@@ -76,7 +76,7 @@ function fmtTick(v: number) {
 <style scoped>
 .line-chart { display: grid; gap: 10px; }
 .line-chart-legend { display: flex; gap: 16px; }
-.line-chart-legend span { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; }
+.line-chart-legend span { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 12px; }
 .line-chart-legend i { width: 8px; height: 2px; }
 .line-path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: line-draw 0.7s var(--ease-out, ease) 0.05s forwards; }
 .line-area { opacity: 0; animation: line-area-in 0.5s ease 0.45s forwards; }

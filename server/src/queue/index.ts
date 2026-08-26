@@ -1,7 +1,7 @@
 import Queue, { Job, JobOptions } from 'bull';
 import { config } from '../config';
 
-export type JobName = 'push-plan' | 'push-composition' | 'sync-metrics' | 'sync-channels' | 'sync-tasks';
+export type JobName = 'push-plan' | 'push-composition' | 'sync-metrics' | 'sync-channels' | 'sync-tasks' | 'settle-earnings';
 export type JobHandler = (data: Record<string, unknown>) => Promise<void>;
 
 const handlers = new Map<JobName, JobHandler>();

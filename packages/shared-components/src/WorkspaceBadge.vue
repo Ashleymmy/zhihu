@@ -27,7 +27,7 @@ const tone = computed(() => roleTone(props.role))
   padding: 4px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 20px;
   white-space: nowrap;

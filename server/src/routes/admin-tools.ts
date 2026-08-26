@@ -5,6 +5,7 @@ import { requirePermission } from '../auth/permissions';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { ok, okList } from '../utils/response';
+import { enqueue } from '../queue';
 import {
   accountMonitor,
   activeAnnouncements,
@@ -24,6 +25,7 @@ const announcementInput = z.object({
   content: z.string().trim().min(1).max(2000),
 });
 const cleanupInput = z.object({ days: z.number().int().min(7).max(365) });
+const settleInput = z.object({ settleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
 
 /** 操作日志（admin 审计） */
 export const auditLogsRouter = Router();
@@ -48,6 +50,15 @@ adminToolsRouter.post(
   asyncHandler(async (req, res) => ok(res, await cleanupAuditLogs(req.user, req.body.days, req.ip))),
 );
 adminToolsRouter.get('/site-info', asyncHandler(async (_req, res) => ok(res, await siteInfo())));
+adminToolsRouter.post(
+  '/settle-earnings',
+  validateBody(settleInput),
+  asyncHandler(async (req, res) => {
+    const jobId = `settle-manual-${Date.now()}`;
+    await enqueue('settle-earnings', { source: 'manual', settleDate: req.body.settleDate }, { jobId });
+    ok(res, { jobId, message: '收益结算任务已加入队列' }, 202);
+  }),
+);
 
 /** 公告：管理面（admin） + 生效列表（全体登录用户） */
 export const announcementsRouter = Router();

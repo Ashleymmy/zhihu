@@ -39,7 +39,7 @@ defineProps<{
 }
 .finance-gate-banner__gates {
   margin: 10px 0 0;
-  font-size: 11px;
+  font-size: 13px;
   font-family: var(--font-mono);
 }
 .finance-gate-banner__gates code {
@@ -47,7 +47,7 @@ defineProps<{
   padding: 2px 8px;
   border-radius: 4px;
   background: var(--white);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.05em;
 }
 </style>

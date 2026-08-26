@@ -32,7 +32,7 @@ defineProps<{
   box-shadow: 6px 6px 0 rgba(32, 41, 35, 0.13);
 }
 .stat-card__label {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -46,7 +46,7 @@ defineProps<{
   color: var(--ink);
 }
 .stat-card__hint {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--moss);
 }
 </style>

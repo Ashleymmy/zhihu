@@ -69,9 +69,9 @@ const arcs = computed(() => {
 @keyframes donut-sweep { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .donut-chart circle { animation: none !important; } }
 .donut-center strong { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.03em; }
-.donut-center span { color: var(--ink-soft); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; }
+.donut-center span { color: var(--ink-soft); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; }
 .donut-legend { display: grid; gap: 8px; }
-.donut-legend span { display: flex; align-items: center; gap: 7px; color: var(--ink-soft); font-size: 11px; }
+.donut-legend span { display: flex; align-items: center; gap: 7px; color: var(--ink-soft); font-size: 13px; }
 .donut-legend i { width: 8px; height: 8px; border-radius: 1px; }
 .donut-legend b { margin-left: 2px; color: var(--ink); font-family: var(--font-mono); font-weight: 500; }
 </style>
