@@ -6,7 +6,7 @@ import { isApiError, type ApiError } from '@zhihu-koc/shared-services'
 import { FinanceGateBanner, StatCard, DonutChart, LineChart } from '@zhihu-koc/shared-components'
 import { formatCurrency, formatDate } from '@zhihu-koc/shared-utils'
 import { APP_ROLE } from '../app-config'
-import { apis } from '../stores/auth'
+import { apis, http } from '../stores/auth'
 
 const t = createTranslator(DEFAULT_LOCALE)
 
@@ -14,6 +14,9 @@ const summary = ref<EarningsSummary | null>(null)
 const earnings = ref<EarningRecord[]>([])
 const errorMessage = ref('')
 const financeGate = ref<ApiError | null>(null)
+const settling = ref(false)
+const settleDate = ref('')
+const showSettleDialog = ref(false)
 
 
 /* ===== 图表数据 ===== */
@@ -58,6 +61,42 @@ async function load() {
   }
 }
 
+function openSettleDialog() {
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  settleDate.value = yesterday.toISOString().slice(0, 10)
+  showSettleDialog.value = true
+}
+
+async function triggerSettle() {
+  if (!settleDate.value || settling.value) return
+  settling.value = true
+  errorMessage.value = ''
+  try {
+    const token = http.tokens.get()
+    if (!token) throw new Error('未登录')
+    const response = await fetch('/api/v1/admin-tools/settle-earnings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ settleDate: settleDate.value }),
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || '结算失败')
+    }
+    showSettleDialog.value = false
+    alert(`${settleDate.value} 的收益结算任务已加入队列，请稍后刷新页面查看新记录`)
+    await load()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '结算失败'
+  } finally {
+    settling.value = false
+  }
+}
+
 
 onMounted(load)
 </script>
@@ -96,7 +135,12 @@ onMounted(load)
     </section>
 
     <section class="panel">
-      <h2>{{ t('nav.earnings') }}</h2>
+      <div class="section-header">
+        <h2>{{ t('nav.earnings') }}</h2>
+        <button class="btn-settle" @click="openSettleDialog" :disabled="settling">
+          {{ settling ? '结算中...' : '手动结算' }}
+        </button>
+      </div>
       <p v-if="!earnings.length" class="page-placeholder">{{ t('earnings.empty') }}</p>
       <table v-else class="panel__table">
         <thead>
@@ -127,6 +171,24 @@ onMounted(load)
       <p class="page-placeholder">提现申请与审批已迁移至「提现审批」页（二级审批：团长初审 → 管理员终审放款）。</p>
       <router-link to="/withdrawals" class="withdraw-link">前往提现审批 →</router-link>
     </section>
+
+    <!-- 手动结算弹窗 -->
+    <div v-if="showSettleDialog" class="modal-overlay" @click.self="showSettleDialog = false">
+      <div class="modal-content">
+        <h3>手动结算</h3>
+        <p class="modal-hint">从知乎拉取的收益数据会按定价规则重新计算并生成待确认记录</p>
+        <div class="form-field">
+          <label for="settle-date">结算日期</label>
+          <input id="settle-date" type="date" v-model="settleDate" :max="new Date().toISOString().slice(0, 10)" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showSettleDialog = false" :disabled="settling">取消</button>
+          <button class="btn-primary" @click="triggerSettle" :disabled="settling || !settleDate">
+            {{ settling ? '结算中...' : '确认结算' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -295,4 +357,115 @@ onMounted(load)
   background: #f1ded9;
 }
 .withdraw-link { display: inline-block; margin-top: 8px; color: var(--clay-deep); font-size: 12px; font-weight: 600; }
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.section-header h2 {
+  margin: 0;
+}
+.btn-settle {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-settle:hover:not(:disabled) {
+  background: var(--accent-deep);
+}
+.btn-settle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: var(--white);
+  padding: 24px;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  width: 90%;
+}
+.modal-content h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.modal-hint {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.form-field {
+  margin-bottom: 20px;
+}
+.form-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.form-field input[type="date"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--ink);
+}
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.btn-primary, .btn-secondary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-deep);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--paper-deep);
+}
 </style>

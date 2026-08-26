@@ -17,6 +17,7 @@ const http = createHttpClient({
 })
 
 export const apis = createApis(http)
+export { http }
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
