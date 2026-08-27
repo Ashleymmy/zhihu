@@ -125,6 +125,7 @@ const clientOnlyDefinitions: ReadonlyArray<AllianceEndpointDefinition> = [
   { definitionKey: 'GET /content_tag', method: 'GET', publicPath: '/content_tag', clientPath: '/alliance/api/content_tag', upstreamPath: '/content_tag', requestKind: 'query', requiredPermission: 'story.read' },
   { definitionKey: 'GET /popularize_tasks', method: 'GET', publicPath: '/popularize_tasks', clientPath: '/alliance/api/popularize_tasks', upstreamPath: '/popularize_tasks', requestKind: 'query', requiredPermission: 'project.manage' },
   { definitionKey: 'GET /get_agent_channels', method: 'GET', publicPath: '/get_agent_channels', clientPath: '/alliance/api/get_agent_channels', upstreamPath: '/get_agent_channels', requestKind: 'query', requiredPermission: 'project.manage' },
+  { definitionKey: 'GET /popularize_plans', method: 'GET', publicPath: '/popularize_plans', clientPath: '/alliance/api/popularize_plans', upstreamPath: '/popularize_plans', requestKind: 'query', requiredPermission: 'project.manage' },
 ];
 
 const registeredEndpoints = new WeakSet<object>();

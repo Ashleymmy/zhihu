@@ -284,6 +284,7 @@ export interface Composition {
   status: 'pending' | 'active' | 'rejected' | 'ended'
   rejectReason: string | null
   syncStatus: 'local' | 'syncing' | 'synced' | 'failed'
+  zhihuStatusJson: Record<string, unknown> | null
   keyword?: string
   channelName?: string
   createdAt: string
@@ -374,6 +375,7 @@ export interface Plan {
   syncStatus: SyncStatus
   syncError: string | null
   zhihuPlanId: string | null
+  zhihuStatusJson: Record<string, unknown> | null
   createdAt: string
   updatedAt: string
 }

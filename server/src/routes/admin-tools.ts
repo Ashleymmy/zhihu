@@ -68,6 +68,22 @@ adminToolsRouter.post(
     ok(res, { jobId, message: '收益结算任务已加入队列' }, 202);
   }),
 );
+adminToolsRouter.post(
+  '/sync-plan-status',
+  asyncHandler(async (_req, res) => {
+    const jobId = `sync-plan-status-manual-${Date.now()}`;
+    await enqueue('sync-plan-status', { source: 'manual' }, { jobId });
+    ok(res, { jobId, message: '推广计划审核状态同步任务已加入队列' }, 202);
+  }),
+);
+adminToolsRouter.post(
+  '/sync-composition-status',
+  asyncHandler(async (_req, res) => {
+    const jobId = `sync-composition-status-manual-${Date.now()}`;
+    await enqueue('sync-composition-status', { source: 'manual' }, { jobId });
+    ok(res, { jobId, message: '作品审核状态同步任务已加入队列' }, 202);
+  }),
+);
 
 /** 公告：管理面（admin） + 生效列表（全体登录用户） */
 export const announcementsRouter = Router();

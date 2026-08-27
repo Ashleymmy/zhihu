@@ -18,14 +18,28 @@ async function load() {
   try { info.value = await apis.adminTools.siteInfo() } catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
-async function trigger(kind: 'channels' | 'tasks' | 'metrics') {
+async function trigger(kind: 'channels' | 'tasks' | 'metrics' | 'planStatus' | 'compositionStatus') {
   syncing.value = kind
   message.value = ''
   error.value = ''
   try {
     if (kind === 'channels') await apis.channels.sync()
     else if (kind === 'tasks') await apis.story.syncTasks()
-    else await apis.metrics.sync()
+    else if (kind === 'metrics') await apis.metrics.sync()
+    else if (kind === 'planStatus') {
+      // 调用推广计划审核状态同步
+      await fetch('/api/v1/admin-tools/sync-plan-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` }
+      })
+    }
+    else if (kind === 'compositionStatus') {
+      // 调用作品审核状态同步
+      await fetch('/api/v1/admin-tools/sync-composition-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` }
+      })
+    }
     message.value = '同步任务已入队，稍后自动刷新。'
     setTimeout(load, 6000)
   } catch (e: any) { error.value = e?.message ?? String(e) }
@@ -81,6 +95,14 @@ onMounted(load)
             <div class="sync-row">
               <div><strong>运营指标</strong><small>上次同步：{{ fmt(info?.sync.metrics ?? null) }}</small></div>
               <button class="row-action" :disabled="!!syncing" @click="trigger('metrics')">{{ syncing === 'metrics' ? '入队中...' : '立即同步' }}</button>
+            </div>
+            <div class="sync-row">
+              <div><strong>推广计划审核状态</strong><small>从知乎拉取计划的审核状态与拒绝原因</small></div>
+              <button class="row-action" :disabled="!!syncing" @click="trigger('planStatus')">{{ syncing === 'planStatus' ? '入队中...' : '立即同步' }}</button>
+            </div>
+            <div class="sync-row">
+              <div><strong>作品审核状态</strong><small>从知乎拉取作品的审核状态与拒绝原因</small></div>
+              <button class="row-action" :disabled="!!syncing" @click="trigger('compositionStatus')">{{ syncing === 'compositionStatus' ? '入队中...' : '立即同步' }}</button>
             </div>
           </div>
         </article>

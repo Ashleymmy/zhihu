@@ -18,6 +18,24 @@ interface TaskOption { id: string; zhihuTaskId: string; name: string }
 
 const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
 const statusLabels: Record<string, string> = { active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝', archived: '已归档' }
+const zhihuAuditLabels: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  auditing: '审核中',
+}
+
+function getZhihuAuditStatus(plan: Plan): { label: string; color: string; reason?: string } | null {
+  if (!plan.zhihuStatusJson) return null
+  const audit = (plan.zhihuStatusJson.auditStatus ?? plan.zhihuStatusJson.audit_status) as string | undefined
+  const reason = (plan.zhihuStatusJson.rejectReason ?? plan.zhihuStatusJson.reject_reason) as string | undefined
+  if (!audit) return null
+  return {
+    label: zhihuAuditLabels[audit] ?? audit,
+    color: audit === 'approved' ? 'active' : audit === 'rejected' ? 'rejected' : 'draft',
+    reason: reason || undefined
+  }
+}
 
 /** picker blur 延迟收起（让点击选项先生效） */
 function closeTaskPicker() { setTimeout(() => { taskPickerOpen.value = false }, 150) }
@@ -230,6 +248,7 @@ onMounted(load)
               <th>日预算</th>
               <th>状态</th>
               <th>同步</th>
+              <th>知乎审核</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -245,6 +264,17 @@ onMounted(load)
                   {{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败' }[plan.syncStatus] }}
                 </span>
                 <small v-if="plan.syncError" style="display: block; margin-top: 4px; font-size: 11px; color: var(--clay);">{{ plan.syncError }}</small>
+              </td>
+              <td>
+                <template v-if="getZhihuAuditStatus(plan)">
+                  <span :class="['status-badge', getZhihuAuditStatus(plan)!.color]">
+                    {{ getZhihuAuditStatus(plan)!.label }}
+                  </span>
+                  <small v-if="getZhihuAuditStatus(plan)!.reason" style="display: block; margin-top: 4px; font-size: 11px; color: var(--clay);">
+                    {{ getZhihuAuditStatus(plan)!.reason }}
+                  </small>
+                </template>
+                <span v-else style="color: var(--ink-soft); font-size: 12px;">—</span>
               </td>
               <td>
                 <div style="display: flex; gap: 6px;">
