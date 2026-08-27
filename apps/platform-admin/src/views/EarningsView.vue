@@ -369,8 +369,8 @@ onMounted(load)
 }
 .btn-settle {
   padding: 8px 16px;
-  background: var(--accent);
-  color: white;
+  background: var(--ink);
+  color: var(--paper);
   border: none;
   border-radius: var(--radius);
   font-size: 13px;
@@ -379,7 +379,7 @@ onMounted(load)
   transition: all 0.2s;
 }
 .btn-settle:hover:not(:disabled) {
-  background: var(--accent-deep);
+  background: var(--forest-deep);
 }
 .btn-settle:disabled {
   opacity: 0.5;
@@ -451,11 +451,11 @@ onMounted(load)
   transition: all 0.2s;
 }
 .btn-primary {
-  background: var(--accent);
-  color: white;
+  background: var(--ink);
+  color: var(--paper);
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-deep);
+  background: var(--forest-deep);
 }
 .btn-primary:disabled {
   opacity: 0.5;
