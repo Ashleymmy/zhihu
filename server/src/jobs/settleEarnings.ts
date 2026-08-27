@@ -34,11 +34,22 @@ interface UserRow extends RowDataPacket {
  * 4. 生成 earnings 记录（达人 + 团长），标记 daily_metrics 已结算
  */
 export async function settleEarnings(data?: Record<string, unknown>) {
-  const settleDate = data?.settleDate ? String(data.settleDate) : (() => {
+  const defaultDate = (() => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - 1); // 默认结算昨天的数据
     return d.toISOString().slice(0, 10);
   })();
+  const from = data?.from ? String(data.from) : (data?.settleDate ? String(data.settleDate) : defaultDate);
+  const to = data?.to ? String(data.to) : from;
+
+  // 逐日结算区间
+  for (let day = new Date(from); day <= new Date(to); day.setUTCDate(day.getUTCDate() + 1)) {
+    const settleDate = day.toISOString().slice(0, 10);
+    await settleOneDay(settleDate);
+  }
+}
+
+async function settleOneDay(settleDate: string) {
 
   // 1. 获取活跃定价规则
   const [creatorRules] = await rows<PricingRule>(

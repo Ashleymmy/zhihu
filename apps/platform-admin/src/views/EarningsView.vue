@@ -15,7 +15,8 @@ const earnings = ref<EarningRecord[]>([])
 const errorMessage = ref('')
 const financeGate = ref<ApiError | null>(null)
 const settling = ref(false)
-const settleDate = ref('')
+const settleFrom = ref('')
+const settleTo = ref('')
 const showSettleDialog = ref(false)
 
 
@@ -64,12 +65,17 @@ async function load() {
 function openSettleDialog() {
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
-  settleDate.value = yesterday.toISOString().slice(0, 10)
+  settleTo.value = yesterday.toISOString().slice(0, 10)
+  settleFrom.value = settleTo.value
   showSettleDialog.value = true
 }
 
 async function triggerSettle() {
-  if (!settleDate.value || settling.value) return
+  if (!settleFrom.value || !settleTo.value || settling.value) return
+  if (settleFrom.value > settleTo.value) {
+    errorMessage.value = '开始日期不能晚于结束日期'
+    return
+  }
   settling.value = true
   errorMessage.value = ''
   try {
@@ -81,14 +87,14 @@ async function triggerSettle() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ settleDate: settleDate.value }),
+      body: JSON.stringify({ from: settleFrom.value, to: settleTo.value }),
     })
     if (!response.ok) {
       const error = await response.json()
       throw new Error(error.message || '结算失败')
     }
     showSettleDialog.value = false
-    alert(`${settleDate.value} 的收益结算任务已加入队列，请稍后刷新页面查看新记录`)
+    alert(`${settleFrom.value} ~ ${settleTo.value} 的收益结算任务已加入队列，请稍后刷新页面查看新记录`)
     await load()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '结算失败'
@@ -178,12 +184,16 @@ onMounted(load)
         <h3>手动结算</h3>
         <p class="modal-hint">从知乎拉取的收益数据会按定价规则重新计算并生成待确认记录</p>
         <div class="form-field">
-          <label for="settle-date">结算日期</label>
-          <input id="settle-date" type="date" v-model="settleDate" :max="new Date().toISOString().slice(0, 10)" />
+          <label>开始日期</label>
+          <input type="date" v-model="settleFrom" :max="settleTo" />
+        </div>
+        <div class="form-field">
+          <label>结束日期</label>
+          <input type="date" v-model="settleTo" :max="new Date().toISOString().slice(0, 10)" />
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showSettleDialog = false" :disabled="settling">取消</button>
-          <button class="btn-primary" @click="triggerSettle" :disabled="settling || !settleDate">
+          <button class="btn-primary" @click="triggerSettle" :disabled="settling || !settleFrom || !settleTo">
             {{ settling ? '结算中...' : '确认结算' }}
           </button>
         </div>
