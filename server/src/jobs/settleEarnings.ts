@@ -51,17 +51,15 @@ export async function settleEarnings(data?: Record<string, unknown>) {
 
 async function settleOneDay(settleDate: string) {
 
-  // 1. 获取活跃定价规则
+  // 1. 获取活跃定价规则；缺规则走批次结算同款语义：达人全额入账(passthrough)、团长不计提
   const [creatorRules] = await rows<PricingRule>(
     "SELECT * FROM pricing_rules WHERE target_role='creator' AND status='active' ORDER BY priority DESC, id DESC LIMIT 1",
   );
   const [leaderRules] = await rows<PricingRule>(
     "SELECT * FROM pricing_rules WHERE target_role='leader' AND status='active' ORDER BY priority DESC, id DESC LIMIT 1",
   );
-  if (!creatorRules || !leaderRules) {
-    console.warn('settleEarnings: 缺少定价规则，跳过结算');
-    return;
-  }
+  if (!creatorRules) console.warn('settleEarnings: 未配置达人定价规则，按全额入账');
+  if (!leaderRules) console.warn('settleEarnings: 未配置团长定价规则，团长不计提');
 
   // 2. 找到未结算的 daily_metrics（earning > 0 且没有对应 earnings 记录）
   const unsettled = await rows<MetricRow>(
@@ -89,11 +87,11 @@ async function settleOneDay(settleDate: string) {
   for (const metric of unsettled) {
     const zhihuEarning = Number(metric.earning); // 知乎官方给的收益
 
-    // 3. 计算达人应得（按 creator 定价规则）
-    let creatorAmount = 0;
-    if (creatorRules.method === 'percentage' && creatorRules.percentage) {
+    // 3. 计算达人应得（按 creator 定价规则；无规则则全额入账）
+    let creatorAmount = zhihuEarning;
+    if (creatorRules?.method === 'percentage' && creatorRules.percentage) {
       creatorAmount = zhihuEarning * Number(creatorRules.percentage);
-    } else if (creatorRules.method === 'fixed' && creatorRules.unit_price) {
+    } else if (creatorRules?.method === 'fixed' && creatorRules.unit_price) {
       creatorAmount = Number(creatorRules.unit_price); // 固定单价（转化按次计费）
     }
 
@@ -108,7 +106,7 @@ async function settleOneDay(settleDate: string) {
 
     if (creator?.parent_id) {
       // 5. 团长抽成
-      if (leaderRules.method === 'percentage' && leaderRules.percentage) {
+      if (leaderRules?.method === 'percentage' && leaderRules.percentage) {
         leaderAmount = creatorAmount * Number(leaderRules.percentage);
         finalCreatorAmount = creatorAmount - leaderAmount; // 达人最终 = 应得 - 团长抽成
       }
