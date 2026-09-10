@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { publicPlanSyncError } from '../../src/services/plans.service';
-import { buildPlanPayload, pushPlan } from '../../src/jobs/pushPlan';
-import type { PlanPayloadInput } from '../../src/jobs/pushPlan';
-import { PLAN_UPDATE_UNSUPPORTED_ERROR } from '../../src/zhihu/allianceVersionPolicy';
+import { publicPlanSyncError } from '../../src/modules/zhihu/services/plans.service';
+import { buildPlanPayload, pushPlan } from '../../src/modules/zhihu/jobs/pushPlan';
+import type { PlanPayloadInput } from '../../src/modules/zhihu/jobs/pushPlan';
+import { PLAN_UPDATE_UNSUPPORTED_ERROR } from '../../src/modules/zhihu/zhihu/allianceVersionPolicy';
 
 const mocks = vi.hoisted(() => ({
   dbQuery: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('../../src/db', () => ({
   rows: mocks.rows,
 }));
 
-vi.mock('../../src/zhihu/client', () => ({
+vi.mock('../../src/modules/zhihu/zhihu/client', () => ({
   zhihuPost: mocks.zhihuPost,
   zhihuSyncErrorDetail: mocks.zhihuSyncErrorDetail,
 }));

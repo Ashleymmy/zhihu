@@ -1,4 +1,4 @@
-import { parseEnvironment } from '../../src/config';
+import { parseEnvironment } from '../../src/modules/zhihu/config';
 
 describe('配置校验', () => {
   it('生产环境拒绝默认安全凭据', () => {

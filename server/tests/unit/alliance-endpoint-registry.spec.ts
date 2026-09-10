@@ -7,7 +7,7 @@ import {
   isRegisteredAllianceEndpoint,
   resolveClientEndpoint,
   resolvePublicEndpoint,
-} from '../../src/zhihu/allianceEndpointRegistry';
+} from '../../src/modules/zhihu/zhihu/allianceEndpointRegistry';
 
 describe('Alliance Endpoint Registry', () => {
   it('P0007-R1-REG-001 exposes the exact seven-operation allowlist', () => {

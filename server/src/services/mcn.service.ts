@@ -3,6 +3,7 @@ import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
 import { AuthUser } from '../types';
 import { writeAudit } from './audit.service';
+import { createDevDemoMcnAccount, isDevDemoAuthUser, listDevDemoMcnAccounts } from '../core/demo';
 
 interface McnAccountRow extends RowDataPacket {
   id: string;
@@ -29,7 +30,9 @@ const publicAccount = (row: McnAccountRow) => ({
   updatedAt: row.updated_at,
 });
 
-export async function listMcnAccounts() {
+export async function listMcnAccounts(user?: AuthUser) {
+  if (user && isDevDemoAuthUser(user)) return listDevDemoMcnAccounts();
+
   const accounts = await rows<McnAccountRow>('SELECT * FROM mcn_accounts ORDER BY id');
   return accounts.map(publicAccount);
 }
@@ -39,6 +42,14 @@ export async function createMcnAccount(
   input: { accountKey: string; accountName: string; ownerUserId?: string },
   ip?: string,
 ) {
+  if (isDevDemoAuthUser(user)) {
+    return createDevDemoMcnAccount({
+      accountKey: input.accountKey,
+      accountName: input.accountName,
+      ownerUserId: input.ownerUserId ?? user.sub,
+    });
+  }
+
   const ownerUserId = input.ownerUserId ?? user.sub;
   const [owner] = await rows<UserRow>('SELECT id, is_active FROM users WHERE id = ? LIMIT 1', [ownerUserId]);
   if (!owner || !owner.is_active) throw new AppError(422, 42206, '账户负责人不存在或已停用');

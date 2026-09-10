@@ -21,7 +21,7 @@ import {
   RedisAllianceQuotaStore,
   type AllianceQuotaPolicy,
   type AllianceQuotaRedisClient,
-} from '../../src/zhihu/allianceQuota';
+} from '../../src/modules/zhihu/zhihu/allianceQuota';
 import { TEST_ALLIANCE_QUOTA_POLICY } from '../support/allianceQuotaFixture';
 
 function policy(dailyBudget: number, cost = 1): AllianceQuotaPolicy {
@@ -322,8 +322,8 @@ describe('联盟账号级 Quota', () => {
 
   it('P0007-R4-CONFIG-001 reserves 50320 exclusively for quota unavailability', () => {
     const source = [
-      readFileSync(resolve(process.cwd(), 'src/routes/alliance.ts'), 'utf8'),
-      readFileSync(resolve(process.cwd(), 'src/zhihu/allianceQuota.ts'), 'utf8'),
+      readFileSync(resolve(process.cwd(), 'src/modules/zhihu/routes/alliance.ts'), 'utf8'),
+      readFileSync(resolve(process.cwd(), 'src/modules/zhihu/zhihu/allianceQuota.ts'), 'utf8'),
     ].join('\n');
     expect(source).toContain('50320');
     expect(source).toContain('知乎配额服务暂不可用');

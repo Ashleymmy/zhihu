@@ -38,6 +38,12 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(error.httpStatus).json({ code: error.code, data: null, message: error.message, ...error.extras });
     return;
   }
+  if ((error as {code?:string}).code === 'ER_ROW_IS_REFERENCED_2') {
+    res.status(409).json({code:40903,data:null,message:'存在关联历史数据，无法删除；请停用该账号'});return;
+  }
+  if ((error as {code?:string}).code === 'ER_NO_REFERENCED_ROW_2') {
+    res.status(422).json({code:42203,data:null,message:'关联记录不存在'});return;
+  }
   if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
     res.status(409).json({ code: 40900, data: null, message: '记录已存在' });
     return;

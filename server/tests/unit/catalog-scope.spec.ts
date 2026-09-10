@@ -1,4 +1,4 @@
-import { channelVisibility } from '../../src/services/catalog.service';
+import { channelVisibility } from '../../src/modules/zhihu/services/catalog.service';
 import { AuthUser } from '../../src/types';
 
 const member: AuthUser = {

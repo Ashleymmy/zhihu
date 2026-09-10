@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildCompositionPayload, pushComposition } from '../../src/jobs/pushComposition';
+import { buildCompositionPayload, pushComposition } from '../../src/modules/zhihu/jobs/pushComposition';
 
 const mocks = vi.hoisted(() => ({
   dbQuery: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../../src/db', () => ({
   rows: mocks.rows,
 }));
 
-vi.mock('../../src/zhihu/client', () => ({
+vi.mock('../../src/modules/zhihu/zhihu/client', () => ({
   zhihuPost: mocks.zhihuPost,
   zhihuPut: mocks.zhihuPut,
   zhihuSyncErrorDetail: mocks.zhihuSyncErrorDetail,

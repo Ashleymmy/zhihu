@@ -12,7 +12,7 @@ const loginSchema = z.object({ username: z.string().trim().min(1).max(64), passw
 const passwordSchema = z.object({ oldPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128) });
 
 export const REFRESH_COOKIE_NAME = 'zk_refresh';
-const REFRESH_COOKIE_PATH = '/api/v1/auth';
+const REFRESH_COOKIE_PATH = '/api/v1';
 
 /** 只解析 Refresh Cookie，避免引入整站 cookie 中间件。 */
 export function readRefreshCookie(req: Request): string | null {

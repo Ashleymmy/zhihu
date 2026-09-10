@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { McnAccount } from '@zhihu-koc/shared-contracts'
+import type { McnAccount } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
 
 const accounts = ref<McnAccount[]>([])

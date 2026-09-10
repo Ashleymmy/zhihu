@@ -2,7 +2,7 @@ import {
   installAllianceAuditSink,
   resetAllianceAuditSink,
   type AllianceRejectedAuditEvent,
-} from '../../src/zhihu/allianceAudit';
+} from '../../src/modules/zhihu/zhihu/allianceAudit';
 
 export function installAllianceAuditTestSink() {
   const events: AllianceRejectedAuditEvent[] = [];

@@ -1,22 +1,23 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { AuthUser } from '@zhihu-koc/shared-contracts'
-import { createApis, createHttpClient, isApiError } from '@zhihu-koc/shared-services'
+import type { AuthUser } from '@zhihu-koc/shared-contracts/core'
+import { createCoreApis, createHttpClient, isApiError } from '@zhihu-koc/shared-services/core'
 import { DEFAULT_LOCALE, createTranslator } from '@zhihu-koc/shared-i18n'
 import { checkWorkspaceAccess } from '../access'
 
 const translate = createTranslator(DEFAULT_LOCALE)
 
 const http = createHttpClient({
+  baseURL: '/api/v1/core',
   onUnauthorized: () => {
     // 会话彻底失效（refresh 也失败）时回到登录页。
     if (globalThis.location && !globalThis.location.pathname.endsWith('/login')) {
-      globalThis.location.href = '/login'
+      globalThis.location.href = import.meta.env.BASE_URL + 'login'
     }
   },
 })
 
-export const apis = createApis(http)
+export const apis = createCoreApis(http)
 export { http }
 
 export const useAuthStore = defineStore('auth', () => {

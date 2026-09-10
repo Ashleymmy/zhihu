@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { TeamMember, CreateMemberResp, TeamApplication } from '@zhihu-koc/shared-contracts'
+import type { TeamMember, CreateMemberResp, TeamApplication } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()

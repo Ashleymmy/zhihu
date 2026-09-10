@@ -1,4 +1,4 @@
-import { buildSignature, buildSignatureTrace, injectSignParams } from '../../src/sign/zhihu';
+import { buildSignature, buildSignatureTrace, injectSignParams } from '../../src/modules/zhihu/sign/zhihu';
 
 describe('知乎签名', () => {
   it('匹配规范 Golden Vector', () => {

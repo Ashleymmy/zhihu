@@ -1,7 +1,7 @@
 import request from 'supertest';
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 import { signToken } from '../../src/auth/jwt';
-import { isCompositionCategoryValid, isZonedIsoDateTime, normalizeMediaType, normalizeZonedIsoDateTime } from '../../src/zhihu/composition';
+import { isCompositionCategoryValid, isZonedIsoDateTime, normalizeMediaType, normalizeZonedIsoDateTime } from '../../src/modules/zhihu/zhihu/composition';
 
 describe('作品 v2 契约', () => {
   it('兼容旧数字媒体类型并统一为知乎字符串', () => {

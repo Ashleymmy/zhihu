@@ -7,7 +7,7 @@ import { config } from '../config';
  */
 export const logger = pino({
   level: process.env.LOG_LEVEL ?? (config.nodeEnv === 'production' ? 'info' : 'debug'),
-  base: { service: 'zhihu-bff', env: config.nodeEnv },
+  base: { service: 'opc', env: config.nodeEnv },
   ...(config.nodeEnv === 'production'
     ? {}
     : { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'HH:MM:ss' } } }),
@@ -16,6 +16,7 @@ export const logger = pino({
 /** HTTP 请求日志中间件用（pino-http） */
 export const httpLoggerOptions = {
   logger,
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
   // 不记录健康检查与静态资源，避免噪音
   autoLogging: { ignore: (req: { url?: string }) => /^\/(healthz|metrics|portal|landing|admin|leader|creator|manus-storage)/.test(req.url ?? '') },
   customLogLevel: (_req: unknown, res: { statusCode: number }, err: unknown) =>

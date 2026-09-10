@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
-import type { RefreshResp } from '@zhihu-koc/shared-contracts'
+import type { RefreshResp } from '@zhihu-koc/shared-contracts/core'
 import { createSessionTokenStore, type TokenStore } from './token-store'
 
 export interface ApiError {
@@ -17,6 +17,7 @@ export function isApiError(value: unknown): value is ApiError {
 
 export interface HttpClientOptions {
   baseURL?: string
+  refreshBaseURL?: string
   tokenStore?: TokenStore
   /** Access Token 失效且 refresh 也失败时的回调（通常跳登录页）。 */
   onUnauthorized?: () => void
@@ -72,6 +73,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
         const response = await instance.request<RawEnvelope<RefreshResp>>({
           method: 'POST',
           url: REFRESH_PATH,
+          baseURL: options.refreshBaseURL ?? options.baseURL,
           // 刷新自身不允许再触发刷新。
           headers: { Authorization: '' },
         })

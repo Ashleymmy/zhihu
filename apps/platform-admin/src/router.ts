@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { PlatformDashboard, ModuleDirectory, PublicFinance } from '@zhihu-koc/shared-components'
 import { useAuthStore } from './stores/auth'
-
+import { workspace } from './stores/platform'
+import { installBusinessRoutes } from './composition/modules'
 export function createAppRouter() {
   const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -13,69 +15,102 @@ export function createAppRouter() {
       },
       {
         path: '/',
+        name: 'shell',
         component: () => import('./layouts/ShellLayout.vue'),
         meta: { requiresAuth: true },
         children: [
           { path: '', redirect: '/dashboard' },
-          // ── 数据看板 ──
-          { path: 'dashboard', name: 'dashboard', component: () => import('./views/DashboardView.vue'), meta: { title: '数据看板' } },
-          // ── 订单管理 ──
-          { path: 'orders', name: 'orders', component: () => import('./views/OrdersView.vue'), meta: { title: '订单管理' } },
-          // ── 结算管理 ──
-          { path: 'settlements', name: 'settlements', component: () => import('./views/SettlementView.vue'), meta: { title: '结算管理' } },
-          { path: 'appeals', name: 'appeals', component: () => import('./views/AppealsView.vue'), meta: { title: '财务申诉' } },
-          { path: 'withdrawals', name: 'withdrawals', component: () => import('./views/WithdrawalsView.vue'), meta: { title: '提现审批' } },
-          // ── 推广管理 ──
-          { path: 'plans', name: 'plans', component: () => import('./views/PlansView.vue'), meta: { title: '推广计划' } },
-          { path: 'keywords', name: 'keywords', component: () => import('./views/KeywordsView.vue'), meta: { title: '关键词回传' } },
-          { path: 'callbacks', name: 'callbacks', component: () => import('./views/CallbackConfigView.vue'), meta: { title: '回传配置' } },
-          // ── 创意工具坊 ──
-          { path: 'creative-tools', name: 'creative-tools', component: () => import('./views/CreativeToolsView.vue'), meta: { title: '创意工具坊' } },
-          // ── 项目管理 ──
-          { path: 'projects', name: 'projects', component: () => import('./views/ProjectsView.vue'), meta: { title: '项目管理' } },
-          { path: 'zhihu-story', name: 'zhihu-story', component: () => import('./views/ZhihuStoryView.vue'), meta: { title: '知乎故事' } },
-{ path: 'zhihu-story/plans', name: 'story-plans', component: () => import('./views/PlansView.vue'), meta: { title: '推广计划' } },
-          { path: 'zhihu-story/works', name: 'story-works', component: () => import('./views/StoryWorksView.vue'), meta: { title: '作品管理' } },
-          { path: 'zhihu-story/tasks', name: 'story-tasks', component: () => import('./views/StoryTasksView.vue'), meta: { title: '任务列表' } },
-          { path: 'zhihu-story/salt', name: 'story-salt', component: () => import('./views/StorySaltView.vue'), meta: { title: '盐选榜单' } },
-          { path: 'zhihu-story/comments', name: 'story-comments', component: () => import('./views/StoryInterceptView.vue'), meta: { title: '评论截流' } },
-          { path: 'zhihu-story/risk', name: 'story-risk', component: () => import('./views/StoryRiskView.vue'), meta: { title: '风险举报' } },
-          { path: 'zhihu-story/media', name: 'story-media', component: () => import('./views/StoryMediaView.vue'), meta: { title: '有声书漫画' } },
-          { path: 'zhihu-story/tags', name: 'story-tags', component: () => import('./views/StoryTagView.vue'), meta: { title: '内容标签' } },
-          { path: 'zhihu-story/products', name: 'story-products', component: () => import('./views/StoryProductsView.vue'), meta: { title: '产品库' } },
-          { path: 'zhihu-story/assets', name: 'story-assets', component: () => import('./views/StoryModuleView.vue'), meta: { title: '素材库', storyModule: 'assets' } },
-          // ── 知识付费 ──
-          { path: 'knowledge', name: 'knowledge', component: () => import('./views/KnowledgePayView.vue'), meta: { title: '知识付费' } },
-          // ── 账户管理 ──
-          { path: 'team', name: 'team', component: () => import('./views/TeamView.vue'), meta: { title: '用户管理' } },
-          { path: 'mcn', name: 'mcn', component: () => import('./views/McnView.vue'), meta: { title: 'MCN管理' } },
-          // ── 数据分析 ──
-          { path: 'analytics', name: 'analytics', component: () => import('./views/AnalyticsView.vue'), meta: { title: '数据分析' } },
-          // ── 系统工具 ──
-          { path: 'system', name: 'system', component: () => import('./views/SystemToolsView.vue'), meta: { title: '系统工具' } },
-          { path: 'system/data', name: 'system-data', component: () => import('./views/SysDataView.vue'), meta: { title: '数据处理与授权' } },
-          { path: 'system/monitor', name: 'system-monitor', component: () => import('./views/SysMonitorView.vue'), meta: { title: '子账号监控' } },
-          { path: 'system/db', name: 'system-db', component: () => import('./views/SysDbView.vue'), meta: { title: '数据库维护' } },
-          { path: 'system/announcements', name: 'system-announcements', component: () => import('./views/SysAnnouncementsView.vue'), meta: { title: '系统公告' } },
-          { path: 'system/site', name: 'system-site', component: () => import('./views/SysSiteView.vue'), meta: { title: '站点维护' } },
-          { path: 'audit-log', name: 'audit-log', component: () => import('./views/AuditLogView.vue'), meta: { title: '审计日志' } },
-          // ── 收益 ──
-          { path: 'earnings', name: 'earnings', component: () => import('./views/EarningsView.vue'), meta: { title: '收益结算' } },
+          { path: 'dashboard', name: 'dashboard', component: PlatformDashboard, meta: { title: '工作台' } },
+          { path: 'modules', name: 'modules', component: ModuleDirectory, meta: { title: '业务模块' } },
+          { path: 'finance', name: 'finance', component: PublicFinance, meta: { title: '财务中心' } },
+          {
+            path: 'projects',
+            name: 'projects',
+            component: () => import('./views/ProjectsView.vue'),
+            meta: { title: '项目管理' },
+          },
+          {
+            path: 'team',
+            name: 'team',
+            component: () => import('./views/TeamView.vue'),
+            meta: { title: '用户管理' },
+          },
+          {
+            path: 'mcn',
+            name: 'mcn',
+            component: () => import('./views/McnView.vue'),
+            meta: { title: 'MCN管理' },
+          },
+          {
+            path: 'system/monitor',
+            name: 'system-monitor',
+            component: () => import('./views/SysMonitorView.vue'),
+            meta: { title: '子账号监控' },
+          },
+          {
+            path: 'system/db',
+            name: 'system-db',
+            component: () => import('./views/SysDbView.vue'),
+            meta: { title: '数据库维护' },
+          },
+          {
+            path: 'system/announcements',
+            name: 'system-announcements',
+            component: () => import('./views/SysAnnouncementsView.vue'),
+            meta: { title: '系统公告' },
+          },
+          {
+            path: 'audit-log',
+            name: 'audit-log',
+            component: () => import('./views/AuditLogView.vue'),
+            meta: { title: '审计日志' },
+          },
+          {
+            path: ':pathMatch(.*)*',
+            name: 'not-found',
+            component: () => import('./views/UnavailableView.vue'),
+            meta: { title: '页面不可用' },
+          },
         ],
       },
-      { path: '/:pathMatch(.*)*', redirect: '/' },
     ],
   })
-
+  let installedFor: object | null = null
+  let removeRoutes: Array<() => void> = []
   router.beforeEach(async (to) => {
     const auth = useAuthStore()
     if (!auth.initialized) await auth.restore()
-    if (to.meta.requiresAuth !== false && !auth.loggedIn) {
-      return { name: 'login', query: { redirect: to.fullPath } }
+    if (!auth.loggedIn) {
+      installedFor = null
+      removeRoutes.forEach((remove) => remove())
+      removeRoutes = []
+      workspace.modules.value = []
+      workspace.projectId.value = ''
     }
+    if (to.meta.requiresAuth !== false && !auth.loggedIn)
+      return { name: 'login', query: { redirect: to.fullPath } }
+    if (auth.loggedIn && installedFor !== auth.user) {
+      try {
+        removeRoutes.forEach((remove) => remove())
+        removeRoutes = []
+        await workspace.refreshModules()
+        removeRoutes = await installBusinessRoutes(
+          router,
+          workspace.modules.value.filter((m) => m.status === 'enabled').map((m) => m.id),
+        )
+        installedFor = auth.user
+        if (to.name === 'not-found') return to.fullPath
+      } catch {
+        return to.name === 'dashboard' ? true : { name: 'dashboard' }
+      }
+    }
+    if (
+      to.meta.moduleId &&
+      !workspace.modules.value.some((m) => m.id === to.meta.moduleId && m.status === 'enabled')
+    )
+      return '/modules'
     if (to.name === 'login' && auth.loggedIn) return { name: 'dashboard' }
     return true
   })
-
   return router
 }

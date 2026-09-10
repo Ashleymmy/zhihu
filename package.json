@@ -15,7 +15,8 @@
     "lint": "turbo run lint",
     "test:unit": "turbo run test:unit",
     "test:e2e": "turbo run test:e2e",
-    "quality": "pnpm typecheck && pnpm lint && pnpm test:unit"
+    "quality": "pnpm typecheck && pnpm lint && pnpm test:unit",
+    "verify:opc": "npm --prefix server run typecheck && npm --prefix server run build:core && pnpm typecheck && pnpm build && npm --prefix server run test:opc"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

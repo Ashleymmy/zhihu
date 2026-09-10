@@ -1,18 +1,11 @@
-import path from 'node:path';
-import { runMigrations } from './migrationRunner';
-
-export async function main(): Promise<void> {
+import { runOpcMigrations } from './opcMigrations';
+export async function main() {
   const { config } = await import('../src/config');
-  const result = await runMigrations(config.db, path.resolve(process.cwd(), 'migrations'));
-
-  for (const name of result.applied) {
-    console.log(`applied ${name}`);
-  }
+  await runOpcMigrations(config.db, config.enabledModules);
+  console.log('OPC schema ready');
 }
-
-if (require.main === module) {
-  void main().catch((error: unknown) => {
+if (require.main === module)
+  void main().catch((error) => {
     console.error(error instanceof Error ? error.message : 'Migration failed');
     process.exitCode = 1;
   });
-}

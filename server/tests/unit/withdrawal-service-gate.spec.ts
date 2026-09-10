@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../src/middleware/errors';
-import { approveWithdrawal, createWithdrawal, rejectWithdrawal } from '../../src/services/earnings.service';
+import { approveWithdrawal, createWithdrawal, rejectWithdrawal } from '../../src/modules/zhihu/services/earnings.service';
 import type { AuthUser } from '../../src/types';
 
 const mocks = vi.hoisted(() => ({

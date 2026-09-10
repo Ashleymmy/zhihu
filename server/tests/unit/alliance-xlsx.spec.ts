@@ -5,7 +5,7 @@ import {
   validateAllianceXlsx,
   validateAllianceXlsxBuffer,
   XLSX_MIME,
-} from '../../src/zhihu/allianceXlsx';
+} from '../../src/modules/zhihu/zhihu/allianceXlsx';
 import {
   allianceXlsxFixtureXml,
   buildMinimalXlsxFixture,
@@ -35,6 +35,16 @@ describe('Alliance XLSX fail-closed validator', () => {
   it('P0007-R3-ZIP-001 accepts independent minimal stored and deflate OOXML fixtures', async () => {
     await expect(validateAllianceXlsx(upload(buildMinimalXlsxFixture(0)))).resolves.toBeUndefined();
     await expect(validateAllianceXlsx(upload(buildMinimalXlsxFixture(8)))).resolves.toBeUndefined();
+  });
+
+  it('P0007-R3-ZIP-001 accepts empty standard XLSX directory entries', async () => {
+    const directories: XlsxZipFixtureEntry[] = [
+      { name: '_rels/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
+      { name: 'docProps/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
+      { name: 'xl/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
+      { name: 'xl/worksheets/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
+    ];
+    await expect(validateAllianceXlsxBuffer(buildXlsxZipFixture([...directories, ...minimalXlsxEntries()]))).resolves.toBeUndefined();
   });
 
   it('P0007-R3-MIME-001 enforces safe filename, exact MIME, size, and ZIP magic', async () => {

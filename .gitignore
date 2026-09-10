@@ -45,3 +45,12 @@
 **/*.swp
 **/*.swo
 ACCOUNTS.md
+
+.opc-work/
+
+**/dist-core/
+
+# 本地文档审阅、pnpm 状态与临时提取文件
+/.codex/
+/.pnpm-store/
+/.tmp-opc-review/

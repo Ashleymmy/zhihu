@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 import { signToken } from '../../src/auth/jwt';
 
 describe('HTTP 基础契约', () => {

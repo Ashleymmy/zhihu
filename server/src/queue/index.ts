@@ -1,7 +1,7 @@
 import Queue, { Job, JobOptions } from 'bull';
 import { config } from '../config';
 
-export type JobName = 'push-plan' | 'push-composition' | 'sync-metrics' | 'sync-channels' | 'sync-tasks' | 'settle-earnings';
+export type JobName = string;
 export type JobHandler = (data: Record<string, unknown>) => Promise<void>;
 
 const handlers = new Map<JobName, JobHandler>();
@@ -9,7 +9,7 @@ const activeMemoryJobs = new Set<string>();
 let bullQueue: Queue.Queue | null = null;
 
 function queue() {
-  bullQueue ??= new Queue('zhihu-bff', config.redisUrl, {
+  bullQueue ??= new Queue('opc-jobs', config.redisUrl, {
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: 'exponential', delay: 1_000 },

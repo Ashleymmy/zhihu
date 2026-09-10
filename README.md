@@ -1,25 +1,28 @@
-# 知乎推广运营平台
+# OPC 平台聚合系统
 
-项目由以下部分组成：
+OPC 提供公共身份、组织、项目、模块接入和三端工作台。知乎是可选业务模块，邮件/Excel 数据处理及历史财务均属于知乎；后续平台可以通过自己的 API 直接提供数据。
 
-- `platform/`：Vue 3 运营后台。
-- `server/`：Express + TypeScript BFF 后端。
-- `app/`：预留的微信小程序工程。
-- `docs/`：产品、接口和部署文档。
+- 三端：`apps/platform-admin`、`apps/platform-leader`、`apps/platform-creator`。
+- 公共后端：`server/src/core` 及公共身份/组织服务；组合入口在 `server/src/composition`。
+- 知乎实现：后端 `server/src/modules/zhihu`，前端各端 `src/modules/zhihu`。
+
+**运行、迁移和验收以 [OPC 公共核心重构说明](docs/OPC公共核心重构.md) 为准。** `OPC_MODULES` 默认空；已有知乎部署升级必须显式设置 `OPC_MODULES=zhihu`。公共核心不要求知乎凭证。公共财务本期只建独立入口和契约。
+
+`pnpm verify:opc` 执行公共核心与三端构建、类型检查和隔离数据库验收；旧单测的 13 项既有失败见上述说明。
 
 ## Docker 快速启动
 
 ```bash
-cp .env.docker.example .env.docker
-# 编辑 .env.docker，填入所有空白的安全配置
-docker compose --env-file .env.docker up -d --build
-docker compose --env-file .env.docker ps
+cp .env.docker.example .env
+# 编辑 .env，填入公共运行配置；仅启用知乎时填写其模块配置
+docker compose up -d --build
+docker compose ps
 curl http://127.0.0.1/healthz
 ```
 
 数据库迁移会在后端容器启动时自动执行。首次管理员初始化、云服务器安全组、HTTPS、备份和升级步骤见 [Docker 云端部署文档](docs/10-Docker云端部署.md)。
 
-## 核心功能
+## 知乎模块历史功能说明
 
 ### 推广计划管理
 - 创建和管理知乎推广计划

@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 
 describe('JSON 请求错误', () => {
   it('把 malformed JSON 映射为统一的 400 响应', async () => {

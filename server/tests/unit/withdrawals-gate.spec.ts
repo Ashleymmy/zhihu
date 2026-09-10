@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as jwt from '../../src/auth/jwt';
 import * as revocation from '../../src/auth/revocation';
 import { errorHandler } from '../../src/middleware/errors';
-import { withdrawalsRouter } from '../../src/routes/withdrawals';
+import { withdrawalsRouter } from '../../src/modules/zhihu/routes/withdrawals';
 import type { AuthUser } from '../../src/types';
 
 const serviceMocks = vi.hoisted(() => ({
@@ -14,7 +14,7 @@ const serviceMocks = vi.hoisted(() => ({
   rejectWithdrawal: vi.fn(),
 }));
 
-vi.mock('../../src/services/earnings.service', () => ({
+vi.mock('../../src/modules/zhihu/services/earnings.service', () => ({
   listWithdrawals: serviceMocks.listWithdrawals,
   createWithdrawal: serviceMocks.createWithdrawal,
   approveWithdrawal: serviceMocks.approveWithdrawal,

@@ -4,7 +4,7 @@ import {
   type AllianceQuotaPolicy,
   InMemoryAllianceQuotaStore,
   installAllianceQuotaManager,
-} from '../../src/zhihu/allianceQuota';
+} from '../../src/modules/zhihu/zhihu/allianceQuota';
 
 export const TEST_ALLIANCE_QUOTA_POLICY: AllianceQuotaPolicy = Object.freeze({
   dailyBudget: 1_000,

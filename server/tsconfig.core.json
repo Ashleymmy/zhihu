@@ -1,0 +1,2 @@
+{"extends":"./tsconfig.json","compilerOptions":{"outDir":"dist-core"},"include":["src/core/start.ts"],"exclude":["node_modules","dist","dist-core","tests","src/modules","src/composition"]}
+

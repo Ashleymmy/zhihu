@@ -4,8 +4,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const signing = vi.hoisted(() => ({ inject: vi.fn() }));
 
-vi.mock('../../src/sign/zhihu', async () => {
-  const actual = await vi.importActual<typeof import('../../src/sign/zhihu')>('../../src/sign/zhihu');
+vi.mock('../../src/modules/zhihu/sign/zhihu', async () => {
+  const actual = await vi.importActual<typeof import('../../src/modules/zhihu/sign/zhihu')>('../../src/modules/zhihu/sign/zhihu');
   return {
     ...actual,
     injectSignParams: (...args: Parameters<typeof actual.injectSignParams>) => {
@@ -15,7 +15,7 @@ vi.mock('../../src/sign/zhihu', async () => {
   };
 });
 
-import { zhihuGet, zhihuPost, zhihuSyncErrorDetail } from '../../src/zhihu/client';
+import { zhihuGet, zhihuPost, zhihuSyncErrorDetail } from '../../src/modules/zhihu/zhihu/client';
 
 const outboundRequests: string[] = [];
 const validPlan = {

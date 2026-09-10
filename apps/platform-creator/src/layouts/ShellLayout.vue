@@ -1,78 +1,61 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { AppShell, type NavGroup, type ShellAnnouncement } from '@zhihu-koc/shared-components'
-import { APP_ROLE } from '../app-config'
 import { useAuthStore, apis } from '../stores/auth'
-
-const auth = useAuthStore()
-const route = useRoute()
-const router = useRouter()
-const currentPath = computed(() => route.path)
-
-const announcements = ref<ShellAnnouncement[]>([])
-onMounted(async () => {
-  try { announcements.value = await apis.announcements.active() } catch { /* 公告加载失败不阻塞工作台 */ }
+import { workspace } from '../stores/platform'
+const auth = useAuthStore(),
+  route = useRoute(),
+  router = useRouter(),
+  announcements = ref<ShellAnnouncement[]>([])
+const navigation = computed<NavGroup[]>(() => {
+  const groups: NavGroup[] = [
+    {
+      label: 'OPC',
+      items: [
+        { key: 'dashboard', label: '工作台', path: '/dashboard' },
+        { key: 'projects', label: '业务项目', path: '/projects' },
+        { key: 'modules', label: '业务模块', path: '/modules' },
+        { key: 'finance', label: '财务中心', path: '/finance' },
+      ],
+    },
+    {
+      label: '个人',
+      items: [
+        { key: 'profile', label: '个人资料', path: '/profile' },
+        { key: 'join-team', label: '加入团队', path: '/join-team' },
+      ],
+    },
+  ]
+  const enabled = workspace.modules.value.filter((m) => m.status === 'enabled')
+  if (enabled.length)
+    groups.push({
+      label: '已接入业务',
+      items: enabled.map((m) => ({ key: m.id, label: m.name, path: m.entryPath })),
+    })
+  return groups
 })
-
-const navigation: NavGroup[] = [
-  {
-    label: '运营',
-    items: [
-      { key: 'dashboard', label: '数据看板', path: '/dashboard' },
-      { key: 'plans', label: '推广计划', path: '/plans' },
-    ],
-  },
-  {
-    label: '业务',
-    items: [
-      { key: 'orders', label: '我的订单', path: '/orders' },
-      { key: 'settlements', label: '结算中心', path: '/settlements' },
-      { key: 'withdrawals', label: '提现申请', path: '/withdrawals' },
-      { key: 'appeals', label: '财务申诉', path: '/appeals' },
-      { key: 'earnings', label: '收益结算', path: '/earnings' },
-    ],
-  },
-  {
-    label: '推广',
-    items: [
-      { key: 'keywords', label: '关键词回传', path: '/keywords' },
-      { key: 'projects', label: '项目管理', path: '/projects' },
-      { key: 'zhihu-story', label: '知乎故事', path: '/zhihu-story' },
-    ],
-  },
-  {
-    label: '增值',
-    items: [
-      { key: 'knowledge', label: '我的课堂', path: '/knowledge' },
-      { key: 'creative-tools', label: '创意工具坊', path: '/creative-tools' },
-    ],
-  },
-  {
-    label: '账户',
-    items: [
-      { key: 'profile', label: '个人信息', path: '/profile' },
-      { key: 'join-team', label: '申请入团', path: '/join-team' },
-    ],
-  },
-]
-
-const roleLabels: Record<string, string> = { admin: '管理员', leader: '团长', creator: '达人' }
-
-function onNavigate(path: string) { router.push(path) }
-async function onLogout() {
+onMounted(async () => {
+  try {
+    announcements.value = await apis.announcements.active()
+  } catch {}
+})
+async function logout() {
   await auth.logout()
-  await router.replace({ name: 'login' })
+  workspace.projectId.value = ''
+  workspace.modules.value = []
+  await router.replace('/login')
 }
 </script>
-
 <template>
-  <AppShell :groups="navigation" :user-name="auth.user?.displayName ?? '达人'" :role-label="roleLabels[APP_ROLE] ?? APP_ROLE" :current-path="currentPath"
-    :announcements="announcements" @navigate="onNavigate" @logout="onLogout">
-    <RouterView v-slot="{ Component }">
-      <Transition name="page" mode="out-in">
-        <component :is="Component" :key="route.path" />
-      </Transition>
-    </RouterView>
-  </AppShell>
+  <AppShell
+    :groups="navigation"
+    :user-name="auth.user?.displayName ?? ''"
+    :role-label="auth.user?.role === 'admin' ? '管理员' : auth.user?.role === 'leader' ? '团长' : '达人'"
+    :current-path="route.path"
+    :announcements="announcements"
+    @navigate="router.push"
+    @logout="logout"
+    ><router-view
+  /></AppShell>
 </template>

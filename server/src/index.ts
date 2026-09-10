@@ -2,18 +2,18 @@ import { createApp } from './app';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { db } from './db';
-import { startScheduler, stopScheduler } from './jobs';
 import { closeQueue } from './queue';
 import { revocationStore } from './auth/revocation';
 import { closeRateLimiter } from './utils/rateLimit';
 
-const server = createApp().listen(config.port, () => {
-  startScheduler();
-  logger.info({ port: config.port }, 'zhihu-bff listening');
+const app = createApp();
+const server = app.listen(config.port, () => {
+  app.locals.moduleRuntime.start();
+  logger.info({ port: config.port }, 'opc listening');
 });
 
 async function shutdown() {
-  stopScheduler();
+  app.locals.moduleRuntime.stop();
   server.close();
   await Promise.all([closeQueue(), revocationStore.close(), closeRateLimiter(), db.end()]);
 }

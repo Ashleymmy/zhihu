@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { AccountMonitorItem } from '@zhihu-koc/shared-contracts'
+import type { AccountMonitorItem } from '@zhihu-koc/shared-contracts/core'
 import { BarChart } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
 

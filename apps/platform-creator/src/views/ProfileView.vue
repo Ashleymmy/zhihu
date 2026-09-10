@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { MeResp } from '@zhihu-koc/shared-contracts'
+import type { MeResp } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()

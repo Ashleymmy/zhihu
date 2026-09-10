@@ -2,12 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { AppError } from '../../src/middleware/errors';
-import { resolveClientEndpoint } from '../../src/zhihu/allianceEndpointRegistry';
+import { resolveClientEndpoint } from '../../src/modules/zhihu/zhihu/allianceEndpointRegistry';
 import {
   ALLIANCE_EGRESS_BASE,
   ALLIANCE_UPSTREAM_UNAVAILABLE_MESSAGE,
   requestAlliance,
-} from '../../src/zhihu/allianceEgress';
+} from '../../src/modules/zhihu/zhihu/allianceEgress';
 
 const officialRequests: string[] = [];
 const multipartSnapshots: Array<{ contentType: string | null; requestedWith: string | null; keys: string[] }> = [];

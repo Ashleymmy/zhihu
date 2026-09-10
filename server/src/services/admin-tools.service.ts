@@ -4,10 +4,34 @@ import { AppError } from '../middleware/errors';
 import { AuthUser } from '../types';
 import { pageOffset } from '../utils/pagination';
 import { writeAudit } from './audit.service';
+import { activeDevDemoAnnouncements, devDemoSiteInfo, isDevDemoEnabled } from '../core/demo';
 
 /* ===== 操作日志（audit_logs 只读查询）===== */
 
 export async function listAuditLogs(query: Record<string, unknown>) {
+  if (isDevDemoEnabled()) {
+    const page = Number(query.page ?? 1);
+    const pageSize = Math.min(Number(query.pageSize ?? 20), 100);
+    return {
+      list: [
+        {
+          id: 'audit-demo-1',
+          action: 'auth.login',
+          resourceType: 'user',
+          resourceId: '900000000000000001',
+          detailJson: { mode: 'local-demo' },
+          ip: '127.0.0.1',
+          createdAt: new Date().toISOString(),
+          operatorUsername: 'admin',
+          operatorName: '本地管理员',
+        },
+      ],
+      total: 1,
+      page,
+      pageSize,
+    };
+  }
+
   const page = Number(query.page ?? 1);
   const pageSize = Math.min(Number(query.pageSize ?? 20), 100);
   const where: string[] = ['1=1'];
@@ -32,6 +56,8 @@ export async function listAuditLogs(query: Record<string, unknown>) {
 }
 
 export async function listAuditActions() {
+  if (isDevDemoEnabled()) return [{ action: 'auth.login' }, { action: 'project.create' }, { action: 'team.apply' }];
+
   return rows<RowDataPacket & { action: string }>(
     'SELECT DISTINCT action FROM audit_logs ORDER BY action',
   );
@@ -40,6 +66,44 @@ export async function listAuditActions() {
 /* ===== 子账号监控：按账号聚合登录与操作行为 ===== */
 
 export async function accountMonitor() {
+  if (isDevDemoEnabled()) {
+    return [
+      {
+        id: '900000000000000001',
+        username: 'admin',
+        displayName: '本地管理员',
+        role: 'admin',
+        isActive: true,
+        lastLoginAt: new Date().toISOString(),
+        actionCount7d: 8,
+        lastAction: 'auth.login',
+        lastActionAt: new Date().toISOString(),
+      },
+      {
+        id: '900000000000000002',
+        username: 'leader',
+        displayName: '本地团长',
+        role: 'leader',
+        isActive: true,
+        lastLoginAt: new Date().toISOString(),
+        actionCount7d: 5,
+        lastAction: 'team.review',
+        lastActionAt: new Date().toISOString(),
+      },
+      {
+        id: '900000000000000003',
+        username: 'creator',
+        displayName: '本地达人',
+        role: 'creator',
+        isActive: true,
+        lastLoginAt: new Date().toISOString(),
+        actionCount7d: 6,
+        lastAction: 'team.apply',
+        lastActionAt: new Date().toISOString(),
+      },
+    ];
+  }
+
   return rows(
     `SELECT u.id, u.username, u.display_name, u.role, u.is_active, u.last_login_at,
             s.actionCount7d, s.last_action, s.last_action_at
@@ -60,6 +124,15 @@ export async function accountMonitor() {
 /* ===== 系统公告 ===== */
 
 export async function listAnnouncements() {
+  if (isDevDemoEnabled()) {
+    return activeDevDemoAnnouncements().map((item) => ({
+      ...item,
+      status: 'published',
+      updatedAt: item.createdAt,
+      createdByName: '本地管理员',
+    }));
+  }
+
   return rows(
     `SELECT a.id, a.title, a.content, a.status, a.created_at, a.updated_at, u.display_name AS created_by_name
      FROM announcements a LEFT JOIN users u ON u.id = a.created_by ORDER BY a.created_at DESC`,
@@ -67,6 +140,8 @@ export async function listAnnouncements() {
 }
 
 export async function activeAnnouncements() {
+  if (isDevDemoEnabled()) return activeDevDemoAnnouncements();
+
   return rows(
     "SELECT id, title, content, created_at FROM announcements WHERE status = 'published' ORDER BY created_at DESC LIMIT 5",
   );
@@ -103,6 +178,14 @@ export async function setAnnouncementStatus(user: AuthUser, id: string, status: 
 /* ===== 数据库维护 ===== */
 
 export async function dbStats() {
+  if (isDevDemoEnabled()) {
+    return [
+      { tableName: 'users', tableRows: 3, dataMb: 0.01 },
+      { tableName: 'projects', tableRows: 1, dataMb: 0.02 },
+      { tableName: 'audit_logs', tableRows: 5, dataMb: 0.02 },
+    ];
+  }
+
   const tables = await rows<RowDataPacket & { table_name: string; table_rows: number; data_mb: number }>(
     `SELECT table_name, table_rows, ROUND((data_length + index_length) / 1024 / 1024, 2) AS data_mb
      FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY data_length DESC`,
@@ -128,19 +211,4 @@ export async function cleanupAuditLogs(user: AuthUser, days: number, ip?: string
 
 /* ===== 站点信息与同步状态 ===== */
 
-export async function siteInfo() {
-  const [channelSync] = await rows<RowDataPacket & { latest: string | null }>('SELECT MAX(synced_at) AS latest FROM channels');
-  const [taskSync] = await rows<RowDataPacket & { latest: string | null }>('SELECT MAX(synced_at) AS latest FROM tasks');
-  const [metricSync] = await rows<RowDataPacket & { latest: string | null }>('SELECT MAX(fetched_at) AS latest FROM daily_metrics');
-  return {
-    node: process.version,
-    uptimeSec: Math.floor(process.uptime()),
-    zhihuApiBase: process.env.ZHIHU_API_BASE ?? '',
-    zhihuCredentialMode: process.env.ZHIHU_ACCESS_TOKEN && !process.env.ZHIHU_ACCESS_TOKEN.startsWith('mock') ? 'real' : 'mock',
-    sync: {
-      channels: channelSync?.latest ?? null,
-      tasks: taskSync?.latest ?? null,
-      metrics: metricSync?.latest ?? null,
-    },
-  };
-}
+export async function siteInfo() { return {name:'OPC',node:process.version,uptimeSec:Math.floor(process.uptime())}; }

@@ -5,7 +5,6 @@ import { requirePermission } from '../auth/permissions';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { ok, okList } from '../utils/response';
-import { enqueue } from '../queue';
 import {
   accountMonitor,
   activeAnnouncements,
@@ -55,36 +54,6 @@ adminToolsRouter.post(
   asyncHandler(async (req, res) => ok(res, await cleanupAuditLogs(req.user, req.body.days, req.ip))),
 );
 adminToolsRouter.get('/site-info', asyncHandler(async (_req, res) => ok(res, await siteInfo())));
-adminToolsRouter.post(
-  '/settle-earnings',
-  validateBody(settleInput),
-  asyncHandler(async (req, res) => {
-    const jobId = `settle-manual-${Date.now()}`;
-    await enqueue(
-      'settle-earnings',
-      { source: 'manual', from: req.body.from ?? req.body.settleDate, to: req.body.to ?? req.body.settleDate },
-      { jobId },
-    );
-    ok(res, { jobId, message: '收益结算任务已加入队列' }, 202);
-  }),
-);
-adminToolsRouter.post(
-  '/sync-plan-status',
-  asyncHandler(async (_req, res) => {
-    const jobId = `sync-plan-status-manual-${Date.now()}`;
-    await enqueue('sync-plan-status', { source: 'manual' }, { jobId });
-    ok(res, { jobId, message: '推广计划审核状态同步任务已加入队列' }, 202);
-  }),
-);
-adminToolsRouter.post(
-  '/sync-composition-status',
-  asyncHandler(async (_req, res) => {
-    const jobId = `sync-composition-status-manual-${Date.now()}`;
-    await enqueue('sync-composition-status', { source: 'manual' }, { jobId });
-    ok(res, { jobId, message: '作品审核状态同步任务已加入队列' }, 202);
-  }),
-);
-
 /** 公告：管理面（admin） + 生效列表（全体登录用户） */
 export const announcementsRouter = Router();
 announcementsRouter.use(requireAuth);

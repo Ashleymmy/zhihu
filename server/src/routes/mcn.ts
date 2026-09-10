@@ -24,7 +24,7 @@ mcnRouter.use(requireAuth);
 mcnRouter.get(
   '/',
   requirePermission('project.manage'),
-  asyncHandler(async (_req, res) => ok(res, await listMcnAccounts())),
+  asyncHandler(async (req, res) => ok(res, await listMcnAccounts(req.user))),
 );
 mcnRouter.post(
   '/',

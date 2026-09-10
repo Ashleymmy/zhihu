@@ -15,7 +15,7 @@ vi.mock('../../src/db', () => ({
   withTransaction: dbMocks.withTransaction,
 }));
 
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 import { signToken } from '../../src/auth/jwt';
 import type { Role } from '../../src/types';
 

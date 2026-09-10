@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { isApiError } from '@zhihu-koc/shared-services'
+import { isApiError } from '@zhihu-koc/shared-services/core'
 import { APP_ROLE } from '../app-config'
 import { useAuthStore } from '../stores/auth'
 
@@ -49,8 +49,8 @@ async function submit() {
 
       <div class="manifesto-copy">
         <p class="eyebrow">WELCOME BACK</p>
-        <h1>让每一次<br /><em>推广都有迹可循。</em></h1>
-        <p>登录后即可管理你的推广计划、查看数据趋势、处理订单与结算。系统会为你准备好本周的投放线索。</p>
+        <h1>让每一项<br /><em>业务协作更清晰。</em></h1>
+        <p>统一管理项目与团队，按需接入业务平台，在同一个工作台查看各项业务。</p>
       </div>
 
       <div class="manifesto-note">

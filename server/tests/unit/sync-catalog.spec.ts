@@ -1,4 +1,4 @@
-import { listOf, normalizeChannel, normalizeTask } from '../../src/jobs/syncCatalog';
+import { listOf, normalizeChannel, normalizeTask } from '../../src/modules/zhihu/jobs/syncCatalog';
 
 describe('知乎渠道与任务响应归一化', () => {
   it('兼容 success/data 数组和裸数组', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateAllianceVersionPolicy, isCanonicalCompositionId } from '../../src/zhihu/allianceVersionPolicy';
+import { evaluateAllianceVersionPolicy, isCanonicalCompositionId } from '../../src/modules/zhihu/zhihu/allianceVersionPolicy';
 
 describe('知乎联盟精确路由策略', () => {
   it('P0007-R1-REG-001 permits exactly the seven registered operations', () => {

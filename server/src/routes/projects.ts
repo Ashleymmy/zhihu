@@ -22,16 +22,10 @@ const addMember = z.object({
 const createProjectBody = z.object({
   name: z.string().trim().min(1).max(64),
   slug: z.string().trim().regex(/^[a-z0-9-]+$/).max(32),
-  apiBaseUrl: z.string().url().max(255),
-  signMethod: z.enum(['hmac_sha256', 'oauth2']).optional(),
-  configJson: z.record(z.unknown()).optional(),
 });
 const updateProjectBody = z.object({
   name: z.string().trim().min(1).max(64).optional(),
-  apiBaseUrl: z.string().url().max(255).optional(),
-  signMethod: z.enum(['hmac_sha256', 'oauth2']).optional(),
   isEnabled: z.boolean().optional(),
-  configJson: z.record(z.unknown()).nullable().optional(),
 });
 
 export const projectsRouter = Router();

@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errors';
 import { AuthUser, ProjectCourse } from '../types';
 import { writeAudit } from './audit.service';
 import { assertProjectMembership } from './projectMembers.service';
+import { isDevDemoAuthUser } from '../core/demo';
 
 interface CourseRow extends RowDataPacket {
   id: string;
@@ -33,6 +34,32 @@ async function assertProjectExists(projectId: string) {
 }
 
 export async function listProjectCourses(user: AuthUser, projectId: string) {
+  if (isDevDemoAuthUser(user)) {
+    const now = new Date().toISOString();
+    return [
+      {
+        id: 'course-demo-1',
+        projectId,
+        courseName: '知乎故事推广入门',
+        courseUrl: 'https://www.zhihu.com',
+        displayOrder: 1,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'course-demo-2',
+        projectId,
+        courseName: '达人投放数据复盘',
+        courseUrl: null,
+        displayOrder: 2,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+  }
+
   await assertProjectExists(projectId);
   await assertProjectMembership(user, projectId);
   const courses = await rows<CourseRow>(
@@ -48,6 +75,20 @@ export async function createProjectCourse(
   input: { courseName: string; courseUrl?: string; displayOrder?: number },
   ip?: string,
 ) {
+  if (isDevDemoAuthUser(user)) {
+    const now = new Date();
+    return {
+      id: `course-demo-${Date.now()}`,
+      projectId,
+      courseName: input.courseName,
+      courseUrl: input.courseUrl ?? null,
+      displayOrder: input.displayOrder ?? 0,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   await assertProjectExists(projectId);
   const id = await withTransaction(async (connection) => {
     const [result] = await connection.query<ResultSetHeader>(
@@ -73,6 +114,8 @@ export async function createProjectCourse(
 }
 
 export async function deleteProjectCourse(user: AuthUser, projectId: string, courseId: string, ip?: string) {
+  if (isDevDemoAuthUser(user)) return;
+
   await assertProjectExists(projectId);
   await withTransaction(async (connection) => {
     const [result] = await connection.query<ResultSetHeader>(

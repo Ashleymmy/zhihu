@@ -25,7 +25,14 @@
     "migrate:prod": "node dist/scripts/migrate.js",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "build:core": "tsc -p tsconfig.core.json",
+    "start:core": "node dist-core/src/core/start.js",
+    "test:opc": "vitest run --config vitest.opc.config.ts",
+    "test:boundaries": "vitest run --config vitest.opc.config.ts tests/opc/boundaries.spec.ts",
+    "bootstrap:admin": "tsx scripts/bootstrap.ts",
+    "bootstrap:prod": "node dist/scripts/bootstrap.js",
+    "test:opc:ui": "node tests/opc-ui/smoke.cjs"
   },
   "dependencies": {
     "axios": "^1.7.9",

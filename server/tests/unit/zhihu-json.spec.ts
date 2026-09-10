@@ -1,4 +1,4 @@
-import { parseZhihuJson } from '../../src/zhihu/json';
+import { parseZhihuJson } from '../../src/modules/zhihu/zhihu/json';
 
 describe('知乎 JSON 大整数解析', () => {
   it('将未加引号的超大整数保留为精确字符串', () => {

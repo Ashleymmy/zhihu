@@ -16,6 +16,16 @@ import {
 } from '../auth/tokenSessions';
 import { writeAudit } from './audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
+import {
+  devDemoLoginUser,
+  devDemoPublicUser,
+  devDemoTokenUser,
+  devDemoUserFromAuth,
+  devDemoUserFromRefreshToken,
+  isDevDemoAuthUser,
+  isDevDemoRefreshToken,
+  issueDevDemoRefreshSession,
+} from '../core/demo';
 
 interface UserRow extends RowDataPacket {
   id: string;
@@ -66,6 +76,13 @@ async function issueAccessToken(user: UserRow, role: Role) {
 }
 
 export async function login(username: string, password: string, ip?: string) {
+  const demoUser = devDemoLoginUser(username, password);
+  if (demoUser) {
+    const token = await signToken(devDemoTokenUser(demoUser));
+    const refresh = issueDevDemoRefreshSession(demoUser.id);
+    return { token, user: devDemoPublicUser(demoUser), mustChangePwd: false, refresh };
+  }
+
   const ipKey = `login:ip:${ip ?? 'unknown'}`;
   const ipCheck = await incrRateLimit(ipKey, 20, 300);
   if (!ipCheck.allowed) throw new AppError(429, 42903, '登录请求过于频繁，请 5 分钟后再试');
@@ -97,6 +114,13 @@ export async function login(username: string, password: string, ip?: string) {
 
 /** Refresh Cookie 轮换：换发新 Access Token 与新 Refresh Token。 */
 export async function refresh(plainToken: string, ip?: string) {
+  const demoUser = devDemoUserFromRefreshToken(plainToken);
+  if (demoUser) {
+    const token = await signToken(devDemoTokenUser(demoUser));
+    const refresh = issueDevDemoRefreshSession(demoUser.id);
+    return { token, user: devDemoPublicUser(demoUser), mustChangePwd: false, refresh };
+  }
+
   const session = await rotateRefreshSession(plainToken);
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [session.userId]);
   if (!user || !user.is_active) throw new AppError(401, 40101, '登录已过期，请重新登录');
@@ -106,6 +130,9 @@ export async function refresh(plainToken: string, ip?: string) {
 }
 
 export async function me(auth: AuthUser) {
+  const demoUser = devDemoUserFromAuth(auth);
+  if (demoUser) return { ...devDemoPublicUser(demoUser), mustChangePwd: false };
+
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [auth.sub]);
   if (!user || !user.is_active) throw new AppError(401, 40101, '登录已过期，请重新登录');
   const role = normalizeRole(user.role);
@@ -118,12 +145,19 @@ export async function me(auth: AuthUser) {
 }
 
 export async function logout(auth: AuthUser, refreshToken: string | null, ip?: string) {
+  if (isDevDemoAuthUser(auth) || isDevDemoRefreshToken(refreshToken)) {
+    await revocationStore.revoke(auth.jti, tokenTtl(auth));
+    return;
+  }
+
   await revocationStore.revoke(auth.jti, tokenTtl(auth));
   if (refreshToken) await revokeRefreshFamily(refreshToken, 'logout');
   await writeAudit({ userId: auth.sub, action: 'auth.logout', resourceType: 'user', resourceId: auth.sub, ip });
 }
 
 export async function changePassword(auth: AuthUser, oldPassword: string, newPassword: string, ip?: string) {
+  if (isDevDemoAuthUser(auth)) return;
+
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [auth.sub]);
   if (!user || !(await bcrypt.compare(oldPassword, user.password_hash))) throw new AppError(422, 42202, '原密码不正确');
   if (await bcrypt.compare(newPassword, user.password_hash)) throw new AppError(422, 42203, '新密码不能与原密码相同');

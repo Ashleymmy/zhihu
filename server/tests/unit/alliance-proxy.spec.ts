@@ -5,9 +5,9 @@ import type { RequestHandler } from 'express';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signToken } from '../../src/auth/jwt';
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 import { AppError } from '../../src/middleware/errors';
-import * as contracts from '../../src/zhihu/allianceContracts';
+import * as contracts from '../../src/modules/zhihu/zhihu/allianceContracts';
 import {
   ALLIANCE_QUOTA_CONFIRM_SCRIPT,
   ALLIANCE_QUOTA_RELEASE_SCRIPT,
@@ -18,8 +18,8 @@ import {
   resetAllianceQuotaManager,
   type AllianceQuotaDecision,
   type AllianceQuotaRedisClient,
-} from '../../src/zhihu/allianceQuota';
-import { XLSX_MIME } from '../../src/zhihu/allianceXlsx';
+} from '../../src/modules/zhihu/zhihu/allianceQuota';
+import { XLSX_MIME } from '../../src/modules/zhihu/zhihu/allianceXlsx';
 import {
   installAllianceQuotaTestFixture,
   TEST_ALLIANCE_QUOTA_POLICY,
@@ -95,8 +95,8 @@ vi.mock('multer', async () => {
   return { ...actual, default: Object.assign(mockedMulter, actualMulter) };
 });
 
-vi.mock('../../src/sign/zhihu', async () => {
-  const actual = await vi.importActual<typeof import('../../src/sign/zhihu')>('../../src/sign/zhihu');
+vi.mock('../../src/modules/zhihu/sign/zhihu', async () => {
+  const actual = await vi.importActual<typeof import('../../src/modules/zhihu/sign/zhihu')>('../../src/modules/zhihu/sign/zhihu');
   return {
     ...actual,
     injectSignParams: (...args: Parameters<typeof actual.injectSignParams>) => {

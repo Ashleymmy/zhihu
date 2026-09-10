@@ -3,6 +3,7 @@ import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
 import { AuthUser } from '../types';
 import { writeAudit } from './audit.service';
+import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser } from '../core/demo';
 
 interface MemberRow extends RowDataPacket {
   id: string;
@@ -34,6 +35,8 @@ async function assertProjectExists(projectId: string) {
  * project_members(project_id, user_id)；无成员记录时 fail closed。
  */
 export async function assertProjectMembership(user: AuthUser, projectId: string): Promise<void> {
+  if (isDevDemoAuthUser(user)) return;
+
   if (user.role === 'admin') return;
   const found = await rows<RowDataPacket>(
     'SELECT id FROM project_members WHERE project_id = ? AND user_id = ? AND left_at IS NULL LIMIT 1',
@@ -53,6 +56,19 @@ interface ProjectRow extends RowDataPacket {
 
 /** 项目列表：admin 看全部；其余角色只看自己在 project_members 里的项目（行级过滤在 SQL 内绑定）。 */
 export async function listProjects(user: AuthUser) {
+  if (isDevDemoAuthUser(user)) {
+    return [
+      {
+        id: '1',
+        name: 'OPC 演示项目',
+        slug: 'opc-demo',
+        isEnabled: true,
+        createdAt: new Date(Date.now() - 14 * 86_400_000).toISOString(),
+        memberRole: user.role === 'admin' ? null : 'member',
+      },
+    ];
+  }
+
   const projects =
     user.role === 'admin'
       ? await rows<ProjectRow>(
@@ -76,6 +92,17 @@ export async function listProjects(user: AuthUser) {
 }
 
 export async function listProjectMembers(user: AuthUser, projectId: string) {
+  if (isDevDemoAuthUser(user)) {
+    return demoUsers().map((item) => ({
+      projectId,
+      userId: item.id,
+      memberRole: item.id === DEV_DEMO_USER_IDS.admin ? 'owner' : 'member',
+      joinedAt: new Date(Date.now() - 10 * 86_400_000).toISOString(),
+      username: item.username,
+      displayName: item.displayName,
+    }));
+  }
+
   await assertProjectExists(projectId);
   await assertProjectMembership(user, projectId);
   const members = await rows<MemberRow>(
@@ -94,6 +121,18 @@ export async function addProjectMember(
   input: { userId: string; memberRole?: 'owner' | 'admin' | 'member' | 'viewer' },
   ip?: string,
 ) {
+  if (isDevDemoAuthUser(user)) {
+    const found = demoUsers().find((item) => item.id === input.userId);
+    return {
+      projectId,
+      userId: input.userId,
+      memberRole: input.memberRole ?? 'member',
+      joinedAt: new Date().toISOString(),
+      username: found?.username ?? null,
+      displayName: found?.displayName ?? null,
+    };
+  }
+
   await assertProjectExists(projectId);
   const [target] = await rows<RowDataPacket & { is_active: number }>(
     'SELECT id, is_active FROM users WHERE id = ? LIMIT 1',
@@ -136,6 +175,8 @@ export async function addProjectMember(
 }
 
 export async function removeProjectMember(user: AuthUser, projectId: string, userId: string, ip?: string) {
+  if (isDevDemoAuthUser(user)) return;
+
   await assertProjectExists(projectId);
   await withTransaction(async (connection) => {
     const [result] = await connection.query<ResultSetHeader>(

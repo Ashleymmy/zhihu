@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errors';
 import { AuthUser, Role } from '../types';
 import { normalizeRole } from '../auth/roles';
 import { writeAudit } from './audit.service';
+import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser, isDevDemoEnabled } from '../core/demo';
 
 interface MemberRow extends RowDataPacket {
   id: string;
@@ -15,6 +16,36 @@ interface MemberRow extends RowDataPacket {
   is_active: number;
   username?: string;
 }
+
+const demoCreatedAt = () => new Date(Date.now() - 7 * 86_400_000).toISOString();
+const demoMemberRows = () =>
+  demoUsers().map((item) => ({
+    id: item.id,
+    username: item.username,
+    role: item.role,
+    parentId: item.parentId,
+    displayName: item.displayName,
+    phone: item.phone,
+    isActive: true,
+    mustChangePwd: false,
+    lastLoginAt: new Date().toISOString(),
+    createdAt: demoCreatedAt(),
+  }));
+
+const demoApplications = () => [
+  {
+    id: 'team-app-demo-1',
+    creatorId: DEV_DEMO_USER_IDS.creator,
+    creatorName: '本地达人',
+    creatorUsername: 'creator',
+    leaderId: DEV_DEMO_USER_IDS.leader,
+    leaderName: '本地团长',
+    message: '本地演示：用于查看入团申请审批流程。',
+    status: 'pending' as const,
+    createdAt: new Date(Date.now() - 86_400_000).toISOString(),
+    handledAt: null,
+  },
+];
 
 async function resolveParentId(user: AuthUser, role: Role, requestedParentId?: string | null) {
   if (user.role === 'leader') return user.sub;
@@ -41,6 +72,12 @@ const target = async (user: AuthUser, id: string) => {
 };
 
 export async function listMembers(user: AuthUser) {
+  if (isDevDemoAuthUser(user)) {
+    const members = demoMemberRows();
+    if (user.role === 'admin') return members;
+    return members.filter((item) => item.id === user.sub || item.parentId === user.sub);
+  }
+
   if (user.role === 'admin')
     return rows(
       'SELECT id, username, role, parent_id, display_name, phone, is_active, must_change_pwd, last_login_at, created_at FROM users ORDER BY created_at DESC',
@@ -56,6 +93,10 @@ export async function createMember(
   input: { username: string; displayName: string; phone?: string | null; role?: Role; parentId?: string | null },
   ip?: string,
 ) {
+  if (isDevDemoAuthUser(user)) {
+    return { id: `demo-member-${Date.now()}`, username: input.username, temporaryPassword: 'demo123456', mustChangePwd: true };
+  }
+
   const role: Role = user.role === 'admin' ? (input.role ?? 'creator') : 'creator';
   const parentId = await resolveParentId(user, role, input.parentId);
   const temporaryPassword = crypto.randomBytes(9).toString('base64url');
@@ -89,6 +130,8 @@ export async function updateMember(
   patch: { displayName?: string; phone?: string | null },
   ip?: string,
 ) {
+  if (isDevDemoAuthUser(user)) return;
+
   await target(user, id);
   const fields: string[] = [];
   const bindings: unknown[] = [];
@@ -111,6 +154,8 @@ export async function updateMember(
 }
 
 export async function resetPassword(user: AuthUser, id: string, ip?: string, customPassword?: string) {
+  if (isDevDemoAuthUser(user)) return { temporaryPassword: customPassword ? null : 'demo123456', mustChangePwd: !customPassword };
+
   await target(user, id);
   // 自定义密码时不再强制下次登录修改；留空则生成临时密码并强制修改
   const temporaryPassword = customPassword ?? crypto.randomBytes(9).toString('base64url');
@@ -129,6 +174,8 @@ export async function resetPassword(user: AuthUser, id: string, ip?: string, cus
 
 /** 物理删除成员：仅允许删除无业务数据的账号（如测试号）；有历史数据的账号只能禁用。 */
 export async function deleteMember(user: AuthUser, id: string, ip?: string) {
+  if (isDevDemoAuthUser(user)) return;
+
   if (id === user.sub) throw new AppError(422, 42204, '不能删除当前登录账号');
   const member = await target(user, id);
   if (normalizeRole(member.role) === 'admin') throw new AppError(422, 42212, '管理员账号不可删除');
@@ -136,11 +183,6 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
   // 依赖检查：任何业务数据存在都拒绝删除，避免外键断裂与审计链丢失
   const checks: Array<{ label: string; sql: string }> = [
     { label: '名下成员', sql: 'SELECT COUNT(*) AS n FROM users WHERE parent_id = ?' },
-    { label: '渠道', sql: 'SELECT COUNT(*) AS n FROM channels WHERE owner_id = ?' },
-    { label: '推广计划', sql: 'SELECT COUNT(*) AS n FROM plans WHERE owner_id = ?' },
-    { label: '收益记录', sql: 'SELECT COUNT(*) AS n FROM earnings WHERE user_id = ?' },
-    { label: '提现记录', sql: 'SELECT COUNT(*) AS n FROM withdrawal_requests WHERE user_id = ?' },
-    { label: '回传规则', sql: 'SELECT COUNT(*) AS n FROM callback_rules WHERE owner_id = ?' },
     { label: 'MCN 账户', sql: 'SELECT COUNT(*) AS n FROM mcn_accounts WHERE owner_user_id = ?' },
   ];
   const blockers: string[] = [];
@@ -165,6 +207,8 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
 }
 
 export async function disableMember(user: AuthUser, id: string, ip?: string) {
+  if (isDevDemoAuthUser(user)) return;
+
   if (id === user.sub) throw new AppError(422, 42204, '不能停用当前账号');
   await target(user, id);
   await withTransaction(async (connection) => {
@@ -181,6 +225,17 @@ export async function disableMember(user: AuthUser, id: string, ip?: string) {
 
 /** 达人可见的可申请团长列表（仅活跃团长）。 */
 export async function listLeaders() {
+  if (isDevDemoEnabled()) {
+    return [
+      {
+        id: DEV_DEMO_USER_IDS.leader,
+        username: 'leader',
+        displayName: '本地团长',
+        memberCount: 1,
+      },
+    ];
+  }
+
   return rows<RowDataPacket & { id: string; username: string; display_name: string; member_count: number }>(
     `SELECT u.id, u.username, u.display_name,
             (SELECT COUNT(*) FROM users m WHERE m.parent_id = u.id AND m.is_active = 1) AS member_count
@@ -192,6 +247,17 @@ export async function listLeaders() {
 
 /** 达人当前所属团队；未入团返回 null。 */
 export async function myTeam(user: AuthUser) {
+  if (isDevDemoAuthUser(user)) {
+    if (user.role !== 'creator') return null;
+    return {
+      leaderId: DEV_DEMO_USER_IDS.leader,
+      leaderUsername: 'leader',
+      leaderName: '本地团长',
+      leaderActive: true,
+      memberCount: 1,
+    };
+  }
+
   const [meRow] = await rows<MemberRow>('SELECT id, role, parent_id, is_active FROM users WHERE id = ? LIMIT 1', [user.sub]);
   if (!meRow?.parent_id) return null;
   const [leader] = await rows<RowDataPacket & { id: string; username: string; display_name: string; is_active: number }>(
@@ -234,6 +300,8 @@ const applicationSelect = `
   JOIN users l ON l.id = a.leader_id`;
 
 export async function applyToTeam(user: AuthUser, leaderUsername: string, message: string | undefined, ip?: string) {
+  if (isDevDemoAuthUser(user)) return { id: `team-app-${Date.now()}` };
+
   if (user.role !== 'creator') throw new AppError(422, 42206, '只有达人账号可以申请入团');
   const [meRow] = await rows<MemberRow>('SELECT id, role, parent_id, is_active FROM users WHERE id = ? LIMIT 1', [user.sub]);
   if (meRow?.parent_id) throw new AppError(422, 42207, '你已在团队内，如需变更请联系管理员');
@@ -274,16 +342,25 @@ export async function applyToTeam(user: AuthUser, leaderUsername: string, messag
 }
 
 export async function listMyApplications(user: AuthUser) {
+  if (isDevDemoAuthUser(user)) return user.role === 'creator' ? demoApplications() : [];
+
   return rows<ApplicationRow>(`${applicationSelect} WHERE a.creator_id = ? ORDER BY a.created_at DESC`, [user.sub]);
 }
 
 export async function listApplications(user: AuthUser) {
+  if (isDevDemoAuthUser(user)) {
+    if (user.role === 'creator') return [];
+    return demoApplications();
+  }
+
   if (user.role === 'admin') return rows<ApplicationRow>(`${applicationSelect} ORDER BY a.created_at DESC`);
   return rows<ApplicationRow>(`${applicationSelect} WHERE a.leader_id = ? ORDER BY a.created_at DESC`, [user.sub]);
 }
 
 /** 达人撤回自己的待审批申请 */
 export async function cancelMyApplication(user: AuthUser, applicationId: string, ip?: string) {
+  if (isDevDemoAuthUser(user)) return;
+
   const [application] = await rows<ApplicationRow>(`${applicationSelect} WHERE a.id = ? LIMIT 1`, [applicationId]);
   if (!application) throw new AppError(404, 40401, '申请不存在');
   if (String(application.creator_id) !== user.sub) throw new AppError(403, 40301, '无权撤回该申请');
@@ -305,7 +382,10 @@ export async function cancelMyApplication(user: AuthUser, applicationId: string,
   });
 }
 
-export async function reviewApplication(user: AuthUser, applicationId: string, action: 'approve' | 'reject', ip?: string) {  const [application] = await rows<ApplicationRow>(`${applicationSelect} WHERE a.id = ? LIMIT 1`, [applicationId]);
+export async function reviewApplication(user: AuthUser, applicationId: string, action: 'approve' | 'reject', ip?: string) {
+  if (isDevDemoAuthUser(user)) return;
+
+  const [application] = await rows<ApplicationRow>(`${applicationSelect} WHERE a.id = ? LIMIT 1`, [applicationId]);
   if (!application) throw new AppError(404, 40401, '申请不存在');
   if (user.role !== 'admin' && String(application.leader_id) !== user.sub) {
     throw new AppError(403, 40301, '无权审批该申请');

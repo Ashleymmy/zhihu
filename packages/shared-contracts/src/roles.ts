@@ -10,56 +10,24 @@ export const PROJECT_MEMBER_ROLES = ['owner', 'admin', 'member', 'viewer'] as co
 export type ProjectMemberRole = (typeof PROJECT_MEMBER_ROLES)[number]
 
 export const ALL_PERMISSIONS = [
-  'plan.create',
-  'plan.edit',
-  'plan.delete',
-  'keyword.bind',
-  'callback.config',
-  'callback.secret',
-  'composition.create',
-  'composition.edit',
   'team.view',
   'team.create_member',
   'team.reset_pwd',
   'team.disable',
-  'earning.view_self',
-  'earning.view_team',
-  'earning.view_all',
-  'withdraw.apply',
-  'withdraw.approve',
+  'team.apply',
+  'team.review',
+  'team.delete',
   'project.manage',
   'audit.view',
+  'module.manage',
 ] as const
 
-export type Permission = (typeof ALL_PERMISSIONS)[number]
+export type Permission = string
 
 export const ROLE_PERMISSIONS: Record<GlobalRole, readonly Permission[]> = {
   admin: ALL_PERMISSIONS,
-  leader: [
-    'plan.create',
-    'plan.edit',
-    'plan.delete',
-    'keyword.bind',
-    'composition.create',
-    'composition.edit',
-    'team.view',
-    'team.create_member',
-    'team.reset_pwd',
-    'team.disable',
-    'earning.view_self',
-    'earning.view_team',
-    'withdraw.apply',
-  ],
-  creator: [
-    'plan.create',
-    'plan.edit',
-    'plan.delete',
-    'keyword.bind',
-    'composition.create',
-    'composition.edit',
-    'earning.view_self',
-    'withdraw.apply',
-  ],
+  leader: ['team.view', 'team.create_member', 'team.reset_pwd', 'team.disable', 'team.review', 'team.delete'],
+  creator: ['team.apply'],
 }
 
 export function isGlobalRole(value: unknown): value is GlobalRole {

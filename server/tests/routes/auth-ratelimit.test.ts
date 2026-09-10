@@ -14,7 +14,7 @@ vi.mock('../../src/db', () => ({
   withTransaction: dbMocks.withTransaction,
 }));
 
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 
 describe('POST /api/v1/auth/login - 限流', () => {
   let app: Express;

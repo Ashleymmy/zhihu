@@ -2,12 +2,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import request, { type Response as SupertestResponse } from 'supertest';
 import { setupServer } from 'msw/node';
 import type { RequestHandler } from 'express';
-import { createApp } from '../../src/app';
+import { createApp } from '../support/legacyApp';
 import type { Express } from 'express';
 import * as jwt from '../../src/auth/jwt';
 import * as revocation from '../../src/auth/revocation';
-import { XLSX_MAX_BYTES, XLSX_MIME } from '../../src/zhihu/allianceXlsx';
-import { resetAllianceQuotaManager } from '../../src/zhihu/allianceQuota';
+import { XLSX_MAX_BYTES, XLSX_MIME } from '../../src/modules/zhihu/zhihu/allianceXlsx';
+import { resetAllianceQuotaManager } from '../../src/modules/zhihu/zhihu/allianceQuota';
 import { installAllianceQuotaTestFixture, TEST_ALLIANCE_QUOTA_POLICY } from '../support/allianceQuotaFixture';
 import { buildMinimalXlsxFixture } from '../support/allianceXlsxFixture';
 import { installAllianceAuditTestSink } from '../support/allianceAuditFixture';
@@ -36,8 +36,8 @@ vi.mock('multer', async () => {
   return { ...actual, default: Object.assign(mockedMulter, actualMulter) };
 });
 
-vi.mock('../../src/sign/zhihu', async () => {
-  const actual = await vi.importActual<typeof import('../../src/sign/zhihu')>('../../src/sign/zhihu');
+vi.mock('../../src/modules/zhihu/sign/zhihu', async () => {
+  const actual = await vi.importActual<typeof import('../../src/modules/zhihu/sign/zhihu')>('../../src/modules/zhihu/sign/zhihu');
   return {
     ...actual,
     injectSignParams: (...args: Parameters<typeof actual.injectSignParams>) => {
@@ -51,9 +51,9 @@ vi.mock('../../src/sign/zhihu', async () => {
   };
 });
 
-vi.mock('../../src/zhihu/allianceEgress', async () => {
-  const actual = await vi.importActual<typeof import('../../src/zhihu/allianceEgress')>(
-    '../../src/zhihu/allianceEgress',
+vi.mock('../../src/modules/zhihu/zhihu/allianceEgress', async () => {
+  const actual = await vi.importActual<typeof import('../../src/modules/zhihu/zhihu/allianceEgress')>(
+    '../../src/modules/zhihu/zhihu/allianceEgress',
   );
   return {
     ...actual,

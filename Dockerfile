@@ -42,6 +42,7 @@ COPY --from=server-build --chown=node:node /app/package.json /app/package-lock.j
 COPY --from=server-build --chown=node:node /app/node_modules ./node_modules
 COPY --from=server-build --chown=node:node /app/dist ./dist
 COPY --chown=node:node server/migrations ./migrations
+COPY --chown=node:node server/schema ./schema
 
 # 门户/落地页静态产物（已提交在仓库 server/public）
 COPY --chown=node:node server/public ./public

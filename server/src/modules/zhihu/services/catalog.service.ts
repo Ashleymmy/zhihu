@@ -1,0 +1,110 @@
+import { RowDataPacket } from 'mysql2/promise';
+import { db, rows, withTransaction } from '../../../db';
+import { enqueue } from '../queue';
+import { AppError } from '../../../middleware/errors';
+import { AuthUser } from '../../../types';
+import { pageOffset } from '../../../utils/pagination';
+import { scopeFilter } from '../../../utils/scopeFilter';
+import { writeAudit } from '../../../services/audit.service';
+import {
+  getDevDemoTask,
+  isDevDemoEnabled,
+  isDevDemoAuthUser,
+  listDevDemoChannels,
+  listDevDemoTasks,
+} from '../dev-demo';
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+export function channelVisibility(_user: AuthUser) {
+  // 渠道是本知乎账号的共享基础设施：所有登录用户可读（密钥永不下发，仅返回目录字段）。
+  // 若未来引入多账号（多租户）再恢复按归属的可见性收敛。
+  return { clause: '1=1', bindings: [] as unknown[] };
+}
+export async function listChannels(user: AuthUser, query: Record<string, unknown>) {
+  if (isDevDemoAuthUser(user)) return listDevDemoChannels(query);
+
+  const page = Number(query.page ?? 1),
+    pageSize = Number(query.pageSize ?? 20);
+  const visibility = channelVisibility(user);
+  const [count] = await rows<CountRow>(
+    `SELECT COUNT(*) total FROM channels c WHERE ${visibility.clause}`,
+    visibility.bindings,
+  );
+  const list = await rows(
+    `SELECT c.* FROM channels c WHERE ${visibility.clause} ORDER BY c.generation,c.name LIMIT ? OFFSET ?`,
+    [...visibility.bindings, pageSize, pageOffset(page, pageSize)],
+  );
+  return { list, total: Number(count?.total ?? 0), page, pageSize };
+}
+export async function assignChannel(user: AuthUser, id: string, ownerId: string | null, ip?: string) {
+  const [channel] = await rows<RowDataPacket>('SELECT id FROM channels WHERE id=? LIMIT 1', [id]);
+  if (!channel) throw new AppError(404, 40401, '渠道不存在');
+  await withTransaction(async (connection) => {
+    await connection.query('UPDATE channels SET owner_id=? WHERE id=?', [ownerId, id]);
+    await writeAudit(
+      {
+        userId: user.sub,
+        action: 'channel.assign_owner',
+        resourceType: 'channel',
+        resourceId: id,
+        detail: { ownerId },
+        ip,
+      },
+      connection,
+    );
+  });
+  return { id, ownerId };
+}
+export async function requestChannelSync(user: AuthUser) {
+  if (isDevDemoAuthUser(user)) return { jobId: 'dev-demo-channels', status: 'queued' };
+
+  const job = await enqueue(
+    'sync-channels',
+    { requestedBy: user.sub },
+    { jobId: `channels-${Math.floor(Date.now() / 60000)}` },
+  );
+  return { jobId: String(job.id), status: 'queued' };
+}
+export async function listTasks(user: AuthUser, query: Record<string, unknown>) {
+  if (isDevDemoAuthUser(user)) return listDevDemoTasks(query);
+
+  const page = Number(query.page ?? 1),
+    pageSize = Number(query.pageSize ?? 20);
+  const where = ['1=1'];
+  const bindings: unknown[] = [];
+  if (query.status) {
+    where.push('status=?');
+    bindings.push(query.status);
+  }
+  if (query.keyword) {
+    where.push('name LIKE ?');
+    bindings.push(`%${String(query.keyword)}%`);
+  }
+  const clause = where.join(' AND ');
+  const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM tasks WHERE ${clause}`, bindings);
+  const list = await rows(`SELECT * FROM tasks WHERE ${clause} ORDER BY start_time DESC LIMIT ? OFFSET ?`, [
+    ...bindings,
+    pageSize,
+    pageOffset(page, pageSize),
+  ]);
+  return { list, total: Number(count?.total ?? 0), page, pageSize };
+}
+export async function getTask(user: AuthUser, id: string) {
+  if (isDevDemoAuthUser(user) || isDevDemoEnabled()) return getDevDemoTask(id);
+
+  const [task] = await rows<RowDataPacket>('SELECT * FROM tasks WHERE id=? OR zhihu_task_id=? LIMIT 1', [id, id]);
+  if (!task) throw new AppError(404, 40401, '推广任务不存在');
+  return task;
+}
+export async function requestTaskSync(user: AuthUser, channelId?: string) {
+  if (isDevDemoAuthUser(user)) return { jobId: 'dev-demo-tasks', status: 'queued' };
+
+  const scope = channelId ?? 'all';
+  const job = await enqueue(
+    'sync-tasks',
+    { requestedBy: user.sub, channelId },
+    { jobId: `tasks-${scope}-${Math.floor(Date.now() / 60000)}` },
+  );
+  return { jobId: String(job.id), status: 'queued' };
+}

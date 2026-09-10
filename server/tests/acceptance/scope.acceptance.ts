@@ -21,7 +21,7 @@ function serializeRows(value: unknown) {
 
 suite('Acceptance scope', () => {
   let lease: MySqlTestLease | undefined;
-  let app: ReturnType<typeof import('../../src/app').createApp>;
+  let app: ReturnType<typeof import('../support/legacyApp').createApp>;
   let db: typeof import('../../src/db').db;
   let rows: typeof import('../../src/db').rows;
   let signToken: typeof import('../../src/auth/jwt').signToken;
@@ -41,7 +41,7 @@ suite('Acceptance scope', () => {
       expect(migration.skipped).toEqual([]);
       vi.resetModules();
       const [{ createApp }, databaseModule, jwtModule] = await Promise.all([
-        import('../../src/app'),
+        import('../support/legacyApp'),
         import('../../src/db'),
         import('../../src/auth/jwt'),
       ]);

@@ -1,3 +1,17 @@
+# OPC 开发入口
+
+当前架构与完整步骤见 [OPC 公共核心重构说明](docs/OPC公共核心重构.md)。以下旧环境记录中的端口和“已启动”只是历史记录，不代表当前实际运行状态。
+
+- 前端在根目录使用 pnpm；后端在 server 下使用 npm。
+- `OPC_MODULES=` 启动公共核心；`OPC_MODULES=zhihu` 加载知乎模块。
+- 空库先 `npm run migrate`，配置管理员密码后 `npm run bootstrap:admin`。
+- 独立 API：`npm run build:core`、`npm run start:core`；三端托管使用根目录 `pnpm build` 后的常规后端入口。
+- 验收命令：`pnpm verify:opc`；浏览器验收与旧测试基线见当前架构说明。
+
+---
+
+## 历史开发环境记录
+
 # 🚀 开发环境启动指南
 
 ## 📋 当前运行状态

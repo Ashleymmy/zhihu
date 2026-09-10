@@ -1,0 +1,38 @@
+import type { ModuleManifest } from '../../core/contracts';
+const creator = [
+  'catalog.sync',
+  'plan.create',
+  'plan.edit',
+  'plan.delete',
+  'keyword.bind',
+  'composition.create',
+  'composition.edit',
+  'story.read',
+  'earning.view_self',
+  'withdraw.apply',
+];
+const leader = [...creator, 'earning.view_team', 'withdraw.review'];
+export const zhihuManifest: ModuleManifest = {
+  id: 'zhihu',
+  name: '知乎',
+  version: '1.0.0',
+  contractVersion: 1,
+  roles: ['admin', 'leader', 'creator'],
+  entryPath: '/modules/zhihu',
+  accountCreation: 'managed',
+  accountMessage: '当前使用迁移生成的历史接入账号；新增知乎凭证接入尚未开放。',
+  capabilities: ['legacy-workflows', 'email-import', 'legacy-finance'],
+  permissions: {
+    creator,
+    leader,
+    admin: [
+      ...leader,
+      'callback.config',
+      'callback.secret',
+      'earning.view_all',
+      'withdraw.approve',
+      'finance.relay',
+      'data.import',
+    ],
+  },
+};

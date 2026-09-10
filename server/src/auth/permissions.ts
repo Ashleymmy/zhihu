@@ -1,17 +1,8 @@
-import { RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import { AppError } from '../middleware/errors';
-import { Role } from '../types';
-
+import type { Role } from '../types';
+import type { ModuleManifest } from '../core/contracts';
 export const ALL_PERMISSIONS = [
-  'plan.create',
-  'catalog.sync',
-  'plan.edit',
-  'plan.delete',
-  'keyword.bind',
-  'callback.config',
-  'callback.secret',
-  'composition.create',
-  'composition.edit',
   'team.view',
   'team.create_member',
   'team.reset_pwd',
@@ -19,60 +10,26 @@ export const ALL_PERMISSIONS = [
   'team.apply',
   'team.review',
   'team.delete',
-  'story.read',
-  'earning.view_self',
-  'earning.view_team',
-  'earning.view_all',
-  'withdraw.apply',
-  'withdraw.review',
-  'withdraw.approve',
   'project.manage',
-  'finance.relay',
   'audit.view',
+  'module.manage',
 ] as const;
-
-export type Permission = (typeof ALL_PERMISSIONS)[number];
-
-const rolePermissions: Record<Role, readonly Permission[]> = {
+export type Permission = string;
+const roles: Record<Role, readonly string[]> = {
   admin: ALL_PERMISSIONS,
-  leader: [
-    'catalog.sync',
-    'plan.create',
-    'plan.edit',
-    'plan.delete',
-    'keyword.bind',
-    'composition.create',
-    'composition.edit',
-    'team.view',
-    'team.create_member',
-    'team.reset_pwd',
-    'team.disable',
-    'team.review',
-    'team.delete',
-    'story.read',
-    'earning.view_self',
-    'earning.view_team',
-    'withdraw.apply',
-    'withdraw.review',
-  ],
-  creator: [
-    'catalog.sync',
-    'plan.create',
-    'plan.edit',
-    'plan.delete',
-    'keyword.bind',
-    'composition.create',
-    'composition.edit',
-    'team.apply',
-    'story.read',
-    'earning.view_self',
-    'withdraw.apply',
-  ],
+  leader: ['team.view', 'team.create_member', 'team.reset_pwd', 'team.disable', 'team.review', 'team.delete'],
+  creator: ['team.apply'],
 };
-
-export const permissionsFor = (role: Role) => [...rolePermissions[role]];
-export const hasPermission = (role: Role, permission: Permission) => rolePermissions[role].includes(permission);
-
+let modules: ModuleManifest[] = [];
+export function setModulePermissions(manifests: ModuleManifest[]) {
+  modules = manifests;
+}
+export function permissionsFor(role: Role): string[] {
+  return [...roles[role], ...modules.flatMap((m) => (m.permissions[role] ?? []).map((p) => m.id + '.' + p))];
+}
+export function hasPermission(role: Role, permission: Permission) {
+  return permissionsFor(role).includes(permission);
+}
 export const requirePermission =
   (permission: Permission): RequestHandler =>
   (req, _res, next) => {

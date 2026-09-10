@@ -9,9 +9,9 @@ import {
   parseAllianceIngress,
   prepareAllianceRequest,
   projectAllianceSuccess,
-} from '../../src/zhihu/allianceContracts';
-import { resolvePublicEndpoint, type AllianceEndpoint } from '../../src/zhihu/allianceEndpointRegistry';
-import { buildSignatureTrace } from '../../src/sign/zhihu';
+} from '../../src/modules/zhihu/zhihu/allianceContracts';
+import { resolvePublicEndpoint, type AllianceEndpoint } from '../../src/modules/zhihu/zhihu/allianceEndpointRegistry';
+import { buildSignatureTrace } from '../../src/modules/zhihu/sign/zhihu';
 
 const releaseTime = '2026-08-17T10:00:00+08:00';
 const composition = {

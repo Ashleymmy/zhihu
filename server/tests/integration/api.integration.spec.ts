@@ -62,14 +62,14 @@ const suite = process.env.RUN_TESTCONTAINERS === '1' ? describe : describe.skip;
 
 suite('MySQL API integration', () => {
   let lease: MySqlTestLease | undefined;
-  let app: ReturnType<typeof import('../../src/app').createApp>;
+  let app: ReturnType<typeof import('../support/legacyApp').createApp>;
   let db: typeof import('../../src/db').db;
   let rows: typeof import('../../src/db').rows;
   let signToken: typeof import('../../src/auth/jwt').signToken;
-  let syncMetrics: typeof import('../../src/jobs/syncMetrics').syncMetrics;
-  let createWithdrawal: typeof import('../../src/services/earnings.service').createWithdrawal;
-  let approveWithdrawal: typeof import('../../src/services/earnings.service').approveWithdrawal;
-  let rejectWithdrawal: typeof import('../../src/services/earnings.service').rejectWithdrawal;
+  let syncMetrics: typeof import('../../src/modules/zhihu/jobs/syncMetrics').syncMetrics;
+  let createWithdrawal: typeof import('../../src/modules/zhihu/services/earnings.service').createWithdrawal;
+  let approveWithdrawal: typeof import('../../src/modules/zhihu/services/earnings.service').approveWithdrawal;
+  let rejectWithdrawal: typeof import('../../src/modules/zhihu/services/earnings.service').rejectWithdrawal;
   let bossToken = '';
   let leaderToken = '';
   let memberToken = '';
@@ -87,11 +87,11 @@ suite('MySQL API integration', () => {
       expect(migration.skipped).toEqual([]);
       vi.resetModules();
       const [{ createApp }, databaseModule, jwtModule, metricsModule, earningsModule] = await Promise.all([
-        import('../../src/app'),
+        import('../support/legacyApp'),
         import('../../src/db'),
         import('../../src/auth/jwt'),
-        import('../../src/jobs/syncMetrics'),
-        import('../../src/services/earnings.service'),
+        import('../../src/modules/zhihu/jobs/syncMetrics'),
+        import('../../src/modules/zhihu/services/earnings.service'),
       ]);
       app = createApp();
       db = databaseModule.db;

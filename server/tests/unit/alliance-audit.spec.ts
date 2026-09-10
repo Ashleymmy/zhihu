@@ -6,9 +6,9 @@ import {
   resetAllianceAuditSink,
   writeAllianceRejectedAudit,
   type AllianceRejectedAuditEvent,
-} from '../../src/zhihu/allianceAudit';
+} from '../../src/modules/zhihu/zhihu/allianceAudit';
 import { AppError } from '../../src/middleware/errors';
-import { handleAllianceError, normalizeAllianceErrorForTest } from '../../src/routes/alliance';
+import { handleAllianceError, normalizeAllianceErrorForTest } from '../../src/modules/zhihu/routes/alliance';
 
 function request(method = 'GET'): Request {
   return { method, user: undefined } as unknown as Request;
@@ -137,7 +137,7 @@ describe('Alliance rejected audit', () => {
     process.env.NODE_ENV = 'production';
     vi.resetModules();
     try {
-      const auditModule = await import('../../src/zhihu/allianceAudit');
+      const auditModule = await import('../../src/modules/zhihu/zhihu/allianceAudit');
       process.env.NODE_ENV = 'test';
       const attempted: AllianceRejectedAuditEvent[] = [];
       auditModule.installAllianceAuditSink(async (event) => {

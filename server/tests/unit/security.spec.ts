@@ -1,6 +1,8 @@
+import {setModulePermissions} from '../../src/auth/permissions';
+import {zhihuManifest} from '../../src/modules/zhihu/manifest';
 import { permissionsFor } from '../../src/auth/permissions';
 import { AuthUser } from '../../src/types';
-import { decryptSecret, encryptSecret } from '../../src/utils/secretCrypto';
+import { decryptSecret, encryptSecret } from '../../src/modules/zhihu/utils/secretCrypto';
 import { maskAccount, maskName, maskSecret } from '../../src/utils/maskSecret';
 import { scopeFilter } from '../../src/utils/scopeFilter';
 
@@ -8,7 +10,8 @@ const user = (role: AuthUser['role']): AuthUser => ({ sub: '42', role, parentId:
 
 describe('权限与安全工具', () => {
   it('角色权限按矩阵收敛', () => {
-    expect(permissionsFor('admin')).toContain('callback.secret');
+    setModulePermissions([zhihuManifest]);
+    expect(permissionsFor('admin')).toContain('zhihu.callback.secret');
     expect(permissionsFor('leader')).toContain('team.create_member');
     expect(permissionsFor('creator')).not.toContain('team.view');
   });
