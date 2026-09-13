@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ProjectIntegrations } from '@zhihu-koc/shared-components'
 import type { Project } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
@@ -13,12 +13,22 @@ const creating = ref(false)
 const selected = ref<Project | null>(null)
 const members = ref<any[]>([])
 const courses = ref<any[]>([])
+const teamMembers = ref<any[]>([])
+const memberUserId = ref('')
+const addingMember = ref(false)
+const availableMembers = computed(() =>
+  teamMembers.value.filter((member) =>
+    member.isActive && member.role !== 'admin' && !members.value.some((item) => item.userId === member.id),
+  ),
+)
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    projects.value = await apis.projects.list()
+    const [projectList, memberList] = await Promise.all([apis.projects.list(), apis.team.listMembers()])
+    projects.value = projectList
+    teamMembers.value = memberList
     const first = projects.value[0]
     if (first && !selected.value) await selectProject(first)
   } catch (e: any) {
@@ -30,6 +40,7 @@ async function load() {
 
 async function selectProject(p: Project) {
   selected.value = p
+  memberUserId.value = ''
   try {
     const [m, c] = await Promise.all([apis.projects.listMembers(p.id), apis.projects.listCourses(p.id)])
     members.value = m
@@ -39,6 +50,32 @@ async function selectProject(p: Project) {
   }
 }
 
+async function addProjectMember() {
+  const project = selected.value
+  if (!project || !memberUserId.value) return
+  addingMember.value = true
+  error.value = ''
+  try {
+    await apis.projects.addMember(project.id, { userId: memberUserId.value, memberRole: 'member' })
+    memberUserId.value = ''
+    await selectProject(project)
+  } catch (e: any) {
+    error.value = e?.message ?? String(e)
+  } finally {
+    addingMember.value = false
+  }
+}
+
+async function removeProjectMember(userId: string, name: string) {
+  const project = selected.value
+  if (!project || !confirm(`确定将成员「${name}」移出该项目？`)) return
+  try {
+    await apis.projects.removeMember(project.id, userId)
+    await selectProject(project)
+  } catch (e: any) {
+    error.value = e?.message ?? String(e)
+  }
+}
 async function createProject() {
   if (!form.value.name.trim() || !form.value.slug.trim()) return
   creating.value = true
@@ -162,7 +199,23 @@ onMounted(load)
         </article>
 
         <article class="panel" style="padding: 20px">
-          <h2 style="margin: 0 0 14px; font-size: 16px">成员（{{ members.length }}）</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px">
+            <h2 style="margin: 0; font-size: 16px">成员（{{ members.length }}）</h2>
+          </div>
+          <form v-if="useAuthStore().user?.role === 'admin'" @submit.prevent="addProjectMember" style="display: flex; gap: 8px; margin-bottom: 14px">
+            <select v-model="memberUserId" required :disabled="addingMember" style="flex: 1">
+              <option value="">选择团长或达人</option>
+              <option v-for="m in availableMembers" :key="m.id" :value="m.id">
+                {{ m.displayName }} · {{ m.username }} · {{ m.role === 'leader' ? '团长' : '达人' }}
+              </option>
+            </select>
+            <button type="submit" class="row-action" :disabled="addingMember || !availableMembers.length">
+              {{ addingMember ? '加入中...' : '加入项目' }}
+            </button>
+          </form>
+          <p v-if="useAuthStore().user?.role === 'admin' && !availableMembers.length" style="color: var(--ink-soft); font-size: 12px; margin: 0 0 10px">
+            暂无可加入的活跃团长或达人；已加入项目的成员不会重复显示。
+          </p>
           <div v-if="!members.length" style="color: var(--ink-soft); font-size: 12px">暂无成员</div>
           <div
             v-for="m in members"
@@ -170,13 +223,18 @@ onMounted(load)
             style="
               display: flex;
               justify-content: space-between;
+              align-items: center;
+              gap: 12px;
               padding: 10px 0;
               border-top: 1px solid var(--paper-deep);
               font-size: 12px;
             "
           >
             <span>{{ m.displayName ?? m.username ?? m.userId }}</span>
-            <span class="status-badge draft">{{ m.memberRole }}</span>
+            <span style="display: flex; align-items: center; gap: 8px">
+              <span class="status-badge draft">{{ m.memberRole }}</span>
+              <button v-if="useAuthStore().user?.role === 'admin'" class="row-action danger" @click="removeProjectMember(m.userId, m.displayName ?? m.username ?? m.userId)">移出</button>
+            </span>
           </div>
         </article>
 

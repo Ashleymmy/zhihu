@@ -186,11 +186,18 @@ export async function dbStats() {
     ];
   }
 
-  const tables = await rows<RowDataPacket & { table_name: string; table_rows: number; data_mb: number }>(
-    `SELECT table_name, table_rows, ROUND((data_length + index_length) / 1024 / 1024, 2) AS data_mb
+  const tables = await rows<RowDataPacket & { tableName: string; tableRows: number; dataMb: number }>(
+    `SELECT table_name AS tableName, table_rows AS tableRows,
+            ROUND((data_length + index_length) / 1024 / 1024, 2) AS dataMb
      FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY data_length DESC`,
   );
-  return tables;
+  // Use the shared camelCase contract explicitly. MySQL may uppercase
+  // information_schema column names when no alias is provided.
+  return tables.map((table) => ({
+    tableName: table.tableName,
+    tableRows: Number(table.tableRows ?? 0),
+    dataMb: Number(table.dataMb ?? 0),
+  }));
 }
 
 /** 清理 N 天前的操作日志 */

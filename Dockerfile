@@ -52,7 +52,7 @@ COPY --from=frontend-build --chown=node:node /workspace/apps/platform-admin/dist
 COPY --from=frontend-build --chown=node:node /workspace/apps/platform-leader/dist /apps/platform-leader/dist
 COPY --from=frontend-build --chown=node:node /workspace/apps/platform-creator/dist /apps/platform-creator/dist
 
-RUN apk add --no-cache tzdata && ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime
+# Node ships ICU timezone data; keep TZ in the environment so restricted/offline builds do not depend on Alpine package downloads.
 
 USER node
 EXPOSE 3000

@@ -104,7 +104,7 @@ onMounted(load)
           v-if="!loading && !projects.length"
           style="color: var(--ink-soft); font-size: 12px; padding: 20px"
         >
-          暂无项目
+          暂无项目，请联系管理员将你的账号加入项目成员。
         </div>
         <button
           v-for="p in projects"

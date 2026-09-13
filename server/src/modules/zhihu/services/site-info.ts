@@ -13,12 +13,18 @@ export async function siteInfo() {
   const [metricSync] = await rows<RowDataPacket & { latest: string | null }>(
     'SELECT MAX(fetched_at) AS latest FROM daily_metrics',
   );
+  const accessToken = process.env.ZHIHU_ACCESS_TOKEN ?? '';
+  const secretKey = process.env.ZHIHU_SECRET_KEY ?? '';
+  const isPlaceholderCredential =
+    accessToken === 'mock_access_token' ||
+    secretKey === 'mock_secret_key' ||
+    accessToken === 'local_attribution_test_token' ||
+    secretKey === 'local_attribution_test_secret';
   return {
     node: process.version,
     uptimeSec: Math.floor(process.uptime()),
     zhihuApiBase: process.env.ZHIHU_API_BASE ?? '',
-    zhihuCredentialMode:
-      process.env.ZHIHU_ACCESS_TOKEN && !process.env.ZHIHU_ACCESS_TOKEN.startsWith('mock') ? 'real' : 'mock',
+    zhihuCredentialMode: accessToken && !isPlaceholderCredential ? 'real' : 'mock',
     sync: {
       channels: channelSync?.latest ?? null,
       tasks: taskSync?.latest ?? null,
