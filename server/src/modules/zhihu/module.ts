@@ -1,4 +1,5 @@
 import { projectsRouter } from './routes/projects';
+import { attributionRouter } from './routes/attribution';
 import { Router } from 'express';
 import type { BusinessModule } from '../../core/contracts';
 import { zhihuManifest } from './manifest';
@@ -20,8 +21,11 @@ import { dataImportRouter } from './routes/data-import';
 import { toolsRouter } from './routes/tools';
 import { registerJobs, startScheduler, stopScheduler } from './jobs';
 import { logger } from '../../utils/logger';
+import { attributionDataProvider } from './attribution/provider';
+import { registerAttributionJobs, startAttributionWorker, stopAttributionWorker } from './attribution/worker';
 export function createZhihuModule(): BusinessModule {
   const router = Router();
+  router.use(attributionRouter);
   const routes: Array<[string, Router]> = [
     ['projects', projectsRouter],
     ['plans', plansRouter],
@@ -42,6 +46,7 @@ export function createZhihuModule(): BusinessModule {
   ];
   for (const [name, child] of routes) router.use('/' + name, child);
   registerJobs();
+  registerAttributionJobs();
   return {
     manifest: zhihuManifest,
     router,
@@ -60,7 +65,14 @@ export function createZhihuModule(): BusinessModule {
           child,
         );
     },
-    start: startScheduler,
-    stop: stopScheduler,
+    dataProvider: attributionDataProvider,
+    start() {
+      startScheduler();
+      startAttributionWorker();
+    },
+    stop() {
+      stopScheduler();
+      stopAttributionWorker();
+    },
   };
 }

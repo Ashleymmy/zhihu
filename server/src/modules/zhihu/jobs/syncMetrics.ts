@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2/promise';
-import { db, rows } from '../../../db';
+import { rows,withTransaction } from '../../../db';
+import { legacyAllowed } from '../attribution/routing';
 import { zhihuGet } from '../zhihu/client';
 import { config } from '../config';
 
@@ -39,7 +40,9 @@ export async function syncMetrics(data: Record<string, unknown>) {
     );
     if (!owner && process.env.NODE_ENV !== 'test')
       console.warn('metric_owner_missing', { channelId, keyword: item.keyword });
-    await db.query(
+    await withTransaction(async connection=>{
+    if(!await legacyAllowed(connection,null,item.stat_date??item.statDate??null))return;
+    await connection.query(
       `INSERT INTO daily_metrics (project_id, channel_id, keyword, plan_id, owner_id, stat_date, impressions, clicks, conversions, earning, raw_json, fetched_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
        ON DUPLICATE KEY UPDATE impressions=VALUES(impressions), clicks=VALUES(clicks), conversions=VALUES(conversions), earning=VALUES(earning), raw_json=VALUES(raw_json), owner_id=VALUES(owner_id), plan_id=VALUES(plan_id), fetched_at=NOW()`,
@@ -57,5 +60,6 @@ export async function syncMetrics(data: Record<string, unknown>) {
         JSON.stringify(item),
       ],
     );
+    });
   }
 }

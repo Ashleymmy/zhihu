@@ -1,0 +1,11 @@
+{
+  "name": "@zhihu-koc/zhihu-module-views",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { "./*": "./zhihu/*" },
+  "dependencies": {
+    "vue": "^3.4.21",
+    "@zhihu-koc/shared-services": "workspace:*"
+  }
+}

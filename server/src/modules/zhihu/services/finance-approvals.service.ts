@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { assertLegacyRoute } from '../attribution/routing';
 import path from 'node:path';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../../../db';
@@ -343,6 +344,7 @@ export async function decideAppeal(
 
     // 通过且指定调账金额 → 写入收益行（confirmed，可正可负）
     if (action === 'approve' && adjustAmount !== null && adjustAmount !== 0) {
+      await assertLegacyRoute(connection,null,null);
       const [[project]] = await connection.query<RowDataPacket[]>(
         "SELECT id FROM projects WHERE slug='zhihu' LIMIT 1",
       );

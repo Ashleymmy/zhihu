@@ -11,6 +11,7 @@
     "lint": "echo \"lint: platform-creator (no linter configured yet)\""
   },
   "dependencies": {
+    "@zhihu-koc/zhihu-module-views": "workspace:*",
     "@zhihu-koc/shared-components": "workspace:*",
     "@zhihu-koc/shared-contracts": "workspace:*",
     "@zhihu-koc/shared-i18n": "workspace:*",

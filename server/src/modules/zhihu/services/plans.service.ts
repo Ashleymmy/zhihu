@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { assertKeywordFree, assertLegacyPlan, lockKeywordSpace } from '../attribution/resources';
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows, withTransaction } from '../../../db';
 import { enqueue } from '../queue';
@@ -172,6 +173,7 @@ export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) 
 
   const ownerId = user.role === 'admin' && input.ownerId ? input.ownerId : user.sub;
   const id = await withTransaction(async (connection) => {
+    await assertKeywordFree(connection, input.keyword);
     const [existing] = await connection.query<RowDataPacket[]>(
       'SELECT id FROM plans WHERE channel_id = ? AND keyword = ? LIMIT 1 FOR UPDATE',
       [input.channelId, input.keyword],
@@ -246,6 +248,8 @@ export async function updatePlan(
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
 
   await withTransaction(async (connection) => {
+    await lockKeywordSpace(connection);
+    await assertLegacyPlan(connection,id);
     const plan = await getPlanForUpdate(connection, user, id);
     const requiresNewKeyword =
       plan.sync_status === 'failed' &&
@@ -255,6 +259,7 @@ export async function updatePlan(
       throw new AppError(409, 40904, '请先修改关键词，再重新同步');
     }
     if (patch.keyword !== undefined) {
+      await assertKeywordFree(connection, patch.keyword, id);
       if (plan.sync_status !== 'failed' || plan.zhihu_plan_id) {
         throw new AppError(409, 40903, '只有尚未同步成功的失败计划可以修改关键词');
       }
@@ -293,6 +298,7 @@ export async function deletePlan(user: AuthUser, id: string, ip?: string) {
 
   await getPlan(user, id);
   await withTransaction(async (connection) => {
+    await assertLegacyPlan(connection,id);
     await connection.query("UPDATE plans SET status = 'ended' WHERE id = ?", [id]);
     await writeAudit(
       {
@@ -311,6 +317,7 @@ export async function retryPlan(user: AuthUser, id: string, ip?: string) {
   if (isDevDemoAuthUser(user)) return retryDevDemoPlan(user, id);
 
   const plan = (await getPlan(user, id)) as PlanRow;
+  await withTransaction(connection=>assertLegacyPlan(connection,id));
   if (plan.sync_status !== 'failed') {
     throw new AppError(409, 40902, '只有同步失败的计划可以重试');
   }

@@ -1,8 +1,9 @@
 import { RowDataPacket } from 'mysql2/promise';
-import { db, rows } from '../../../db';
-import { config } from '../config';
+import { rows, withTransaction } from '../../../db';
+import { legacyAllowed } from '../attribution/routing';
 
 interface MetricRow extends RowDataPacket {
+  project_id: string;
   id: string;
   plan_id: string;
   owner_id: string;
@@ -63,7 +64,7 @@ async function settleOneDay(settleDate: string) {
 
   // 2. 找到未结算的 daily_metrics（earning > 0 且没有对应 earnings 记录）
   const unsettled = await rows<MetricRow>(
-    `SELECT dm.id, dm.plan_id, dm.owner_id, dm.stat_date, dm.earning, dm.keyword
+    `SELECT dm.id, dm.project_id,dm.plan_id, dm.owner_id, DATE_FORMAT(dm.stat_date,'%Y-%m-%d') stat_date, dm.earning, dm.keyword
      FROM daily_metrics dm
      WHERE dm.stat_date = ?
        AND dm.earning > 0
@@ -85,6 +86,11 @@ async function settleOneDay(settleDate: string) {
 
   let settled = 0;
   for (const metric of unsettled) {
+    await withTransaction(async connection=>{
+    if(!await legacyAllowed(connection,String(metric.project_id),settleDate))return;
+    await connection.query('SELECT id FROM daily_metrics WHERE id=? FOR UPDATE',[metric.id]);
+    const [already]=await connection.query<RowDataPacket[]>('SELECT id FROM earnings WHERE source_ref=? LIMIT 1',[`metric:${metric.id}`]);
+    if(already.length)return;
     const zhihuEarning = Number(metric.earning); // 知乎官方给的收益
 
     // 3. 计算达人应得（按 creator 定价规则；无规则则全额入账）
@@ -113,12 +119,12 @@ async function settleOneDay(settleDate: string) {
 
       // 写入团长收益
       if (leaderAmount > 0) {
-        await db.query(
+        await connection.query(
           `INSERT INTO earnings (user_id, project_id, plan_id, settle_date, amount, status, source_ref, created_at)
            VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())`,
           [
             creator.parent_id,
-            config.defaultProjectId,
+            metric.project_id,
             metric.plan_id,
             metric.stat_date,
             leaderAmount,
@@ -129,12 +135,12 @@ async function settleOneDay(settleDate: string) {
     }
 
     // 6. 写入达人最终收益
-    await db.query(
+    await connection.query(
       `INSERT INTO earnings (user_id, project_id, plan_id, settle_date, amount, status, source_ref, created_at)
        VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())`,
       [
         metric.owner_id,
-        config.defaultProjectId,
+        metric.project_id,
         metric.plan_id,
         metric.stat_date,
         finalCreatorAmount,
@@ -143,6 +149,7 @@ async function settleOneDay(settleDate: string) {
     );
 
     settled++;
+    });
   }
 
   console.log(`settleEarnings: ${settleDate} 已结算 ${settled} 条记录`);

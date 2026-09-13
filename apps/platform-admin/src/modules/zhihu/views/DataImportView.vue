@@ -84,9 +84,11 @@ function onFileChange(event: Event) {
 
 async function loadBatches() {
   loading.value = true;
+  error.value = "";
   try {
     batches.value = await apis.dataImport.listBatches();
   } catch (e: any) {
+    message.value = "";
     error.value = e?.message ?? String(e);
   } finally {
     loading.value = false;
@@ -114,6 +116,7 @@ async function parseFile() {
         : "解析完成，请核对预览内容后确认。";
     await loadBatches();
   } catch (e: any) {
+    message.value = "";
     error.value = e?.message ?? String(e);
   } finally {
     parsing.value = false;
@@ -132,6 +135,7 @@ async function confirmImport() {
     return;
   confirming.value = true;
   error.value = "";
+  message.value = "";
   try {
     const result = await apis.dataImport.confirm(preview.value.id);
     preview.value = {
@@ -144,6 +148,7 @@ async function confirmImport() {
     await loadBatches();
     await loadBatchDetail(batchId);
   } catch (e: any) {
+    message.value = "";
     error.value = e?.message ?? String(e);
   } finally {
     confirming.value = false;
@@ -155,6 +160,7 @@ async function rejectImport() {
   if (!window.confirm("驳回后该批次会保留在历史记录中，但不能继续确认。继续吗？")) return;
   rejecting.value = true;
   error.value = "";
+  message.value = "";
   try {
     const reason = window.prompt("可填写驳回原因（选填）") ?? "";
     preview.value = {
@@ -164,6 +170,7 @@ async function rejectImport() {
     message.value = "导入批次已驳回，原始暂存数据已保留。";
     await loadBatches();
   } catch (e: any) {
+    message.value = "";
     error.value = e?.message ?? String(e);
   } finally {
     rejecting.value = false;
@@ -193,7 +200,8 @@ async function loadBatchDetail(id: string, page = 1) {
     });
     detailPage.value = batchDetail.value.page;
   } catch (e: any) {
-    error.value = e?.message ?? String(e);
+    message.value = "";
+    error.value = `批次明细读取失败：${e?.message ?? String(e)}`;
   } finally {
     detailLoading.value = false;
   }
@@ -231,13 +239,19 @@ onMounted(loadBatches);
     <header class="page-header">
       <div>
         <p class="section-index">01 / 数据导入</p>
-        <h1>邮件 / Excel 导入</h1>
+        <h1>历史邮件 / Excel 导入</h1>
         <p>
           把邮件中的报表附件上传，系统自动识别报表类型、校验字段并提供人工确认。
         </p>
       </div>
       <button class="row-action" @click="loadBatches">刷新记录</button>
     </header>
+
+    <div class="notice">
+      此入口用于旧版报表导入及历史记录查询。独占关键词的报告请进入
+      <router-link to="/modules/zhihu/keywords">归因与对账</router-link>
+      中的“报告与归因”。
+    </div>
 
     <div v-if="error" class="notice error-notice">{{ error }}</div>
     <div v-if="message" class="notice success-notice">{{ message }}</div>

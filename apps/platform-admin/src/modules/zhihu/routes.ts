@@ -22,7 +22,7 @@ export const modulePages: RouteRecordRaw[] = [
     path: 'data-import',
     name: 'zhihu-data-import',
     component: () => import('./views/DataImportView.vue'),
-    meta: { moduleId: 'zhihu', title: '邮件 / Excel 导入' },
+    meta: { moduleId: 'zhihu', title: '历史邮件 / Excel 导入' },
   },
   {
     path: 'appeals',
@@ -45,8 +45,8 @@ export const modulePages: RouteRecordRaw[] = [
   {
     path: 'keywords',
     name: 'zhihu-keywords',
-    component: () => import('./views/KeywordsView.vue'),
-    meta: { moduleId: 'zhihu', title: '关键词回传' },
+    component: () => import('./views/ExclusiveView.vue'),
+    meta: { moduleId: 'zhihu', title: '归因与对账' },
   },
   {
     path: 'callbacks',

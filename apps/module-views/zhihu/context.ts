@@ -1,0 +1,33 @@
+import type { HttpClient } from '@zhihu-koc/shared-services/core'
+export interface Scope {
+  projectId: string
+  accountId: string
+}
+export interface Option {
+  id: string
+  name?: string
+  displayName?: string
+  role?: string
+  parentId?: string
+  channelName?: string
+}
+export interface EngineOptions {
+  tasks: Option[]
+  channels: Option[]
+  mappings: Option[]
+  users: Option[]
+}
+export interface EngineContext {
+  http: HttpClient
+  scope: Scope
+  role: string
+  userId: string
+  options: EngineOptions
+}
+export const errorText = (e: unknown) =>
+  typeof e === 'object' && e !== null && 'message' in e
+    ? String(e.message)
+    : '操作失败，请稍后重试'
+export function requestKey() {
+  return crypto.randomUUID()
+}

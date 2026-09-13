@@ -1,5 +1,6 @@
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import * as XLSX from 'xlsx';
+import { assertLegacyRoute } from '../attribution/routing';
 import { rows, withTransaction } from '../../../db';
 import { AppError } from '../../../middleware/errors';
 import { AuthUser } from '../../../types';
@@ -301,6 +302,8 @@ export async function approveBatch(user: AuthUser, id: string, ip?: string) {
     const batch = batchRows[0];
     if (!batch) throw new AppError(404, 40401, '批次不存在');
     if (batch.status !== 'draft') throw new AppError(422, 42214, '只有草稿状态的批次可以审批');
+    const [period]=await connection.query<RowDataPacket[]>("SELECT DATE_FORMAT(period_end,'%Y-%m-%d') business_day FROM settlement_batches WHERE id=?",[id]);
+    await assertLegacyRoute(connection,null,period[0]?.business_day?String(period[0].business_day):null);
 
     const [items] = await connection.query<ItemRow[]>(
       `SELECT i.*, u.parent_id, p.role AS parent_role

@@ -1,0 +1,10 @@
+CREATE TABLE zh_engine_gate (id TINYINT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO zh_engine_gate(id) VALUES(1);
+CREATE TABLE zh_engine_routes (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,account_id BIGINT NOT NULL,project_id BIGINT NOT NULL,
+ exclusive_from DATE NOT NULL,mode VARCHAR(16) NOT NULL DEFAULT 'trial',
+ reason VARCHAR(1000) NOT NULL,sample_verified BOOLEAN NOT NULL DEFAULT FALSE,updated_by BIGINT NOT NULL,
+ created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+ UNIQUE KEY uk_zh_route(account_id,project_id),
+ FOREIGN KEY(account_id) REFERENCES integration_accounts(id),FOREIGN KEY(project_id) REFERENCES projects(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

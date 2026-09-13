@@ -39,8 +39,8 @@ export const modulePages: RouteRecordRaw[] = [
   {
     path: 'keywords',
     name: 'zhihu-keywords',
-    component: () => import('./views/KeywordsView.vue'),
-    meta: { moduleId: 'zhihu', title: '关键词回传' },
+    component: () => import('./views/ExclusiveView.vue'),
+    meta: { moduleId: 'zhihu', title: '归因与对账' },
   },
   {
     path: '',

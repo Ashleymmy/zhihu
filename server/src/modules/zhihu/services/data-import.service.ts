@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { assertLegacyRoute } from '../attribution/routing';
 import * as XLSX from 'xlsx';
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../../../db';
@@ -658,7 +659,7 @@ async function storedPreview(
      `SELECT \`row_number\`, occurred_at, channel_name, keyword, promotion_task, risk_decision,
             search_volume, order_count, search_conversion_rate, revenue_amount,
             validation_status, errors_json, raw_json
-     FROM data_import_rows WHERE batch_id = ? ORDER BY row_number LIMIT ?`,
+     FROM data_import_rows WHERE batch_id = ? ORDER BY \`row_number\` LIMIT ?`,
     [batch.id, DATA_IMPORT_PREVIEW_LIMIT],
   );
   return {
@@ -703,11 +704,14 @@ function finiteNumber(value: string | number | null): number {
  * 同一日期和关键词由 attribution_tasks 的唯一键保证幂等。
  */
 async function createAttributionTasksForBatch(connection: PoolConnection, batchId: string): Promise<string[]> {
+  // 旧行没有可靠账号与项目范围，按业务日期保守拦截新周期。
+  const routeDates=await connection.query<RowDataPacket[]>("SELECT DISTINCT DATE_FORMAT(occurred_at,'%Y-%m-%d') day FROM data_import_rows WHERE batch_id=? AND validation_status='valid'",[batchId]);
+  for(const row of routeDates[0])await assertLegacyRoute(connection,null,row.day?String(row.day):null);
   const importRows = await connection.query<AttributionImportRow[]>(
     `SELECT occurred_at, keyword, search_volume, order_count, revenue_amount
      FROM data_import_rows
      WHERE batch_id = ? AND validation_status = 'valid'
-     ORDER BY row_number`,
+     ORDER BY \`row_number\``,
     [batchId],
   );
   const [sourceRows] = importRows;
@@ -1096,7 +1100,7 @@ export async function getDataImportBatch(
             validation_status, errors_json, raw_json
      FROM data_import_rows
      WHERE batch_id = ?
-     ORDER BY row_number
+     ORDER BY \`row_number\`
      LIMIT ? OFFSET ?`,
     [id, safePageSize, offset],
   );

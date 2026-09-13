@@ -5,13 +5,27 @@ const creator = [
   'plan.edit',
   'plan.delete',
   'keyword.bind',
+  'keyword.read',
+  'keyword.claim',
+  'binding.use',
+  'attribution.read',
+  'evidence.submit',
+  'statement.read',
   'composition.create',
   'composition.edit',
   'story.read',
   'earning.view_self',
   'withdraw.apply',
 ];
-const leader = [...creator, 'earning.view_team', 'withdraw.review'];
+const leader = [
+  ...creator,
+  'earning.view_team',
+  'withdraw.review',
+  'binding.assign',
+  'price.manage',
+  'evidence.review',
+  'statement.confirm',
+];
 export const zhihuManifest: ModuleManifest = {
   id: 'zhihu',
   name: '知乎',
@@ -21,7 +35,14 @@ export const zhihuManifest: ModuleManifest = {
   entryPath: '/modules/zhihu',
   accountCreation: 'managed',
   accountMessage: '当前使用迁移生成的历史接入账号；新增知乎凭证接入尚未开放。',
-  capabilities: ['legacy-workflows', 'email-import', 'legacy-finance'],
+  capabilities: [
+    'legacy-workflows',
+    'email-import',
+    'legacy-finance',
+    'exclusive-attribution',
+    'module-statements',
+    'readonly-summary',
+  ],
   permissions: {
     creator,
     leader,
@@ -33,6 +54,11 @@ export const zhihuManifest: ModuleManifest = {
       'withdraw.approve',
       'finance.relay',
       'data.import',
+      'keyword.create',
+      'binding.release',
+      'channel.manage',
+      'attribution.manage',
+      'engine.configure',
     ],
   },
 };

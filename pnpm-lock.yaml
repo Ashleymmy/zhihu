@@ -15,6 +15,15 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  apps/module-views:
+    dependencies:
+      '@zhihu-koc/shared-services':
+        specifier: workspace:*
+        version: link:../../packages/shared-services
+      vue:
+        specifier: ^3.4.21
+        version: 3.5.41(typescript@5.9.3)
+
   apps/platform-admin:
     dependencies:
       '@zhihu-koc/shared-components':
@@ -35,6 +44,9 @@ importers:
       '@zhihu-koc/shared-utils':
         specifier: workspace:*
         version: link:../../packages/shared-utils
+      '@zhihu-koc/zhihu-module-views':
+        specifier: workspace:*
+        version: link:../module-views
       pinia:
         specifier: ^2.1.7
         version: 2.3.1(typescript@5.9.3)(vue@3.5.41(typescript@5.9.3))
@@ -84,6 +96,9 @@ importers:
       '@zhihu-koc/shared-utils':
         specifier: workspace:*
         version: link:../../packages/shared-utils
+      '@zhihu-koc/zhihu-module-views':
+        specifier: workspace:*
+        version: link:../module-views
       pinia:
         specifier: ^2.1.7
         version: 2.3.1(typescript@5.9.3)(vue@3.5.41(typescript@5.9.3))
@@ -133,6 +148,9 @@ importers:
       '@zhihu-koc/shared-utils':
         specifier: workspace:*
         version: link:../../packages/shared-utils
+      '@zhihu-koc/zhihu-module-views':
+        specifier: workspace:*
+        version: link:../module-views
       pinia:
         specifier: ^2.1.7
         version: 2.3.1(typescript@5.9.3)(vue@3.5.41(typescript@5.9.3))
