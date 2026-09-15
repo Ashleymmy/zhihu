@@ -282,9 +282,9 @@ onUnmounted(() => {
 
     <!-- 创建计划对话框 -->
     <Teleport to="body">
-      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showModal = false">
-        <div style="width: min(480px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
-          <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
+      <div v-if="showModal" class="plan-dialog-overlay" @click.self="showModal = false">
+        <div class="plan-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
+          <h2 id="plan-dialog-title" style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
           <form class="form-grid" @submit.prevent="createPlan" style="gap: 16px;">
             <!-- 推广渠道（可搜索） -->
             <div class="full-span picker-field">
@@ -408,4 +408,43 @@ onUnmounted(() => {
 .picker-option strong { font-size: 12px; font-weight: 500; }
 .picker-meta { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
 .picker-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 13px; }
+
+.plan-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 16px;
+  background: rgba(33, 33, 33, 0.4);
+  backdrop-filter: blur(2px);
+}
+.plan-dialog {
+  box-sizing: border-box;
+  width: min(480px, 100%);
+  min-width: 0;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: var(--shadow-float);
+}
+.plan-dialog .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.plan-dialog .form-grid > div, .picker-option > * { min-width: 0; }
+.picker-option > * { overflow-wrap: anywhere; }
+.picker-options { max-height: min(280px, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 700px) {
+  .plan-dialog-overlay { padding: 12px; }
+  .plan-dialog { padding: 16px; max-height: calc(100dvh - 24px); }
+  .plan-dialog .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .plan-dialog input { width: 100%; min-width: 0; font-size: 16px; }
+  .plan-dialog button { min-height: 44px; }
+  .picker-option { flex-wrap: wrap; gap: 4px; }
+  .picker-option > * { flex: 1 1 100%; }
+}
+
 </style>
