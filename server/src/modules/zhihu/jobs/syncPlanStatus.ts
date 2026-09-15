@@ -28,7 +28,8 @@ export async function syncPlanStatus() {
   // 1. 获取本地所有已同步的推广计划（有 zhihu_plan_id 的）
   const [localPlans] = await db.query<LocalPlan[]>(
     `SELECT id, zhihu_plan_id, keyword FROM plans
-     WHERE zhihu_plan_id IS NOT NULL AND status <> 'ended'`,
+     WHERE zhihu_plan_id IS NOT NULL AND status <> 'ended'
+       AND NOT EXISTS(SELECT 1 FROM zh_keywords k JOIN zhihu_account_settings s ON s.project_id=k.project_id AND s.account_id=k.account_id WHERE k.plan_id=plans.id AND JSON_UNQUOTE(JSON_EXTRACT(s.config_json,'$.mode'))='simulation')`,
   );
 
   if (localPlans.length === 0) {

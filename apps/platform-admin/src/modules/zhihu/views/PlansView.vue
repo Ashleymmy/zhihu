@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Plan } from '@zhihu-koc/shared-contracts/zhihu'
 import { useAuthStore, apis } from '../context'
@@ -8,7 +8,8 @@ const route = useRoute()
 /** 从知乎故事聚合页进入（/zhihu-story/plans）时显示返回入口 */
 const fromStoryHub = route.path.startsWith('/zhihu-story')
 
-const plans = ref<Plan[]>([])
+type PoolPlan = Plan & {keywordId?:string;keywordProjectId?:string;keywordAccountId?:string}
+const plans = ref<PoolPlan[]>([])
 const loading = ref(true)
 const error = ref('')
 const showModal = ref(false)
@@ -17,7 +18,7 @@ interface ChannelOption { id: string; zhihuChannelId: string; name: string }
 interface TaskOption { id: string; zhihuTaskId: string; name: string }
 
 const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
-const statusLabels: Record<string, string> = { active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝', archived: '已归档' }
+const statusLabels: Record<string, string> = { pending: '待审核', active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝', archived: '已归档' }
 const zhihuAuditLabels: Record<string, string> = {
   pending: '待审核',
   approved: '已通过',
@@ -75,13 +76,17 @@ function onKeywordInput() {
   keywordCheck.value = { checking: false, available: null }
   if (keywordTimer) clearTimeout(keywordTimer)
   const kw = form.value.keyword.trim()
-  if (!kw || !form.value.channelId) return
+  const channelId = form.value.channelId
+  if (!kw || !channelId) return
+  const stillCurrent = () => form.value.keyword.trim() === kw && form.value.channelId === channelId
   keywordTimer = setTimeout(async () => {
+    keywordTimer = null
+    if (!stillCurrent()) return
     keywordCheck.value = { checking: true, available: null }
     try {
-      const r = await apis.plans.checkKeyword(form.value.channelId, kw)
-      keywordCheck.value = { checking: false, available: r.available }
-    } catch { keywordCheck.value = { checking: false, available: null } }
+      const r = await apis.plans.checkKeyword(channelId, kw)
+      if (stillCurrent()) keywordCheck.value = { checking: false, available: r.available }
+    } catch { if (stillCurrent()) keywordCheck.value = { checking: false, available: null } }
   }, 600)
 }
 
@@ -173,6 +178,8 @@ async function createPlan() {
       startDate: form.value.startDate || null,
       endDate: form.value.endDate || null,
     })
+    if (keywordTimer) clearTimeout(keywordTimer)
+    keywordTimer = null
     showModal.value = false
     form.value = { keyword: '', taskId: '', channelId: '', landingUrl: '', name: '', dailyBudgetYuan: '', startDate: '', endDate: '' }
     taskQuery.value = ''
@@ -183,9 +190,14 @@ async function createPlan() {
   finally { submitting.value = false }
 }
 
+const retrying = ref<string | null>(null)
 async function retrySync(id: string) {
+  if (retrying.value) return
+  retrying.value = id
+  error.value = ''
   try { await apis.plans.retry(id); await load() }
   catch (e: any) { error.value = e?.message ?? String(e) }
+  finally { retrying.value = null }
 }
 
 async function deletePlan(id: string) {
@@ -194,7 +206,17 @@ async function deletePlan(id: string) {
   catch (e: any) { error.value = e?.message ?? String(e) }
 }
 
-onMounted(load)
+let syncPoll: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  void load()
+  syncPoll = setInterval(() => {
+    if (!loading.value && !showModal.value && !retrying.value && plans.value.some(p => p.syncStatus === 'local' || p.syncStatus === 'syncing')) void load()
+  }, 5000)
+})
+onUnmounted(() => {
+  if (keywordTimer) clearTimeout(keywordTimer)
+  if (syncPoll) clearInterval(syncPoll)
+})
 </script>
 
 <template>
@@ -205,7 +227,7 @@ onMounted(load)
         <p class="eyebrow">PROMOTION / CAMPAIGNS</p>
         <h1>推广计划</h1>
       </div>
-      <div class="page-actions">
+      <div class="page-actions"><router-link to="/modules/zhihu/operations" class="ghost-aurora">关键词领取与分发</router-link>
         <button class="ghost-aurora" :disabled="syncingCatalog" @click="syncCatalog">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
           {{ syncingCatalog ? '同步中...' : '同步渠道/任务' }}
@@ -254,14 +276,14 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="plan in plans" :key="plan.id">
-              <td><strong>{{ plan.keyword }}</strong></td>
+              <td><strong>{{ plan.keyword }}</strong><router-link v-if="plan.keywordId" :to="{path:'/modules/zhihu/operations',query:{projectId:plan.keywordProjectId,accountId:plan.keywordAccountId}}" style="display:block">查看关键词归属 / 领取</router-link></td>
               <td>{{ plan.channelName }}</td>
               <td>{{ plan.ownerName }}</td>
               <td>{{ plan.dailyBudget != null ? fmt.format(plan.dailyBudget / 100) : '—' }}</td>
               <td><span :class="['status-badge', plan.status]">{{ statusLabels[plan.status] }}</span></td>
               <td>
                 <span :class="['status-badge', plan.syncStatus === 'synced' ? 'active' : plan.syncStatus === 'failed' ? 'rejected' : 'draft']">
-                  {{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败' }[plan.syncStatus] }}
+                  {{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败', simulated: '联测就绪（未提交知乎）' }[plan.syncStatus] }}
                 </span>
                 <small v-if="plan.syncError" style="display: block; margin-top: 4px; font-size: 11px; color: var(--clay);">{{ plan.syncError }}</small>
               </td>
@@ -278,7 +300,7 @@ onMounted(load)
               </td>
               <td>
                 <div style="display: flex; gap: 6px;">
-                  <button v-if="plan.syncStatus === 'failed'" class="row-action" @click="retrySync(plan.id)">重试同步</button>
+                  <button v-if="plan.syncStatus === 'failed'" :disabled="retrying !== null" class="row-action" @click="retrySync(plan.id)">重试同步</button>
                   <button class="row-action danger" @click="deletePlan(plan.id)">删除</button>
                 </div>
               </td>

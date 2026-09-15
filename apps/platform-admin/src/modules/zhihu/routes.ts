@@ -167,7 +167,7 @@ export const zhihuRoutes: RouteRecordRaw[] = [
     path: 'modules/zhihu',
     component: () => import('./ModuleLayout.vue'),
     meta: { moduleId: 'zhihu' },
-    children: [{path:'',redirect:'/modules/zhihu/operations'},...modulePages.map(p=>({...p,beforeEnter:()=>{const duty=useAuthStore().user?.adminDuty??'all';if(duty==='finance'&&p.path!=='finance')return '/modules/zhihu/finance';if(duty==='operations'&&p.meta?.section!=='operations')return '/modules/zhihu/operations';return true}}))],
+    children: [{path:'',redirect:'/modules/zhihu/dashboard'},...modulePages.map(p=>({...p,beforeEnter:()=>{const duty=useAuthStore().user?.adminDuty??'all';if(duty==='finance'&&!['dashboard','finance','data-import','settlements','earnings','withdrawals','appeals','orders'].includes(p.path))return '/modules/zhihu/finance';if(duty==='operations'&&['finance','wallet','data-import','settlements','earnings','withdrawals','appeals'].includes(p.path))return '/modules/zhihu/operations';return true}}))],
   },
   { path: 'orders', redirect: (to) => ({ path: '/modules/zhihu/orders', query: to.query, hash: to.hash }) },
   {

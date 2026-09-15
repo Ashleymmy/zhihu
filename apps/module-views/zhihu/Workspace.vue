@@ -9,7 +9,7 @@ import Works from './Works.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
 import {errorText,type EngineOptions,type Option} from './context'
-const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;section?:string;activeTab?:string}>()
+const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string}>()
 const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
@@ -22,9 +22,26 @@ const tabs=computed(()=>[{key:'keywords',label:'关键词'}, {key:'works',label:
 watch([()=>props.activeTab,tabs],()=>{tab.value=tabs.value.some(t=>t.key===props.activeTab)?props.activeTab!:'keywords'},{immediate:true})
 let generation=0
 async function refreshOptions(){const version=++generation;ready.value=false;loading.value=true;error.value='';try{const result=await props.http.get<EngineOptions>('/attribution-options',{...scope});if(version===generation){options.value=result;ready.value=true}}catch(e){if(version===generation)error.value=errorText(e)}finally{if(version===generation)loading.value=false}}
-watch(()=>scope.projectId,async id=>{const version=++generation;ready.value=false;accounts.value=[];scope.accountId='';if(!id)return;loading.value=true;try{const list=await props.coreHttp.get<(Option&{moduleId:string;status:string})[]>('/projects/'+id+'/integrations');if(version!==generation)return;accounts.value=list.filter(a=>a.moduleId==='zhihu'&&a.status==='active');scope.accountId=accounts.value[0]?.id??'';try{localStorage.setItem('zhihu-project-'+props.userId,id)}catch{}}catch(e){if(version===generation)error.value=errorText(e)}finally{if(version===generation)loading.value=false}})
-watch(()=>scope.accountId,id=>{if(id)void refreshOptions()})
-onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/projects');let saved='';try{saved=localStorage.getItem('zhihu-project-'+props.userId)||''}catch{}scope.projectId=projects.value.find(p=>p.id===saved)?.id??projects.value[projects.value.length-1]?.id??''}catch(e){error.value=errorText(e)}})
+watch(()=>scope.projectId,async id=>{
+ const version=++generation;ready.value=false;accounts.value=[];scope.accountId='';if(!id)return;loading.value=true;error.value=''
+ try{
+  const list=await props.coreHttp.get<(Option&{moduleId:string;status:string})[]>('/projects/'+id+'/integrations')
+  if(version!==generation)return
+  accounts.value=list.filter(a=>a.moduleId==='zhihu'&&a.status==='active')
+  const requested=id===props.initialProjectId?props.initialAccountId:''
+  let saved='';try{saved=localStorage.getItem('zhihu-account-'+props.userId+'-'+id)||''}catch{}
+  let chosen=accounts.value.find(a=>a.id===requested)||accounts.value.find(a=>a.id===saved)
+  if(!chosen&&accounts.value.length>1){
+   const details=await Promise.all(accounts.value.map(async a=>({account:a,options:await props.http.get<EngineOptions>('/attribution-options',{projectId:id,accountId:a.id})})))
+   if(version!==generation)return
+   chosen=details.find(d=>d.options.mappings.length>0)?.account
+  }
+  scope.accountId=(chosen||accounts.value[0])?.id??''
+  try{localStorage.setItem('zhihu-project-'+props.userId,id)}catch{}
+ }catch(e){if(version===generation)error.value=errorText(e)}finally{if(version===generation)loading.value=false}
+})
+watch(()=>scope.accountId,id=>{if(id){try{localStorage.setItem('zhihu-account-'+props.userId+'-'+scope.projectId,id)}catch{}void refreshOptions()}})
+onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/projects');let saved='';try{saved=localStorage.getItem('zhihu-project-'+props.userId)||''}catch{}scope.projectId=projects.value.find(p=>p.id===props.initialProjectId)?.id??projects.value.find(p=>p.id===saved)?.id??projects.value[projects.value.length-1]?.id??''}catch(e){error.value=errorText(e)}})
 </script>
 <template><section class="engine page-stack">
 <header class="business-heading"><div><p class="business-eyebrow">知乎业务</p><h1>{{title}}</h1><p>{{intro}}</p></div><div class="project-picker"><label v-if="projects.length>1">业务项目<select v-model="scope.projectId"><option v-for="p in projects" :key="p.id" :value="p.id">{{p.name}}</option></select></label><span v-else>{{projects[0]?.name}}</span><label v-if="accounts.length>1">接入账号<select v-model="scope.accountId"><option v-for="a in accounts" :key="a.id" :value="a.id">{{a.name}}</option></select></label></div></header>

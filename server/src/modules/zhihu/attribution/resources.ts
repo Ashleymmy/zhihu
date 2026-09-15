@@ -5,7 +5,12 @@ import { enqueue } from '../queue';
 import { audit, authorize, bindingLock, insert, keywordLock, mutate, ownBinding, scopeLock, select } from './store';
 import { businessDay, day, fail, keywordText, type Scope } from './domain';
 import { logger } from '../../../utils/logger';
+import { ensurePoolMapping, keywordVisibility } from './plan-pool';
 
+async function simulationScope(c: PoolConnection, scope: Scope) {
+  const [setting] = await select(c, "SELECT JSON_UNQUOTE(JSON_EXTRACT(config_json,'$.mode')) mode FROM zhihu_account_settings WHERE project_id=? AND account_id=?", [scope.projectId, scope.accountId]);
+  return setting?.mode === 'simulation';
+}
 export async function lockKeywordSpace(c: PoolConnection) {
   const tables = await select(
     c,
@@ -36,8 +41,8 @@ export async function assertLegacyPlan(c: PoolConnection, id: string) {
 export async function synchronizeKeywords(scope?: Scope) {
   await db.query(
     `UPDATE zh_keywords k JOIN plans p ON p.id=k.plan_id JOIN zh_agency_spaces s ON s.id=k.agency_space_id
-    SET k.upstream_status='available', k.lifecycle_status='available',
-    k.upstream_confirmed_at=NOW(3), k.priority_until=TIMESTAMPADD(SECOND,s.priority_seconds,NOW(3)), k.version=k.version+1
+    SET k.upstream_status=IF(k.upstream_status='simulated','simulated','available'), k.lifecycle_status='available',
+    k.upstream_confirmed_at=NOW(3), k.priority_until=COALESCE(k.priority_until,TIMESTAMPADD(MINUTE,30,k.created_at)), k.version=k.version+1
     WHERE k.upstream_confirmed_at IS NULL AND p.sync_status='synced' AND p.status='active'
       AND (? IS NULL OR k.account_id=?) AND (? IS NULL OR k.project_id=?)
       AND NOT EXISTS(SELECT 1 FROM zh_engine_routes r WHERE r.account_id=k.account_id AND r.project_id=k.project_id AND r.mode='stopped')`,
@@ -61,7 +66,7 @@ export async function confirmUpstream(user: AuthUser, scope: Scope, id: string, 
     if (!word.upstream_confirmed_at) {
       await c.query("UPDATE plans SET status='active' WHERE id=?", [word.plan_id]);
       await c.query(
-        "UPDATE zh_keywords SET upstream_status='available',lifecycle_status='available',upstream_confirmed_at=NOW(3),priority_until=TIMESTAMPADD(SECOND,(SELECT priority_seconds FROM zh_agency_spaces WHERE id=1),NOW(3)),version=version+1 WHERE id=?",
+        "UPDATE zh_keywords SET upstream_status='available',lifecycle_status='available',upstream_confirmed_at=NOW(3),priority_until=COALESCE(priority_until,TIMESTAMPADD(MINUTE,30,created_at)),version=version+1 WHERE id=?",
         [id],
       );
       await audit(c, user, 'keyword.confirm-upstream', id, { reason });
@@ -123,7 +128,7 @@ export async function options(user: AuthUser, scope: Scope) {
       AND (?='admin' OR u.parent_id=? OR u.id=?) ORDER BY u.id`,
             [scope.projectId, user.role, user.sub, user.sub],
           );
-    return { tasks, channels, mappings, users };
+    return { tasks, channels, mappings, users, integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
   });
 }
 export async function createMapping(
@@ -180,24 +185,25 @@ export async function createKeyword(
   user: AuthUser,
   scope: Scope,
   key: string,
-  input: { keyword: string; taskId: string; mappingId: string; landingUrl: string; popularizeType: number },
+  input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null },
 ) {
   if (user.role !== 'admin') fail('仅管理员可以创建词库关键词', 403);
   const keyword = keywordText(input.keyword);
   const result = await mutate(user, scope, 'keyword.create', key, input, async (c) => {
     await assertKeywordFree(c, keyword);
+    const mappingId = input.mappingId ?? await ensurePoolMapping(c,user,scope,input.channelId ?? '');
     const [task] = await select(c, 'SELECT * FROM tasks WHERE id=? AND project_id=?', [input.taskId, scope.projectId]);
     const [mapping] = await select(
       c,
       `SELECT m.*,ch.zhihu_channel_id FROM zh_channel_mappings m JOIN channels ch ON ch.id=m.channel_id
       WHERE m.id=? AND m.account_id=? AND m.project_id=? AND m.canonical_id IS NULL AND ch.is_enabled=1`,
-      [input.mappingId, scope.accountId, scope.projectId],
+      [mappingId, scope.accountId, scope.projectId],
     );
     if (!task || !mapping) fail('任务或渠道映射不属于当前范围');
     const planId = await insert(
       c,
-      `INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by)
-      VALUES(?,?,?,?,?,?,?,?)`,
+      `INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,second_channel_id,name,daily_budget,start_date,end_date)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         scope.projectId,
         task.zhihu_task_id,
@@ -207,12 +213,13 @@ export async function createKeyword(
         input.popularizeType,
         user.sub,
         user.sub,
+        input.secondChannelId ?? null, input.name ?? null, input.dailyBudget ?? null, input.startDate ?? null, input.endDate ?? null,
       ],
     );
     const id = await insert(
       c,
-      'INSERT INTO zh_keywords(account_id,project_id,task_id,channel_mapping_id,plan_id,keyword,created_by) VALUES(?,?,?,?,?,?,?)',
-      [scope.accountId, scope.projectId, input.taskId, input.mappingId, planId, keyword, user.sub],
+      'INSERT INTO zh_keywords(account_id,project_id,task_id,channel_mapping_id,plan_id,keyword,created_by,priority_until) VALUES(?,?,?,?,?,?,?,TIMESTAMPADD(MINUTE,30,NOW(3)))',
+      [scope.accountId, scope.projectId, input.taskId, mappingId, planId, keyword, user.sub],
     );
     await audit(c, user, 'keyword.create', id, { ...scope, planId });
     return { id, planId };
@@ -234,18 +241,17 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
   await synchronizeKeywords(scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
-    const where = `k.account_id=? AND k.project_id=? AND k.keyword LIKE ? AND
-      (?='admin' OR k.current_binding_id IS NULL OR b.leader_id=? OR b.executor_id=?)`;
-    const args = [scope.accountId, scope.projectId, `%${search}%`, user.role, user.sub, user.sub];
-    const [total] = await select(
-      c,
+    const visibility = keywordVisibility(user);
+    const args = [scope.accountId, scope.projectId, `%${search}%`, ...visibility.bindings];
+    const where = `k.account_id=? AND k.project_id=? AND k.keyword LIKE ? AND ${visibility.clause}`;
+    const [total] = await select(c,
       `SELECT COUNT(*) total FROM zh_keywords k LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id WHERE ${where}`,
       args,
     );
     const list = await select(
       c,
       `SELECT CAST(k.id AS CHAR) id,k.keyword,CAST(k.task_id AS CHAR) task_id,CAST(k.plan_id AS CHAR) plan_id,
-      k.lifecycle_status,p.sync_status,p.status AS plan_status,${user.role === 'admin' ? 'p.sync_error' : 'NULL'} AS sync_error,
+      k.lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,${user.role === 'admin' ? 'p.sync_error' : 'NULL'} AS sync_error,
       DATE_FORMAT(TIMESTAMPADD(SECOND,TIMESTAMPDIFF(SECOND,NOW(),UTC_TIMESTAMP()),k.priority_until),'%Y-%m-%dT%H:%i:%s.%fZ') priority_until,k.used_ever_at,k.version,
       CAST(b.id AS CHAR) binding_id,b.path_type,CAST(b.leader_id AS CHAR) leader_id,CAST(b.executor_id AS CHAR) executor_id,b.verification_status,b.release_status,
       (k.priority_until<=NOW(3)) AS priority_ended
@@ -263,7 +269,7 @@ export async function claim(user: AuthUser, scope: Scope, id: string, key: strin
     const word = await keywordLock(c, scope, id);
     if (word.current_binding_id || word.lifecycle_status !== 'available') fail('关键词不可领取或已被占用', 409);
     const [plan] = await select(c, 'SELECT status,sync_status FROM plans WHERE id=? FOR SHARE', [word.plan_id]);
-    if (plan.status !== 'active' || plan.sync_status !== 'synced') fail('上游计划当前不可用', 409);
+    if (plan.status !== 'active' || !(plan.sync_status === 'synced' || plan.sync_status === 'simulated' && word.upstream_status === 'simulated' && await simulationScope(c, scope))) fail('关键词当前不可用，请联系管理员核对接入', 409);
     const [actor] = await select(c, 'SELECT id,role,parent_id FROM users WHERE id=? FOR SHARE', [user.sub]);
     const [time] = await select(c, 'SELECT (priority_until<=NOW(3)) AS ended FROM zh_keywords WHERE id=?', [id]);
     if (user.role === 'creator' && (actor.parent_id !== null || Number(time.ended) !== 1))
@@ -396,7 +402,7 @@ export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,
   const word=await keywordLock(c,scope,id);
   if(word.current_binding_id||word.lifecycle_status!=='available')fail('关键词已分配或尚不可用',409);
   const [plan]=await select(c,'SELECT status,sync_status FROM plans WHERE id=? FOR SHARE',[word.plan_id]);
-  if(plan.status!=='active'||plan.sync_status!=='synced')fail('关键词尚未创建成功');
+  if(plan.status!=='active'||!(plan.sync_status==='synced'||plan.sync_status==='simulated'&&word.upstream_status==='simulated'&&await simulationScope(c,scope)))fail('关键词尚未创建成功');
   const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL',[targetId,scope.projectId]);
   if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择有效的团长或达人');
   const leader=target.role==='leader'?targetId:target.parent_id===null?null:String(target.parent_id);

@@ -135,7 +135,7 @@ export const zhihuRoutes: RouteRecordRaw[] = [
     path: 'modules/zhihu',
     component: () => import('./ModuleLayout.vue'),
     meta: { moduleId: 'zhihu' },
-    children: [{path:'',redirect:'/modules/zhihu/operations'},...modulePages],
+    children: [{path:'',redirect:'/modules/zhihu/dashboard'},...modulePages],
   },
   { path: 'orders', redirect: (to) => ({ path: '/modules/zhihu/orders', query: to.query, hash: to.hash }) },
   {

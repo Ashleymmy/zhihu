@@ -93,5 +93,5 @@ plansRouter.delete(
 plansRouter.post(
   '/:id/retry-sync',
   requirePermission('plan.create'),
-  asyncHandler(async (req, res) => ok(res, await retryPlan(req.user, id.parse(req.params.id), req.ip))),
+  asyncHandler(async (req, res) => ok(res, await retryPlan(req.user, id.parse(req.params.id), req.ip, req.header('Idempotency-Key') ?? String(req.body?.requestKey ?? '')))),
 );

@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
-import { assertKeywordFree, assertLegacyPlan, lockKeywordSpace } from '../attribution/resources';
+import { assertDuty } from '../../../core/duties';
+import { keywordVisibility, resolvePlanPool } from '../attribution/plan-pool';
+import { createKeyword, retryKeyword, assertKeywordFree, assertLegacyPlan, lockKeywordSpace } from '../attribution/resources';
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows, withTransaction } from '../../../db';
 import { enqueue } from '../queue';
@@ -34,6 +36,9 @@ interface PlanRow extends RowDataPacket {
   sync_status: string;
   sync_error: string | null;
   status: string;
+  keyword_id?: string;
+  keyword_project_id?: string;
+  keyword_account_id?: string;
 }
 export interface PlanInput {
   taskId: string;
@@ -125,12 +130,25 @@ export async function checkKeyword(user: AuthUser, channelId: string, keyword: s
   };
 }
 
+function readablePlans(user: AuthUser) {
+  const owned = scopeFilter(user, 'p.owner_id');
+  if (user.role === 'admin') return owned;
+  const visible = keywordVisibility(user);
+  return { clause: `((NOT EXISTS(SELECT 1 FROM zh_keywords legacy_word WHERE legacy_word.plan_id=p.id) AND ${owned.clause}) OR EXISTS(
+    SELECT 1 FROM zh_keywords k LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
+    JOIN project_members pm ON pm.project_id=k.project_id AND pm.user_id=? AND pm.left_at IS NULL
+    JOIN projects pr ON pr.id=k.project_id AND pr.is_enabled=1
+    JOIN integration_accounts a ON a.id=k.account_id AND a.status='active' AND a.module_id='zhihu'
+    JOIN project_integrations pi ON pi.project_id=k.project_id AND pi.account_id=k.account_id
+    WHERE k.plan_id=p.id AND ${visible.clause}))`, bindings: [...owned.bindings,user.sub,...visible.bindings] };
+}
+
 export async function listPlans(user: AuthUser, query: Record<string, unknown>) {
   if (isDevDemoAuthUser(user)) return listDevDemoPlans(user, query);
 
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? 20);
-  const scope = scopeFilter(user, 'p.owner_id');
+  const scope = readablePlans(user);
   const where = [scope.clause, "p.status <> 'ended'"];
   const bindings: unknown[] = [...scope.bindings];
   for (const [sql, value] of [
@@ -150,7 +168,7 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM plans p WHERE ${clause}`, bindings);
   const list = await rows<PlanRow>(
-    `SELECT p.*, c.name AS channel_name FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id WHERE ${clause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+    `SELECT p.*, c.name AS channel_name,CAST(k.id AS CHAR) keyword_id,CAST(k.project_id AS CHAR) keyword_project_id,CAST(k.account_id AS CHAR) keyword_account_id FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id AND c.project_id=p.project_id LEFT JOIN zh_keywords k ON k.plan_id=p.id WHERE ${clause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list: list.map(publicPlan), total: Number(count?.total ?? 0), page, pageSize };
@@ -159,8 +177,8 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
 export async function getPlan(user: AuthUser, id: string) {
   if (isDevDemoAuthUser(user)) return getDevDemoPlan(user, id);
 
-  const scope = scopeFilter(user, 'p.owner_id');
-  const [plan] = await rows<PlanRow>(`SELECT p.*, c.name AS channel_name FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id WHERE p.id = ? AND ${scope.clause} LIMIT 1`, [
+  const scope = readablePlans(user);
+  const [plan] = await rows<PlanRow>(`SELECT p.*, c.name AS channel_name,CAST(k.id AS CHAR) keyword_id,CAST(k.project_id AS CHAR) keyword_project_id,CAST(k.account_id AS CHAR) keyword_account_id FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id AND c.project_id=p.project_id LEFT JOIN zh_keywords k ON k.plan_id=p.id WHERE p.id = ? AND ${scope.clause} LIMIT 1`, [
     id,
     ...scope.bindings,
   ]);
@@ -171,6 +189,11 @@ export async function getPlan(user: AuthUser, id: string) {
 export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) {
   if (isDevDemoAuthUser(user)) return createDevDemoPlan(user, input as unknown as Record<string, unknown>);
 
+  if (user.role === 'admin' && (!input.ownerId || input.ownerId === user.sub)) {
+    const scope = await withTransaction(c => resolvePlanPool(c,input.taskId,input.channelId));
+    const result = await createKeyword(user,scope,crypto.randomUUID(),{...input,taskId:scope.taskId,channelId:scope.channelId});
+    return {id:result.planId,keywordId:result.id,...scope,syncStatus:'local'};
+  }
   const ownerId = user.role === 'admin' && input.ownerId ? input.ownerId : user.sub;
   const id = await withTransaction(async (connection) => {
     await assertKeywordFree(connection, input.keyword);
@@ -313,10 +336,15 @@ export async function deletePlan(user: AuthUser, id: string, ip?: string) {
   });
 }
 
-export async function retryPlan(user: AuthUser, id: string, ip?: string) {
+export async function retryPlan(user: AuthUser, id: string, ip?: string, requestKey?: string) {
   if (isDevDemoAuthUser(user)) return retryDevDemoPlan(user, id);
 
   const plan = (await getPlan(user, id)) as PlanRow;
+  if (plan.keyword_id && plan.keyword_project_id && plan.keyword_account_id) {
+    assertDuty(user, 'operations');
+    const result = await retryKeyword(user, { projectId: String(plan.keyword_project_id), accountId: String(plan.keyword_account_id) }, String(plan.keyword_id), requestKey || crypto.randomUUID());
+    return { id, keywordId: result.id, syncStatus: 'local' };
+  }
   await withTransaction(connection=>assertLegacyPlan(connection,id));
   if (plan.sync_status !== 'failed') {
     throw new AppError(409, 40902, '只有同步失败的计划可以重试');

@@ -13,6 +13,7 @@ export interface Option {
   channelName?: string
 }
 export interface EngineOptions {
+  integrationMode?: 'simulation' | 'upstream'
   tasks: Option[]
   channels: Option[]
   mappings: Option[]

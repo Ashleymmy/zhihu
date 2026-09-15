@@ -444,7 +444,7 @@ export interface AddProjectCourseReq {
 }
 
 export type PlanStatus = 'pending' | 'active' | 'paused' | 'rejected' | 'ended'
-export type SyncStatus = 'local' | 'syncing' | 'synced' | 'failed'
+export type SyncStatus = 'local' | 'syncing' | 'synced' | 'failed' | 'simulated'
 
 export interface Plan {
   id: string

@@ -156,3 +156,23 @@ describe('知乎推广计划同步竞态保护', () => {
     );
   });
 });
+
+describe('联测账号隔离', () => {
+  it('明确配置的模拟词在本地就绪，不产生知乎 ID 或上游请求', async () => {
+    mocks.rows.mockResolvedValue([{id:'71',status:'pending',zhihu_plan_id:null,keyword:'联测隔离词',simulation_mode:1,account_id:'11',keyword_project_id:'12'}]);
+    mocks.dbQuery.mockReset();
+    mocks.zhihuPost.mockReset();
+    mocks.dbQuery.mockResolvedValue([{affectedRows:1}]);
+    await pushPlan({planId:'71',accountId:'11',projectId:'12'});
+    expect(mocks.zhihuPost).not.toHaveBeenCalled();
+    expect(mocks.dbQuery).toHaveBeenLastCalledWith(expect.stringContaining("p.sync_status='simulated'"),['71','联测隔离词']);
+  });
+  it('错误的项目或账号不能改变词状态或提交上游', async () => {
+    mocks.rows.mockResolvedValue([{id:'71',status:'pending',zhihu_plan_id:null,keyword:'联测隔离词',simulation_mode:1,account_id:'11',keyword_project_id:'12'}]);
+    mocks.dbQuery.mockReset();mocks.zhihuPost.mockReset();
+    await expect(pushPlan({planId:'71',accountId:'1',projectId:'12'})).rejects.toThrow('不一致');
+    await expect(pushPlan({planId:'71',accountId:'11',projectId:'1'})).rejects.toThrow('不一致');
+    expect(mocks.dbQuery).not.toHaveBeenCalled();
+    expect(mocks.zhihuPost).not.toHaveBeenCalled();
+  });
+});

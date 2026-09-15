@@ -51,9 +51,12 @@ async function failLocally(id: string, message: string) {
 export async function pushComposition(data: Record<string, unknown>) {
   const id = String(data.compositionId);
   const [item] = await rows<CompositionRow>(
-    `SELECT c.*, p.zhihu_plan_id, p.channel_id, p.sync_status AS plan_sync_status
+    `SELECT c.*, p.zhihu_plan_id, p.channel_id, p.sync_status AS plan_sync_status,
+      JSON_UNQUOTE(JSON_EXTRACT(s.config_json,'$.mode')) AS integration_mode
      FROM compositions c
      JOIN plans p ON p.id = c.plan_id
+     LEFT JOIN zh_keywords k ON k.plan_id=p.id
+     LEFT JOIN zhihu_account_settings s ON s.project_id=k.project_id AND s.account_id=k.account_id
      WHERE c.id = ?
      LIMIT 1`,
     [id],
@@ -66,6 +69,10 @@ export async function pushComposition(data: Record<string, unknown>) {
   );
   if (claimed.affectedRows === 0) return;
 
+  if (item.integration_mode === 'simulation') {
+    await failLocally(id, '联测账号不提交知乎，请在“我的关键词”中提交作品完成本地联测');
+    return;
+  }
   if (item.plan_sync_status !== 'synced' || !item.zhihu_plan_id) {
     await failLocally(id, '推广计划尚未同步成功，请稍后重试');
     return;

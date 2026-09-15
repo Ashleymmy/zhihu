@@ -124,7 +124,7 @@ onMounted(load)
               <td><strong>{{ p.keyword }}</strong></td>
               <td>{{ p.channelName }}</td>
               <td><span :class="['status-badge', p.status]">{{ { pending: '待审核', active: '投放中', paused: '已暂停', rejected: '已拒绝', ended: '已结束' }[p.status] }}</span></td>
-              <td><span :class="['status-badge', p.syncStatus === 'synced' ? 'active' : 'draft']">{{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败' }[p.syncStatus] }}</span></td>
+              <td><span :class="['status-badge', p.syncStatus === 'synced' ? 'active' : 'draft']">{{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败', simulated: '联测就绪' }[p.syncStatus] }}</span></td>
             </tr>
           </tbody>
         </table>

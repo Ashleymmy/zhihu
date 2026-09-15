@@ -124,7 +124,8 @@ attributionRouter.post(
       .extend({
         keyword: z.string().max(128),
         taskId: idSchema,
-        mappingId: idSchema,
+        mappingId: idSchema.optional(),
+        channelId: idSchema.optional(),
         landingUrl: z.string().url().max(1024),
         popularizeType: z.number().int(),
       })

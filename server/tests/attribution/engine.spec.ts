@@ -133,7 +133,7 @@ describe('独占资源数据库闭环', () => {
     ).rejects.toThrow('保留原归属');
     await expect(resource.listKeywords(creator, { ...scope, projectId: '999' }, 1, 25)).rejects.toThrow();
   });
-  it('24 小时优先期及人工释放不重置开放时间', async () => {
+  it('30 分钟优先期及人工释放不重置开放时间', async () => {
     const word = await resource.createKeyword(admin, scope, key(), {
       keyword: '直属词乙',
       taskId: '1',
@@ -758,5 +758,128 @@ describe('队列恢复、公共摘要和切换保护', () => {
     await settleEarnings({ from: businessDay(), to: businessDay() });
     const [money] = await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) n FROM earnings');
     expect(Number(money[0].n)).toBe(0);
+  });
+});
+
+describe('推广计划与关键词库贯通', () => {
+  let planService: typeof import('../../src/modules/zhihu/services/plans.service');
+  let poolScope: {projectId:string;accountId:string};
+  beforeAll(async()=>{
+    planService=await import('../../src/modules/zhihu/services/plans.service');
+    await c.query("INSERT INTO projects(id,name,slug) VALUES(91,'关键词贯通测试','pool-bridge-test')");
+    await c.query('INSERT INTO project_integrations(project_id,account_id) VALUES(91,?)',[scope.accountId]);
+    await c.query('INSERT INTO project_members(project_id,user_id) VALUES(91,2),(91,3),(91,4)');
+    await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(91,91,'pool-channel',1,'贯通渠道')");
+    await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(91,91,'pool-task','贯通任务',NOW())");
+    poolScope={projectId:'91',accountId:scope.accountId};
+  });
+  const input=(keyword:string)=>({keyword,taskId:'pool-task',channelId:'pool-channel',landingUrl:'https://example.com/pool',popularizeType:0,name:'保留计划名称',dailyBudget:1234});
+  it('原创建入口进入实际项目词库，保留计划字段，两个列表权限一致',async()=>{
+    const created=await planService.createPlan(admin,input('旧入口贯通甲'));
+    const [words]=await c.query<mysql.RowDataPacket[]>('SELECT *,TIMESTAMPDIFF(SECOND,created_at,priority_until) priority FROM zh_keywords WHERE plan_id=?',[created.id]);
+    expect(words).toHaveLength(1);const word=words[0];
+    expect(String(word.project_id)).toBe('91');
+    expect(Number(word.priority)).toBe(1800);
+    const [plans]=await c.query<mysql.RowDataPacket[]>('SELECT project_id,name,daily_budget FROM plans WHERE id=?',[created.id]);
+    expect(String(plans[0].project_id)).toBe('91');expect(plans[0].name).toBe('保留计划名称');expect(Number(plans[0].daily_budget)).toBe(1234);
+    const visible=async(u:AuthUser)=>(await planService.listPlans(u,{keyword:'旧入口贯通甲'})).list.map(p=>String(p.id));
+    expect(await visible(leader)).toContain(created.id);
+    expect(await visible(creator)).not.toContain(created.id);
+    expect(await visible(direct)).not.toContain(created.id);
+    expect(await visible(outsider)).not.toContain(created.id);
+    expect((await resource.listKeywords(leader,poolScope,1,25,'旧入口贯通甲')).total).toBe(1);
+    expect((await resource.listKeywords(direct,poolScope,1,25,'旧入口贯通甲')).total).toBe(0);
+    await expect(planService.getPlan(outsider,created.id)).rejects.toThrow();
+    await expect(resource.claim(leader,poolScope,String(word.id),key())).rejects.toThrow('不可领取');
+    await c.query("UPDATE plans SET sync_status='synced',status='active' WHERE id=?",[created.id]);
+    const binding=await resource.claim(leader,poolScope,String(word.id),key());
+    await resource.changeBinding(leader,poolScope,binding.id,key(),{action:'assign',executorId:'3'});
+    expect(await visible(creator)).toContain(created.id);
+    expect(await visible(direct)).not.toContain(created.id);
+    expect((await resource.listKeywords(creator,poolScope,1,25,'旧入口贯通甲')).total).toBe(1);
+    await expect(resource.claim(direct,poolScope,String(word.id),key())).rejects.toThrow('已被占用');
+  });
+  it('30分钟边界按数据库判定，团队达人不能抢领，独立达人可以领取到期词',async()=>{
+    const created=await planService.createPlan(admin,input('旧入口贯通乙'));
+    const [words]=await c.query<mysql.RowDataPacket[]>('SELECT id FROM zh_keywords WHERE plan_id=?',[created.id]);
+    const id=String(words[0].id);
+    await c.query("UPDATE plans SET sync_status='synced',status='active' WHERE id=?",[created.id]);
+    await c.query('UPDATE zh_keywords SET priority_until=TIMESTAMPADD(SECOND,30,NOW(3)) WHERE id=?',[id]);
+    await expect(resource.claim(direct,poolScope,id,key())).rejects.toThrow('优先期');
+    await c.query('UPDATE zh_keywords SET priority_until=NOW(3) WHERE id=?',[id]);
+    expect((await resource.listKeywords(direct,poolScope,1,25,'旧入口贯通乙')).total).toBe(1);
+    expect((await resource.listKeywords(creator,poolScope,1,25,'旧入口贯通乙')).total).toBe(0);
+    await expect(resource.claim(creator,poolScope,id,key())).rejects.toThrow('优先期');
+    await resource.claim(direct,poolScope,id,key());
+    expect((await planService.listPlans(leader,{keyword:'旧入口贯通乙'})).list).toHaveLength(0);
+    expect((await planService.listPlans(direct,{keyword:'旧入口贯通乙'})).list).toHaveLength(1);
+  });
+  it('只修复管理员未使用计划，纠正默认项目且不伪造上游成功',async()=>{
+    const {registerUnusedAdminPlan}=await import('../../src/modules/zhihu/attribution/plan-pool');
+    const {withTransaction}=await import('../../src/db');
+    const [result]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,sync_status,created_at) VALUES(1,'pool-task','pool-channel','修复既有词','https://example.com/existing',0,1,1,'failed',TIMESTAMPADD(HOUR,-2,NOW()))");
+    const id=String(result.insertId);
+    const repaired=await withTransaction(conn=>registerUnusedAdminPlan(conn,admin,id));
+    expect((await withTransaction(conn=>registerUnusedAdminPlan(conn,admin,id))).id).toBe(repaired.id);
+    const [rows]=await c.query<mysql.RowDataPacket[]>('SELECT project_id,sync_status FROM plans WHERE id=?',[id]);
+    expect(String(rows[0].project_id)).toBe('91');expect(rows[0].sync_status).toBe('failed');
+    expect((await resource.listKeywords(direct,poolScope,1,25,'修复既有词')).total).toBe(1);
+    await expect(resource.claim(direct,poolScope,repaired.id,key())).rejects.toThrow('不可领取');
+    await c.query("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by) VALUES(1,'pool-task','pool-channel','保留历史词','https://example.com/history',0,1,1)");
+    const [used]=await c.query<mysql.RowDataPacket[]>("SELECT id FROM plans WHERE keyword='保留历史词'");
+    await c.query("INSERT INTO daily_metrics(project_id,channel_id,plan_id,owner_id,stat_date,keyword,fetched_at) VALUES(1,'pool-channel',?,1,CURDATE(),'保留历史词',NOW())",[used[0].id]);
+    await expect(withTransaction(conn=>registerUnusedAdminPlan(conn,admin,String(used[0].id)))).rejects.toThrow('历史业务数据');
+  });
+  it('跨项目任务渠道组合拒绝，读取选项不创建额外渠道映射',async()=>{
+    await expect(planService.createPlan(admin,{...input('跨项目错误词'),taskId:'task1'})).rejects.toThrow('同一个明确的业务项目');
+    const [before]=await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) total FROM zh_channel_mappings');
+    await resource.options(admin,poolScope);
+    const [after]=await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) total FROM zh_channel_mappings');
+    expect(after[0].total).toBe(before[0].total);
+  });
+
+  it('模拟账号正规重试保留优先期，旧新入口一致且支持完整领取分发使用', async()=>{
+    const {enqueue}=await import('../../src/modules/zhihu/queue');
+    const push=await import('../../src/modules/zhihu/jobs/pushPlan');
+    const created=await planService.createPlan(admin,input('重试模拟完整链路'));
+    const [before]=await c.query<mysql.RowDataPacket[]>('SELECT * FROM zh_keywords WHERE plan_id=?',[created.id]);
+    const id=String(before[0].id);
+    await c.query("UPDATE plans SET sync_status='failed',sync_error='知乎接口失败（HTTP 400 / code 400400）' WHERE id=?",[created.id]);
+    await expect(planService.retryPlan(leader,created.id)).rejects.toThrow('运营权限');
+    await expect(planService.retryPlan({...admin,adminDuty:'finance'},created.id)).rejects.toThrow('运营权限');
+    // No simulation setting: a retry remains pending upstream and cannot be claimed.
+    await planService.retryPlan(admin,created.id);
+    expect(enqueue).toHaveBeenCalledWith('push-plan',expect.objectContaining({...poolScope,planId:created.id}),expect.anything());
+    await expect(resource.claim(leader,poolScope,id,key())).rejects.toThrow('不可领取');
+    await c.query("UPDATE plans SET sync_status='failed' WHERE id=?",[created.id]);
+    await c.query("INSERT INTO zhihu_account_settings(project_id,account_id,config_json) VALUES(?,?,JSON_OBJECT('mode','simulation'))",[poolScope.projectId,poolScope.accountId]);
+    const retryKey=key();
+    const receipt=await planService.retryPlan(admin,created.id,undefined,retryKey);
+    expect(receipt.id).toBe(created.id);
+    await push.pushPlan({...poolScope,planId:created.id});
+    expect(await planService.retryPlan(admin,created.id,undefined,retryKey)).toEqual(receipt);
+    const [plans]=await c.query<mysql.RowDataPacket[]>('SELECT sync_status,zhihu_plan_id FROM plans WHERE id=?',[created.id]);
+    expect(plans[0].sync_status).toBe('simulated');expect(plans[0].zhihu_plan_id).toBeNull();
+    const [after]=await c.query<mysql.RowDataPacket[]>('SELECT * FROM zh_keywords WHERE id=?',[id]);
+    expect(after[0].priority_until).toEqual(before[0].priority_until);
+    expect(after[0].upstream_confirmed_at).toBeNull();
+    expect((await resource.options(admin,poolScope)).integrationMode).toBe('simulation');
+    await expect(resource.claim(direct,poolScope,id,key())).rejects.toThrow('优先期');
+    const binding=await resource.claim(leader,poolScope,id,key());
+    await resource.changeBinding(leader,poolScope,binding.id,key(),{action:'assign',executorId:'3'});
+    await resource.changeBinding(creator,poolScope,binding.id,key(),{action:'activate'});
+    await expect(resource.retryKeyword(admin,poolScope,id,key())).rejects.toThrow('仅可重试');
+    const {submitEvidence}=await import('../../src/modules/zhihu/attribution/statements');
+    await submitEvidence(creator,poolScope,key(),{bindingId:binding.id,url:'https://example.com/local-simulation',description:'明确标注的本地联测作品'});
+    expect((await resource.listKeywords(creator,poolScope,1,25,'重试模拟完整链路')).list[0].lifecycle_status).toBe('active');
+    const fresh=await resource.createKeyword(admin,poolScope,key(),{keyword:'模拟独立达人到期领取',taskId:'91',channelId:'91',landingUrl:'https://example.com/simulation',popularizeType:0});
+    await c.query("UPDATE plans SET sync_status='failed' WHERE id=?",[fresh.planId]);
+    await resource.retryKeyword(admin,poolScope,fresh.id,key());
+    await push.pushPlan({...poolScope,planId:fresh.planId});
+    await c.query('UPDATE zh_keywords SET priority_until=NOW(3) WHERE id=?',[fresh.id]);
+    await expect(resource.claim(creator,poolScope,fresh.id,key())).rejects.toThrow('优先期');
+    const solo=await resource.claim(direct,poolScope,fresh.id,key());
+    await resource.changeBinding(direct,poolScope,solo.id,key(),{action:'activate'});
+    await expect(resource.claim(leader,poolScope,fresh.id,key())).rejects.toThrow('已被占用');
   });
 });

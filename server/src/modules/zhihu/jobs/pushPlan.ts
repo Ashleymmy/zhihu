@@ -18,6 +18,9 @@ interface PlanRow extends RowDataPacket, PlanPayloadInput {
   zhihu_plan_id: string | null;
   name: string | null;
   daily_budget: number | null;
+  simulation_mode?: number;
+  account_id?: string;
+  keyword_project_id?: string;
 }
 
 /**
@@ -46,8 +49,12 @@ const upstreamId = (response: unknown): string | null => {
 
 export async function pushPlan(data: Record<string, unknown>) {
   const id = String(data.planId);
-  const [plan] = await rows<PlanRow>('SELECT * FROM plans WHERE id = ? LIMIT 1', [id]);
+  const [plan] = await rows<PlanRow>("SELECT p.*, k.account_id, k.project_id keyword_project_id, CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(s.config_json, '$.mode')) = 'simulation' THEN 1 ELSE 0 END AS simulation_mode FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id LEFT JOIN zhihu_account_settings s ON s.project_id=k.project_id AND s.account_id=k.account_id WHERE p.id = ? LIMIT 1", [id]);
   if (!plan || plan.status === 'ended') return;
+  if (plan.account_id && ((data.accountId && data.accountId !== 'legacy' && String(data.accountId) !== String(plan.account_id)) ||
+      (data.projectId && String(data.projectId) !== String(plan.keyword_project_id)))) {
+    throw new Error('关键词同步任务与接入账号或项目不一致');
+  }
 
   if (plan.zhihu_plan_id != null) {
     await db.query(
@@ -65,11 +72,22 @@ export async function pushPlan(data: Record<string, unknown>) {
   const body = buildPlanPayload(plan);
 
   try {
+    // 联测账号使用显式账号配置的本地适配器，绝不访问知乎上游。
+    if (Number(plan.simulation_mode) === 1) {
+      await db.query(
+        `UPDATE plans p JOIN zh_keywords k ON k.plan_id=p.id
+         SET p.sync_status='simulated',p.status='active',p.sync_error=NULL,
+             k.upstream_status='simulated',k.lifecycle_status='available',k.version=k.version+1
+         WHERE p.id=? AND p.keyword=? AND p.sync_status='syncing'
+           AND p.zhihu_plan_id IS NULL AND k.current_binding_id IS NULL AND k.used_ever_at IS NULL
+           AND NOT EXISTS(SELECT 1 FROM zh_engine_routes r WHERE r.account_id=k.account_id AND r.project_id=k.project_id AND r.mode='stopped')`,
+        [id, plan.keyword],
+      );
+      return;
+    }
     const response = await zhihuPost('/alliance/api/popularize_plan', body);
     await db.query(
-      `UPDATE plans
-       SET sync_status = 'synced', zhihu_plan_id = COALESCE(?, zhihu_plan_id), sync_error = NULL
-       WHERE id = ? AND keyword = ? AND sync_status = 'syncing'`,
+      `UPDATE plans SET sync_status = 'synced', zhihu_plan_id = COALESCE(?, zhihu_plan_id), sync_error = NULL WHERE id = ? AND keyword = ? AND sync_status = 'syncing'`,
       [upstreamId(response), id, plan.keyword],
     );
   } catch (error) {
