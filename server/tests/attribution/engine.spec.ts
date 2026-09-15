@@ -740,7 +740,7 @@ describe('队列恢复、公共摘要和切换保护', () => {
       ]),
       'manual_excel',
     );
-    await expect(legacyImport.confirmDataImport(admin, String(batch.id))).rejects.toThrow('禁止旧流程');
+    await expect(legacyImport.confirmDataImport(admin, String(batch.id))).rejects.toThrow('新引擎已停止写入');
     const [created] = await c.query<mysql.ResultSetHeader>(
       "INSERT INTO settlement_batches(title,period_start,period_end,created_by) VALUES('旧手动批次',?,?,1)",
       [businessDay(), businessDay()],

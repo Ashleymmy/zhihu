@@ -447,7 +447,10 @@ export async function importBatch(
   if (isDevDemoAuthUser(user)) return { id: `batch-demo-${Date.now()}`, imported: 1 };
 
   try {
-    await validateAllianceXlsx(file);
+    // 结算单通常由 Excel/WPS 导出，工作表可能包含本地计算公式。
+    // 校验器仍会拒绝外部工作簿、URL、DDE 及高风险函数；这里只放行安全的本地公式，
+    // 结算解析随后只读取计算后的单元格值，不执行上传文件中的公式。
+    await validateAllianceXlsx(file, { allowFormulas: true });
   } catch (error) {
     if (error instanceof AllianceXlsxValidationError) throw new AppError(422, 42216, '上传文件不符合要求：仅接受合法的 .xlsx 文件');
     throw error;

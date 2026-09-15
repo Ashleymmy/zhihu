@@ -3,15 +3,30 @@ import { assertLegacyRoute } from '../attribution/routing';
 import * as XLSX from 'xlsx';
 import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../../../db';
+import { assertDataScope } from '../../../core/accounts';
 import { AppError } from '../../../middleware/errors';
 import { AuthUser } from '../../../types';
 import { writeAudit } from '../../../services/audit.service';
 import { isDevDemoAuthUser } from '../dev-demo';
 import { AllianceXlsxValidationError, validateAllianceXlsx, type AllianceUploadFile } from '../zhihu/allianceXlsx';
+import type { Scope } from '../attribution/domain';
 
 export type DataImportSourceType = 'email_attachment' | 'manual_excel';
 export type DataImportReportType = 'search' | 'order' | 'unknown';
 export type DataImportBatchStatus = 'preview' | 'confirmed' | 'rejected';
+
+export interface DataImportAttributionSummary {
+  scope: Scope;
+  attributionBatchId: string;
+  analyzedRows: number;
+  matchedRows: number;
+  exceptionRows: number;
+  orders: string;
+  payable: string;
+  issues: number;
+  from: string | null;
+  to: string | null;
+}
 
 export const DATA_IMPORT_PREVIEW_LIMIT = 20;
 export const DATA_IMPORT_MAX_ROWS = 10_000;
@@ -140,6 +155,7 @@ export interface DataImportConfirmResult extends DataImportBatch {
   imported: number;
   failed: number;
   taskIds: string[];
+  attribution?: DataImportAttributionSummary;
 }
 
 export interface DataImportPreview extends DataImportBatch {
@@ -466,7 +482,7 @@ function dataRow(
 export function parseDataImportWorkbook(buffer: Buffer): ParsedImport {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(buffer, { type: 'buffer', dense: true, cellDates: true, cellFormula: false });
+    workbook = XLSX.read(buffer, { type: 'buffer', dense: true, cellDates: false, cellFormula: false });
   } catch {
     throw new AppError(422, 42217, '无法读取 Excel 文件，请确认文件未损坏');
   }
@@ -891,7 +907,7 @@ export async function parseDataImport(
 ): Promise<DataImportPreview> {
   const normalizedFile = { ...file, originalname: normalizeUploadFilename(file.originalname) };
   try {
-    await validateAllianceXlsx(normalizedFile);
+    await validateAllianceXlsx(normalizedFile, { allowFormulas: true });
   } catch (error) {
     if (error instanceof AllianceXlsxValidationError)
       throw new AppError(422, 42216, '上传文件不符合要求：仅接受合法的 .xlsx 文件');
@@ -943,6 +959,145 @@ export async function parseDataImport(
   return persistParsedImport(user, normalizedFile, sourceType, parsed, ip);
 }
 
+
+async function resolveLegacyAttributionScope(user: AuthUser): Promise<Scope> {
+  const candidates = await rows<RowDataPacket>(
+    `SELECT CAST(pi.project_id AS CHAR) project_id,CAST(pi.account_id AS CHAR) account_id,
+            EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.project_id=pi.project_id AND er.account_id=pi.account_id) has_route
+     FROM project_integrations pi
+     JOIN integration_accounts a ON a.id=pi.account_id
+     JOIN projects p ON p.id=pi.project_id
+     WHERE a.module_id='zhihu' AND a.status='active' AND p.is_enabled=1
+       AND (?='admin' OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id=pi.project_id AND pm.user_id=? AND pm.left_at IS NULL))
+     ORDER BY has_route DESC,pi.project_id,pi.account_id`,
+    [user.role, user.sub],
+  );
+  const latest = await rows<RowDataPacket>(
+    'SELECT CAST(project_id AS CHAR) project_id,CAST(account_id AS CHAR) account_id FROM zh_import_batches WHERE created_by=? ORDER BY id DESC LIMIT 1',
+    [user.sub],
+  );
+  const latestScope = latest[0] && candidates.find((row) => String(row.project_id) === String(latest[0].project_id) && String(row.account_id) === String(latest[0].account_id));
+  const routed = candidates.filter((row) => Number(row.has_route) === 1);
+  const selected = latestScope ?? (routed.length === 1 ? routed[0] : candidates.length === 1 ? candidates[0] : null);
+  if (!selected) throw new AppError(409, 40912, 'Multiple Zhihu project scopes require a workbench selection');
+  const scope = { projectId: String(selected.project_id), accountId: String(selected.account_id) };
+  await assertDataScope(user, scope.projectId, scope.accountId, 'zhihu');
+  return scope;
+}
+
+function legacyDate(row: RowDataPacket): string | null {
+  try {
+    const raw = typeof row.raw_json === 'string' ? JSON.parse(row.raw_json) : row.raw_json;
+    if (raw && typeof raw === 'object') {
+      const value = Object.values(raw as Record<string, unknown>).find(
+        (item) => typeof item === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(item),
+      );
+      if (typeof value === 'string') {
+        const artifact = /T15:59:17(?:\.000)?Z$/u.test(value);
+        if (artifact) {
+          const corrected = new Date(Date.parse(value) + 86400000);
+          return corrected.toISOString().slice(0, 10);
+        }
+        return value.slice(0, 10);
+      }
+    }
+  } catch {}
+  return row.occurred_at ? String(row.occurred_at).slice(0, 10) : null;
+}
+async function bridgeConfirmedImport(user: AuthUser, id: string): Promise<DataImportAttributionSummary> {
+  const scope = await resolveLegacyAttributionScope(user);
+  const imported = await withTransaction(async (connection) => {
+    const [batchRows] = await connection.query<RowDataPacket[]>(
+      `SELECT * FROM data_import_batches WHERE id=? FOR UPDATE`, [id],
+    );
+    const batch = batchRows[0];
+    if (!batch) throw new AppError(404, 40401, '导入批次不存在');
+    const [sourceRows] = await connection.query<RowDataPacket[]>(
+      "SELECT * FROM data_import_rows WHERE batch_id=? AND validation_status='valid' ORDER BY `row_number`", [id],
+    );
+    if (!sourceRows.length) throw new AppError(422, 42219, '批次没有可分析的有效行');
+    const dates = sourceRows.map(legacyDate).filter((value): value is string => Boolean(value)).sort();
+    if (!dates.length) throw new AppError(422, 42219, '批次没有可识别的业务日期');
+    const hasSearch = sourceRows.some((row) => row.search_volume !== null);
+    const hasOrders = sourceRows.some((row) => row.order_count !== null);
+    const reportKind = hasSearch && hasOrders ? 'combined' : hasOrders ? 'order' : 'search';
+    const hash = String(batch.file_sha256);
+    const [existing] = await connection.query<RowDataPacket[]>(
+      `SELECT id FROM zh_import_batches WHERE account_id=? AND project_id=? AND file_sha256=? AND report_kind=? AND template_version='zhihu-v3' FOR UPDATE`,
+      [scope.accountId, scope.projectId, hash, reportKind],
+    );
+    if (existing[0]) return { id: String(existing[0].id), dates, sourceCount: sourceRows.length };
+    const [routeRows] = await connection.query<RowDataPacket[]>(
+      `SELECT id,DATE_FORMAT(exclusive_from,'%Y-%m-%d') start,mode FROM zh_engine_routes WHERE account_id=? AND project_id=? FOR UPDATE`,
+      [scope.accountId, scope.projectId],
+    );
+    const route = routeRows[0];
+    if (route && dates[0] < String(route.start)) return {
+      id: '',
+      dates,
+      sourceCount: sourceRows.length,
+      legacyOnly: true,
+    };
+    if (!route) await connection.query(
+      `INSERT INTO zh_engine_routes(account_id,project_id,exclusive_from,mode,reason,updated_by) VALUES(?,?,?,'trial',?,?)`,
+      [scope.accountId, scope.projectId, dates[0], '历史导入已确认，进入归因试算', user.sub],
+    );
+    const previewHash = crypto.createHash('sha256').update(`legacy:${hash}:${scope.projectId}:${scope.accountId}`).digest('hex');
+    const [created] = await connection.query<ResultSetHeader>(
+      `INSERT INTO zh_import_batches
+       (account_id,project_id,file_name,file_sha256,file_bytes,report_kind,template_version,preview_hash,status,created_by,committed_by,committed_at)
+       VALUES(?,?,?,?,?,?,?,?, 'committed',?,?,NOW(3))`,
+      [scope.accountId, scope.projectId, String(batch.file_name), hash, Buffer.from(`legacy-data-import:${hash}`), reportKind, 'zhihu-v3', previewHash, user.sub, user.sub],
+    );
+    const batchId = String(created.insertId);
+    for (const row of sourceRows) {
+      const date = legacyDate(row);
+      if (!date || !row.channel_name || !row.keyword) continue;
+      const normalized = {
+        date, channel: String(row.channel_name).trim(), keyword: String(row.keyword).trim(),
+        search: row.search_volume === null ? null : String(row.search_volume),
+        orders: row.order_count === null ? null : String(row.order_count),
+        revenue: row.revenue_amount === null ? null : String(row.revenue_amount),
+        promotionTask: row.promotion_task === null ? null : String(row.promotion_task),
+        riskAssessment: row.risk_decision === null ? null : String(row.risk_decision),
+        conversionRateRaw: row.search_conversion_rate === null ? null : String(row.search_conversion_rate),
+      };
+      await connection.query(
+        `INSERT INTO zh_import_rows(batch_id,line_number,normalized_json,raw_json,error_text,processing_status) VALUES(?,?,?,?,NULL,'pending')`,
+        [batchId, row.row_number, JSON.stringify(normalized), JSON.stringify(row.raw_json)],
+      );
+    }
+    return { id: batchId, dates, sourceCount: sourceRows.length };
+  });
+  const facts = await import('../attribution/facts');
+  if (imported.legacyOnly) {
+    return {
+      scope,
+      attributionBatchId: '',
+      analyzedRows: imported.sourceCount,
+      matchedRows: 0,
+      exceptionRows: imported.sourceCount,
+      orders: '0',
+      payable: '0.0000',
+      issues: 0,
+      from: imported.dates[0],
+      to: imported.dates[imported.dates.length - 1],
+    };
+  }
+  await facts.processBatch(user, scope, imported.id, 200);
+  const workbench = await import('../attribution/workbench');
+  const from = imported.dates[0], to = imported.dates[imported.dates.length - 1];
+  const overview = await workbench.overview(user, scope, { from, to });
+  const counts = await rows<RowDataPacket>(
+    `SELECT processing_status,COUNT(*) total FROM zh_import_rows WHERE batch_id=? GROUP BY processing_status`, [imported.id],
+  );
+  const count = (status: string) => Number(counts.find((row) => String(row.processing_status) === status)?.total ?? 0);
+  return {
+    scope, attributionBatchId: imported.id, analyzedRows: imported.sourceCount,
+    matchedRows: count('processed') + count('duplicate'), exceptionRows: count('exception'),
+    orders: overview.summary.orders, payable: overview.summary.payable, issues: overview.summary.issues, from, to,
+  };
+}
 export async function confirmDataImport(
   user: AuthUser,
   id: string,
@@ -963,7 +1118,7 @@ export async function confirmDataImport(
     return { ...batch, imported: batch.validRows, failed: batch.errorRows, taskIds };
   }
 
-  return withTransaction(async (connection) => {
+  const result = await withTransaction(async (connection) => {
     const [batchRows] = await connection.query<DataImportBatchRow[]>(
       'SELECT * FROM data_import_batches WHERE id = ? FOR UPDATE',
       [id],
@@ -971,7 +1126,7 @@ export async function confirmDataImport(
     const batch = batchRows[0];
     if (!batch) throw new AppError(404, 40401, '导入批次不存在');
     if (batch.status === 'confirmed') {
-      const taskIds = await createAttributionTasksForBatch(connection, id);
+      const taskIds: string[] = [];
       return { ...batchFromRow(batch), imported: Number(batch.valid_rows), failed: Number(batch.error_rows), taskIds };
     }
     if (batch.status !== 'preview') throw new AppError(422, 42219, '该批次当前不可确认');
@@ -983,7 +1138,7 @@ export async function confirmDataImport(
        WHERE id = ? AND status = 'preview'`,
       [user.sub, id],
     );
-    const taskIds = await createAttributionTasksForBatch(connection, id);
+    const taskIds: string[] = [];
     await writeAudit(
       { userId: user.sub, action: 'data_import.confirm', resourceType: 'data_import_batch', resourceId: id, ip },
       connection,
@@ -995,6 +1150,12 @@ export async function confirmDataImport(
       taskIds,
     };
   });
+  const attribution = await bridgeConfirmedImport(user, id);
+  if (!attribution.attributionBatchId) {
+    const taskIds = await withTransaction((connection) => createAttributionTasksForBatch(connection, id));
+    return { ...result, taskIds, attribution };
+  }
+  return { ...result, attribution };
 }
 
 export async function rejectDataImport(

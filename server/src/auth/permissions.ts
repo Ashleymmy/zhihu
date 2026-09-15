@@ -33,6 +33,6 @@ export function hasPermission(role: Role, permission: Permission) {
 export const requirePermission =
   (permission: Permission): RequestHandler =>
   (req, _res, next) => {
-    if (!hasPermission(req.user.role, permission)) return next(new AppError(403, 40301, '无权执行此操作'));
+    if ((req.user.role === 'admin' && req.user.adminDuty === 'finance' && permission !== 'audit.view') || !hasPermission(req.user.role, permission)) return next(new AppError(403, 40301, '无权执行此操作'));
     next();
   };

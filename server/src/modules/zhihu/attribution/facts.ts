@@ -9,6 +9,7 @@ import { digest, fail, money, moneyText, type Scope } from './domain';
 import { parseReport, REPORT_TEMPLATE_VERSION, type ReportKind, type SourceRow } from './report';
 import { quote, type Obligation } from './pricing';
 import { refreshAdjustments } from './statements';
+import { blockIncome } from '../../../core/finance';
 import { scheduleImport } from './outbox';
 import { assertNewRoute, assertEngineWritable } from './routing';
 export interface FactSnapshot {
@@ -202,6 +203,7 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
   });
 }
 async function exception(c: PoolConnection, scope: Scope, rowId: string | null, factId: string | null, code: string) {
+  if(factId) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+factId,'来源数据待核对');
   const exists = await select(
     c,
     "SELECT id FROM zh_exceptions WHERE source_row_id<=>? AND fact_id<=>? AND reason_code=? AND status='open'",
@@ -286,6 +288,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       [fact.id],
     );
   }
+  await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+fact.id,'账单更新，待财务核对');
   await refreshAdjustments(c, scope, fact, id, snapshot);
   return { id, snapshot, code, binding, source };
 }

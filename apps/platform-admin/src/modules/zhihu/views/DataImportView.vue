@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import type {
   DataImportBatch,
   DataImportBatchDetail,
+  DataImportConfirmResult,
   DataImportPreview,
   DataImportPreviewRow,
   DataImportSourceType,
@@ -24,6 +25,7 @@ const message = ref("");
 const inputKey = ref(0);
 const detailPage = ref(1);
 const detailPageSize = 100;
+const attribution = ref<DataImportConfirmResult["attribution"] | null>(null);
 
 const hasErrors = computed(() => (preview.value?.errorRows ?? 0) > 0);
 const canConfirm = computed(
@@ -78,6 +80,7 @@ function onFileChange(event: Event) {
   selectedFile.value = input.files?.[0] ?? null;
   preview.value = null;
   batchDetail.value = null;
+  attribution.value = null;
   error.value = "";
   message.value = "";
 }
@@ -181,6 +184,7 @@ function clearSelection() {
   selectedFile.value = null;
   preview.value = null;
   batchDetail.value = null;
+  attribution.value = null;
   inputKey.value += 1;
   error.value = "";
   message.value = "";
@@ -320,7 +324,7 @@ onMounted(loadBatches);
         </div>
 
         <div class="field-hint">
-          支持字段：日期时间、渠道名称、关键词、推广任务、风险判定、搜索量、订单量、搜索转化率、收益金额。系统会按列名自动识别，解析成功后先展示前 20 行；确认后可在历史批次中查看全部已暂存数据。本阶段不计算收益。
+          支持字段：日期时间、渠道名称、关键词、推广任务、风险判定、搜索量、订单量、搜索转化率、收益金额。确认后会按渠道、关键词绑定和生效单价进入归因分析；未匹配记录会显示具体待办。
         </div>
       </article>
 
@@ -333,7 +337,7 @@ onMounted(loadBatches);
           </div>
           <div><span>处理方式</span><strong>解析 → 预览 → 确认</strong></div>
           <div><span>错误策略</span><strong>错误行跳过，有效行可确认</strong></div>
-          <div><span>业务影响</span><strong>暂不写入收益</strong></div>
+          <div><span>业务影响</span><strong>确认后进入归因分析</strong></div>
         </div>
       </aside>
     </section>
@@ -387,6 +391,14 @@ onMounted(loadBatches);
             preview.errorRows
           }}</strong>
         </div>
+      </div>
+
+      <div v-if="attribution" class="attribution-result">
+        <strong>归因分析结果</strong>
+        <span>业务日期：{{ attribution.from || "—" }} 至 {{ attribution.to || "—" }}</span>
+        <span>已分析 {{ attribution.analyzedRows }} 行，已匹配 {{ attribution.matchedRows }} 行，待处理 {{ attribution.exceptionRows }} 行</span>
+        <span>订单量 {{ attribution.orders }}，当前应付 ¥{{ Number(attribution.payable || 0).toFixed(2) }}</span>
+        <span v-if="attribution.issues">还有 {{ attribution.issues }} 项需要运营处理，原因可在归因待办中查看。</span>
       </div>
 
       <div class="field-mapping">
@@ -647,6 +659,7 @@ onMounted(loadBatches);
 </template>
 
 <style scoped>
+.attribution-result{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0;padding:16px;border:1px solid #8eb8b9;border-radius:10px;background:#eef6f5}.attribution-result strong{width:100%}.attribution-result span{padding:6px 10px;background:#fff;border-radius:6px}
 .notice {
   padding: 12px 16px;
   border-radius: var(--radius);

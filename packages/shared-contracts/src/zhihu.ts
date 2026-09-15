@@ -23,6 +23,7 @@ export interface LoginReq {
 }
 
 export interface AuthUser {
+  adminDuty?: 'all' | 'operations' | 'finance';
   id: string
   username: string
   displayName: string
@@ -269,10 +270,24 @@ export interface DataImportBatch {
   rejectionReason: string | null
 }
 
+export interface DataImportAttributionSummary {
+  scope: { projectId: string; accountId: string }
+  attributionBatchId: string
+  analyzedRows: number
+  matchedRows: number
+  exceptionRows: number
+  orders: string
+  payable: string
+  issues: number
+  from: string | null
+  to: string | null
+}
+
 export interface DataImportConfirmResult extends DataImportBatch {
   imported: number
   failed: number
   taskIds: string[]
+  attribution?: DataImportAttributionSummary
 }
 
 export interface DataImportPreview extends DataImportBatch {

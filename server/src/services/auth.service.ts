@@ -28,6 +28,7 @@ import {
 } from '../core/demo';
 
 interface UserRow extends RowDataPacket {
+  admin_duty?: 'all' | 'operations' | 'finance';
   id: string;
   username: string;
   password_hash: string;
@@ -44,6 +45,7 @@ const publicUser = (user: UserRow, role: Role) => ({
   username: user.username,
   displayName: user.display_name,
   role,
+  adminDuty: user.admin_duty ?? 'all',
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
 });
@@ -69,6 +71,7 @@ async function issueAccessToken(user: UserRow, role: Role) {
   return signToken({
     id: String(user.id),
     role,
+    adminDuty: user.admin_duty ?? 'all',
     parentId: user.parent_id ? String(user.parent_id) : null,
     username: user.username,
     displayName: user.display_name,

@@ -2,6 +2,17 @@ import { inflateRaw } from 'node:zlib';
 import { TextDecoder } from 'node:util';
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' as const;
+/**
+ * MIME values commonly emitted for a real .xlsx file by Windows, WPS and
+ * browser file pickers. MIME is only a client supplied hint; the ZIP/XLSX
+ * structure is validated below before the upload is accepted.
+ */
+export const XLSX_MIME_ALIASES = Object.freeze([
+  XLSX_MIME,
+  'application/vnd.ms-excel',
+  'application/zip',
+  'application/octet-stream',
+] as const);
 export const XLSX_MAX_BYTES = 10 * 1024 * 1024;
 export const XLSX_MAX_ENTRIES = 512;
 export const XLSX_MAX_ENTRY_BYTES = 16 * 1024 * 1024;
@@ -109,6 +120,13 @@ const DANGEROUS_XML_NAMES = new Set([
   'customui',
   'signature',
 ]);
+const FORMULA_XML_NAMES = new Set(['f', 'formula']);
+const UNSAFE_FORMULA_PATTERN =
+  /(?:\[[^\]]+\]|(?:https?|ftp|file):|#(?:REF|NAME|VALUE|N\/A)!|(?:DDE|EXEC|WEBSERVICE|HYPERLINK|INDIRECT|RTD|CALL|REGISTER\.ID|IMPORTXML|IMPORTDATA|FILTERXML)\s*\()/iu;
+
+export interface AllianceXlsxValidationOptions {
+  readonly allowFormulas?: boolean;
+}
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -353,8 +371,20 @@ function assertAttributes(token: XmlToken, allowed: readonly string[]): void {
   for (const item of token.attrs) if (!names.has(item.name)) invalid();
 }
 
-function assertNoDangerousXmlTokens(tokens: readonly XmlToken[]): void {
-  for (const token of tokens) if (DANGEROUS_XML_NAMES.has(localName(token.name))) invalid();
+function assertNoDangerousXmlTokens(tokens: readonly XmlToken[], allowFormulas = false): void {
+  for (const token of tokens) {
+    const name = localName(token.name);
+    if (DANGEROUS_XML_NAMES.has(name) && !(allowFormulas && FORMULA_XML_NAMES.has(name))) invalid();
+  }
+}
+
+function assertSafeFormulaExpressions(value: string): void {
+  const formulaTags =
+    /<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:f|formula)\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:f|formula)>/giu;
+  for (const match of value.matchAll(formulaTags)) {
+    const expression = decodeXmlEntities(match[1], false);
+    if (UNSAFE_FORMULA_PATTERN.test(expression)) return invalid();
+  }
 }
 
 function validatePartNameBytes(nameBytes: Buffer): string {
@@ -545,8 +575,20 @@ function assertRelationshipTarget(sourceRels: string, target: string): string {
     return invalid();
   }
   const base = sourceRels === '_rels/.rels' ? '' : sourceRels.replace(/\/_rels\/[^/]+\.rels$/u, '');
-  const segments = [...(base ? base.split('/') : []), ...target.split('/')];
-  if (segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')) return invalid();
+  const segments = base ? base.split('/') : [];
+  for (const segment of target.split('/')) {
+    if (segment.length === 0 || segment === '.') return invalid();
+    if (segment === '..') {
+      // OOXML commonly uses ../ to reference a sibling part (for example,
+      // xl/worksheets/_rels/sheet1.xml.rels -> xl/tables/table1.xml).
+      // Resolve it safely while preventing traversal above the package root.
+      if (segments.length === 0) return invalid();
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+  if (segments.length === 0) return invalid();
   return segments.join('/');
 }
 
@@ -705,7 +747,7 @@ function validateRelationships(parts: ReadonlyMap<string, string>): void {
       parseRelationships(parts, name);
 }
 
-async function validateBuffer(buffer: Buffer): Promise<void> {
+async function validateBuffer(buffer: Buffer, options: AllianceXlsxValidationOptions = {}): Promise<void> {
   const entries = parseZipEntries(buffer);
   let totalUncompressed = 0;
   const parts = new Map<string, string>();
@@ -728,7 +770,11 @@ async function validateBuffer(buffer: Buffer): Promise<void> {
   }
   for (const name of REQUIRED_PARTS) if (!parts.has(name)) return invalid();
   if (![...parts.keys()].some((name) => /^xl\/worksheets\/sheet[1-9][0-9]*\.xml$/u.test(name))) return invalid();
-  for (const text of parts.values()) assertNoDangerousXmlTokens(parseXml(text));
+  for (const [name, text] of parts) {
+    const allowFormulas = options.allowFormulas === true && /^xl\/worksheets\/sheet[1-9][0-9]*\.xml$/u.test(name);
+    assertNoDangerousXmlTokens(parseXml(text), allowFormulas);
+    if (allowFormulas) assertSafeFormulaExpressions(text);
+  }
   parseContentTypes(parts);
   validateRelationships(parts);
 }
@@ -753,8 +799,17 @@ export function isSafeXlsxFilename(value: unknown): value is string {
   return true;
 }
 
-export async function validateAllianceXlsx(file: AllianceUploadFile): Promise<void> {
-  if (!isSafeXlsxFilename(file.originalname) || file.mimetype !== XLSX_MIME || !Buffer.isBuffer(file.buffer))
+export function isSupportedXlsxMime(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const mime = value.split(';', 1)[0].trim().toLowerCase();
+  return (XLSX_MIME_ALIASES as readonly string[]).includes(mime);
+}
+
+export async function validateAllianceXlsx(
+  file: AllianceUploadFile,
+  options: AllianceXlsxValidationOptions = {},
+): Promise<void> {
+  if (!isSafeXlsxFilename(file.originalname) || !isSupportedXlsxMime(file.mimetype) || !Buffer.isBuffer(file.buffer))
     return invalid();
   if (
     file.buffer.length < 1 ||
@@ -764,12 +819,15 @@ export async function validateAllianceXlsx(file: AllianceUploadFile): Promise<vo
     return invalid();
   if (file.buffer.length < 4 || !file.buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])))
     return invalid();
-  await validateBuffer(file.buffer);
+  await validateBuffer(file.buffer, options);
 }
 
-export async function validateAllianceXlsxBuffer(buffer: Buffer): Promise<void> {
+export async function validateAllianceXlsxBuffer(
+  buffer: Buffer,
+  options: AllianceXlsxValidationOptions = {},
+): Promise<void> {
   if (!Buffer.isBuffer(buffer)) return invalid();
-  await validateBuffer(buffer);
+  await validateBuffer(buffer, options);
 }
 
 export const validateXlsxUpload = validateAllianceXlsx;

@@ -19,6 +19,7 @@ export interface LoginReq {
 }
 
 export interface AuthUser {
+  adminDuty?: 'all' | 'operations' | 'finance';
   id: string
   username: string
   displayName: string

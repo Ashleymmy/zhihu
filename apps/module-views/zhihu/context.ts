@@ -4,6 +4,7 @@ export interface Scope {
   accountId: string
 }
 export interface Option {
+  channelId?: string
   id: string
   name?: string
   displayName?: string
@@ -18,6 +19,9 @@ export interface EngineOptions {
   users: Option[]
 }
 export interface EngineContext {
+  coreHttp: HttpClient
+  parentId: string | null
+  adminDuty: string
   http: HttpClient
   scope: Scope
   role: string

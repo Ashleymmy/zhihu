@@ -1,5 +1,10 @@
 import type { RouteRecordRaw } from 'vue-router'
+import {useAuthStore} from './context'
 export const modulePages: RouteRecordRaw[] = [
+{path:'operations',name:'zhihu-operations',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'operations',title:'运营管理'}},
+{path:'wallet',name:'zhihu-wallet',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'wallet',title:'收入与提现'}},
+{path:'finance',name:'zhihu-finance',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'finance',title:'财务做账'}},
+
   {
     path: 'dashboard',
     name: 'zhihu-dashboard',
@@ -61,7 +66,7 @@ export const modulePages: RouteRecordRaw[] = [
     meta: { moduleId: 'zhihu', title: '创意工具坊' },
   },
   {
-    path: '',
+    path: 'history',
     name: 'zhihu-zhihu-story',
     component: () => import('./views/ZhihuStoryView.vue'),
     meta: { moduleId: 'zhihu', title: '知乎故事' },
@@ -162,7 +167,7 @@ export const zhihuRoutes: RouteRecordRaw[] = [
     path: 'modules/zhihu',
     component: () => import('./ModuleLayout.vue'),
     meta: { moduleId: 'zhihu' },
-    children: modulePages,
+    children: [{path:'',redirect:'/modules/zhihu/operations'},...modulePages.map(p=>({...p,beforeEnter:()=>{const duty=useAuthStore().user?.adminDuty??'all';if(duty==='finance'&&p.path!=='finance')return '/modules/zhihu/finance';if(duty==='operations'&&p.meta?.section!=='operations')return '/modules/zhihu/operations';return true}}))],
   },
   { path: 'orders', redirect: (to) => ({ path: '/modules/zhihu/orders', query: to.query, hash: to.hash }) },
   {

@@ -10,11 +10,14 @@ import * as facts from '../attribution/facts';
 import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
+import * as workbench from '../attribution/workbench';
+import { assertDuty } from '../../../core/duties';
 import { requirePermission } from '../permissions';
 import { XLSX_MAX_BYTES } from '../zhihu/allianceXlsx';
 
 export const attributionRouter = Router();
 const engineGroups = new Set([
+  'workbench',
   'attribution-options',
   'channel-mappings',
   'keywords',
@@ -36,6 +39,14 @@ attributionRouter.use((req, res, next) =>
   engineGroups.has(req.path.split('/')[1]) ? requireAuth(req, res, next) : next('router'),
 );
 attributionRouter.use(requirePermission('attribution.read'));
+attributionRouter.use((req,_res,next)=>{
+ if(req.user.role!=='admin'||['GET','HEAD'].includes(req.method))return next();
+ try {
+  const group=req.path.split('/')[1];
+  assertDuty(req.user,['imports','metric-revisions','statements'].includes(group)||group==='workbench'&&['import','confirm'].includes(req.path.split('/')[2])?'finance':'operations');
+  next();
+ }catch(e){next(e)}
+});
 attributionRouter.get(
   '/engine-route',
   asyncHandler(async (req, res) => ok(res, await cutover.getRoute(req.user, scopeSchema.parse(req.query)))),
@@ -375,3 +386,14 @@ attributionRouter.post(
     ok(res, await statements.confirmStatement(req.user, q, idSchema.parse(req.params.id), key(req), q.expectedHash));
   }),
 );
+
+const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date()});
+attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{const q=periodSchema.parse(req.query);ok(res,await workbench.overview(req.user,q,q));}));
+attributionRouter.post('/workbench/import',upload,asyncHandler(async(req,res)=>{const q=scopeSchema.parse(req.body);if(!req.file)fail('请选择知乎 Excel 报表');ok(res,await workbench.uploadReport(req.user,q,req.file),202);}));
+attributionRouter.post('/workbench/confirm',asyncHandler(async(req,res)=>{
+ const q=periodSchema.extend({reviewHash:z.string().length(64),acknowledged:z.literal(true),requestKey:z.string().regex(/^[\w.-]{8,110}$/)}).parse(req.body);
+ ok(res,await workbench.confirmBills(req.user,q,q,q.requestKey,q.reviewHash));
+}));
+attributionRouter.post('/keywords/:id/distribute',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({targetId:idSchema}).parse(req.body);ok(res,await resource.distribute(req.user,q,idSchema.parse(req.params.id),key(req),q.targetId));
+}));

@@ -67,6 +67,7 @@ async function resolveParentId(user: AuthUser, role: Role, requestedParentId?: s
 const target = async (user: AuthUser, id: string) => {
   const [member] = await rows<MemberRow>('SELECT id, role, parent_id, is_active, username FROM users WHERE id = ? LIMIT 1', [id]);
   if (!member) throw new AppError(404, 40401, '成员不存在');
+  if (member.role === 'admin' && user.role === 'admin' && (user.adminDuty ?? 'all') !== 'all') throw new AppError(403,40301,'运营人员不能修改管理员账号');
   if (user.role === 'leader' && String(member.parent_id) !== user.sub) throw new AppError(403, 40301, '无权访问该成员');
   return member;
 };

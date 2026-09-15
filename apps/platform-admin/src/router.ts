@@ -109,6 +109,7 @@ export function createAppRouter() {
       !workspace.modules.value.some((m) => m.id === to.meta.moduleId && m.status === 'enabled')
     )
       return '/modules'
+    if (auth.loggedIn && auth.user?.adminDuty === 'finance' && to.name === 'dashboard' && workspace.modules.value.filter(m=>m.status==='enabled').length===1) return workspace.modules.value.find(m=>m.status==='enabled')!.entryPath
     if (to.name === 'login' && auth.loggedIn) return { name: 'dashboard' }
     return true
   })

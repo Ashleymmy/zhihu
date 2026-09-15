@@ -237,14 +237,14 @@ describe('OPC independent core', () => {
       'unavailable',
     );
   });
-  it('public finance cannot fabricate balances or write funds', async () => {
+  it('public finance requires a business scope before reading balances or applying withdrawals', async () => {
     const response = await request(app).get('/api/v1/core/finance').set('Authorization', auth());
-    expect(response.body.data.status).toBe('not_connected');
+    expect(response.body.data.status).toBe('requires_scope');
     expect(response.body.data).not.toHaveProperty('balance');
     expect(
       (await request(app).post('/api/v1/core/finance/withdrawals').set('Authorization', auth()).send({ amount: 1 }))
         .status,
-    ).toBe(501);
+    ).toBe(422);
   });
   it('optional installation preserves IDs and is repeatable', async () => {
     await runOpcMigrations(target, ['zhihu']);

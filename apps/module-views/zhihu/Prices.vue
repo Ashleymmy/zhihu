@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { errorText, requestKey, type EngineContext } from './context'
 const props = defineProps<{ context: EngineContext }>()
 interface Price {
@@ -13,6 +13,14 @@ interface Price {
   endDay: string | null
   priceStatus: string
 }
+const canEdit=computed(()=>props.context.role==='leader'||props.context.role==='admin'&&props.context.adminDuty!=='finance')
+const showForm=ref(false)
+async function savePrice(){
+const draft=await post('/price-agreements',{...form,to:form.to||undefined}) as {id:string}
+await post('/price-versions/'+draft.id+'/publish',{})
+showForm.value=false
+}
+const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
 const list = ref<Price[]>([]),
   page = ref(1),
   total = ref(0),
@@ -23,9 +31,9 @@ const form = reactive({
   taskId: '',
   payeeId: '',
   unitPrice: '',
-  from: '',
+  from: today,
   to: '',
-  reason: '',
+  reason: '设置业务单价',
 })
 const name = (id: string) =>
   props.context.options.users.find((x) => String(x.id) === String(id))
@@ -63,18 +71,14 @@ onMounted(() => run(load))
 </script>
 <template>
   <section class="engine-panel">
-    <h2>任务级报价</h2>
+    <div class="section-heading"><h2>定价规则</h2><button v-if="canEdit" @click="showForm=!showForm">设置单价</button></div>
     <p class="engine-note">
-      价格单位为元 / 有效订单。同一任务的全部关键词适用；未来调价按生效日切换。
+      当前支持按有效订单设置单价；模拟项目中的价格仅用于联测。后续可调整规则，已确认账单保留当时的价格依据。未来调价请选择新的生效日期。
     </p>
     <form
-      v-if="context.role !== 'creator'"
-      @submit.prevent="
-        run(() =>
-          post('/price-agreements', { ...form, to: form.to || undefined }),
-        )
-      "
-    >
+      v-if="canEdit && showForm"
+      @submit.prevent="run(savePrice)"
+ >
       <label
         >推广任务<select v-model="form.taskId" required>
           <option value="">选择任务</option>
@@ -112,7 +116,7 @@ onMounted(() => run(load))
           v-model="form.reason"
           required
           maxlength="500" /></label
-      ><button :disabled="busy">保存草稿</button>
+      ><button :disabled="busy">保存并发布</button>
     </form>
     <p v-if="error" role="alert" class="engine-error">{{ error }}</p>
     <p v-if="success" role="status">{{ success }}</p>
@@ -139,16 +143,16 @@ onMounted(() => run(load))
               }}
             </td>
             <td>
-              {{ p.payerKind === 'agency' ? '运营代理' : name(p.payerId) }}
+              {{ p.payerKind === 'agency' ? '平台' : name(p.payerId) }}
             </td>
             <td>{{ name(p.payeeId) }}</td>
             <td>{{ p.price }}</td>
             <td>{{ p.startDay }} 至 {{ p.endDay ?? '长期' }}</td>
-            <td>{{ p.priceStatus === 'published' ? '已发布' : '草稿' }}</td>
+            <td>{{ p.priceStatus === 'published' ? '已发布' : '待发布' }}</td>
             <td>
               <button
                 v-if="
-                  p.priceStatus === 'draft' &&
+                  canEdit && p.priceStatus === 'draft' &&
                   (p.payerKind === 'agency'
                     ? context.role === 'admin'
                     : String(p.payerId) === context.userId)
@@ -165,7 +169,7 @@ onMounted(() => run(load))
         </tbody>
       </table>
     </div>
-    <p v-if="!list.length">暂无本人有权查看的报价；缺价时不会按零元计算。</p>
+    <p v-if="!list.length">还没有设置适用单价。未设置单价的记录会等待处理。</p>
     <div class="engine-actions">
       <button
         :disabled="page <= 1 || busy"

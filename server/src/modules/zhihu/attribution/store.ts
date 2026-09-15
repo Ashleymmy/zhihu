@@ -4,7 +4,7 @@ import { assertDataScope } from '../../../core/accounts';
 import type { AuthUser } from '../../../types';
 import { writeAudit } from '../../../services/audit.service';
 import { digest, fail, type Scope } from './domain';
-import { assertEngineWritable } from './routing';
+import { assertEngineWritable, gate } from './routing';
 
 export type RecordRow = RowDataPacket & Record<string, unknown>;
 export async function select(c: PoolConnection, sql: string, values: unknown[] = []): Promise<RecordRow[]> {
@@ -22,11 +22,12 @@ export async function authorize(user: AuthUser, scope: Scope) {
   await assertDataScope(user, scope.projectId, scope.accountId, 'zhihu');
 }
 export async function scopeLock(c: PoolConnection, scope: Scope, user?: AuthUser) {
+  await gate(c);
   const records = await select(
     c,
     `SELECT a.id FROM integration_accounts a
     JOIN project_integrations pi ON pi.account_id=a.id JOIN projects p ON p.id=pi.project_id
-    WHERE a.id=? AND pi.project_id=? AND a.module_id='zhihu' AND a.status='active' AND p.is_enabled=1 FOR SHARE`,
+    WHERE a.id=? AND pi.project_id=? AND a.module_id='zhihu' AND a.status='active' AND p.is_enabled=1 FOR UPDATE`,
     [scope.accountId, scope.projectId],
   );
   if (!records.length) fail('账号或项目不可用', 403);

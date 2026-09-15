@@ -9,6 +9,10 @@ export function hasPermission(role: Role, permission: string) {
 export const requirePermission =
   (permission: string): RequestHandler =>
   (req, _res, next) => {
+    const duty=req.user.adminDuty;
+    const reading=['GET','HEAD'].includes(req.method);
+    if(req.user.role==='admin'&&duty==='finance'&&permission!=='attribution.read'&&(!reading||['callback.secret','callback.config'].includes(permission)))return next(new AppError(403,40301,'此操作需要运营权限'));
+    if(req.user.role==='admin'&&duty==='operations'&&/^(withdraw\.|finance\.|data\.import|statement\.confirm)/.test(permission))return next(new AppError(403,40301,'此操作需要财务权限'));
     if (!hasPermission(req.user.role, permission)) return next(new AppError(403, 40301, '无权执行此操作'));
     next();
   };

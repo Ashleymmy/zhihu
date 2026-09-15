@@ -18,3 +18,6 @@ export {default as ModuleDirectory} from './ModuleDirectory.vue'
 export {default as PublicFinance} from './PublicFinance.vue'
 export {default as ProjectIntegrations} from './ProjectIntegrations.vue'
 export type {CoreWorkspace} from './core-workspace'
+
+export { default as CashWallet } from './CashWallet.vue'
+export { default as StaffManager } from './StaffManager.vue'

@@ -4,6 +4,7 @@ import {
   isSafeXlsxFilename,
   validateAllianceXlsx,
   validateAllianceXlsxBuffer,
+  isSupportedXlsxMime,
   XLSX_MIME,
 } from '../../src/modules/zhihu/zhihu/allianceXlsx';
 import {
@@ -27,8 +28,8 @@ function replacePart(name: string, data: string | Buffer, method: 0 | 8 = 0): Xl
   return minimalXlsxEntries(method).map((entry) => (entry.name === name ? { ...entry, data } : entry));
 }
 
-async function rejects(buffer: Buffer): Promise<void> {
-  await expect(validateAllianceXlsxBuffer(buffer)).rejects.toBeInstanceOf(AllianceXlsxValidationError);
+async function rejects(buffer: Buffer, options: { allowFormulas?: boolean } = {}): Promise<void> {
+  await expect(validateAllianceXlsxBuffer(buffer, options)).rejects.toBeInstanceOf(AllianceXlsxValidationError);
 }
 
 describe('Alliance XLSX fail-closed validator', () => {
@@ -44,12 +45,25 @@ describe('Alliance XLSX fail-closed validator', () => {
       { name: 'xl/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
       { name: 'xl/worksheets/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
     ];
-    await expect(validateAllianceXlsxBuffer(buildXlsxZipFixture([...directories, ...minimalXlsxEntries()]))).resolves.toBeUndefined();
+    await expect(
+      validateAllianceXlsxBuffer(buildXlsxZipFixture([...directories, ...minimalXlsxEntries()])),
+    ).resolves.toBeUndefined();
   });
 
-  it('P0007-R3-MIME-001 enforces safe filename, exact MIME, size, and ZIP magic', async () => {
+  it('P0007-R3-MIME-001 accepts common XLSX MIME variants and enforces safe filename, size, and ZIP magic', async () => {
     const valid = buildMinimalXlsxFixture();
     expect(isSafeXlsxFilename('安全批量.XLSX')).toBe(true);
+    for (const mimetype of [
+      XLSX_MIME,
+      'application/vnd.ms-excel',
+      'application/zip',
+      'application/octet-stream',
+      XLSX_MIME + '; charset=binary',
+      'APPLICATION/OCTET-STREAM',
+    ]) {
+      expect(isSupportedXlsxMime(mimetype)).toBe(true);
+      await expect(validateAllianceXlsx(upload(valid, { mimetype }))).resolves.toBeUndefined();
+    }
     for (const originalname of [
       'batch.csv',
       'batch.xlsx ',
@@ -63,7 +77,8 @@ describe('Alliance XLSX fail-closed validator', () => {
         AllianceXlsxValidationError,
       );
     }
-    for (const mimetype of ['', 'application/zip', 'application/octet-stream']) {
+    for (const mimetype of ['', 'text/plain', 'application/pdf']) {
+      expect(isSupportedXlsxMime(mimetype)).toBe(false);
       await expect(validateAllianceXlsx(upload(valid, { mimetype }))).rejects.toBeInstanceOf(
         AllianceXlsxValidationError,
       );
@@ -97,6 +112,30 @@ describe('Alliance XLSX fail-closed validator', () => {
     await rejects(buildXlsxZipFixture(minimalXlsxEntries(), { prefix: Buffer.from('SFX') }));
     await rejects(buildXlsxZipFixture(minimalXlsxEntries(), { suffix: Buffer.from('polyglot') }));
     await rejects(buildXlsxZipFixture(minimalXlsxEntries(), { archiveComment: Buffer.from('comment') }));
+  });
+
+  it('accepts standard relative relationship targets without allowing package-root escape', async () => {
+    const contentTypes = allianceXlsxFixtureXml.contentTypes.replace(
+      '</Types>',
+      '<Override PartName="/xl/tables/table1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/></Types>',
+    );
+    const tableRelationships = `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/table" Target="../tables/table1.xml"/>
+</Relationships>`;
+    const table = `<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>`;
+    const entries = [
+      ...minimalXlsxEntries().map((entry) =>
+        entry.name === '[Content_Types].xml' ? { ...entry, data: contentTypes } : entry,
+      ),
+      { name: 'xl/tables/table1.xml', data: table },
+      { name: 'xl/worksheets/_rels/sheet1.xml.rels', data: tableRelationships },
+    ];
+    await expect(validateAllianceXlsxBuffer(buildXlsxZipFixture(entries))).resolves.toBeUndefined();
+
+    const escape = tableRelationships.replace('../tables/table1.xml', '../../../tables/table1.xml');
+    await rejects(
+      buildXlsxZipFixture([...entries.slice(0, -1), { name: 'xl/worksheets/_rels/sheet1.xml.rels', data: escape }]),
+    );
   });
 
   it('P0007-R3-PATH-001 rejects traversal, duplicate identity, directory, and special-file entries', async () => {
@@ -147,6 +186,20 @@ describe('Alliance XLSX fail-closed validator', () => {
         ...minimalXlsxEntries().slice(1),
       ]),
     );
+  });
+
+  it('allows local formulas only when explicitly enabled for data import', async () => {
+    const safeFormula = allianceXlsxFixtureXml.worksheet.replace('</sheetData>', '<f>IF(A1=0,1,2)</f></sheetData>');
+    await expect(
+      validateAllianceXlsxBuffer(buildXlsxZipFixture(replacePart('xl/worksheets/sheet1.xml', safeFormula)), {
+        allowFormulas: true,
+      }),
+    ).resolves.toBeUndefined();
+
+    const externalFormula = safeFormula.replace('IF(A1=0,1,2)', 'HYPERLINK("https://attacker.invalid")');
+    await rejects(buildXlsxZipFixture(replacePart('xl/worksheets/sheet1.xml', externalFormula)), {
+      allowFormulas: true,
+    });
   });
 
   it('P0007-R3-ACTIVE-001 rejects active parts, external/encoded relationships, formulas, and DTD', async () => {

@@ -41,7 +41,7 @@ export interface ModuleDataProvider {
 }
 export interface FinanceProvider {
   capabilities: { income: boolean; settlements: boolean; withdrawals: boolean };
-  // No fund-write contract until a verified accounting implementation is installed.
+  // Business providers expose summaries; the shared finance ledger handles fund operations.
   summary(scope: DataScope, user: AuthUser): Promise<{ currency: string; amount: string | null }>;
 }
 export interface BusinessModule {

@@ -1,6 +1,7 @@
 export type Role = 'admin' | 'leader' | 'creator';
 
 export interface AuthUser {
+  adminDuty?: 'all' | 'operations' | 'finance';
   sub: string;
   role: Role;
   parentId: string | null;

@@ -5,6 +5,8 @@ import { requirePermission } from '../auth/permissions';
 import { asyncHandler, AppError } from '../middleware/errors';
 import { ok } from '../utils/response';
 import { ModuleRuntime } from './module-runtime';
+import { financeRouter } from './finance-routes';
+import { staffRouter } from './staff';
 import {
   listAccounts,
   createAccount,
@@ -26,17 +28,8 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
     '/modules',
     asyncHandler(async (req, res) => ok(res, runtime.list(req.user.role))),
   );
-  r.get(
-    '/finance',
-    asyncHandler(async (_req, res) =>
-      ok(res, {
-        status: 'not_connected',
-        capabilities: { income: false, settlements: false, withdrawals: false },
-        message: '公共财务尚未接入，历史记录请从业务模块查看',
-      }),
-    ),
-  );
-  r.all('/finance/*', (_req, _res, next) => next(new AppError(501, 50101, '公共资金写入尚未开放')));
+  r.use('/finance',financeRouter);
+  r.use('/staff',staffRouter);
   r.get(
     '/integrations',
     asyncHandler(async (req, res) => ok(res, await listAccounts(req.user))),

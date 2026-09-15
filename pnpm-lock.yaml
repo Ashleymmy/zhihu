@@ -17,6 +17,9 @@ importers:
 
   apps/module-views:
     dependencies:
+      '@zhihu-koc/shared-components':
+        specifier: workspace:*
+        version: link:../../packages/shared-components
       '@zhihu-koc/shared-services':
         specifier: workspace:*
         version: link:../../packages/shared-services

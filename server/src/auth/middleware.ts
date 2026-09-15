@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { AppError } from '../middleware/errors';
 import { Role } from '../types';
+import { rows } from '../db';
 import { verifyToken } from './jwt';
 import { revocationStore } from './revocation';
 
@@ -15,6 +16,11 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
     try {
       const user = verifyToken(token);
       if (await revocationStore.isRevoked(user.jti)) throw new Error('revoked');
+      if (user.role === 'admin' && /^\d+$/.test(user.sub)) {
+        const [current] = await rows<import('mysql2/promise').RowDataPacket>('SELECT role,is_active,admin_duty FROM users WHERE id=?',[user.sub]);
+        if (!current || !current.is_active || current.role !== 'admin') throw new Error('inactive');
+        user.adminDuty = current.admin_duty;
+      }
       req.user = user;
       req.token = token;
       next();
@@ -27,6 +33,6 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
 export const requireRole =
   (...roles: Role[]): RequestHandler =>
   (req, _res, next) => {
-    if (!roles.includes(req.user.role)) return next(new AppError(403, 40301, '无权执行此操作'));
+    if (!roles.includes(req.user.role) || req.user.role === 'admin' && (req.user.adminDuty ?? 'all') !== 'all') return next(new AppError(403, 40301, '无权执行此操作'));
     next();
   };

@@ -389,3 +389,24 @@ export async function changeBinding(
     return { id };
   });
 }
+
+export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,targetId:string){
+ if(user.role!=='admin')fail('只有运营人员可以直接分发关键词',403);
+ return mutate(user,scope,'keyword.distribute',key,{id,targetId},async c=>{
+  const word=await keywordLock(c,scope,id);
+  if(word.current_binding_id||word.lifecycle_status!=='available')fail('关键词已分配或尚不可用',409);
+  const [plan]=await select(c,'SELECT status,sync_status FROM plans WHERE id=? FOR SHARE',[word.plan_id]);
+  if(plan.status!=='active'||plan.sync_status!=='synced')fail('关键词尚未创建成功');
+  const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL',[targetId,scope.projectId]);
+  if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择有效的团长或达人');
+  const leader=target.role==='leader'?targetId:target.parent_id===null?null:String(target.parent_id);
+  if(leader&&target.role==='creator'){
+   const parents=await select(c,"SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.role='leader' AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL",[leader,scope.projectId]);
+   if(!parents.length)fail('请先将该达人的团长加入项目');
+  }
+  const reserved=target.role==='leader';
+  const bindingId=await insert(c,'INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,relation_snapshot,assigned_at) VALUES(?,?,?,?,?,?)',[id,reserved?'reserved':leader?'team_creator':'direct_creator',leader,reserved?null:targetId,JSON.stringify({scope,target,assignedBy:user.sub}),reserved?null:new Date()]);
+  await c.query('UPDATE zh_keywords SET current_binding_id=?,lifecycle_status=?,version=version+1 WHERE id=?',[bindingId,reserved?'reserved':'assigned',id]);
+  await audit(c,user,'keyword.distribute',id,{targetId,bindingId});return{id:bindingId};
+ });
+}

@@ -40,7 +40,7 @@ const headerText = (value: unknown) =>
     .replace(/）/g, ')');
 export async function parseReport(file: AllianceUploadFile, kind: ReportKind): Promise<ParsedRow[]> {
   try {
-    await validateAllianceXlsx(file);
+    await validateAllianceXlsx(file, { allowFormulas: true });
   } catch (e) {
     if (e instanceof AllianceXlsxValidationError) fail(e.message);
     throw e;

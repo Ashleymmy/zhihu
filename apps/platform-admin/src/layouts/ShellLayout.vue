@@ -42,6 +42,9 @@ const navigation = computed<NavGroup[]>(() => {
       label: '已接入业务',
       items: enabled.map((m) => ({ key: m.id, label: m.name, path: m.entryPath })),
     })
+  const duty=auth.user?.adminDuty??'all'
+  if(duty==='finance')return groups.map(g=>({...g,items:g.items.filter(i=>['dashboard','finance'].includes(i.key)||enabled.some(m=>m.id===i.key))})).filter(g=>g.items.length)
+  if(duty==='operations')return groups.filter(g=>g.label!=='系统').map(g=>({...g,items:g.items.filter(i=>i.key!=='finance')}))
   return groups
 })
 onMounted(async () => {
@@ -60,7 +63,7 @@ async function logout() {
   <AppShell
     :groups="navigation"
     :user-name="auth.user?.displayName ?? ''"
-    :role-label="auth.user?.role === 'admin' ? '管理员' : auth.user?.role === 'leader' ? '团长' : '达人'"
+    :role-label="auth.user?.role === 'admin' ? (auth.user.adminDuty==='finance'?'财务':auth.user.adminDuty==='operations'?'运营':'管理员') : auth.user?.role === 'leader' ? '团长' : '达人'"
     :current-path="route.path"
     :announcements="announcements"
     @navigate="router.push"
