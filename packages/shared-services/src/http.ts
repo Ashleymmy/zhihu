@@ -122,12 +122,13 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
     } catch (raw: any) {
       const status: number | undefined = raw?.response?.status
       const isRefreshCall = config.url === REFRESH_PATH
+      const isPublicAuthCall = ['/auth/login', '/auth/register'].includes(config.url ?? '')
 
-      if (status === 401 && !retried && !isRefreshCall) {
+      if (status === 401 && !retried && !isRefreshCall && !isPublicAuthCall) {
         const refreshed = await refresh()
         if (refreshed) return request<T>(config, true)
         options.onUnauthorized?.()
-      } else if (status === 401 && (retried || isRefreshCall)) {
+      } else if (status === 401 && !isPublicAuthCall && (retried || isRefreshCall)) {
         tokens.set(null)
         options.onUnauthorized?.()
       }

@@ -8,10 +8,10 @@ describe(`workspace 门禁（${APP_ROLE}）`, () => {
     expect(checkWorkspaceAccess(fakeUser({ role: APP_ROLE }))).toBe('ok')
   })
 
-  it('其余两个角色一律拒绝', () => {
+  it('其余两种角色也可使用统一入口', () => {
     const others = (['admin', 'leader', 'creator'] as const).filter((role) => role !== APP_ROLE)
     for (const role of others) {
-      expect(checkWorkspaceAccess(fakeUser({ role })), role).toBe('wrong-workspace')
+      expect(checkWorkspaceAccess(fakeUser({ role })), role).toBe('ok')
     }
   })
 

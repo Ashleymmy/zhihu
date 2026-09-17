@@ -93,7 +93,7 @@ async function host(modules) {
           await page.route('**/*', (route) =>
             new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort(),
           );
-          const base = h.url + '/' + role;
+          const base = h.url + '/app';
           const login = async () => {
             await page.locator('input[autocomplete="username"]').fill(role);
             await page.locator('input[type="password"]').fill(role + '123456');
@@ -101,7 +101,7 @@ async function host(modules) {
             await page.waitForURL('**/dashboard');
             await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
           };
-          await page.goto(base + '/login');
+          await page.goto(h.url + '/' + role + '/login');
           await login();
           assert.equal(await page.locator('.studio-nav').getByText('邮件 / Excel 导入', { exact: true }).count(), 0);
           await page.screenshot({
@@ -112,21 +112,22 @@ async function host(modules) {
           await page.getByRole('heading', { name: '业务模块', exact: true }).waitFor();
           if (modules) {
             await page.getByRole('link', { name: '进入业务', exact: true }).click();
-            await page.getByLabel('知乎业务功能').waitFor();
-            await page.getByLabel('知乎业务功能').selectOption('/modules/zhihu/plans');
+            await page.getByRole('navigation', { name: '知乎业务导航' }).waitFor();
+            await page.getByRole('navigation', { name: '知乎业务导航' }).getByRole('link', { name: '推广计划', exact: true }).click();
             await page.waitForURL('**/modules/zhihu/plans');
             if (role === 'admin') {
-              await page.getByLabel('知乎业务功能').selectOption('/modules/zhihu/data-import');
+              await page.goto(base + '/modules/zhihu/data-import');
               await page.waitForURL('**/modules/zhihu/data-import');
               await page.screenshot({ path: path.join(out, 'zhihu-email.png'), fullPage: true });
             }
           } else {
             await page.getByText('未启用', { exact: true }).waitFor();
             await page.goto(base + '/plans');
-            await page.getByRole('heading', { name: '页面暂不可用' }).waitFor();
+            await page.waitForURL('**/app/dashboard');
+            await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
           }
           await page.goto(base + '/finance');
-          await page.getByRole('heading', { name: '公共财务尚未接入' }).waitFor();
+          await page.getByRole('heading', { name: role === 'admin' ? '财务中心' : '收入与提现', exact: true }).waitFor();
           await page.goto(base + '/projects');
           await page.getByRole('heading', { name: /项目/ }).first().waitFor();
           await page.goto(base + '/dashboard');

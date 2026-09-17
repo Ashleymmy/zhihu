@@ -171,7 +171,12 @@ docker compose -f compose.dev.yaml exec redis redis-cli -a redis_dev_pass
 # 健康检查
 curl http://localhost:3001/healthz
 
-# 登录接口（需要先创建用户）
+# 注册（公开，仅创建达人账号；角色不能由客户端指定）
+curl -X POST http://localhost:3001/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"creator_01","password":"password123","displayName":"新达人"}'
+
+# 登录接口（登录后自动按角色进入 /app/ 对应工作台）
 curl -X POST http://localhost:3001/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"password"}'

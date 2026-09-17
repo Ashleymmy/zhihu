@@ -1,12 +1,14 @@
 import express, { type Express } from 'express';
 import path from 'node:path';
+import fs from 'node:fs';
 export function mountStatic(app: Express) {
   /* ===== 营销门户与转化落地页（静态站点，公开访问）===== */
   // 静态资源以进程工作目录为锚（dev 与生产 dist 下均为 server/）
-  const publicDir = path.resolve(process.cwd(), 'public');
+  const cwd = process.cwd();
+  const publicDir = fs.existsSync(path.join(cwd, 'public')) ? path.join(cwd, 'public') : path.resolve(cwd, 'server/public');
   const portalDir = path.join(publicDir, 'portal');
   const landingDir = path.join(publicDir, 'landing');
-  app.get('/', (_req, res) => res.redirect('/portal/'));
+  app.get('/', (_req, res) => res.redirect('/app/'));
   app.use('/portal', express.static(portalDir));
   app.get('/portal/*', (_req, res) => res.sendFile(path.join(portalDir, 'index.html')));
   app.use('/landing', express.static(landingDir));
@@ -26,18 +28,16 @@ export function mountStatic(app: Express) {
       );
   });
 
-  /* ===== 三端工作台（生产模式：由后端托管各端构建产物）===== */
-  // 三端以子路径挂载：/admin/、/leader/、/creator/；各端 vite base 与之对应
-  const spaMounts: Array<[string, string]> = [
-    ['admin', 'platform-admin'],
-    ['leader', 'platform-leader'],
-    ['creator', 'platform-creator'],
-  ];
-  const appsRoot = path.resolve(process.cwd(), '../apps');
-  for (const [mount, dir] of spaMounts) {
-    const distDir = path.join(appsRoot, dir, 'dist');
-    app.use(`/${mount}`, express.static(distDir));
-    // SPA 回退：非文件请求一律回 index.html
-    app.get(`/${mount}/*`, (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
+  // One SPA; legacy URLs keep their deep link but never select an identity.
+  for (const role of ['admin', 'leader', 'creator']) {
+    app.get([`/${role}`, `/${role}/*`], (req, res) => {
+      res.redirect(302, req.originalUrl.replace(/^\/(admin|leader|creator)(?=\/|\?|$)/, '/app'));
+    });
   }
+  const localDist = path.resolve(cwd, 'apps/platform-admin/dist');
+  const distDir = fs.existsSync(path.join(localDist, 'index.html'))
+    ? localDist
+    : path.resolve(cwd, '../apps/platform-admin/dist');
+  app.use('/app', express.static(distDir));
+  app.get('/app/*', (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
 }

@@ -3,8 +3,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig(({ command }) => ({
-  // 生产构建挂到后端子路径；dev 保持根路径
-  base: command === 'build' ? '/admin/' : '/',
+  // 统一入口生产挂载 /app/；dev 保持根路径
+  base: command === 'build' ? '/app/' : '/',
   plugins: [vue()],
   resolve: {
     alias: {

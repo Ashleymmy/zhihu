@@ -4,6 +4,8 @@ import type {
   PageResp,
   PageReq,
   LoginReq,
+  RegisterReq,
+  RegisterResp,
   LoginResp,
   MeResp,
   RefreshResp,
@@ -33,6 +35,7 @@ import type {
 import type { HttpClient } from './http'
 export function createAuthApi(http: HttpClient) {
   return {
+    register: (data: RegisterReq) => http.post<RegisterResp>('/auth/register', data),
     login: (data: LoginReq) => http.post<LoginResp>('/auth/login', data),
     refresh: () => http.post<RefreshResp>('/auth/refresh'),
     me: () => http.get<MeResp>('/auth/me'),

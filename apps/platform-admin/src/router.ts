@@ -1,11 +1,19 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { PlatformDashboard, ModuleDirectory, PublicFinance } from '@zhihu-koc/shared-components'
+import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { workspace } from './stores/platform'
 import { installBusinessRoutes } from './composition/modules'
-export function createAppRouter() {
+import { canAccessPath } from './access'
+
+const workspaceLoaders = {
+  admin: () => import('./workspace-routes'),
+  leader: () => import('../../platform-leader/src/workspace-routes'),
+  creator: () => import('../../platform-creator/src/workspace-routes'),
+}
+export function createAppRouter(
+  history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),
+) {
   const router = createRouter({
-    history: createWebHistory(import.meta.env.BASE_URL),
+    history,
     routes: [
       {
         path: '/login',
@@ -14,103 +22,98 @@ export function createAppRouter() {
         meta: { requiresAuth: false, title: '登录' },
       },
       {
+        path: '/register',
+        name: 'register',
+        component: () => import('./views/LoginView.vue'),
+        meta: { requiresAuth: false, title: '注册' },
+      },
+      {
         path: '/',
         name: 'shell',
         component: () => import('./layouts/ShellLayout.vue'),
         meta: { requiresAuth: true },
-        children: [
-          { path: '', redirect: '/dashboard' },
-          { path: 'dashboard', name: 'dashboard', component: PlatformDashboard, meta: { title: '工作台' } },
-          { path: 'modules', name: 'modules', component: ModuleDirectory, meta: { title: '业务模块' } },
-          { path: 'finance', name: 'finance', component: PublicFinance, meta: { title: '财务中心' } },
-          {
-            path: 'projects',
-            name: 'projects',
-            component: () => import('./views/ProjectsView.vue'),
-            meta: { title: '项目管理' },
-          },
-          {
-            path: 'team',
-            name: 'team',
-            component: () => import('./views/TeamView.vue'),
-            meta: { title: '用户管理' },
-          },
-          {
-            path: 'mcn',
-            name: 'mcn',
-            component: () => import('./views/McnView.vue'),
-            meta: { title: 'MCN管理' },
-          },
-          {
-            path: 'system/monitor',
-            name: 'system-monitor',
-            component: () => import('./views/SysMonitorView.vue'),
-            meta: { title: '子账号监控' },
-          },
-          {
-            path: 'system/db',
-            name: 'system-db',
-            component: () => import('./views/SysDbView.vue'),
-            meta: { title: '数据库维护' },
-          },
-          {
-            path: 'system/announcements',
-            name: 'system-announcements',
-            component: () => import('./views/SysAnnouncementsView.vue'),
-            meta: { title: '系统公告' },
-          },
-          {
-            path: 'audit-log',
-            name: 'audit-log',
-            component: () => import('./views/AuditLogView.vue'),
-            meta: { title: '审计日志' },
-          },
-          {
-            path: ':pathMatch(.*)*',
-            name: 'not-found',
-            component: () => import('./views/UnavailableView.vue'),
-            meta: { title: '页面不可用' },
-          },
-        ],
+        children: [],
+      },
+      {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        component: () => import('./views/UnavailableView.vue'),
+        meta: { requiresAuth: true },
       },
     ],
   })
-  let installedFor: object | null = null
+  let installedFor = ''
   let removeRoutes: Array<() => void> = []
+  function resetRoutes() {
+    removeRoutes.forEach((remove) => remove())
+    removeRoutes = []
+    installedFor = ''
+    workspace.modules.value = []
+    workspace.projectId.value = ''
+  }
   router.beforeEach(async (to) => {
     const auth = useAuthStore()
     if (!auth.initialized) await auth.restore()
-    if (!auth.loggedIn) {
-      installedFor = null
-      removeRoutes.forEach((remove) => remove())
-      removeRoutes = []
-      workspace.modules.value = []
-      workspace.projectId.value = ''
+    else if (auth.loggedIn) await auth.validateSession().catch(() => undefined)
+    if (!auth.loggedIn || !auth.user) {
+      resetRoutes()
+      return to.meta.requiresAuth === false
+        ? true
+        : { name: 'login', query: { redirect: to.fullPath } }
     }
-    if (to.meta.requiresAuth !== false && !auth.loggedIn)
-      return { name: 'login', query: { redirect: to.fullPath } }
-    if (auth.loggedIn && installedFor !== auth.user) {
+    const identity = JSON.stringify([
+      auth.user.id,
+      auth.user.role,
+      auth.user.adminDuty,
+      auth.user.permissions,
+    ])
+    if (installedFor !== identity) {
+      resetRoutes()
+      const { workspaceRoutes } = await workspaceLoaders[auth.user.role]()
+      removeRoutes = workspaceRoutes.map((record) =>
+        router.addRoute('shell', record),
+      )
       try {
-        removeRoutes.forEach((remove) => remove())
-        removeRoutes = []
         await workspace.refreshModules()
-        removeRoutes = await installBusinessRoutes(
-          router,
-          workspace.modules.value.filter((m) => m.status === 'enabled').map((m) => m.id),
+        removeRoutes.push(
+          ...(await installBusinessRoutes(
+            router,
+            workspace.modules.value
+              .filter((m) => m.status === 'enabled')
+              .map((m) => m.id),
+            auth.user.role,
+          )),
         )
-        installedFor = auth.user
-        if (to.name === 'not-found') return to.fullPath
       } catch {
-        return to.name === 'dashboard' ? true : { name: 'dashboard' }
+        workspace.modules.value = []
       }
+      installedFor = identity
+      // Resolve again against this account's route table, including after a role change.
+      return to.fullPath
     }
     if (
+      to.meta.requiresAuth === false ||
+      to.name === 'not-found' ||
+      !canAccessPath(auth.user, to.path)
+    )
+      return '/dashboard'
+    if (
       to.meta.moduleId &&
-      !workspace.modules.value.some((m) => m.id === to.meta.moduleId && m.status === 'enabled')
+      !workspace.modules.value.some(
+        (m) => m.id === to.meta.moduleId && m.status === 'enabled',
+      )
     )
       return '/modules'
-    if (auth.loggedIn && auth.user?.adminDuty === 'finance' && to.name === 'dashboard' && workspace.modules.value.filter(m=>m.status==='enabled').length===1) return workspace.modules.value.find(m=>m.status==='enabled')!.entryPath
-    if (to.name === 'login' && auth.loggedIn) return { name: 'dashboard' }
+    if (
+      auth.user.role === 'admin' &&
+      auth.user.adminDuty === 'finance' &&
+      to.name === 'dashboard'
+    ) {
+      const enabled = workspace.modules.value.filter(
+        (m) => m.status === 'enabled',
+      )
+      if (enabled.length === 1) return enabled[0]!.entryPath
+    }
     return true
   })
   return router

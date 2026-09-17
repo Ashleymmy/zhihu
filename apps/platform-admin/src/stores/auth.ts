@@ -1,68 +1,66 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { AuthUser } from '@zhihu-koc/shared-contracts/core'
-import { createCoreApis, createHttpClient, isApiError } from '@zhihu-koc/shared-services/core'
-import { DEFAULT_LOCALE, createTranslator } from '@zhihu-koc/shared-i18n'
-import { checkWorkspaceAccess } from '../access'
+import type { AuthUser, RegisterReq } from '@zhihu-koc/shared-contracts/core'
+import { createCoreApis, createHttpClient } from '@zhihu-koc/shared-services/core'
+import { isValidAccount } from '../access'
 
-const translate = createTranslator(DEFAULT_LOCALE)
-
-const http = createHttpClient({
+export const http = createHttpClient({
   baseURL: '/api/v1/core',
   onUnauthorized: () => {
-    // 会话彻底失效（refresh 也失败）时回到登录页。
-    if (globalThis.location && !globalThis.location.pathname.endsWith('/login')) {
+    if (globalThis.location && !/\/(login|register)$/.test(globalThis.location.pathname)) {
       globalThis.location.href = import.meta.env.BASE_URL + 'login'
     }
   },
 })
-
 export const apis = createCoreApis(http)
-export { http }
-
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
   const initialized = ref(false)
   const loggedIn = computed(() => user.value !== null)
+  let restoreTask: Promise<void> | null = null
+  let validationTask: Promise<void> | null = null
 
-  /** 登录并强制校验工作台角色；跨角色登录立即登出并抛错（fail closed）。 */
-  async function login(username: string, password: string): Promise<void> {
-    const result = await apis.auth.login({ username, password })
-    if (checkWorkspaceAccess(result.user) !== 'ok') {
-      http.tokens.set(null)
-      await apis.auth.logout().catch(() => undefined)
-      throw new Error(translate('auth.wrongWorkspace'))
-    }
-    http.tokens.set(result.token)
-    user.value = result.user
+  async function validateSession(): Promise<void> {
+    validationTask ??= (async () => {
+      try {
+        const current = await apis.auth.me()
+        if (!isValidAccount(current)) throw new Error('账号角色异常，请联系管理员')
+        user.value = current
+      } catch (error) {
+        user.value = null
+        http.tokens.set(null)
+        throw error
+      } finally { validationTask = null }
+    })()
+    return validationTask
   }
-
-  /** 应用启动时恢复会话：优先用现有 Token 拉 me，失败再尝试 refresh。 */
+  async function login(username: string, password: string): Promise<void> {
+    user.value = null
+    http.tokens.set(null)
+    const result = await apis.auth.login({ username, password })
+    http.tokens.set(result.token)
+    // /me provides current role and permissions; never infer these from local storage or the URL.
+    await validateSession()
+    initialized.value = true
+  }
+  async function register(input: RegisterReq): Promise<void> {
+    await apis.auth.register(input)
+  }
   async function restore(): Promise<void> {
     if (initialized.value) return
-    initialized.value = true
-    try {
-      if (!http.tokens.get()) {
-        const refreshed = await http.refresh()
-        if (!refreshed) return
-      }
-      const me = await apis.auth.me()
-      if (checkWorkspaceAccess(me) !== 'ok') {
-        http.tokens.set(null)
-        return
-      }
-      user.value = me
-    } catch (error) {
-      if (isApiError(error) && error.status === 401) return
-      // 网络抖动等场景保持未登录态，由路由守卫引导到登录页。
-    }
+    restoreTask ??= (async () => {
+      try {
+        if (!http.tokens.get() && !await http.refresh()) return
+        await validateSession()
+      } catch { user.value = null }
+      finally { initialized.value = true; restoreTask = null }
+    })()
+    return restoreTask
   }
-
   async function logout(): Promise<void> {
     await apis.auth.logout().catch(() => undefined)
     http.tokens.set(null)
     user.value = null
   }
-
-  return { user, loggedIn, initialized, login, restore, logout }
+  return { user, initialized, loggedIn, login, register, restore, validateSession, logout }
 })

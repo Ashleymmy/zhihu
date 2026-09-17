@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+vi.mock('../../src/db', async (original) => ({ ...await original<typeof import('../../src/db')>(), rows: vi.fn(async (sql: string) => { if (sql === 'SELECT role,is_active,admin_duty,parent_id FROM users WHERE id=?') return [{role:'creator',is_active:1,admin_duty:'all',parent_id:'2'}]; throw new Error('Unexpected query in isolated contract test'); }) }));
 import request from 'supertest';
 import { createApp } from '../support/legacyApp';
 import { signToken } from '../../src/auth/jwt';

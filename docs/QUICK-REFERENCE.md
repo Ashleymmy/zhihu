@@ -59,8 +59,8 @@ LIMIT 10;
 ## 📍 关键位置
 
 ### 前端入口
-- 推广计划列表：`http://your-domain.com/admin/plans`
-- 系统工具：`http://your-domain.com/admin/system/data`
+- 推广计划列表：`http://your-domain.com/app/modules/zhihu/plans`
+- 系统工具：`http://your-domain.com/app/modules/zhihu/system/data`
 
 ### 后端代码
 - 同步任务：`server/src/jobs/syncPlanStatus.ts`

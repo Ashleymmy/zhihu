@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { AppShell, type NavGroup, type ShellAnnouncement } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
 import { workspace } from '../stores/platform'
+import { canAccessPath } from '../access'
 const auth = useAuthStore(),
   route = useRoute(),
   router = useRouter(),
@@ -36,16 +37,18 @@ const navigation = computed<NavGroup[]>(() => {
       ],
     },
   ]
+  if (auth.user?.role === 'creator') groups.push({ label: '个人', items: [
+    { key: 'profile', label: '个人资料', path: '/profile' },
+    { key: 'join-team', label: '加入团队', path: '/join-team' },
+  ] })
   const enabled = workspace.modules.value.filter((m) => m.status === 'enabled')
   if (enabled.length)
     groups.push({
       label: '已接入业务',
       items: enabled.map((m) => ({ key: m.id, label: m.name, path: m.entryPath })),
     })
-  const duty=auth.user?.adminDuty??'all'
-  if(duty==='finance')return groups.map(g=>({...g,items:g.items.filter(i=>['dashboard','finance'].includes(i.key)||enabled.some(m=>m.id===i.key))})).filter(g=>g.items.length)
-  if(duty==='operations')return groups.filter(g=>g.label!=='系统').map(g=>({...g,items:g.items.filter(i=>i.key!=='finance')}))
-  return groups
+  return groups.map(group => ({ ...group, items: group.items.filter(item => canAccessPath(auth.user, item.path)) })).filter(group => group.items.length)
+
 })
 onMounted(async () => {
   try {
@@ -68,6 +71,6 @@ async function logout() {
     :announcements="announcements"
     @navigate="router.push"
     @logout="logout"
-    ><router-view
+    ><router-view :key="auth.user?.id + '-' + auth.user?.role + '-' + auth.user?.adminDuty"
   /></AppShell>
 </template>

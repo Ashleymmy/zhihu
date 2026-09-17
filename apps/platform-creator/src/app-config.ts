@@ -1,6 +1,6 @@
 import type { GlobalRole } from '@zhihu-koc/shared-contracts'
 
-/** 本应用允许的全局角色——三端各自锁定一个角色，跨角色登录 fail closed。 */
+/** 本角色页面的展示配置；统一入口会在登录后按服务端角色选择此配置。 */
 export const APP_ROLE: GlobalRole = 'creator'
 
 /** 顶部导航（key 同路由 name 与 i18n nav.* key）。 */

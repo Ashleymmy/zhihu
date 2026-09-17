@@ -45,7 +45,7 @@ services:
     networks:
       - app_network
 
-  # 全栈一体：后端 API + 门户/落地页 + 三端工作台（/admin /leader /creator）
+  # 全栈一体：后端 API + 门户/落地页 + 统一工作台（/app，旧三端地址自动跳转）
   app:
     image: zhihu-koc:${IMAGE_TAG:-latest}
     build:

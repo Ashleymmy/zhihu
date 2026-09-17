@@ -48,6 +48,7 @@ const publicUser = (user: UserRow, role: Role) => ({
   adminDuty: user.admin_duty ?? 'all',
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
+  permissions: permissionsFor(role),
 });
 
 /** 未知角色值必须拒绝并审计，不得默认提升权限（03 §5.3）。 */
@@ -76,6 +77,35 @@ async function issueAccessToken(user: UserRow, role: Role) {
     username: user.username,
     displayName: user.display_name,
   });
+}
+
+/** 公开注册固定创建未入团达人；与审计写入保持同一事务。 */
+export async function register(
+  input: { username: string; password: string; displayName?: string; phone?: string },
+  ip?: string,
+) {
+  const limit = await incrRateLimit(`register:ip:${ip ?? 'unknown'}`, 5, 3600);
+  if (!limit.allowed) throw new AppError(429, 42903, '注册请求过于频繁，请 1 小时后再试');
+  const [existing] = await rows<UserRow>('SELECT id FROM users WHERE username = ? LIMIT 1', [input.username]);
+  if (existing) throw new AppError(409, 40901, '用户名已被使用');
+  const hash = await bcrypt.hash(input.password, 12);
+  try {
+    const id = await withTransaction(async connection => {
+      const [result] = await connection.query<ResultSetHeader>(
+        `INSERT INTO users (username, password_hash, role, role_id, parent_id, display_name, phone, is_active, must_change_pwd)
+         VALUES (?, ?, 'creator', (SELECT id FROM roles WHERE role_key = 'creator'), NULL, ?, ?, 1, 0)`,
+        [input.username, hash, input.displayName?.trim() || input.username, input.phone ?? null],
+      );
+      const id = String(result.insertId);
+      await writeAudit({ userId: id, action: 'auth.register', resourceType: 'user', resourceId: id, ip }, connection);
+      return id;
+    });
+    return { id, username: input.username };
+  } catch (error) {
+    // 唯一索引处理并发注册同名账号，不能只依赖上面的预检查。
+    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') throw new AppError(409, 40901, '用户名已被使用');
+    throw error;
+  }
 }
 
 export async function login(username: string, password: string, ip?: string) {

@@ -5,10 +5,16 @@ import { requireAuth } from '../auth/middleware';
 import { RefreshSession } from '../auth/tokenSessions';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
-import { changePassword, login, logout, me, refresh } from '../services/auth.service';
+import { changePassword, login, logout, me, refresh, register } from '../services/auth.service';
 import { ok } from '../utils/response';
 
 const loginSchema = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(128) });
+const registerSchema = z.object({
+  username: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+  password: z.string().min(8).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72),
+  displayName: z.string().trim().min(1).max(64).optional(),
+  phone: z.string().trim().regex(/^\+?[0-9 -]{6,20}$/).optional(),
+}).strict();
 const passwordSchema = z.object({ oldPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128) });
 
 export const REFRESH_COOKIE_NAME = 'zk_refresh';
@@ -48,6 +54,14 @@ const clearRefreshCookie = (res: Response) => {
 
 export const authRouter = Router();
 
+authRouter.post(
+  '/register',
+  validateBody(registerSchema),
+  asyncHandler(async (req, res) => {
+    const result = await register(req.body, req.ip);
+    ok(res, result, 201);
+  }),
+);
 authRouter.post(
   '/login',
   validateBody(loginSchema),

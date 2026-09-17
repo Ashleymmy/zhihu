@@ -1,14 +1,15 @@
 # OPC 平台聚合系统
 
-OPC 提供公共身份、组织、项目、模块接入和三端工作台。知乎是可选业务模块，邮件/Excel 数据处理及历史财务均属于知乎；后续平台可以通过自己的 API 直接提供数据。
+OPC 提供公共身份、组织、项目、模块接入和统一工作台。知乎是可选业务模块，邮件/Excel 数据处理及历史财务均属于知乎；后续平台可以通过自己的 API 直接提供数据。
 
-- 三端：`apps/platform-admin`、`apps/platform-leader`、`apps/platform-creator`。
+- 统一入口：`/app/`（旧 `/admin/`、`/leader/`、`/creator/` 地址会自动跳转）；源码按角色复用三端页面。
+- 登录与注册共用一个入口；公开注册创建未入团达人账号，管理员、团长身份由现有账号管理分配，登录后依据服务端当前角色和权限加载工作台。
 - 公共后端：`server/src/core` 及公共身份/组织服务；组合入口在 `server/src/composition`。
 - 知乎实现：后端 `server/src/modules/zhihu`，前端各端 `src/modules/zhihu`。
 
 **运行、迁移和验收以 [OPC 公共核心重构说明](docs/OPC公共核心重构.md) 为准。** `OPC_MODULES` 默认空；已有知乎部署升级必须显式设置 `OPC_MODULES=zhihu`。公共核心不要求知乎凭证。公共财务本期只建独立入口和契约。
 
-`pnpm verify:opc` 执行公共核心与三端构建、类型检查和隔离数据库验收；旧单测的 13 项既有失败见上述说明。
+`pnpm verify:opc` 执行公共核心与统一前端构建、类型检查和隔离数据库验收；旧单测的 13 项既有失败见上述说明。
 
 ## Docker 快速启动
 

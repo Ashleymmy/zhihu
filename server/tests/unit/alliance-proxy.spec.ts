@@ -28,7 +28,7 @@ import {
 import { buildMinimalXlsxFixture } from '../support/allianceXlsxFixture';
 import { installAllianceAuditTestSink } from '../support/allianceAuditFixture';
 
-vi.mock('../../src/db', async (original) => ({...await original<typeof import('../../src/db')>(), rows: vi.fn(async (sql:string) => {if(sql==='SELECT role,is_active,admin_duty FROM users WHERE id=?')return [{role:'admin',is_active:1,admin_duty:'all'}];throw new Error('Unexpected database query in isolated proxy test');})}));
+vi.mock('../../src/db', async (original) => ({...await original<typeof import('../../src/db')>(), rows: vi.fn(async (sql:string, bindings:unknown[]) => {if(sql==='SELECT role,is_active,admin_duty,parent_id FROM users WHERE id=?')return [{role:bindings[0]==='1'?'admin':bindings[0],is_active:1,admin_duty:'all',parent_id:null}];throw new Error('Unexpected database query in isolated proxy test');})}));
 
 const multerMock = vi.hoisted(() => ({ single: vi.fn() }));
 const signMock = vi.hoisted(() => ({ inject: vi.fn(), build: vi.fn() }));

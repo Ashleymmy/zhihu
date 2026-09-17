@@ -35,12 +35,12 @@ OPC 是单运营组织下的平台聚合系统，保留管理员、团长、达�
 
 ## 3. 公共 API
 
-统一响应沿用 `{code, data, message}`。除健康检查外，下列接口均需登录；金额、外部 ID 使用字符串，保持精度和来源语义。
+统一响应沿用 `{code, data, message}`。除健康检查、登录和注册外，下列接口均需登录；金额、外部 ID 使用字符串，保持精度和来源语义。
 
 | 入口                                                              | 用途/约束                                                |
 | ----------------------------------------------------------------- | -------------------------------------------------------- |
 | `GET /healthz`                                                    | 公共应用存活检查，不代表模块或数据库均健康               |
-| `/api/v1/core/auth/*`                                             | 登录、刷新、当前用户、退出；刷新 Cookie 路径为 `/api/v1` |
+| `/api/v1/core/auth/*`                                             | 注册（固定达人角色）、登录、刷新、当前用户、退出；刷新 Cookie 路径为 `/api/v1` |
 | `/api/v1/core/projects/*`                                         | 公共项目、项目成员和课程信息                             |
 | `/api/v1/core/team/*`                                             | 团队成员和入团流程                                       |
 | `/api/v1/core/mcn-accounts`                                       | 现有运营账户管理，保留兼容数据模型                       |
@@ -77,7 +77,7 @@ npm run start:core
 
 `start:core` 只启动公共 API，不加载业务组合或三端静态页面。迁移前应使用目标环境的正确数据库配置。迁移只建立 schema。首次空库需先设置 ADMIN_USERNAME/ADMIN_PASSWORD，再执行 npm run bootstrap:admin；密码少于 8 位会拒绝初始化。已有用户的库不会被 bootstrap 重置。
 
-托管三端并按需加载业务模块：先在仓库根目录执行 `pnpm build`，再在 `server` 下执行 `npm run build`、`npm run migrate` 和 `npm start`。三个工作台地址分别为 `/admin/`、`/leader/`、`/creator/`。生产 Docker 两个构建入口均已包含新 `schema` 目录。
+托管三端并按需加载业务模块：先在仓库根目录执行 `pnpm build`，再在 `server` 下执行 `npm run build`、`npm run migrate` 和 `npm start`。统一工作台地址为 `/app/`；旧 `/admin/`、`/leader/`、`/creator/` 地址会自动跳转，登录后按账号角色和权限加载对应页面。生产 Docker 两个构建入口均已包含新 `schema` 目录。
 
 只构建公共前端：
 
@@ -138,3 +138,11 @@ OPC 验收使用自行创建和清理的 MySQL 测试容器及本地 HTTP 模拟
 | `withdrawals-gate.spec.ts` | 6      | 旧路由、角色和 mock/数据库依赖未与现状对齐 |
 
 源码归属迁移清单另见 `OPC源码迁移清单.md`。本次运行的截图和原始结果保存在本地忽略目录 `.opc-work/ui`、`.opc-work/legacy-unit-final.json`，不作为产品数据提交。
+
+## 统一入口与开放注册验收（2026-09-17）
+
+统一前端产物挂载于 `/app/`，登录和注册分别为 `/app/login`、`/app/register`。旧三端地址保留深链接并转至统一入口，地址不再决定账号身份。公开注册固定创建未入团达人账号；角色、职责、团队与权限不能通过注册参数指定。每次受保护请求复核数据库中的账号状态、角色、职责和所属团队，前端导航同步刷新当前身份与路由。
+
+新增验证：前后端类型检查与构建通过；前端单元测试通过；独立 MySQL 注册验收和真实浏览器注册、角色变更、越权跳转共 4 项通过；三角色在知乎启用/停用时的 6 组浏览器验收通过（含退出重登及移动端布局）。后端旧单元测试为 183 通过、13 失败，失败仍位于上表列出的三个旧测试文件。
+
+注册专项测试在 `server` 目录运行 `npx vitest run --config vitest.opc.config.ts tests/opc/unified-auth.integration.spec.ts`，使用自动创建并清理的临时 MySQL 容器。设置 `OPC_PLAYWRIGHT_MODULE` 为 Playwright 模块路径可同时执行浏览器注册与角色变更检查；默认使用本机 Edge，可用 `OPC_BROWSER_CHANNEL` 指定浏览器。六组合页面验收使用 `npm run test:opc:ui`。
