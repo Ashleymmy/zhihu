@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { ZhihuTask } from '@zhihu-koc/shared-contracts/zhihu'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 const tasks = ref<ZhihuTask[]>([])
@@ -22,15 +23,19 @@ async function syncNow() {
   } catch (e: any) { error.value = e?.message ?? String(e); syncing.value = false }
 }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
+  const filters = { keyword: keyword.value.trim() || undefined, status: statusFilter.value || undefined }
   loading.value = true
   error.value = ''
   try {
-    const data = await apis.story.listTasks({ page: 1, pageSize: 100, keyword: keyword.value.trim() || undefined, status: statusFilter.value || undefined })
-    tasks.value = data.list
-    total.value = data.total
-  } catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loading.value = false }
+    const result = await fetchAllPages((params) => apis.story.listTasks({ ...params, ...filters }))
+    if (version !== loadVersion) return
+    tasks.value = result
+    total.value = tasks.value.length
+  } catch (e: any) { if (version === loadVersion) error.value = e?.message ?? String(e) }
+  finally { if (version === loadVersion) loading.value = false }
 }
 
 function fmtTime(value: string | null) {

@@ -168,7 +168,7 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM plans p WHERE ${clause}`, bindings);
   const list = await rows<PlanRow>(
-    `SELECT p.*, c.name AS channel_name,CAST(k.id AS CHAR) keyword_id,CAST(k.project_id AS CHAR) keyword_project_id,CAST(k.account_id AS CHAR) keyword_account_id FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id AND c.project_id=p.project_id LEFT JOIN zh_keywords k ON k.plan_id=p.id WHERE ${clause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+    `SELECT p.*, c.name AS channel_name,CAST(k.id AS CHAR) keyword_id,CAST(k.project_id AS CHAR) keyword_project_id,CAST(k.account_id AS CHAR) keyword_account_id FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id AND c.project_id=p.project_id LEFT JOIN zh_keywords k ON k.plan_id=p.id WHERE ${clause} ORDER BY p.created_at DESC,p.id DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list: list.map(publicPlan), total: Number(count?.total ?? 0), page, pageSize };

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fetchAllOffsetPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 /** 评论截流词（知乎 OpenApi §2.9.3） */
@@ -16,21 +17,26 @@ const keyword = ref('')
 const statusLabels: Record<number, string> = { 1: '审核中', 2: '判定违规', 3: '判定正常' }
 const statusClass: Record<number, string> = { 1: 'paused', 2: 'rejected', 3: 'active' }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
   loading.value = true
   error.value = ''
+  items.value = []
+  total.value = 0
   try {
-    const resp: any = await apis.story.interceptWords({
+    const filters = {
       type: typeFilter.value,
       status: statusFilter.value === '' ? undefined : statusFilter.value,
       keyword: keyword.value.trim() || undefined,
-      limit: 50,
-    })
-    items.value = Array.isArray(resp) ? resp : (resp?.data ?? [])
-    total.value = resp?.pagination?.total ?? items.value.length
+    }
+    const result = await fetchAllOffsetPages<InterceptWord>((params) => apis.story.interceptWords({ ...filters, ...params }))
+    if (version !== loadVersion) return
+    items.value = result.items
+    total.value = result.total
   }
-  catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loading.value = false }
+  catch (e: any) { if (version === loadVersion) error.value = e?.message ?? String(e) }
+  finally { if (version === loadVersion) loading.value = false }
 }
 
 onMounted(load)

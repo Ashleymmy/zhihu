@@ -10,7 +10,9 @@ const dbMocks = vi.hoisted(() => ({
 
 vi.mock('../../src/db', () => ({
   db: { query: dbMocks.query },
-  rows: dbMocks.rows,
+  rows: (sql: string, bindings?: unknown[]) => sql.startsWith('SELECT role,is_active,admin_duty,parent_id FROM users')
+    ? Promise.resolve([{ role: bindings?.[0] === '1' ? 'admin' : 'leader', is_active: 1, admin_duty: 'all', parent_id: null }])
+    : dbMocks.rows(sql, bindings),
   withTransaction: dbMocks.withTransaction,
 }));
 
@@ -51,7 +53,18 @@ describe('邮件附件 / Excel 导入路由', () => {
       .set('Authorization', `Bearer ${await token('admin', '1')}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([]);
+    expect(res.body.data).toEqual({ list: [], total: 0, page: 1, pageSize: 20 });
+  });
+
+  it('导入历史支持读取第 100 条之后的数据，并拒绝超大分页', async () => {
+    dbMocks.rows.mockResolvedValueOnce([{ total: 205 }]).mockResolvedValueOnce([]);
+    const authorization = `Bearer ${await token('admin', '1')}`;
+    const res = await request(app).get('/api/v1/data-import/batches?page=3&pageSize=100').set('Authorization', authorization);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ total: 205, page: 3, pageSize: 100 });
+    expect(dbMocks.rows).toHaveBeenLastCalledWith(expect.stringContaining('LIMIT ? OFFSET ?'), [100, 200]);
+    const invalid = await request(app).get('/api/v1/data-import/batches?pageSize=101').set('Authorization', authorization);
+    expect(invalid.status).toBe(422);
   });
 
   it('管理员可以查看已保存批次的原始行数据', async () => {

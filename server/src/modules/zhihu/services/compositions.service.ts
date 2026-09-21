@@ -150,7 +150,7 @@ export async function getComposition(user: AuthUser, id: string) {
   return item;
 }
 
-async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection) {
+export async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection) {
   const ownerId = await planOwner(user, input.planId, connection);
   const [result] = await connection.query<ResultSetHeader>(
     `INSERT INTO compositions

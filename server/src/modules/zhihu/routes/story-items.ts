@@ -11,10 +11,11 @@ import {
   updateStoryItem,
 } from '../services/story-items.service';
 import { ok } from '../../../utils/response';
+import { paginationSchema } from '../../../utils/pagination';
 
 const id = z.string().regex(/^\d+$/);
 const typeSchema = z.enum(STORY_ITEM_TYPES);
-const listQuery = z.object({
+const listQuery = paginationSchema.extend({
   type: typeSchema,
   includeArchived: z.enum(['true', 'false']).optional(),
 });
@@ -37,7 +38,7 @@ storyItemsRouter.get(
   '/',
   validateQuery(listQuery),
   asyncHandler(async (req, res) =>
-    ok(res, await listStoryItems(req.user, req.query.type as never, req.query.includeArchived === 'true')),
+    ok(res, await listStoryItems(req.user, req.query.type as never, req.query.includeArchived === 'true', Number(req.query.page), Number(req.query.pageSize))),
   ),
 );
 storyItemsRouter.post(

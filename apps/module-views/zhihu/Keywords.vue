@@ -8,7 +8,7 @@ interface Word{allocationReady:number;planStatus?:string;hasUpstreamPlan?:number
 const list=ref<Word[]>([]),total=ref(0),page=ref(1),search=ref(props.initialSearch??''),busy=ref(false),error=ref(''),notice=ref(''),createOpen=ref(false)
 const selected=ref<Word|null>(null),action=ref(''),target=ref(''),reason=ref(''),work=reactive({url:'',description:''}),operationKey=ref(requestKey())
 const form=reactive({keyword:'',taskId:props.context.options.tasks[0]?.id||'',mappingId:props.context.options.mappings[0]?.id||'',channelId:props.context.options.channels[0]?.id||'',landingUrl:'',popularizeType:0})
-const prices=ref<{taskId:string;payeeId:string;price:string;priceStatus:string;startDay:string;endDay:string|null}[]>([])
+const prices=ref<{versionId:string;taskId:string;payeeId:string;price:string;priceStatus:string;startDay:string;endDay:string|null}[]>([])
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
 const admin=computed(()=>props.context.role==='admin')
 const summary=ref<KeywordSummary|null>(null),readAt=ref('')
@@ -33,7 +33,7 @@ async function perform(){const w=selected.value;if(!w)return;
 let poll:ReturnType<typeof setInterval>|undefined
 onMounted(()=>{poll=setInterval(()=>{if(!document.hidden&&!busy.value&&!selected.value)void run(async()=>{})},15000)})
 onUnmounted(()=>{if(poll)clearInterval(poll)})
-onMounted(()=>run(async()=>{prices.value=await fetchAllPages(params=>props.context.http.get<{list:typeof prices.value;total:number}>('/price-agreements',{...props.context.scope,...params}))}))
+onMounted(()=>run(async()=>{prices.value=await fetchAllPages(params=>props.context.http.get<{list:typeof prices.value;total:number}>('/price-agreements',{...props.context.scope,...params}),100,row=>row.versionId)}))
 </script>
 <template><section class="work-card"><div class="section-heading"><div><h2>{{admin?'本地关键词管理':context.role==='leader'?'团队关键词':'我的关键词'}}</h2><p>{{admin?'创建的关键词先进入词库：前 30 分钟团长优先领取，之后独立达人也可以领取。':context.role==='leader'?'领取后分发给团队成员，也可以自己使用。':'从这里提交作品，系统会自动记录关键词归属。'}}</p></div><button v-if="admin" class="primary" @click="createOpen=!createOpen">创建关键词</button></div>
 <p v-if="context.options.integrationMode==='simulation'" class="engine-note">当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。</p>

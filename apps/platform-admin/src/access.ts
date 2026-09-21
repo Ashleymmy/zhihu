@@ -30,7 +30,7 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
   )
     return false
   if (path === '/team') return user.role !== 'creator' && has('team.view')
-  if (path === '/mcn') return user.role !== 'creator'
+  if (path === '/mcn') return has('project.manage')
   if (path === '/join-team') return user.role === 'creator' && has('team.apply')
   if (path === '/profile') return user.role === 'creator'
   if (path.startsWith('/system/'))

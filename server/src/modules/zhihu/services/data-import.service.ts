@@ -1211,20 +1211,23 @@ export async function rejectDataImport(
   });
 }
 
-export async function listDataImportBatches(user?: AuthUser): Promise<DataImportBatch[]> {
+export async function listDataImportBatches(user?: AuthUser, page = 1, pageSize = 100) {
   if (user && isDevDemoAuthUser(user)) {
-    return demoBatches.map(({ previewRows: _previewRows, headers: _headers, ...batch }) => ({
+    const list = demoBatches.slice((page - 1) * pageSize, page * pageSize).map(({ previewRows: _previewRows, headers: _headers, ...batch }) => ({
       ...batch,
       fileName: normalizeUploadFilename(batch.fileName),
     }));
+    return { list, total: demoBatches.length, page, pageSize };
   }
+  const [count] = await rows<RowDataPacket & { total: number }>('SELECT COUNT(*) total FROM data_import_batches');
   const batchRows = await rows<DataImportBatchRow>(
     `SELECT id, source_type, file_name, file_size, file_sha256, sheet_name, report_type, status,
             total_rows, valid_rows, error_rows, errors_json, headers_json, created_by,
             confirmed_at, rejected_at, rejection_reason, created_at
-     FROM data_import_batches ORDER BY id DESC LIMIT 100`,
+     FROM data_import_batches ORDER BY id DESC LIMIT ? OFFSET ?`,
+    [pageSize, (page - 1) * pageSize],
   );
-  return batchRows.map((batch) => batchFromRow(batch));
+  return { list: batchRows.map((batch) => batchFromRow(batch)), total: Number(count?.total ?? 0), page, pageSize };
 }
 
 export async function getDataImportBatch(

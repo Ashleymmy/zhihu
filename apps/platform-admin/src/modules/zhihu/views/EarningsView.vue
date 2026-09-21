@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { EarningRecord, EarningsSummary } from '@zhihu-koc/shared-contracts/zhihu'
 import { DEFAULT_LOCALE, createTranslator, type MessageKey } from '@zhihu-koc/shared-i18n'
-import { isApiError, type ApiError } from '@zhihu-koc/shared-services'
+import { fetchAllPages, isApiError, type ApiError } from '@zhihu-koc/shared-services'
 import { FinanceGateBanner, StatCard, DonutChart, LineChart } from '@zhihu-koc/shared-components'
 import { formatCurrency, formatDate } from '@zhihu-koc/shared-utils'
 import { APP_ROLE } from '../../../app-config'
@@ -33,7 +33,7 @@ const statusSlices = computed(() => {
 const dailySeries = computed(() => {
   const byDate = new Map<string, number>()
   for (const e of earnings.value) {
-    const day = ((e as any).settleDate ?? e.date ?? '').slice(5, 10)
+    const day = e.date.slice(0, 10)
     if (!day) continue
     byDate.set(day, (byDate.get(day) ?? 0) + Number(e.amount) / 100)
   }
@@ -55,7 +55,7 @@ async function load() {
   try {
     ;[summary.value, earnings.value] = await Promise.all([
       apis.earnings.summary(),
-      apis.earnings.list({ pageSize: 20 }).then((data) => data.list),
+      fetchAllPages((params) => apis.earnings.list(params)),
     ])
   } catch (error) {
     captureError(error)

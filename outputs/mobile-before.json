@@ -1,0 +1,1267 @@
+[
+  {
+    "path": "operations?projectId=12&accountId=11",
+    "state": "normal",
+    "viewport": 704,
+    "doc": 704,
+    "elements": [
+      {
+        "tag": "ASIDE",
+        "class": "studio-nav",
+        "left": -228,
+        "right": -4,
+        "width": 224
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-brand",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "SPAN",
+        "class": "studio-mark",
+        "left": -200,
+        "right": -166,
+        "width": 34
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "STRONG",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "SPAN",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "NAV",
+        "class": "studio-nav-scroll",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "nav-utility",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      }
+    ]
+  },
+  {
+    "path": "operations?projectId=12&accountId=11",
+    "state": "create-keyword",
+    "viewport": 704,
+    "doc": 704,
+    "elements": [
+      {
+        "tag": "ASIDE",
+        "class": "studio-nav",
+        "left": -228,
+        "right": -4,
+        "width": 224
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-brand",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "SPAN",
+        "class": "studio-mark",
+        "left": -200,
+        "right": -166,
+        "width": 34
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "STRONG",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "SPAN",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "NAV",
+        "class": "studio-nav-scroll",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "nav-utility",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      }
+    ]
+  },
+  {
+    "path": "finance?projectId=12&accountId=11",
+    "state": "normal",
+    "viewport": 585,
+    "doc": 585,
+    "elements": [
+      {
+        "tag": "ASIDE",
+        "class": "studio-nav",
+        "left": -228,
+        "right": -4,
+        "width": 224
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-brand",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "SPAN",
+        "class": "studio-mark",
+        "left": -200,
+        "right": -166,
+        "width": 34
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "STRONG",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "SPAN",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "NAV",
+        "class": "studio-nav-scroll",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "nav-utility",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      }
+    ]
+  },
+  {
+    "path": "plans",
+    "state": "normal",
+    "viewport": 390,
+    "doc": 390,
+    "elements": [
+      {
+        "tag": "ASIDE",
+        "class": "studio-nav",
+        "left": -228,
+        "right": -4,
+        "width": 224
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-brand",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "SPAN",
+        "class": "studio-mark",
+        "left": -200,
+        "right": -166,
+        "width": 34
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "STRONG",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "SPAN",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "NAV",
+        "class": "studio-nav-scroll",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "nav-utility",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      }
+    ]
+  },
+  {
+    "path": "plans",
+    "state": "create-plan",
+    "viewport": 390,
+    "doc": 390,
+    "elements": [
+      {
+        "tag": "ASIDE",
+        "class": "studio-nav",
+        "left": -228,
+        "right": -4,
+        "width": 224
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-brand",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "SPAN",
+        "class": "studio-mark",
+        "left": -200,
+        "right": -166,
+        "width": 34
+      },
+      {
+        "tag": "DIV",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "STRONG",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "SPAN",
+        "class": "",
+        "left": -154,
+        "right": -63,
+        "width": 91
+      },
+      {
+        "tag": "NAV",
+        "class": "studio-nav-scroll",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "studio-nav-group",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "BUTTON",
+        "class": "nav-group-trigger",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "svg",
+        "class": {},
+        "left": -45,
+        "right": -33,
+        "width": 12
+      },
+      {
+        "tag": "polyline",
+        "class": {},
+        "left": -42,
+        "right": -36,
+        "width": 6
+      },
+      {
+        "tag": "BUTTON",
+        "class": "studio-nav-item",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      },
+      {
+        "tag": "DIV",
+        "class": "nav-utility",
+        "left": -208,
+        "right": -25,
+        "width": 183
+      }
+    ]
+  }
+]

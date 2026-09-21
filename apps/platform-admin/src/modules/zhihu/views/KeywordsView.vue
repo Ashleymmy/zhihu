@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { Plan } from '@zhihu-koc/shared-contracts/zhihu'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 const plans = ref<Plan[]>([])
@@ -11,8 +12,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await apis.plans.list({ page: 1, pageSize: 100 })
-    plans.value = data.list
+    plans.value = await fetchAllPages((params) => apis.plans.list(params))
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }

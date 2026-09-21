@@ -38,7 +38,12 @@ export async function listEarnings(user: AuthUser, query: Record<string, unknown
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM earnings e WHERE ${clause}`, bindings);
   const list = await rows(
-    `SELECT e.* FROM earnings e WHERE ${clause} ORDER BY e.settle_date DESC,e.id DESC LIMIT ? OFFSET ?`,
+    `SELECT e.*,DATE_FORMAT(e.settle_date,'%Y-%m-%d') date,CAST(e.user_id AS CHAR) owner_id,
+      p.keyword,p.channel_id,c.name channel_name,u.display_name owner_name
+     FROM earnings e LEFT JOIN plans p ON p.id=e.plan_id
+     LEFT JOIN channels c ON c.zhihu_channel_id=p.channel_id AND c.project_id=p.project_id
+     LEFT JOIN users u ON u.id=e.user_id
+     WHERE ${clause} ORDER BY e.settle_date DESC,e.id DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list, total: Number(count?.total ?? 0), page, pageSize };
@@ -78,7 +83,7 @@ export async function listWithdrawals(user: AuthUser, query: Record<string, unkn
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM withdrawal_requests w WHERE ${clause}`, bindings);
   const list = await rows<WithdrawalRow>(
-    `SELECT w.* FROM withdrawal_requests w WHERE ${clause} ORDER BY w.created_at DESC LIMIT ? OFFSET ?`,
+    `SELECT w.* FROM withdrawal_requests w WHERE ${clause} ORDER BY w.created_at DESC,w.id DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return {

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { Withdrawal, WithdrawalStatus } from '@zhihu-koc/shared-contracts/zhihu'
 import { APP_ROLE } from '../../../app-config'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 const auth = useAuthStore()
@@ -106,8 +107,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await apis.withdrawals.list({ page: 1, pageSize: 100 })
-    withdrawals.value = data.list
+    withdrawals.value = await fetchAllPages((params) => apis.withdrawals.list(params))
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }

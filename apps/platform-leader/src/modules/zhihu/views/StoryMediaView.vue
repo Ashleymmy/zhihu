@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fetchAllOffsetPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 interface AudioContent { title: string; contentType?: string; author?: string; topic?: { name: string }[] | string; audioBookUrl?: string; episodes?: number }
@@ -11,26 +12,31 @@ const comics = ref<ComicDrama[]>([])
 const loading = ref(true)
 const error = ref('')
 
-function unwrap(resp: any): any[] {
-  if (Array.isArray(resp)) return resp
-  return resp?.data ?? []
-}
-
 function topicText(topic: AudioContent['topic']) {
   if (!topic) return '—'
   if (typeof topic === 'string') return topic || '—'
   return topic.map((t) => t.name).join(' / ') || '—'
 }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
+  const selectedTab = tab.value
   loading.value = true
   error.value = ''
   try {
-    if (tab.value === 'audio') audios.value = unwrap(await apis.story.audioContents({ limit: 50 }))
-    else comics.value = unwrap(await apis.story.comicDramas({ limit: 50 }))
+    if (selectedTab === 'audio') {
+      const result = await fetchAllOffsetPages<AudioContent>((params) => apis.story.audioContents(params))
+      if (version !== loadVersion) return
+      audios.value = result.items
+    } else {
+      const result = await fetchAllOffsetPages<ComicDrama>((params) => apis.story.comicDramas(params))
+      if (version !== loadVersion) return
+      comics.value = result.items
+    }
   }
-  catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loading.value = false }
+  catch (e: any) { if (version === loadVersion) error.value = e?.message ?? String(e) }
+  finally { if (version === loadVersion) loading.value = false }
 }
 
 function switchTab(next: 'audio' | 'comic') {

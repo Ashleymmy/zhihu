@@ -1,0 +1,24 @@
+{
+  "site": "http://127.0.0.1:8088/app/modules/zhihu/works",
+  "batchId": "1",
+  "total": 135,
+  "pending": 56,
+  "duplicate": 79,
+  "pendingPlanOnly": 45,
+  "needsCorrections": 11,
+  "fileName": "达人记录.xlsx",
+  "sourceSha256": "4956e6842c6bea7f55951439d4a9fffd6dfb93cb66e844897b9566e4acd80692",
+  "repeatedUploadBatchId": "1",
+  "originalFileVerified": true,
+  "officialWorksBefore": 0,
+  "officialWorksAfter": 0,
+  "deliveredToZhihu": false,
+  "categoryCounts": {
+    "2 / 8": 9,
+    "2 / 7": 9,
+    "2 / 10": 9,
+    "2 / 5": 10,
+    "2 / 9": 9,
+    "2 / 6": 10
+  }
+}

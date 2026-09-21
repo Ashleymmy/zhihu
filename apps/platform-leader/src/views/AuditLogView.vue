@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { onMounted, ref } from 'vue'
 import type { AuditLogItem } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
@@ -76,9 +77,10 @@ async function load() {
 
 async function exportLogs() {
   try {
-    const data = await apis.adminTools.auditLogs({ page: 1, pageSize: 1000, action: selectedAction.value || undefined })
+    const filters = { action: selectedAction.value || undefined, username: searchUser.value.trim() || undefined, from: dateRange.value.start || undefined, to: dateRange.value.end || undefined }
+    const data = await fetchAllPages(params => apis.adminTools.auditLogs({ ...params, ...filters }))
     const header = '时间,操作人,操作,资源,详情,IP\n'
-    const lines = data.list.map((l) =>
+    const lines = data.map((l) =>
       `${new Date(l.createdAt).toLocaleString('zh-CN')},${l.operatorUsername ?? ''},${actionLabel(l.action)},${l.resourceType}:${l.resourceId ?? ''},"${detailText(l).replace(/"/g, '""')}",${l.ip ?? ''}`,
     )
     const blob = new Blob(['﻿' + header + lines.join('\n')], { type: 'text/csv;charset=utf-8' })

@@ -1,0 +1,47 @@
+{
+  "priorFlowSteps": [
+    "four-role-login-and-dashboard",
+    "admin-create-from-original-plan-page",
+    "new-word-visible-to-leader-only",
+    "leader-claim-and-assign-creator7",
+    "creator-submit-work-and-persist-use",
+    "solo-claim-expired-word-and-submit-work"
+  ],
+  "usedTeamWord": "联测完整流程1789458979049",
+  "usedSoloWord": "测试3",
+  "steps": [
+    "original-plan-retry-200-and-auto-refresh",
+    "original-plan-create-without-stale-422",
+    "keyword-pool-retry-200",
+    "keyword-pool-create",
+    "lt_leader-persisted-state-and-visibility",
+    "lt_daren_a-persisted-state-and-visibility",
+    "lt_solo-persisted-state-and-visibility"
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "username": "admin",
+      "path": "/api/v1/modules/zhihu/plans/10/retry-sync",
+      "status": 200
+    },
+    {
+      "username": "admin",
+      "path": "/api/v1/modules/zhihu/plans",
+      "status": 201
+    },
+    {
+      "username": "admin",
+      "path": "/api/v1/modules/zhihu/keywords/11/retry-upstream",
+      "status": 200
+    },
+    {
+      "username": "admin",
+      "path": "/api/v1/modules/zhihu/keywords",
+      "status": 201
+    }
+  ],
+  "oldWord": "联测旧页待领取1789459543039",
+  "newWord": "联测词库待领取1789459563236",
+  "completed": true
+}

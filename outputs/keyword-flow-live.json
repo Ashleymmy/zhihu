@@ -1,0 +1,134 @@
+{
+  "steps": [
+    "four-role-login-and-dashboard",
+    "admin-create-from-original-plan-page",
+    "new-word-visible-to-leader-only",
+    "leader-claim-and-assign-creator7",
+    "creator-submit-work-and-persist-use",
+    "solo-claim-expired-word-and-submit-work"
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "username": "admin",
+      "path": "/api/v1/core/auth/refresh",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "username": "admin",
+      "path": "/api/v1/core/auth/login",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_leader",
+      "path": "/api/v1/core/auth/refresh",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "username": "lt_leader",
+      "path": "/api/v1/core/auth/login",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_daren_a",
+      "path": "/api/v1/core/auth/refresh",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "username": "lt_daren_a",
+      "path": "/api/v1/core/auth/login",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_solo",
+      "path": "/api/v1/core/auth/refresh",
+      "method": "POST",
+      "status": 401
+    },
+    {
+      "username": "lt_solo",
+      "path": "/api/v1/core/auth/login",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "admin",
+      "path": "/api/v1/modules/zhihu/plans",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "username": "admin",
+      "path": "/api/v1/modules/zhihu/plans/check-keyword",
+      "method": "POST",
+      "status": 422
+    },
+    {
+      "username": "lt_leader",
+      "path": "/api/v1/modules/zhihu/keywords/9/claim",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_leader",
+      "path": "/api/v1/modules/zhihu/bindings/6/assign",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_daren_a",
+      "path": "/api/v1/modules/zhihu/bindings/6/activate",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_daren_a",
+      "path": "/api/v1/modules/zhihu/evidence",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "username": "lt_solo",
+      "path": "/api/v1/modules/zhihu/keywords/8/claim",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_solo",
+      "path": "/api/v1/modules/zhihu/bindings/7/activate",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "username": "lt_solo",
+      "path": "/api/v1/modules/zhihu/evidence",
+      "method": "POST",
+      "status": 201
+    }
+  ],
+  "task": "模拟知乎推广任务0913\nmock-lt0913-task",
+  "word": "联测完整流程1789458979049",
+  "failure": "[{\"username\":\"admin\",\"path\":\"/api/v1/core/auth/refresh\",\"method\":\"POST\",\"status\":401},{\"username\":\"admin\",\"path\":\"/api/v1/core/auth/login\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_leader\",\"path\":\"/api/v1/core/auth/refresh\",\"method\":\"POST\",\"status\":401},{\"username\":\"lt_leader\",\"path\":\"/api/v1/core/auth/login\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_daren_a\",\"path\":\"/api/v1/core/auth/refresh\",\"method\":\"POST\",\"status\":401},{\"username\":\"lt_daren_a\",\"path\":\"/api/v1/core/auth/login\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_solo\",\"path\":\"/api/v1/core/auth/refresh\",\"method\":\"POST\",\"status\":401},{\"username\":\"lt_solo\",\"path\":\"/api/v1/core/auth/login\",\"method\":\"POST\",\"status\":200},{\"username\":\"admin\",\"path\":\"/api/v1/modules/zhihu/plans\",\"method\":\"POST\",\"status\":201},{\"username\":\"admin\",\"path\":\"/api/v1/modules/zhihu/plans/check-keyword\",\"method\":\"POST\",\"status\":422},{\"username\":\"lt_leader\",\"path\":\"/api/v1/modules/zhihu/keywords/9/claim\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_leader\",\"path\":\"/api/v1/modules/zhihu/bindings/6/assign\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_daren_a\",\"path\":\"/api/v1/modules/zhihu/bindings/6/activate\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_daren_a\",\"path\":\"/api/v1/modules/zhihu/evidence\",\"method\":\"POST\",\"status\":201},{\"username\":\"lt_solo\",\"path\":\"/api/v1/modules/zhihu/keywords/8/claim\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_solo\",\"path\":\"/api/v1/modules/zhihu/bindings/7/activate\",\"method\":\"POST\",\"status\":200},{\"username\":\"lt_solo\",\"path\":\"/api/v1/modules/zhihu/evidence\",\"method\":\"POST\",\"status\":201}]",
+  "admin": {
+    "url": "http://127.0.0.1:8088/admin/modules/zhihu/operations?projectId=12&accountId=11",
+    "body": "O\nOPC\nDESK / 管理员\nOPC\n工作台\n业务项目\n业务模块\n财务中心\n组织\n团队与成员\n运营账户\n系统\n账号监控\n系统公告\n审计日志\n数据库状态\n已接入业务\n知乎\n退出登录\n归因\n归因测试管理员\n管理员\n业务模块 / 03\n搜索\n⌘K\n公告\n测试公告1\nkajdvbaliure;\n×\n关键词与团队\n财务做账\n数据看板\n推广计划\nOPC 工作台\n更多功能\n\n知乎业务\n\n运营管理\n\n管理渠道、人员、关键词与审核待办。\n\n业务项目\n知乎历史业务\n测试1\n模拟联测0913\n接入账号\n知乎历史接入\n模拟知乎接入0913（无真实连接）\n关键词\n作品审核\n定价规则\n人员与权限\n渠道与任务\n数据待办\n关键词管理\n\n创建的关键词先进入词库：前 30 分钟团长优先领取，之后独立达人也可以领取。\n\n创建关键词\n\n当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。\n\n查找关键词\n搜索\n关键词 / 任务\t使用人\t进度\t操作\n联测完整流程1789458979049\n模拟知乎推广任务0913\n\t模拟团队达人A\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n测试3\n模拟知乎推广任务0913\n\t模拟独立达人\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n测试2\n模拟知乎推广任务0913\n\t尚未分发\t可以领取\n本地联测，未提交知乎\n团长、独立达人可领取\n\t\n分发给成员\n\n测试1\n模拟知乎推广任务0913\n\t尚未分发\t可以领取\n本地联测，未提交知乎\n团长、独立达人可领取\n\t\n分发给成员\n\n模拟0913零订单\n模拟知乎推广任务0913\n\t模拟团队达人A\t使用中\n本地联测，未提交知乎\n作品已通过\n\t\n更多\n\n模拟0913团长自营\n模拟知乎推广任务0913\n\t模拟团长\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n模拟0913独立达人\n模拟知乎推广任务0913\n\t模拟独立达人\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n模拟0913达人乙\n模拟知乎推广任务0913\n\t模拟团队达人B\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n模拟0913达人甲\n模拟知乎推广任务0913\n\t模拟团队达人A\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多"
+  },
+  "lt_leader": {
+    "url": "http://127.0.0.1:8088/leader/modules/zhihu/operations?projectId=12&accountId=11",
+    "body": "O\nOPC\nDESK / 团长\nOPC\n工作台\n业务项目\n业务模块\n财务中心\n组织\n团队与成员\n运营账户\n已接入业务\n知乎\n退出登录\n模拟\n模拟团长\n团长\n业务模块 / 03\n搜索\n⌘K\n公告\n测试公告1\nkajdvbaliure;\n×\n关键词与团队\n收入与提现\n数据看板\n推广计划\nOPC 工作台\n更多功能\n\n知乎业务\n\n团队业务\n\n分发关键词、管理团队单价和审核作品。\n\n模拟联测0913\n接入账号\n知乎历史接入\n模拟知乎接入0913（无真实连接）\n关键词\n作品审核\n定价规则\n人员与权限\n团队关键词\n\n领取后分发给团队成员，也可以自己使用。\n\n当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。\n\n查找关键词\n搜索\n关键词 / 任务\t使用人\t进度\t操作\n联测完整流程1789458979049\n模拟知乎推广任务0913\n\t模拟团队达人A\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n测试2\n模拟知乎推广任务0913\n\t尚未分发\t可以领取\n本地联测，未提交知乎\n团长、独立达人可领取\n\t\n领取关键词\n\n测试1\n模拟知乎推广任务0913\n\t尚未分发\t可以领取\n本地联测，未提交知乎\n团长、独立达人可领取\n\t\n领取关键词\n\n模拟0913零订单\n模拟知乎推广任务0913\n\t模拟团队达人A\t使用中\n本地联测，未提交知乎\n作品已通过\n\t\n更多\n\n模拟0913团长自营\n模拟知乎推广任务0913\n\t模拟团长\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n提交 / 补充作品\n更多\n\n模拟0913达人乙\n模拟知乎推广任务0913\n\t模拟团队达人B\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多\n\n模拟0913达人甲\n模拟知乎推广任务0913\n\t模拟团队达人A\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n更多"
+  },
+  "lt_daren_a": {
+    "url": "http://127.0.0.1:8088/creator/modules/zhihu/operations?projectId=12&accountId=11",
+    "body": "O\nOPC\nDESK / 达人\nOPC\n工作台\n业务项目\n业务模块\n财务中心\n个人\n个人资料\n加入团队\n已接入业务\n知乎\n退出登录\n模拟\n模拟团队达人A\n达人\n业务模块 / 03\n搜索\n⌘K\n公告\n测试公告1\nkajdvbaliure;\n×\n我的关键词\n收入与提现\n数据看板\n推广计划\nOPC 工作台\n更多功能\n\n知乎业务\n\n我的关键词\n\n选择关键词，提交作品，查看审核结果。\n\n模拟联测0913\n接入账号\n知乎历史接入\n模拟知乎接入0913（无真实连接）\n关键词\n审核进度\n我的关键词\n\n从这里提交作品，系统会自动记录关键词归属。\n\n当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。\n\n查找关键词\n搜索\n关键词 / 任务\t适用单价\t进度\t操作\n联测完整流程1789458979049\n模拟知乎推广任务0913\n\t¥13 / 单\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n提交 / 补充作品\n更多\n\n模拟0913零订单\n模拟知乎推广任务0913\n\t¥13 / 单\t使用中\n本地联测，未提交知乎\n作品已通过\n\t\n提交 / 补充作品\n更多\n\n模拟0913达人甲\n模拟知乎推广任务0913\n\t¥13 / 单\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n提交 / 补充作品\n更多"
+  },
+  "lt_solo": {
+    "url": "http://127.0.0.1:8088/creator/modules/zhihu/operations?projectId=12&accountId=11",
+    "body": "O\nOPC\nDESK / 达人\nOPC\n工作台\n业务项目\n业务模块\n财务中心\n个人\n个人资料\n加入团队\n已接入业务\n知乎\n退出登录\n模拟\n模拟独立达人\n达人\n业务模块 / 03\n搜索\n⌘K\n公告\n测试公告1\nkajdvbaliure;\n×\n我的关键词\n收入与提现\n数据看板\n推广计划\nOPC 工作台\n更多功能\n\n知乎业务\n\n我的关键词\n\n选择关键词，提交作品，查看审核结果。\n\n模拟联测0913\n接入账号\n知乎历史接入\n模拟知乎接入0913（无真实连接）\n关键词\n审核进度\n我的关键词\n\n从这里提交作品，系统会自动记录关键词归属。\n\n当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。\n\n查找关键词\n搜索\n关键词 / 任务\t适用单价\t进度\t操作\n测试3\n模拟知乎推广任务0913\n\t¥14 / 单\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n提交 / 补充作品\n更多\n\n测试2\n模拟知乎推广任务0913\n\t¥14 / 单\t可以领取\n本地联测，未提交知乎\n团长、独立达人可领取\n\t\n领取关键词\n\n测试1\n模拟知乎推广任务0913\n\t¥14 / 单\t可以领取\n本地联测，未提交知乎\n团长、独立达人可领取\n\t\n领取关键词\n\n模拟0913独立达人\n模拟知乎推广任务0913\n\t¥14 / 单\t使用中\n本地联测，未提交知乎\n等待作品审核\n\t\n提交 / 补充作品\n更多"
+  }
+}

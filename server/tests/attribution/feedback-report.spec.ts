@@ -45,13 +45,23 @@ describe('真实反馈表头契约', () => {
       ),
     ).rejects.toThrow(message);
   });
-  it.each(['首表', '附加表'])('等待整个工作簿的安全检查，拒绝%s中的公式', async (location) => {
+  it.each(['首表', '附加表'])('等待整个工作簿的安全检查，拒绝%s中的外部公式', async (location) => {
     const book = XLSX.utils.book_new();
     const main = XLSX.utils.aoa_to_sheet([headers, ['2026-08-26', '渠道甲', '词', '任务', null, 1000, 100, 10]]);
     XLSX.utils.book_append_sheet(book, main, '反馈');
-    if (location === '首表') main.G2.f = '100';
-    else XLSX.utils.book_append_sheet(book, { A1: { t: 'n', v: 100, f: '100' }, '!ref': 'A1' }, '附加表');
+    const formula = 'WEBSERVICE("https://example.com")';
+    if (location === '首表') main.G2.f = formula;
+    else XLSX.utils.book_append_sheet(book, { A1: { t: 'n', v: 100, f: formula }, '!ref': 'A1' }, '附加表');
     await expect(parseReport(workbookFile(book), 'combined')).rejects.toThrow('上传文件不符合要求');
+  });
+  it('读取安全本地公式的已保存结果，不在服务端计算公式', async () => {
+    const book = XLSX.utils.book_new();
+    const main = XLSX.utils.aoa_to_sheet([headers, ['2026-08-26', '渠道甲', '词', '任务', null, 1000, 100, 10]]);
+    main.G2.f = '50+50';
+    XLSX.utils.book_append_sheet(book, main, '反馈');
+    const [row] = await parseReport(workbookFile(book), 'combined');
+    expect(row.error).toBeNull();
+    expect(row.value.orders).toBe('100');
   });
   it('1904 日期系统按工作簿声明解析，不把业务日期提前四年', async () => {
     const book = XLSX.utils.book_new();

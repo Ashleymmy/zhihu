@@ -1,3 +1,5 @@
+import { createWorkImportApi } from './composition-import'
+export type { WorkImportOptions, WorkImportPreview, WorkImportResult, WorkImportRow, WorkImportDraft, WorkImportDraftDetail, WorkImportDraftReceipt } from './composition-import'
 import type {
   Appeal,
   AppealKind,
@@ -61,6 +63,9 @@ import type {
   ZhihuTask,
 } from '@zhihu-koc/shared-contracts/zhihu'
 import type { HttpClient } from './http'
+import { normalizeMetricsOverview, normalizeMetricsTrend, normalizeEarningsSummary } from './zhihu-data'
+import type { MetricsOverviewResponse, MetricsTrendResponse } from './zhihu-data'
+import { fetchAllPages } from './pagination'
 export function createFinanceApi(http: HttpClient) {
   return {
     listRules: () => http.get<PricingRule[]>('/finance/rules'),
@@ -93,7 +98,7 @@ export function createDataImportApi(http: HttpClient) {
     confirm: (id: string) => http.post<DataImportConfirmResult>('/data-import/confirm', { tempFileId: id }),
     reject: (id: string, reason?: string) =>
       http.post<DataImportBatch>(`/data-import/${id}/reject`, reason ? { reason } : {}),
-    listBatches: () => http.get<DataImportBatch[]>('/data-import/batches'),
+    listBatches: () => fetchAllPages(params => http.get<PageResp<DataImportBatch>>('/data-import/batches', params)),
     getBatch: (id: string, params: { page?: number; pageSize?: number } = {}) =>
       http.get<DataImportBatchDetail>(`/data-import/${id}`, params),
   }
@@ -118,7 +123,7 @@ export function createPlansApi(http: HttpClient) {
     }) => http.post<Plan>('/plans', data),
     checkKeyword: (channelId: string, keyword: string) =>
       http.post<{ available: boolean }>('/plans/check-keyword', { channelId, keyword }),
-    update: (id: string, data: UpdatePlanReq) => http.put<Plan>(`/plans/${id}`, data),
+    update: (id: string, data: UpdatePlanReq) => http.patch<Plan>(`/plans/${id}`, data),
     remove: (id: string) => http.del<void>(`/plans/${id}`),
     retry: (id: string) => http.post<Plan>(`/plans/${id}/retry-sync`),
   }
@@ -126,8 +131,8 @@ export function createPlansApi(http: HttpClient) {
 
 export function createMetricsApi(http: HttpClient) {
   return {
-    overview: () => http.get<MetricsOverview>('/metrics/overview'),
-    trend: (params: { from?: string; to?: string } = {}) => http.get<TrendPoint[]>('/metrics/trend', params),
+    overview: async () => normalizeMetricsOverview(await http.get<MetricsOverviewResponse>('/metrics/overview')),
+    trend: async (params: { from?: string; to?: string } = {}) => normalizeMetricsTrend(await http.get<MetricsTrendResponse>('/metrics/trend', params)),
     sync: () => http.post<{ jobId: string; status: string }>('/metrics/sync'),
   }
 }
@@ -142,9 +147,11 @@ export function createChannelsApi(http: HttpClient) {
 
 export function createEarningsApi(http: HttpClient) {
   return {
-    list: (params: { page?: number; pageSize?: number; status?: EarningsStatus } = {}) =>
-      http.get<PageResp<EarningRecord>>('/earnings', params),
-    summary: () => http.get<EarningsSummary>('/earnings/summary'),
+    list: async (params: { page?: number; pageSize?: number; status?: EarningsStatus } = {}) => {
+      const data = await http.get<PageResp<EarningRecord & { settleDate?: string; userId?: string }>>('/earnings', params)
+      return { ...data, list: data.list.map(row => ({ ...row, date: (row.date ?? row.settleDate ?? '').slice(0, 10), ownerId: row.ownerId ?? row.userId ?? '' })) }
+    },
+    summary: async () => normalizeEarningsSummary(await http.get<Omit<EarningsSummary, 'total'> & { total?: number }>('/earnings/summary')),
   }
 }
 
@@ -210,6 +217,7 @@ export function createCallbacksApi(http: HttpClient) {
 
 export function createZhihuStoryApi(http: HttpClient) {
   return {
+    ...createWorkImportApi(http),
     /** 作品管理（compositions） */
     listWorks: (params: { page?: number; pageSize?: number; planId?: string; status?: string; keyword?: string } = {}) =>
       http.get<PageResp<Composition>>('/compositions', params),
@@ -232,7 +240,7 @@ export function createZhihuStoryApi(http: HttpClient) {
         `/tasks/sync${channelId ? `?channelId=${encodeURIComponent(channelId)}` : ''}`,
       ),
     /** 通用内容资产（盐选/截流/举报/有声书漫画/标签/产品/素材） */
-    listItems: (type: StoryItemType) => http.get<StoryItem[]>('/story-items', { type }),
+    listItems: (type: StoryItemType) => fetchAllPages(params => http.get<PageResp<StoryItem>>('/story-items', { type, ...params })),
     createItem: (data: { type: StoryItemType; title: string; url?: string | null; note?: string | null }) =>
       http.post<{ id: string }>('/story-items', data),
     updateItem: (

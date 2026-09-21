@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { SiteInfo } from '@zhihu-koc/shared-contracts/zhihu'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { apis, http } from '../context'
 
 const info = ref<SiteInfo | null>(null)
@@ -49,10 +50,10 @@ async function trigger(kind: 'channels' | 'tasks' | 'metrics' | 'compositionStat
 
 async function exportEarnings() {
   try {
-    const data = await apis.earnings.list({ page: 1, pageSize: 1000 })
+    const earnings = await fetchAllPages((params) => apis.earnings.list(params))
     const header = '结算日期,关键词,渠道,金额(分),状态\n'
-    const lines = data.list.map(
-      (e: any) => `${e.settleDate},${e.keyword ?? ''},${e.channelName ?? ''},${e.amount},${e.status}`,
+    const lines = earnings.map(
+      e => [e.date, e.keyword ?? '', e.channelName ?? '', e.amount, e.status].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','),
     )
     const blob = new Blob(['﻿' + header + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')

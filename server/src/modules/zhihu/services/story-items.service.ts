@@ -57,19 +57,25 @@ const demoStoryItems = (type: StoryItemType) => [
   },
 ];
 
-export async function listStoryItems(user: AuthUser, type: StoryItemType, includeArchived: boolean) {
-  if (isDevDemoAuthUser(user)) return demoStoryItems(type);
+export async function listStoryItems(user: AuthUser, type: StoryItemType, includeArchived: boolean, page = 1, pageSize = 100) {
+  if (isDevDemoAuthUser(user)) {
+    const items = demoStoryItems(type);
+    return { list: items.slice((page - 1) * pageSize, page * pageSize), total: items.length, page, pageSize };
+  }
 
   const scope = user.role === 'admin' ? '' : 'AND (i.owner_id = ? OR i.owner_id IN (SELECT id FROM users WHERE parent_id = ?))';
   const bindings: unknown[] = [type];
   if (user.role !== 'admin') bindings.push(user.sub, user.sub);
-  return rows<StoryItemRow>(
+  const where = `i.type = ? ${includeArchived ? '' : "AND i.status = 'active'"} ${scope}`;
+  const [count] = await rows<RowDataPacket & { total: number }>(`SELECT COUNT(*) total FROM story_items i WHERE ${where}`, bindings);
+  const list = await rows<StoryItemRow>(
     `SELECT i.*, u.display_name AS owner_name
      FROM story_items i JOIN users u ON u.id = i.owner_id
-     WHERE i.type = ? ${includeArchived ? '' : "AND i.status = 'active'"} ${scope}
-     ORDER BY i.created_at DESC LIMIT 200`,
-    bindings,
+     WHERE ${where}
+     ORDER BY i.created_at DESC,i.id DESC LIMIT ? OFFSET ?`,
+    [...bindings, pageSize, (page - 1) * pageSize],
   );
+  return { list, total: Number(count?.total ?? 0), page, pageSize };
 }
 
 export async function createStoryItem(

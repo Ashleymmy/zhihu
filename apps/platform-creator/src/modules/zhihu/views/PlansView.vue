@@ -2,11 +2,12 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Plan } from '@zhihu-koc/shared-contracts/zhihu'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 const route = useRoute()
 /** 从知乎故事聚合页进入（/zhihu-story/plans）时显示返回入口 */
-const fromStoryHub = route.path.startsWith('/zhihu-story')
+const fromStoryHub = route.path.startsWith('/zhihu-story') || route.query.from === 'story'
 
 type PoolPlan = Plan & {keywordId?:string;keywordProjectId?:string;keywordAccountId?:string}
 const plans = ref<PoolPlan[]>([])
@@ -27,6 +28,7 @@ function closeChannelPicker() { setTimeout(() => { channelPickerOpen.value = fal
 const channels = ref<ChannelOption[]>([])
 const tasks = ref<TaskOption[]>([])
 const submitting = ref(false)
+const catalogLoading = ref(false)
 
 /** 可搜索下拉（任务/渠道） */
 const taskQuery = ref('')
@@ -99,13 +101,13 @@ async function syncCatalog() {
     // 同步是异步任务：等待执行后刷新目录与计划，并给出数量反馈
     setTimeout(async () => {
       try {
-        const [c, t] = await Promise.all([
-          apis.channels.list({ page: 1, pageSize: 100 }),
-          apis.story.listTasks({ page: 1, pageSize: 100 }),
+        const [channelList, taskList] = await Promise.all([
+          fetchAllPages((params) => apis.channels.list(params)),
+          fetchAllPages((params) => apis.story.listTasks(params)),
         ])
-        channels.value = c.list as unknown as ChannelOption[]
-        tasks.value = t.list as TaskOption[]
-        catalogMessage.value = `同步完成：${channels.value.length} 个渠道、${tasks.value.length} 个任务可用`
+        channels.value = channelList as unknown as ChannelOption[]
+        tasks.value = taskList as TaskOption[]
+        catalogMessage.value = `已刷新目录：${channels.value.length} 个渠道、${tasks.value.length} 个任务可用；同步任务已提交，请稍后刷新核对`
         await load()
       } catch { catalogMessage.value = '同步已提交，下拉数据稍后自动更新' }
       syncingCatalog.value = false
@@ -121,29 +123,36 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await apis.plans.list({ page: 1, pageSize: 50 })
-    plans.value = data.list
+    plans.value = await fetchAllPages((params) => apis.plans.list(params))
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }
 
-async function openCreate() {  showModal.value = true
+async function openCreate() {
+  showModal.value = true
+  if (catalogLoading.value) return
+  catalogLoading.value = true
+  error.value = ''
+  channels.value = []
+  tasks.value = []
   keywordCheck.value = { checking: false, available: null }
   if (!channels.value.length || !tasks.value.length) {
     try {
-      const [c, t] = await Promise.all([
-        apis.channels.list({ page: 1, pageSize: 100 }),
-        apis.story.listTasks({ page: 1, pageSize: 100 }),
-      ])
-      channels.value = c.list as unknown as ChannelOption[]
-      tasks.value = t.list as TaskOption[]
+      const [channelList, taskList] = await Promise.all([
+          fetchAllPages((params) => apis.channels.list(params)),
+          fetchAllPages((params) => apis.story.listTasks(params)),
+        ])
+        channels.value = channelList as unknown as ChannelOption[]
+        tasks.value = taskList as TaskOption[]
     } catch (e: any) { error.value = '渠道/任务目录加载失败：' + (e?.message ?? String(e)) }
+    finally { catalogLoading.value = false }
   }
 }
 
 async function createPlan() {
+  if (submitting.value || catalogLoading.value) return
   error.value = ''
-  if (!form.value.taskId || !form.value.channelId || !form.value.keyword.trim() || !form.value.landingUrl.trim()) {
+  if (!tasks.value.some(t => t.zhihuTaskId === form.value.taskId) || !channels.value.some(c => c.zhihuChannelId === form.value.channelId) || !form.value.keyword.trim() || !form.value.landingUrl.trim()) {
     error.value = '请完整填写任务、渠道、关键词和推广内容地址'
     return
   }
@@ -287,13 +296,15 @@ onUnmounted(() => {
         <div class="plan-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
           <h2 id="plan-dialog-title" style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
           <form class="form-grid" @submit.prevent="createPlan" style="gap: 16px;">
+            <p v-if="error" class="full-span" role="alert">{{ error }}</p>
+            <p v-if="catalogLoading" class="full-span" role="status">正在加载全部渠道和任务…</p>
             <!-- 推广渠道（可搜索） -->
             <div class="full-span picker-field">
               <label>推广渠道 <span class="required">*</span></label>
               <div class="picker-wrap">
                 <input v-model="channelQuery" placeholder="搜索渠道名称或 ID" @focus="channelPickerOpen = true" @blur="closeChannelPicker" @input="form.channelId = ''" />
                 <div v-if="channelPickerOpen" class="picker-options">
-                  <button v-for="c in filteredChannels.slice(0, 8)" :key="c.id" type="button" class="picker-option" @mousedown.prevent="pickChannel(c)">
+                  <button v-for="c in filteredChannels" :key="c.id" type="button" class="picker-option" @mousedown.prevent="pickChannel(c)">
                     <strong>{{ c.name }}</strong>
                     <span class="picker-meta">{{ c.zhihuChannelId }}</span>
                   </button>
@@ -309,7 +320,7 @@ onUnmounted(() => {
               <div class="picker-wrap">
                 <input v-model="taskQuery" placeholder="搜索任务名称或 ID" @focus="taskPickerOpen = true" @blur="closeTaskPicker" @input="form.taskId = ''" />
                 <div v-if="taskPickerOpen" class="picker-options">
-                  <button v-for="t in filteredTasks.slice(0, 8)" :key="t.id" type="button" class="picker-option" @mousedown.prevent="pickTask(t)">
+                  <button v-for="t in filteredTasks" :key="t.id" type="button" class="picker-option" @mousedown.prevent="pickTask(t)">
                     <strong>{{ t.name }}</strong>
                     <span class="picker-meta">{{ t.zhihuTaskId }}</span>
                   </button>
@@ -364,7 +375,7 @@ onUnmounted(() => {
             </div>
 
             <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
-              <button type="submit" class="primary-action" style="flex: 1;" :disabled="submitting">{{ submitting ? '创建中...' : '确认创建' }}</button>
+              <button type="submit" class="primary-action" style="flex: 1;" :disabled="submitting || catalogLoading || !channels.length || !tasks.length">{{ submitting ? '创建中...' : '确认创建' }}</button>
               <button type="button" class="ghost-aurora" @click="showModal = false">取消</button>
             </div>
           </form>

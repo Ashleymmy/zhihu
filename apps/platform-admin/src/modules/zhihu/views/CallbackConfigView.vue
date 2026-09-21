@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { SearchableSelect } from '@zhihu-koc/shared-components'
 import type { CallbackRule, CallbackSecret, Plan } from '@zhihu-koc/shared-contracts/zhihu'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 const auth = useAuthStore()
@@ -12,6 +14,9 @@ const error = ref('')
 const showModal = ref(false)
 const submitting = ref(false)
 const rotating = ref(false)
+const plansLoading = ref(false)
+const modalError = ref('')
+const planOptions = computed(() => plans.value.map(p => ({ value: p.id, label: `${p.keyword}（${p.channelName}）`, detail: `计划编号：${p.id}` })))
 const form = ref({ planId: '', callbackUrl: '', events: ['impression', 'click', 'conversion'] as string[] })
 
 const eventTypeLabels: Record<string, string> = { impression: '曝光', click: '点击', conversion: '转化' }
@@ -21,10 +26,10 @@ async function load() {
   error.value = ''
   try {
     const [r, s] = await Promise.all([
-      apis.callbacks.listRules({ page: 1, pageSize: 100 }),
-      apis.callbacks.getSecret().catch(() => null),
+      fetchAllPages((params) => apis.callbacks.listRules(params)),
+      apis.callbacks.getSecret().catch(e => { if (e?.status === 404) return null; throw e }),
     ])
-    rules.value = r.list
+    rules.value = r
     secret.value = s
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
@@ -32,15 +37,20 @@ async function load() {
 
 async function openCreate() {
   showModal.value = true
-  if (!plans.value.length) {
-    try { plans.value = (await apis.plans.list({ page: 1, pageSize: 100 })).list } catch { /* 不阻塞 */ }
-  }
+  if (plansLoading.value) return
+  plansLoading.value = true
+  modalError.value = ''
+  plans.value = []
+  try { plans.value = await fetchAllPages((params) => apis.plans.list(params)) }
+  catch (e: any) { modalError.value = e?.message ?? '计划加载失败，请重试' }
+  finally { plansLoading.value = false }
 }
 
 async function createRule() {
-  error.value = ''
-  if (!form.value.planId || !form.value.callbackUrl.trim()) { error.value = '请选择计划并填写回传 URL'; return }
-  if (!form.value.events.length) { error.value = '至少选择一个事件类型'; return }
+  if (submitting.value || plansLoading.value) return
+  modalError.value = ''
+  if (!plans.value.some(p => p.id === form.value.planId) || !form.value.callbackUrl.trim()) { modalError.value = '请选择计划并填写回传 URL'; return }
+  if (!form.value.events.length) { modalError.value = '至少选择一个事件类型'; return }
   submitting.value = true
   try {
     await apis.callbacks.createRule({
@@ -51,7 +61,7 @@ async function createRule() {
     showModal.value = false
     form.value = { planId: '', callbackUrl: '', events: ['impression', 'click', 'conversion'] }
     await load()
-  } catch (e: any) { error.value = e?.message ?? String(e) }
+  } catch (e: any) { modalError.value = e?.message ?? String(e) }
   finally { submitting.value = false }
 }
 
@@ -96,7 +106,7 @@ onMounted(load)
           <p class="section-index quiet" style="margin-bottom: 4px;">回传密钥</p>
           <p style="margin: 0; font-family: var(--font-mono); font-size: 12px;">
             {{ secret ? `****${secret.lastFour}` : '未配置' }}
-            <small v-if="secret" style="color: var(--ink-soft); margin-left: 8px;">轮换于 {{ new Date(secret.rotatedAt).toLocaleDateString('zh-CN') }}</small>
+            <small v-if="secret?.rotatedAt" style="color: var(--ink-soft); margin-left: 8px;">轮换于 {{ new Date(secret.rotatedAt).toLocaleDateString('zh-CN') }}</small>
           </p>
         </div>
         <button class="row-action" :disabled="rotating" @click="rotateSecret">{{ rotating ? '轮换中...' : '轮换密钥' }}</button>
@@ -137,12 +147,10 @@ onMounted(load)
             <button type="button" class="dialog-close" @click="showModal = false">×</button>
           </div>
           <div class="dialog-body">
+            <p v-if="modalError" role="alert">{{ modalError }} <button type="button" @click="openCreate">重新加载计划</button></p>
             <div class="form-field">
-              <label>所属计划</label>
-              <select v-model="form.planId">
-                <option value="" disabled>选择推广计划</option>
-                <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.keyword }}（{{ p.channelName }}）</option>
-              </select>
+              <label for="callback-plan">所属计划</label>
+              <SearchableSelect id="callback-plan" v-model="form.planId" :options="planOptions" :loading="plansLoading" />
             </div>
             <div class="form-field">
               <label>回传 URL</label>
@@ -160,7 +168,7 @@ onMounted(load)
           </div>
           <div class="dialog-footer">
             <button class="ghost-aurora" @click="showModal = false">取消</button>
-            <button class="primary-action" :disabled="submitting" @click="createRule">{{ submitting ? '提交中...' : '确认添加' }}</button>
+            <button class="primary-action" :disabled="submitting || plansLoading || !form.planId" @click="createRule">{{ submitting ? '提交中...' : '确认添加' }}</button>
           </div>
         </div>
       </div>

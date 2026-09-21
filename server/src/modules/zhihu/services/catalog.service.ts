@@ -32,7 +32,7 @@ export async function listChannels(user: AuthUser, query: Record<string, unknown
     visibility.bindings,
   );
   const list = await rows(
-    `SELECT c.* FROM channels c WHERE ${visibility.clause} ORDER BY c.generation,c.name LIMIT ? OFFSET ?`,
+    `SELECT c.* FROM channels c WHERE ${visibility.clause} ORDER BY c.generation,c.name,c.id LIMIT ? OFFSET ?`,
     [...visibility.bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list, total: Number(count?.total ?? 0), page, pageSize };
@@ -83,7 +83,7 @@ export async function listTasks(user: AuthUser, query: Record<string, unknown>) 
   }
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM tasks WHERE ${clause}`, bindings);
-  const list = await rows(`SELECT * FROM tasks WHERE ${clause} ORDER BY start_time DESC LIMIT ? OFFSET ?`, [
+  const list = await rows(`SELECT * FROM tasks WHERE ${clause} ORDER BY start_time DESC,id DESC LIMIT ? OFFSET ?`, [
     ...bindings,
     pageSize,
     pageOffset(page, pageSize),

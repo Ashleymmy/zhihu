@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fetchAllOffsetPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 interface SaltBoard { id: string; name: string; type: number; updatedAt?: string }
@@ -28,17 +29,23 @@ async function loadBoards() {
   finally { loadingBoards.value = false }
 }
 
+let loadVersion = 0
 async function selectBoard(board: SaltBoard) {
+  if (!board) return
+  const version = ++loadVersion
+  contents.value = []
+  total.value = 0
   activeBoard.value = board
   loadingContents.value = true
   error.value = ''
   try {
-    const resp: any = await apis.story.saltBoardContents(board.id, { limit: 50 })
-    contents.value = unwrap(resp)
-    total.value = resp?.pagination?.total ?? contents.value.length
+    const result = await fetchAllOffsetPages<SaltContent>((params) => apis.story.saltBoardContents(board.id, params))
+    if (version !== loadVersion) return
+    contents.value = result.items
+    total.value = result.total
   }
-  catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loadingContents.value = false }
+  catch (e: any) { if (version === loadVersion) error.value = e?.message ?? String(e) }
+  finally { if (version === loadVersion) loadingContents.value = false }
 }
 
 onMounted(loadBoards)

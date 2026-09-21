@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fetchAllPages, taskProduct } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 /** 产品库：从推广任务（popularize_tasks）聚合 product_name 维度 */
@@ -13,10 +14,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const resp = await apis.story.listTasks({ page: 1, pageSize: 100 })
+    const taskList = await fetchAllPages((params) => apis.story.listTasks(params))
     const map = new Map<string, ProductRow>()
-    for (const t of resp.list as any[]) {
-      const name = t.product_name ?? t.productName ?? '未标注产品'
+    for (const t of taskList) {
+      const name = taskProduct(t)
       const row: ProductRow = map.get(name) ?? { name, taskCount: 0, statuses: [] }
       row.taskCount++
       if (t.status && !row.statuses.includes(t.status)) row.statuses.push(t.status)

@@ -6,6 +6,7 @@ import { requirePermission } from '../permissions';
 import { asyncHandler } from '../../../middleware/errors';
 import { AppError } from '../../../middleware/errors';
 import { ok } from '../../../utils/response';
+import { paginationSchema } from '../../../utils/pagination';
 import { XLSX_MAX_BYTES } from '../zhihu/allianceXlsx';
 import {
   confirmDataImport,
@@ -102,7 +103,8 @@ dataImportRouter.post(
 dataImportRouter.get(
   '/batches',
   asyncHandler(async (req, res) => {
-    ok(res, await listDataImportBatches(req.user));
+    const query = paginationSchema.parse(req.query);
+    ok(res, await listDataImportBatches(req.user, query.page, query.pageSize));
   }),
 );
 

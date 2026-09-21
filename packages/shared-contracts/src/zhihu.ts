@@ -383,6 +383,8 @@ export interface Composition {
 
 /** 推广任务（tasks 表，知乎侧同步） */
 export interface ZhihuTask {
+  productName?: string | null
+  rawJson?: string | Record<string, unknown>
   id: string
   projectId: string
   zhihuTaskId: string
@@ -490,7 +492,7 @@ export interface MetricsOverview {
   totalClicks: number
   totalConversions: number
   /** 分 */
-  totalSpend: number
+  totalSpend: number | null
   /** 分 */
   totalEarnings: number
   /** 0–1 */
@@ -498,7 +500,7 @@ export interface MetricsOverview {
   /** 0–1 */
   cvr: number
   /** 分 */
-  cpc: number
+  cpc: number | null
 }
 
 export interface TrendPoint {
@@ -507,7 +509,7 @@ export interface TrendPoint {
   clicks: number
   conversions: number
   /** 分 */
-  spend: number
+  spend: number | null
   /** 分 */
   earnings: number
 }
@@ -553,7 +555,7 @@ export interface CallbackRule {
 
 export interface CallbackSecret {
   lastFour: string
-  rotatedAt: string
+  rotatedAt: string | null
 }
 
 export type WithdrawalStatus = 'pending' | 'leader_approved' | 'approved' | 'rejected' | 'cancelled'

@@ -16,7 +16,7 @@ onUnmounted(()=>{if(poll)clearInterval(poll)})
 </script>
 <template>
   <section class="work-card">
-    <div class="section-heading"><div><h2>{{context.role==='creator'?'作品审核进度':'作品审核'}}</h2><p>汇总平台提交与推广作品，分别显示平台核验和知乎审核结果。</p></div><button :disabled="busy" @click="refresh">刷新</button></div>
+    <div class="section-heading"><div><h2>{{context.role==='creator'?'作品审核进度':'作品审核'}}</h2><p>汇总平台提交与推广作品，分别显示平台核验和知乎审核结果。</p></div><div class="engine-actions"><router-link class="engine-action-link" to="/modules/zhihu/works">登记推广作品</router-link><button :disabled="busy" @click="refresh">刷新</button></div></div>
     <p v-if="error" role="alert" class="engine-error">{{error}}</p><p v-if="notice" role="status">{{notice}}</p>
     <div class="engine-table"><table>
       <thead><tr><th>关键词</th><th v-if="context.role!=='creator'">提交人</th><th>作品</th><th>平台核验</th><th>知乎审核</th><th>操作</th></tr></thead>
@@ -33,4 +33,9 @@ onUnmounted(()=>{if(poll)clearInterval(poll)})
     <div class="engine-actions" v-if="total>25"><button :disabled="page===1||busy" @click="page--;refresh()">上一页</button><span>第 {{page}} 页，共 {{total}} 条</span><button :disabled="page*25>=total||busy" @click="page++;refresh()">下一页</button></div>
   </section>
 </template>
+
+<style scoped>
+.engine-action-link{display:inline-flex;align-items:center;min-height:40px;padding:0 15px;border-radius:8px;background:#195e62;color:#fff;text-decoration:none}
+.engine-action-link:hover{background:#124b4e}
+</style>
 

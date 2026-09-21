@@ -15,7 +15,12 @@ interface CountRow extends RowDataPacket {
 interface RuleRow extends RowDataPacket {
   id: string;
   owner_id: string;
+  plan_id: string | null;
+  plan_name: string | null;
+  callback_url: string;
   events_json: string | unknown[];
+  status: 'active' | 'inactive';
+  created_at: string;
 }
 
 export async function listRules(user: AuthUser, query: Record<string, unknown>) {
@@ -50,14 +55,19 @@ export async function listRules(user: AuthUser, query: Record<string, unknown>) 
      FROM callback_rules r
      LEFT JOIN plans p ON p.id = r.plan_id
      WHERE ${scope.clause}
-     ORDER BY r.created_at DESC
+     ORDER BY r.created_at DESC,r.id DESC
      LIMIT ? OFFSET ?`,
     [...scope.bindings, pageSize, pageOffset(page, pageSize)],
   );
   return {
     list: list.map((item) => ({
-      ...item,
-      events_json: typeof item.events_json === 'string' ? JSON.parse(item.events_json) : item.events_json,
+      id: String(item.id),
+      planId: item.plan_id == null ? null : String(item.plan_id),
+      planName: item.plan_name ?? null,
+      callbackUrl: item.callback_url,
+      eventsJson: typeof item.events_json === 'string' ? JSON.parse(item.events_json) : item.events_json,
+      status: item.status,
+      createdAt: item.created_at,
     })),
     total: Number(count?.total ?? 0),
     page,
@@ -180,18 +190,18 @@ export async function deleteRule(user: AuthUser, id: string, ip?: string) {
 }
 
 export async function getSecret() {
-  if (process.env.DEV_DEMO_AUTH === '1') return { signKey: 'sk_live_****DEMO' };
+  if (process.env.DEV_DEMO_AUTH === '1') return { signKey: 'sk_live_****DEMO', lastFour: 'DEMO', rotatedAt: null };
 
-  const [secret] = await rows<RowDataPacket & { last_four: string }>(
-    'SELECT last_four FROM callback_secrets WHERE project_id = ? LIMIT 1',
+  const [secret] = await rows<RowDataPacket & { last_four: string; rotated_at: string }>(
+    'SELECT last_four, rotated_at FROM callback_secrets WHERE project_id = ? LIMIT 1',
     [config.defaultProjectId],
   );
   if (!secret) throw new AppError(404, 40402, '尚未生成回传秘钥');
-  return { signKey: `sk_live_****${secret.last_four}` };
+  return { signKey: `sk_live_****${secret.last_four}`, lastFour: secret.last_four, rotatedAt: secret.rotated_at };
 }
 
 export async function rotateSecret(user: AuthUser, ip?: string) {
-  if (isDevDemoAuthUser(user)) return { signKey: 'sk_live_****DEMO' };
+  if (isDevDemoAuthUser(user)) return { signKey: 'sk_live_****DEMO', lastFour: 'DEMO', rotatedAt: null };
 
   const secret = generateCallbackSecret();
   const value = encryptSecret(secret);
@@ -220,7 +230,7 @@ export async function rotateSecret(user: AuthUser, ip?: string) {
       connection,
     );
   });
-  return { signKey: `sk_live_****${value.lastFour}` };
+  return getSecret();
 }
 
 export async function listLogs(user: AuthUser, query: Record<string, unknown>) {

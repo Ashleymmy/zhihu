@@ -152,10 +152,10 @@ export const zhihuRoutes: RouteRecordRaw[] = [
     path: 'keywords',
     redirect: (to) => ({ path: '/modules/zhihu/keywords', query: to.query, hash: to.hash }),
   },
-  { path: 'zhihu-story', redirect: (to) => ({ path: '/modules/zhihu/', query: to.query, hash: to.hash }) },
+  { path: 'zhihu-story', redirect: (to) => ({ path: '/modules/zhihu/history', query: to.query, hash: to.hash }) },
   {
     path: 'zhihu-story/plans',
-    redirect: (to) => ({ path: '/modules/zhihu/plans', query: to.query, hash: to.hash }),
+    redirect: (to) => ({ path: '/modules/zhihu/plans', query: { ...to.query, from: 'story' }, hash: to.hash }),
   },
   {
     path: 'zhihu-story/works',

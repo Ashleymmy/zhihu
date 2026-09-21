@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { Appeal, AppealKind, AppealStatus } from '@zhihu-koc/shared-contracts/zhihu'
 import { APP_ROLE } from '../../../app-config'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 const auth = useAuthStore()
@@ -46,8 +47,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await apis.appeals.list({ page: 1, pageSize: 100 })
-    appeals.value = data.list
+    appeals.value = await fetchAllPages((params) => apis.appeals.list(params))
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }

@@ -89,7 +89,7 @@ onMounted(load)
                 <td><strong>{{ fmt.format(point.impressions) }}</strong></td>
                 <td><strong>{{ fmt.format(point.clicks) }}</strong></td>
                 <td><strong>{{ fmt.format(point.conversions) }}</strong></td>
-                <td>{{ money.format(point.spend / 100) }}</td>
+                <td>{{ point.spend == null ? '—' : money.format(point.spend / 100) }}</td>
                 <td style="color: var(--forest);"><strong>{{ money.format(point.earnings / 100) }}</strong></td>
               </tr>
             </tbody>

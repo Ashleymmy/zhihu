@@ -1,4 +1,5 @@
 export { default as WorkspaceBadge } from './WorkspaceBadge.vue'
+export { default as SearchableSelect } from './SearchableSelect.vue'
 export { default as FinanceGateBanner } from './FinanceGateBanner.vue'
 export { default as AppShell } from './AppShell.vue'
 export { default as RouteTrace } from './RouteTrace.vue'

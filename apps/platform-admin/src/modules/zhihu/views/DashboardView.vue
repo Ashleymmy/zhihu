@@ -40,7 +40,7 @@ onMounted(async () => {
 })
 
 function f(n: number) { return fmt.format(n || 0) }
-function fm(n: number) { return money.format((n || 0) / 100) }
+function fm(n: number | null) { return n == null ? '—' : money.format(n / 100) }
 function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.00' }
 </script>
 
@@ -50,7 +50,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
     <header class="page-header">
       <div>
         <p class="section-index">01 / 数据看板</p>
-        <h1>{{ pendingPlans.length ? `先处理等待审核的 ${pendingPlans.length} 条计划。` : '先看清增长正在往哪里走。' }}</h1>
+        <h1>{{ pendingPlans.length ? `最近计划中有 ${pendingPlans.length} 条等待审核。` : '先看清增长正在往哪里走。' }}</h1>
         <p>{{ todayLabel }}。OPC 已整理好本周的投放线索与待处理事项。</p>
         <RouteTrace code="ROUTE / 01" label="指标 → 计划 → 行动" style="margin-top: 20px;" />
       </div>
@@ -62,7 +62,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
       <div class="metric-cell">
         <p>曝光</p>
         <strong>{{ f(overview.totalImpressions) }}</strong>
-        <small>本期累计</small>
+        <small>累计</small>
       </div>
       <div class="metric-cell">
         <p>点击</p>
@@ -77,7 +77,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
       <div class="metric-cell">
         <p>消耗</p>
         <strong>{{ fm(overview.totalSpend) }}</strong>
-        <small>本期累计</small>
+        <small>累计</small>
       </div>
     </section>
 

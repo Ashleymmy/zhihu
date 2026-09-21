@@ -172,7 +172,7 @@ describe('真实表头的归因、修订与对账', () => {
   it('文件未通过异步安全校验时，不保存批次、原始行或待办', async () => {
     const source = file(feedback(100));
     const book = XLSX.read(source.buffer, { type: 'buffer' });
-    book.Sheets['反馈'].G2.f = '100';
+    book.Sheets['反馈'].G2.f = 'WEBSERVICE("https://example.com")';
     const buffer = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
     const counts = async () =>
       (

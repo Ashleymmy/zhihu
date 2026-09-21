@@ -1,0 +1,2353 @@
+{
+  "id": "1",
+  "fileName": "达人记录.xlsx",
+  "sheetName": "9月21日",
+  "optionsJson": null,
+  "previewJson": null,
+  "totalCount": 135,
+  "pendingCount": 56,
+  "duplicateCount": 79,
+  "readyCount": 0,
+  "createdAt": "2026-09-21T09:09:34.000Z",
+  "updatedAt": "2026-09-21T09:09:34.000Z",
+  "options": {
+    "defaults": {},
+    "sheetName": "9月21日",
+    "categoryMode": "rotate-video",
+    "knownExternal": {
+      "site": "https://zhihu.cosinimin.icu/app/modules/zhihu/works",
+      "links": [
+        "https://v.kuaishou.com/K5jlHIgV",
+        "https://v.kuaishou.com/Jd6N43na",
+        "https://v.douyin.com/3JBfz5GVBVs/",
+        "https://xhslink.cn/o/89qO4RBkjUe",
+        "https://weixin.qq.com/sph/Adhci578f2",
+        "https://v.douyin.com/-aR7Hn3xMsk/",
+        "https://v.douyin.com/qigivYjPbRA/",
+        "https://xhslink.cn/o/ABO3OEuCZPU",
+        "https://v.kuaishou.com/KKaNnqmI",
+        "https://v.kuaishou.com/J9T1jrs3",
+        "https://xhslink.cn/o/7cAj7zohTqn",
+        "https://v.douyin.com/c8n5Cr8CpGQ/",
+        "https://weixin.qq.com/sph/AoONfMt8ud",
+        "https://v.kuaishou.com/Ji16f8SP",
+        "https://xhslink.cn/o/9PxxEGThsL8",
+        "https://v.kuaishou.com/nsJcx7eL",
+        "https://weixin.qq.com/sph/AahpsD7J6k",
+        "https://xhslink.cn/o/3RxReqyTMib",
+        "https://v.kuaishou.com/nXyEJKvX",
+        "https://v.kuaishou.com/Jyp9zZWx",
+        "https://v.douyin.com/UIcJKkpvK1c/",
+        "https://v.douyin.com/V_DflCPc17I/",
+        "https://v.kuaishou.com/nMrR6Ybw",
+        "https://v.kuaishou.com/KZcyAmP1",
+        "https://xhslink.cn/o/4Egcizgrq8R",
+        "https://v.douyin.com/ljxiRhzJ1KI/",
+        "https://v.douyin.com/vziZsf-JBIM/",
+        "https://xhslink.cn/o/5Oj69syfZuO",
+        "https://www.xiaohongshu.com/discovery/item/6ab09b98000000002b01cbe6?source=webshare&xhsshare=pc_web&xsec_token=DBypWwXYa7-sqJ9I3wXGe4qeDbtMsdyLrIF1KNKW87PMg=&xsec_source=pc_share",
+        "https://v.kuaishou.com/KZNdjtk2",
+        "https://v.douyin.com/ef-fiSWg428/",
+        "https://www.kuaishou.com/f/X-6mmqhg4FJiuRrE",
+        "https://v.douyin.com/2nvq2ZhJTbU/",
+        "https://www.xiaohongshu.com/discovery/item/6ab09fa8000000002603ab48?source=webshare&xhsshare=pc_web&xsec_token=CB3gM4KVH_MWK5w-yz9Uh6Q4wewPy_9eFTLh8NLIR-pM0=&xsec_source=pc_share",
+        "https://www.kuaishou.com/f/X-1QWbu53rgpj1qG",
+        "https://v.kuaishou.com/JLvoxTK2",
+        "https://v.kuaishou.com/JI2ZKJ5b",
+        "https://xhslink.cn/o/5nfq07eVLG9",
+        "https://v.kuaishou.com/KdQPZwoI",
+        "https://v.douyin.com/s8ocr-zM65M/",
+        "https://v.kuaishou.com/K1pqudgZ",
+        "https://v.kuaishou.com/KMT0WfH9",
+        "https://v.kuaishou.com/KMT0WfH9",
+        "https://www.douyin.com/video/7687815871319031525",
+        "https://xhslink.cn/o/3LQkBBpo485",
+        "https://xhslink.cn/o/65VocWe93Nl",
+        "https://v.kuaishou.com/JGawHKkV",
+        "https://v.kuaishou.com/JFpbMJ8p",
+        "https://xhslink.cn/o/8YL4SFNW0ER",
+        "https://v.douyin.com/9ThaxBXCYXA/",
+        "https://v.kuaishou.com/KDlyf2DZ",
+        "https://v.kuaishou.com/K58GMZEc",
+        "https://v.douyin.com/6MHTChQ_f6A/",
+        "https://v.douyin.com/35GUu0QNVfA/",
+        "https://v.kuaishou.com/Jc16vKz1",
+        "https://xhslink.cn/o/9fK0Hx7bAjm",
+        "https://xhslink.cn/o/16DORnafEkB",
+        "https://xhslink.cn/o/AEK2KRNA3x7",
+        "https://xhslink.cn/o/1WGIahUQa6i",
+        "https://v.douyin.com/PQw1_5uTu0c/",
+        "https://xhslink.cn/o/8ChEYMyqM9L",
+        "https://v.kuaishou.com/nv33tanT",
+        "https://v.douyin.com/mHCN4T4xVjM/",
+        "https://v.kuaishou.com/Jcp3E421",
+        "https://v.kuaishou.com/JJqcppd1",
+        "https://xhslink.cn/o/16DORnafEkB",
+        "https://weixin.qq.com/sph/ArEIUQiBtO",
+        "https://v.douyin.com/L5W_O3n-dwo/",
+        "https://v.douyin.com/h-SHptP-lB8/",
+        "https://v.douyin.com/HTew9ZtiK40/",
+        "https://v.kuaishou.com/KUonTYdR",
+        "https://v.douyin.com/e_rmeicfhDs/",
+        "https://v.kuaishou.com/KHDk4tp1",
+        "https://v.kuaishou.com/JeLvEmEP",
+        "https://weixin.qq.com/sph/A3WELKgLmD",
+        "https://v.douyin.com/sQFu0yP0JpQ/ :4pm g@O.kP 06/27 nDu:/",
+        "https://v.kuaishou.com/JDaq8nKx"
+      ],
+      "checkedAt": "2026-09-21（线上187条作品时的核对快照）"
+    }
+  },
+  "preview": {
+    "rows": [
+      {
+        "row": 2,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.kuaishou.com/K5jlHIgV",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "1773719316"
+      },
+      {
+        "row": 3,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.kuaishou.com/Jd6N43na",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "3761336376"
+      },
+      {
+        "row": 4,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.douyin.com/3JBfz5GVBVs/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46285",
+        "mediaAccount": "35809749761"
+      },
+      {
+        "row": 5,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://xhslink.cn/o/89qO4RBkjUe",
+        "mediaType": "小红书",
+        "releaseTime": "46285",
+        "mediaAccount": "95094752492"
+      },
+      {
+        "row": 6,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 8",
+        "promoUrl": "https://v.kuaishou.com/JpvDzq2t",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "2448878508"
+      },
+      {
+        "row": 7,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/cogSIwGwqy0/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "69039508939"
+      },
+      {
+        "row": 8,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "白白金陵",
+        "category": "2 / 10",
+        "promoUrl": "https://v.kuaishou.com/KZkSuJ3y",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "2879882282"
+      },
+      {
+        "row": 9,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://weixin.qq.com/sph/Adhci578f2",
+        "mediaType": "微信视频号",
+        "releaseTime": "46285",
+        "mediaAccount": "雨果mama9020"
+      },
+      {
+        "row": 10,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.douyin.com/-aR7Hn3xMsk/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46285",
+        "mediaAccount": "23334002996"
+      },
+      {
+        "row": 11,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "白白金陵",
+        "category": "2 / 8",
+        "promoUrl": "https://v.douyin.com/rwNDYO6WcEQ/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "tao199999919"
+      },
+      {
+        "row": 12,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "白白金陵",
+        "category": "2 / 10",
+        "promoUrl": "https://v.kuaishou.com/KHDglceP",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "5540790027"
+      },
+      {
+        "row": 13,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容",
+          "与本表第 12 行链接相同，本地批次只保留一条待推送记录"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "duplicate",
+        "keyword": "白白金陵",
+        "category": "2 / 10",
+        "promoUrl": "https://v.kuaishou.com/KHDglceP",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "5540790027"
+      },
+      {
+        "row": 14,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "白白金陵",
+        "category": "2 / 5",
+        "promoUrl": "https://weixin.qq.com/sph/AuRKybOLx2",
+        "mediaType": "KOC视频号",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "风的颜色72"
+      },
+      {
+        "row": 15,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "白白金陵",
+        "category": "2 / 5",
+        "promoUrl": "https://www.kuaishou.com/f/X9iQ8QHCYN9OYi2",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "2037555563"
+      },
+      {
+        "row": 16,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "白白金陵",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/HUiUs7e_OPo/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "27363868763"
+      },
+      {
+        "row": 17,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离对手",
+        "promoUrl": "https://v.douyin.com/qigivYjPbRA/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46285",
+        "mediaAccount": "80202567352"
+      },
+      {
+        "row": 18,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离对手",
+        "promoUrl": "https://xhslink.cn/o/ABO3OEuCZPU",
+        "mediaType": "小红书",
+        "releaseTime": "46285",
+        "mediaAccount": "26163555320"
+      },
+      {
+        "row": 19,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离对手",
+        "promoUrl": "https://v.kuaishou.com/KKaNnqmI",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "5155092584"
+      },
+      {
+        "row": 20,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离大伯",
+        "promoUrl": "https://v.kuaishou.com/J9T1jrs3",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "5427254780"
+      },
+      {
+        "row": 21,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离大伯",
+        "promoUrl": "https://xhslink.cn/o/7cAj7zohTqn",
+        "mediaType": "小红书",
+        "releaseTime": "46285",
+        "mediaAccount": "42307741837"
+      },
+      {
+        "row": 22,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.douyin.com/c8n5Cr8CpGQ/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46285",
+        "mediaAccount": "48747286690"
+      },
+      {
+        "row": 23,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://weixin.qq.com/sph/AoONfMt8ud",
+        "mediaType": "微信视频号",
+        "releaseTime": "46285",
+        "mediaAccount": "卷卷077"
+      },
+      {
+        "row": 24,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.kuaishou.com/Ji16f8SP",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "3393320757"
+      },
+      {
+        "row": 25,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://xhslink.cn/o/9PxxEGThsL8",
+        "mediaType": "小红书",
+        "releaseTime": "46285",
+        "mediaAccount": "95510487365"
+      },
+      {
+        "row": 26,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离路过",
+        "promoUrl": "https://v.kuaishou.com/nsJcx7eL",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "1381498099"
+      },
+      {
+        "row": 27,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "离离路过",
+        "category": "2 / 9",
+        "promoUrl": "https://v.douyin.com/Pu0sfmqtgEQ/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "Lfei199600"
+      },
+      {
+        "row": 28,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 5",
+        "promoUrl": "https://v.kuaishou.com/KeT8u4qI",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "5629410610"
+      },
+      {
+        "row": 29,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 10",
+        "promoUrl": "https://v.douyin.com/BuWZY8rJeyc/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "dy58k7zyexhk"
+      },
+      {
+        "row": 30,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 5",
+        "promoUrl": "https://www.kuaishou.com/f/X-7nXh2msDo6N1BQ",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "905000034"
+      },
+      {
+        "row": 31,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 10",
+        "promoUrl": "https://www.xiaohongshu.com/discovery/item/6aafafa50000000011030091?source=webshare&xhsshare=pc_web&xsec_token=CBQxNt3vPqFxwBaXR0HZFBayP2GMKhpMr8CpjIc12JHyc=&xsec_source=pc_share",
+        "mediaType": "KOC小红书",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "26225156063"
+      },
+      {
+        "row": 32,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 7",
+        "promoUrl": "https://www.kuaishou.com/f/X577ba5TIs6p1Kd",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "ID___ZMM"
+      },
+      {
+        "row": 33,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离对手",
+        "promoUrl": "https://weixin.qq.com/sph/AahpsD7J6k",
+        "mediaType": "微信视频号",
+        "releaseTime": "46285",
+        "mediaAccount": "啊啊啊啊啊啊啊啊啊啊喜啊啊啊嗯"
+      },
+      {
+        "row": 34,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 9",
+        "promoUrl": "https://www.kuaishou.com/f/X5zOlygAoEum1d1",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "3095362496"
+      },
+      {
+        "row": 35,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 8",
+        "promoUrl": "https://v.kuaishou.com/nubSygU1",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "1237842925"
+      },
+      {
+        "row": 36,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 10",
+        "promoUrl": "https://v.douyin.com/yYHdHae-7hY/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "64656766929"
+      },
+      {
+        "row": 37,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离背包",
+        "promoUrl": "https://xhslink.cn/o/3RxReqyTMib",
+        "mediaType": "小红书",
+        "releaseTime": "46285",
+        "mediaAccount": "95931245385"
+      },
+      {
+        "row": 38,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离背包",
+        "promoUrl": "https://v.kuaishou.com/nXyEJKvX",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "5367179002"
+      },
+      {
+        "row": 39,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离妙妙",
+        "promoUrl": "https://v.kuaishou.com/Jyp9zZWx",
+        "mediaType": "快手",
+        "releaseTime": "46285",
+        "mediaAccount": "5669798377"
+      },
+      {
+        "row": 40,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离妙妙",
+        "promoUrl": "https://v.douyin.com/UIcJKkpvK1c/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46285",
+        "mediaAccount": "woxinlaotianye"
+      },
+      {
+        "row": 41,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 6",
+        "promoUrl": "https://v.kuaishou.com/JWEyx5Zp",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-19T16:00:00.000Z",
+        "mediaAccount": "5770569553"
+      },
+      {
+        "row": 42,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://v.douyin.com/V_DflCPc17I/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "48747286690"
+      },
+      {
+        "row": 43,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://v.kuaishou.com/nMrR6Ybw",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "1381498099"
+      },
+      {
+        "row": 44,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://v.kuaishou.com/KZcyAmP1",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "3393320757"
+      },
+      {
+        "row": 45,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://xhslink.cn/o/4Egcizgrq8R",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "95510487365"
+      },
+      {
+        "row": 46,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://v.douyin.com/ljxiRhzJ1KI/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "Lfei199600"
+      },
+      {
+        "row": 47,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/DZM3RMbr-Ik/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "48747286690"
+      },
+      {
+        "row": 48,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 9",
+        "promoUrl": "https://v.kuaishou.com/J6tz5Tjz",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "3393320757"
+      },
+      {
+        "row": 49,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 7",
+        "promoUrl": "https://v.kuaishou.com/JjXkpDGL",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "1381498099"
+      },
+      {
+        "row": 50,
+        "notes": [
+          "媒体类型根据链接域名识别",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号",
+          "发布时间缺失或无效，请填写完整日期"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 5",
+        "promoUrl": "https://v.douyin.com/sw2RyDI4RE8/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "",
+        "mediaAccount": "Lfei199600"
+      },
+      {
+        "row": 51,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛种蛊",
+        "category": "2 / 8",
+        "promoUrl": "https://v.douyin.com/Jv0IjQXR3z8/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "zyc20171107"
+      },
+      {
+        "row": 52,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛种蛊",
+        "category": "2 / 5",
+        "promoUrl": "https://v.kuaishou.com/KSolpUpT",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "5514556602"
+      },
+      {
+        "row": 53,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://v.douyin.com/vziZsf-JBIM/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "dya2s0nmdgrp72"
+      },
+      {
+        "row": 54,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://xhslink.cn/o/5Oj69syfZuO",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "1086933649"
+      },
+      {
+        "row": 55,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://www.xiaohongshu.com/discovery/item/6ab09b98000000002b01cbe6?source=webshare&xhsshare=pc_web&xsec_token=DBypWwXYa7-sqJ9I3wXGe4qeDbtMsdyLrIF1KNKW87PMg=&xsec_source=pc_share",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "4274010596"
+      },
+      {
+        "row": 56,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离老板",
+        "promoUrl": "https://v.kuaishou.com/KZNdjtk2",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "5770569553"
+      },
+      {
+        "row": 57,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "北窗照疏星",
+        "promoUrl": "https://v.douyin.com/ef-fiSWg428/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "59034033570"
+      },
+      {
+        "row": 58,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离大伯",
+        "promoUrl": "https://www.kuaishou.com/f/X-6mmqhg4FJiuRrE",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "5771859861"
+      },
+      {
+        "row": 59,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离大伯",
+        "promoUrl": "https://v.douyin.com/2nvq2ZhJTbU/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "73041756481"
+      },
+      {
+        "row": 60,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 6",
+        "promoUrl": "https://www.kuaishou.com/f/X7i1eC5J9pcdT7c",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "2381901294"
+      },
+      {
+        "row": 61,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 9",
+        "promoUrl": "https://v.kuaishou.com/J2eczvZJ",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "5673870694"
+      },
+      {
+        "row": 62,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 8",
+        "promoUrl": "https://xhslink.cn/o/6B4viSr4Cz",
+        "mediaType": "KOC小红书",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "837092028"
+      },
+      {
+        "row": 63,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛种蛊",
+        "category": "2 / 8",
+        "promoUrl": "https://www.kuaishou.com/f/X-3YlV1UtTzaJ1R5",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "ID___ZMM"
+      },
+      {
+        "row": 64,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛种蛊",
+        "category": "2 / 5",
+        "promoUrl": "https://v.douyin.com/CSlIj9tDUY0/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "dyi9znosqipy"
+      },
+      {
+        "row": 65,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "洛洛哑女",
+        "category": "2 / 5",
+        "promoUrl": "https://v.douyin.com/o7UnhiTxiSU/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "dyi9znosqipy"
+      },
+      {
+        "row": 66,
+        "notes": [
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划",
+          "发布时间缺失或无效，请填写完整日期"
+        ],
+        "status": "invalid",
+        "keyword": "尘笼异遇",
+        "category": "2 / 6",
+        "promoUrl": "https://www.kuaishou.com/f/X6vDifvMN7Id1fI",
+        "mediaType": "KOC快手",
+        "releaseTime": "",
+        "mediaAccount": "ID___ZMM"
+      },
+      {
+        "row": 67,
+        "notes": [
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划",
+          "发布时间缺失或无效，请填写完整日期"
+        ],
+        "status": "invalid",
+        "keyword": "尘笼异遇",
+        "category": "2 / 9",
+        "promoUrl": "https://www.xiaohongshu.com/discovery/item/6ab0e0680000000033025371?source=webshare&xhsshare=pc_web&xsec_token=CBf1kEqPRRg4Y2gWQDAF02camoBCFiWU3RJaobb_K1I7E=&xsec_source=pc_share",
+        "mediaType": "KOC小红书",
+        "releaseTime": "",
+        "mediaAccount": "5615318076"
+      },
+      {
+        "row": 68,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "尘笼异遇",
+        "category": "2 / 6",
+        "promoUrl": "https://v.douyin.com/e-4UC0jD9o0/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "dyi9znosqipy"
+      },
+      {
+        "row": 69,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离对手",
+        "promoUrl": "https://www.xiaohongshu.com/discovery/item/6ab09fa8000000002603ab48?source=webshare&xhsshare=pc_web&xsec_token=CB3gM4KVH_MWK5w-yz9Uh6Q4wewPy_9eFTLh8NLIR-pM0=&xsec_source=pc_share",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "291010306"
+      },
+      {
+        "row": 70,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离对手",
+        "promoUrl": "https://www.kuaishou.com/f/X-1QWbu53rgpj1qG",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "5771877562"
+      },
+      {
+        "row": 71,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离弹幕",
+        "promoUrl": "https://v.kuaishou.com/JLvoxTK2",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "171316993"
+      },
+      {
+        "row": 72,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离弹幕",
+        "promoUrl": "https://v.kuaishou.com/JI2ZKJ5b",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "5427254780"
+      },
+      {
+        "row": 73,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离弹幕",
+        "promoUrl": "https://xhslink.cn/o/5nfq07eVLG9",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "42307741837"
+      },
+      {
+        "row": 74,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离弹幕",
+        "promoUrl": "https://v.kuaishou.com/KdQPZwoI",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "1131050676"
+      },
+      {
+        "row": 75,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "离离弹幕",
+        "promoUrl": "https://v.douyin.com/s8ocr-zM65M/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "woxinlaotianye"
+      },
+      {
+        "row": 76,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "春溪晒浅唱",
+        "promoUrl": "https://v.kuaishou.com/K1pqudgZ",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "5367179002"
+      },
+      {
+        "row": 77,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "榴花照残景",
+        "promoUrl": "https://v.kuaishou.com/KMT0WfH9",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "lg123456qx"
+      },
+      {
+        "row": 78,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "北窗照疏星",
+        "promoUrl": "https://v.kuaishou.com/KMT0WfH9",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "2328561108"
+      },
+      {
+        "row": 79,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "北窗照疏星",
+        "promoUrl": "https://www.douyin.com/video/7687815871319031525",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "80386634112"
+      },
+      {
+        "row": 80,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "北窗照疏星",
+        "promoUrl": "https://xhslink.cn/o/3LQkBBpo485",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "63644276049"
+      },
+      {
+        "row": 81,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "春庭扫残雪",
+        "promoUrl": "https://xhslink.cn/o/65VocWe93Nl",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "27756439510I"
+      },
+      {
+        "row": 82,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "春庭扫残雪",
+        "promoUrl": "https://v.kuaishou.com/JGawHKkV",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "2180652476"
+      },
+      {
+        "row": 83,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "木樨落闲盏",
+        "promoUrl": "https://v.kuaishou.com/JFpbMJ8p",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "239519495"
+      },
+      {
+        "row": 84,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "木樨落闲盏",
+        "promoUrl": "https://xhslink.cn/o/8YL4SFNW0ER",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "9116648048"
+      },
+      {
+        "row": 85,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "榴花照残影",
+        "promoUrl": "https://v.douyin.com/9ThaxBXCYXA/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "64656766929"
+      },
+      {
+        "row": 86,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "榴花照残影",
+        "promoUrl": "https://v.kuaishou.com/KDlyf2DZ",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "3095362496"
+      },
+      {
+        "row": 87,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "榴花照残影",
+        "promoUrl": "https://v.kuaishou.com/K58GMZEc",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "1237842925"
+      },
+      {
+        "row": 88,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 6",
+        "promoUrl": "https://v.douyin.com/pajys5DiJyA/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "64656766929"
+      },
+      {
+        "row": 89,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 9",
+        "promoUrl": "https://v.kuaishou.com/JZvjQrct",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "3095362496"
+      },
+      {
+        "row": 90,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 9",
+        "promoUrl": "https://v.kuaishou.com/KcDJvcAF",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "1237842925"
+      },
+      {
+        "row": 91,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "尘笼异遇",
+        "promoUrl": "https://v.douyin.com/6MHTChQ_f6A/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "Asahicx"
+      },
+      {
+        "row": 92,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "尘笼异遇",
+        "promoUrl": "https://v.douyin.com/35GUu0QNVfA/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "dydwey3k218f"
+      },
+      {
+        "row": 93,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "尘笼异遇",
+        "promoUrl": "https://v.kuaishou.com/Jc16vKz1",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "2242098623"
+      },
+      {
+        "row": 94,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "尘笼异遇",
+        "promoUrl": "https://xhslink.cn/o/9fK0Hx7bAjm",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "6552622707"
+      },
+      {
+        "row": 95,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "梧桐戏秋雨",
+        "promoUrl": "https://xhslink.cn/o/16DORnafEkB",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "26163555320"
+      },
+      {
+        "row": 96,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "光阴浅淡",
+        "promoUrl": "https://xhslink.cn/o/AEK2KRNA3x7",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "27492768664"
+      },
+      {
+        "row": 97,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "光阴浅淡",
+        "promoUrl": "https://xhslink.cn/o/1WGIahUQa6i",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "9756340943"
+      },
+      {
+        "row": 98,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "光阴浅淡",
+        "promoUrl": "https://v.douyin.com/PQw1_5uTu0c/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "35604834831"
+      },
+      {
+        "row": 99,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "光阴浅淡",
+        "promoUrl": "https://xhslink.cn/o/8ChEYMyqM9L",
+        "mediaType": "小红书",
+        "releaseTime": "46286",
+        "mediaAccount": "5898198585"
+      },
+      {
+        "row": 100,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "光阴浅淡",
+        "promoUrl": "https://v.kuaishou.com/nv33tanT",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "3250025690"
+      },
+      {
+        "row": 101,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "光阴浅淡",
+        "promoUrl": "https://v.douyin.com/mHCN4T4xVjM/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "77838769946"
+      },
+      {
+        "row": 102,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "",
+        "promoUrl": "https://v.kuaishou.com/Jcp3E421",
+        "mediaType": "快手",
+        "releaseTime": "",
+        "mediaAccount": "1108124473"
+      },
+      {
+        "row": 103,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "",
+        "promoUrl": "https://v.kuaishou.com/JJqcppd1",
+        "mediaType": "快手",
+        "releaseTime": "",
+        "mediaAccount": "5772026103"
+      },
+      {
+        "row": 104,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "",
+        "promoUrl": "https://xhslink.cn/o/16DORnafEkB",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "80202567352"
+      },
+      {
+        "row": 105,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "梧桐戏秋雨",
+        "promoUrl": "https://weixin.qq.com/sph/ArEIUQiBtO",
+        "mediaType": "视频号",
+        "releaseTime": "46286",
+        "mediaAccount": "26163555320"
+      },
+      {
+        "row": 106,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.douyin.com/L5W_O3n-dwo/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "128923663"
+      },
+      {
+        "row": 107,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.douyin.com/h-SHptP-lB8/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "24986795"
+      },
+      {
+        "row": 108,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.douyin.com/HTew9ZtiK40/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "51981528814"
+      },
+      {
+        "row": 109,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.kuaishou.com/KUonTYdR",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "5772178762"
+      },
+      {
+        "row": 110,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.douyin.com/e_rmeicfhDs/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "80294338983"
+      },
+      {
+        "row": 111,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.kuaishou.com/KHDk4tp1",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "1567850135"
+      },
+      {
+        "row": 112,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "淡月映疏星",
+        "promoUrl": "https://v.kuaishou.com/JeLvEmEP",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "1596007902"
+      },
+      {
+        "row": 113,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "",
+        "promoUrl": "https://weixin.qq.com/sph/A3WELKgLmD",
+        "mediaType": "视频号",
+        "releaseTime": "46286",
+        "mediaAccount": "WHXunF"
+      },
+      {
+        "row": 114,
+        "notes": [
+          "已从分享文本中提取作品链接",
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "木樨落闲盏",
+        "promoUrl": "https://v.douyin.com/sQFu0yP0JpQ/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "46286",
+        "mediaAccount": "98518272378"
+      },
+      {
+        "row": 115,
+        "notes": [
+          "线上核对快照已包含此链接（2026-09-21（线上187条作品时的核对快照）），跳过；推送前需复核"
+        ],
+        "title": "",
+        "errors": [],
+        "status": "duplicate",
+        "keyword": "木樨落闲盏",
+        "promoUrl": "https://v.kuaishou.com/JDaq8nKx",
+        "mediaType": "快手",
+        "releaseTime": "46286",
+        "mediaAccount": "htc-11413"
+      },
+      {
+        "row": 116,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "北窗照疏星",
+        "category": "2 / 5",
+        "promoUrl": "https://v.kuaishou.com/Jn6KuR2n",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "1132840053"
+      },
+      {
+        "row": 117,
+        "notes": [
+          "已从分享文本中提取作品链接",
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "木樨落闲盏",
+        "category": "2 / 8",
+        "promoUrl": "https://v.douyin.com/PcKU5Gp0e2A/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "he9720311"
+      },
+      {
+        "row": 118,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "木樨落闲盏",
+        "category": "2 / 10",
+        "promoUrl": "https://v.kuaishou.com/Kt3KkDvz",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "239074049"
+      },
+      {
+        "row": 119,
+        "notes": [
+          "已从分享文本中提取作品链接",
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划",
+          "平台与链接不一致：链接属于抖音"
+        ],
+        "status": "invalid",
+        "keyword": "梧桐戏秋雨",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/yTxxuPJw_vg/",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "68677471139"
+      },
+      {
+        "row": 120,
+        "notes": [
+          "已从分享文本中提取作品链接",
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "月色临旧窗",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/AdW8MquljBw/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "40897765075"
+      },
+      {
+        "row": 121,
+        "notes": [
+          "已从分享文本中提取作品链接",
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容",
+          "与本表第 120 行链接相同，本地批次只保留一条待推送记录"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划",
+          "平台与链接不一致：链接属于抖音"
+        ],
+        "status": "duplicate",
+        "keyword": "梧桐戏秋雨",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/AdW8MquljBw/",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "5378323533"
+      },
+      {
+        "row": 122,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "月色临旧窗",
+        "category": "2 / 6",
+        "promoUrl": "https://v.kuaishou.com/KFhWdc1N",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "5338267277"
+      },
+      {
+        "row": 123,
+        "notes": [
+          "已从分享文本中提取作品链接",
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "月色临旧窗",
+        "category": "2 / 8",
+        "promoUrl": "https://v.douyin.com/oC59lqsqwMk/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "tao199999919"
+      },
+      {
+        "row": 124,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "台城空晚",
+        "category": "2 / 9",
+        "promoUrl": "https://v.kuaishou.com/KwYiTwwb",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "a351072001"
+      },
+      {
+        "row": 125,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "台城空晚",
+        "category": "2 / 7",
+        "promoUrl": "https://v.kuaishou.com/JqokQwQL",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "2381901294"
+      },
+      {
+        "row": 126,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "台城空晚",
+        "category": "2 / 10",
+        "promoUrl": "https://xhslink.cn/o/9KmljLy2JKS",
+        "mediaType": "KOC小红书",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "837092028"
+      },
+      {
+        "row": 128,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "月色临旧窗",
+        "category": "2 / 9",
+        "promoUrl": "https://xhslink.cn/o/9z9hcLMNgAv",
+        "mediaType": "KOC小红书",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "26922235506"
+      },
+      {
+        "row": 130,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "残荷映春水",
+        "category": "2 / 5",
+        "promoUrl": "https://v.kuaishou.com/JGQYQaj1",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "1773719316"
+      },
+      {
+        "row": 131,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "残荷映春水",
+        "category": "2 / 8",
+        "promoUrl": "https://v.kuaishou.com/KwyzUZSL",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "q2879145843"
+      },
+      {
+        "row": 132,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "离离老板",
+        "category": "2 / 7",
+        "promoUrl": "https://v.douyin.com/4Zs2jMelYSE/",
+        "mediaType": "KOC抖音",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "dy58k7zyexhk"
+      },
+      {
+        "row": 133,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "离离老板",
+        "category": "2 / 10",
+        "promoUrl": "https://www.kuaishou.com/f/X-3shQX9espgF1Tn",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "905000034"
+      },
+      {
+        "row": 134,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "离离老板",
+        "category": "2 / 6",
+        "promoUrl": "https://www.xiaohongshu.com/discovery/item/6ab0df36000000003100e999?source=webshare&xhsshare=pc_web&xsec_token=CBi5LP-rz8Co-HChT4GWDhEeN9LQvXObjmabHufs8B3mI=&xsec_source=pc_share",
+        "mediaType": "KOC小红书",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "26225156063"
+      },
+      {
+        "row": 135,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "晚风渡宣口",
+        "category": "2 / 6",
+        "promoUrl": "https://v.kuaishou.com/JPYVpH2N",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "2014389456"
+      },
+      {
+        "row": 136,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "暮色随片场",
+        "category": "2 / 6",
+        "promoUrl": "https://v.kuaishou.com/nn5S2vSx",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "3658861600"
+      },
+      {
+        "row": 137,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "未找到该关键词对应的可用计划"
+        ],
+        "status": "invalid",
+        "keyword": "月色临旧窗",
+        "category": "2 / 6",
+        "promoUrl": "https://v.kuaishou.com/K2Dh5Eo1",
+        "mediaType": "KOC快手",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "2006758602"
+      },
+      {
+        "row": 138,
+        "notes": [
+          "原表仅有日期，按北京时间 00:00 登记",
+          "视频子分类按所选设置均衡随机补填，未分析视频内容"
+        ],
+        "title": "",
+        "errors": [
+          "缺少关键词或计划编号"
+        ],
+        "status": "invalid",
+        "keyword": "",
+        "category": "2 / 10",
+        "promoUrl": "https://xhslink.cn/o/2KMZrtVroM6",
+        "mediaType": "KOC小红书",
+        "releaseTime": "2026-09-20T16:00:00.000Z",
+        "mediaAccount": "4983375735"
+      }
+    ],
+    "ready": 0,
+    "total": 135,
+    "fields": [
+      {
+        "key": "planId",
+        "label": "计划编号"
+      },
+      {
+        "key": "keyword",
+        "label": "关键词"
+      },
+      {
+        "key": "mediaAccount",
+        "label": "媒体账号"
+      },
+      {
+        "key": "mediaType",
+        "label": "媒体类型"
+      },
+      {
+        "key": "promoUrl",
+        "label": "推广链接"
+      },
+      {
+        "key": "releaseTime",
+        "label": "发布时间"
+      },
+      {
+        "key": "compositionType",
+        "label": "作品分类"
+      },
+      {
+        "key": "compositionSubType",
+        "label": "作品子分类"
+      },
+      {
+        "key": "title",
+        "label": "标题"
+      }
+    ],
+    "columns": [
+      {
+        "index": 0,
+        "label": "日期",
+        "samples": [
+          "46285",
+          "46285",
+          "46285"
+        ]
+      },
+      {
+        "index": 1,
+        "label": "平台id",
+        "samples": [
+          "1773719316",
+          "3761336376",
+          "35809749761"
+        ]
+      },
+      {
+        "index": 2,
+        "label": "微信/qq",
+        "samples": [
+          "种花家",
+          "溜溜",
+          "溜溜"
+        ]
+      },
+      {
+        "index": 3,
+        "label": "平台",
+        "samples": [
+          "快手",
+          "快手",
+          "KOC抖音"
+        ]
+      },
+      {
+        "index": 4,
+        "label": "视频链接",
+        "samples": [
+          "https://v.kuaishou.com/K5jlHIgV",
+          "https://v.kuaishou.com/Jd6N43na",
+          "https://v.douyin.com/3JBfz5GVBVs/"
+        ]
+      },
+      {
+        "index": 5,
+        "label": "关键词",
+        "samples": [
+          "离离路过",
+          "离离路过",
+          "离离路过"
+        ]
+      }
+    ],
+    "invalid": 56,
+    "mapping": {
+      "title": null,
+      "planId": null,
+      "keyword": 5,
+      "promoUrl": 4,
+      "mediaType": 3,
+      "releaseTime": 0,
+      "mediaAccount": 1,
+      "compositionType": null,
+      "compositionSubType": null
+    },
+    "duplicate": 79,
+    "headerRow": 1,
+    "sheetName": "9月21日",
+    "sheetNames": [
+      "9月20日",
+      "9月21日"
+    ]
+  }
+}

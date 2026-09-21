@@ -2,8 +2,13 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Composition, Plan } from '@zhihu-koc/shared-contracts/zhihu'
+import { SearchableSelect } from '@zhihu-koc/shared-components'
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 import { upstreamReview } from '@zhihu-koc/zhihu-module-views/work-status'
+import WorkImportDialog from '@zhihu-koc/zhihu-module-views/WorkImportDialog.vue'
+import WorkImportDrafts from '@zhihu-koc/zhihu-module-views/WorkImportDrafts.vue'
+import type { WorkImportOptions } from '@zhihu-koc/shared-services/zhihu'
 
 const route=useRoute()
 type LinkedComposition=Composition & {keywordProjectId?:string;keywordAccountId?:string}
@@ -17,7 +22,22 @@ const error = ref('')
 const statusFilter = ref('')
 
 const showCreate = ref(false)
+const showImport = ref(false)
+const draftsVersion = ref(0)
+const importInitialFile = ref<File>()
+const importInitialOptions = ref<WorkImportOptions>()
+function resumeImport(file: File, options: WorkImportOptions) {
+  importInitialFile.value = file
+  importInitialOptions.value = options
+  showImport.value = true
+  void loadPlans()
+}
 const creating = ref(false)
+const createError = ref('')
+const plansError = ref('')
+const planOptions = computed(() => plans.value.map(plan => ({ value: plan.id, label: `${plan.keyword}（${plan.channelName || '未标注渠道'}）`, detail: `计划编号：${plan.id}` })))
+const plansLoading = ref(false)
+let planSearchVersion = 0
 const MEDIA_TYPES = ['KOC视频号', 'KOC百家号', 'KOC抖音', 'KOC快手', 'KOC微博', 'KOC小红书', 'KOC定向', 'KOC头条号', 'KOC哔哩哔哩', 'KOC公众号']
 const TYPE_OPTIONS = [
   { value: 1, label: '图文' },
@@ -60,14 +80,32 @@ async function load() {
 
 async function openCreate() {
   showCreate.value = true
-  if (!plans.value.length) {
-    try { plans.value = (await apis.plans.list({ page: 1, pageSize: 100 })).list } catch { /* 计划加载失败不阻塞打开 */ }
+  createError.value = ''
+  await loadPlans()
+}
+
+async function loadPlans() {
+  const version = ++planSearchVersion
+  plansLoading.value = true
+  plansError.value = ''
+  plans.value = []
+  try {
+    const result = await fetchAllPages(params => apis.plans.list(params))
+    if (version !== planSearchVersion) return
+    plans.value = result
+    if (!result.some(plan => plan.id === form.value.planId)) form.value.planId = ''
+  } catch (e) {
+    if (version === planSearchVersion) plansError.value = e instanceof Error ? e.message : '计划加载失败，请重试'
+  } finally {
+    if (version === planSearchVersion) plansLoading.value = false
   }
 }
 
 async function submitCreate() {
-  if (!form.value.planId || !form.value.mediaAccount.trim() || !form.value.promoUrl.trim() || !form.value.releaseTime) {
-    error.value = '请完整填写计划、媒体账号、推广链接和发布时间'
+  if (creating.value) return
+  createError.value = ''
+  if (plansLoading.value || plansError.value || !plans.value.some(plan => plan.id === form.value.planId) || !form.value.mediaAccount.trim() || !form.value.promoUrl.trim() || !form.value.releaseTime) {
+    createError.value = '请完整填写计划、媒体账号、推广链接和发布时间'
     return
   }
   creating.value = true
@@ -85,19 +123,19 @@ async function submitCreate() {
     showCreate.value = false
     form.value = { planId: '', mediaType: 'KOC抖音', mediaAccount: '', compositionType: 1, compositionSubType: 1, title: '', promoUrl: '', releaseTime: '' }
     await load()
-  } catch (e: any) { error.value = e?.message ?? String(e) }
+  } catch (e: any) { createError.value = e?.message ?? String(e) }
   finally { creating.value = false }
 }
 
 let poll:ReturnType<typeof setInterval>|undefined
 watch(()=>[route.query.planId,route.query.keyword],()=>{keywordFilter.value=String(route.query.keyword||'');page.value=1;void load()})
-onMounted(()=>{void load();poll=setInterval(()=>{if(!document.hidden&&!loading.value&&!showCreate.value)void load()},15000)})
-onUnmounted(()=>{loadVersion++;if(poll)clearInterval(poll)})
+onMounted(()=>{void load();poll=setInterval(()=>{if(!document.hidden&&!loading.value&&!showCreate.value&&!showImport.value)void load()},15000)})
+onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
 </script>
 
 <template>
   <div class="page-stack">
-    <router-link to="/zhihu-story" class="back-link">← 返回知乎故事</router-link>
+    <router-link to="/modules/zhihu/history" class="back-link">← 返回知乎故事</router-link>
     <header class="page-header">
       <div>
         <p class="section-index">02 / 作品管理</p>
@@ -150,15 +188,16 @@ onUnmounted(()=>{loadVersion++;if(poll)clearInterval(poll)})
         <div class="dialog-card" style="width: min(520px, 92vw);">
           <div class="dialog-header">
             <h3>登记作品</h3>
+            <button type="button" class="work-batch-button" :disabled="creating" @click="showCreate = false; importInitialFile = undefined; importInitialOptions = undefined; showImport = true; loadPlans()">批量上传</button>
             <button type="button" class="dialog-close" @click="showCreate = false">×</button>
           </div>
           <div class="dialog-body">
+            <p v-if="createError" role="alert" style="color: var(--clay)">{{ createError }}</p>
             <div class="form-field">
-              <label>所属计划</label>
-              <select v-model="form.planId">
-                <option value="" disabled>选择推广计划</option>
-                <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.keyword }}（{{ p.channelName }}）</option>
-              </select>
+              <label for="work-plan">所属计划</label>
+              <SearchableSelect id="work-plan" v-model="form.planId" :options="planOptions" :loading="plansLoading" placeholder="输入关键词、渠道或计划编号搜索" />
+              <small v-if="plansError" role="alert">{{ plansError }} <button type="button" @click="loadPlans">重新加载</button></small>
+              <small v-else>可按关键词、渠道或计划编号搜索，共 {{ plans.length }} 条可选计划</small>
             </div>
             <div class="form-field">
               <label>媒体类型</label>
@@ -196,10 +235,18 @@ onUnmounted(()=>{loadVersion++;if(poll)clearInterval(poll)})
           </div>
           <div class="dialog-footer">
             <button class="ghost-aurora" @click="showCreate = false">取消</button>
-            <button class="primary-action" :disabled="creating" @click="submitCreate">{{ creating ? '提交中...' : '确认登记' }}</button>
+            <button class="primary-action" :disabled="creating || plansLoading || !!plansError || !form.planId" @click="submitCreate">{{ creating ? '提交中...' : '确认登记' }}</button>
           </div>
         </div>
       </div>
     </Teleport>
+    <WorkImportDrafts :api="apis.story" :refresh-key="draftsVersion" @resume="resumeImport" />
+    <WorkImportDialog v-if="showImport" :api="apis.story" :plans="plans" :initial-plan-id="form.planId" :initial-file="importInitialFile" :initial-options="importInitialOptions" @close="showImport = false" @imported="page = 1; load(); draftsVersion++" @saved="draftsVersion++" />
   </div>
 </template>
+
+<style scoped>
+.work-batch-button { margin-left: auto; margin-right: 14px; padding: 7px 13px; border: 1px solid var(--line, #d6d2cc); border-radius: 2px; background: transparent; color: var(--ink, #20282d); font-size: 12px; font-weight: 600; cursor: pointer; }
+.work-batch-button:hover { background: var(--paper, #f2f0ec); border-color: var(--ink-soft, #807b73); }
+.work-batch-button:disabled { opacity: .5; cursor: wait; }
+</style>

@@ -251,7 +251,7 @@ export async function listWithdrawals(user: AuthUser, query: Record<string, unkn
      FROM withdrawal_requests w
      JOIN users u ON u.id = w.user_id
      LEFT JOIN users lu ON lu.id = w.leader_id
-     WHERE ${clause} ORDER BY w.created_at DESC LIMIT ? OFFSET ?`,
+     WHERE ${clause} ORDER BY w.created_at DESC,w.id DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list, total: Number(count?.total ?? 0), page, pageSize };
@@ -397,7 +397,7 @@ export async function listAppeals(user: AuthUser, query: Record<string, unknown>
      FROM finance_appeals a
      JOIN users u ON u.id = a.user_id
      LEFT JOIN users lu ON lu.id = a.leader_id
-     WHERE ${clause} ORDER BY a.created_at DESC LIMIT ? OFFSET ?`,
+     WHERE ${clause} ORDER BY a.created_at DESC,a.id DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
   return { list, total: Number(count?.total ?? 0), page, pageSize };

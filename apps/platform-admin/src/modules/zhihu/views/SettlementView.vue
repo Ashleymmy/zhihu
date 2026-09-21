@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fetchAllPages } from '@zhihu-koc/shared-services'
 import { computed, onMounted, ref } from 'vue'
 import type { EarningRecord, PricingRule, SettlementBatch, SettlementBatchDetail, TeamMember } from '@zhihu-koc/shared-contracts/zhihu'
 import { APP_ROLE } from '../../../app-config'
@@ -150,9 +151,9 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [e] = await Promise.all([apis.earnings.list({ page: 1, pageSize: 50 }), ...(isAdmin ? [loadRules(), loadBatches()] : [])])
-    earnings.value = e.list
-    earningsTotal.value = e.total
+    const [e] = await Promise.all([fetchAllPages(params => apis.earnings.list(params)), ...(isAdmin ? [loadRules(), loadBatches()] : [])])
+    earnings.value = e
+    earningsTotal.value = e.length
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }

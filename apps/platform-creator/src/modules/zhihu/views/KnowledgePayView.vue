@@ -1,20 +1,11 @@
-<script setup lang="ts">
-</script>
-
 <template>
   <div class="page-stack">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">KNOWLEDGE / PAY</p>
-        <h1>知识付费</h1>
-      </div>
-    </header>
-    <article class="panel" style="padding: 20px;">
-      <h2 style="margin: 0 0 16px; font-size: 16px;">课程管理</h2>
-      <p style="font-size: 12px; color: var(--ink-soft);">管理知识付费课程的上架、下架和更新。</p>
+    <header class="page-header"><div><p class="eyebrow">KNOWLEDGE</p><h1>知识付费</h1></div></header>
+    <article class="panel" style="padding: 24px;">
+      <h2>暂未接入课程销售数据</h2>
+      <p>课程销量、收入及上下架功能尚未开放。已同步的推广任务与产品可在知乎故事中查看。</p>
+      <router-link class="primary-action" to="/modules/zhihu/tasks">查看推广任务</router-link>
+      <router-link class="ghost-aurora" to="/modules/zhihu/products">查看产品库</router-link>
     </article>
-    <div class="empty-panel" style="border: 1px solid var(--line); border-radius: var(--radius); background: var(--white);">
-      <span>课程管理功能即将上线。</span>
-    </div>
   </div>
 </template>

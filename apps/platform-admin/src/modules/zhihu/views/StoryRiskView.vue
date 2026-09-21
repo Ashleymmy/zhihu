@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fetchAllOffsetPages } from '@zhihu-koc/shared-services'
 import { useAuthStore, apis } from '../context'
 
 /** 风险词（知乎 OpenApi §2.13.2） */
@@ -17,22 +18,27 @@ const keyword = ref('')
 const statusLabels: Record<number, string> = { 1: '审核中', 2: '判定违规', 3: '判定正常' }
 const statusClass: Record<number, string> = { 1: 'paused', 2: 'rejected', 3: 'active' }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
   loading.value = true
   error.value = ''
+  items.value = []
+  total.value = 0
   try {
-    const resp: any = await apis.story.riskWords({
+    const filters = {
       type: typeFilter.value,
       risk_type: riskTypeFilter.value === '' ? undefined : riskTypeFilter.value,
       status: statusFilter.value === '' ? undefined : statusFilter.value,
       keyword: keyword.value.trim() || undefined,
-      limit: 50,
-    })
-    items.value = Array.isArray(resp) ? resp : (resp?.data ?? [])
-    total.value = resp?.pagination?.total ?? items.value.length
+    }
+    const result = await fetchAllOffsetPages<RiskWord>((params) => apis.story.riskWords({ ...filters, ...params }))
+    if (version !== loadVersion) return
+    items.value = result.items
+    total.value = result.total
   }
-  catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loading.value = false }
+  catch (e: any) { if (version === loadVersion) error.value = e?.message ?? String(e) }
+  finally { if (version === loadVersion) loading.value = false }
 }
 
 onMounted(load)
