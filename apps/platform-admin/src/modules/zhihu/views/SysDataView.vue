@@ -26,7 +26,7 @@ async function load() {
   }
 }
 
-async function trigger(kind: 'channels' | 'tasks' | 'metrics' | 'planStatus' | 'compositionStatus') {
+async function trigger(kind: 'channels' | 'tasks' | 'metrics' | 'compositionStatus') {
   syncing.value = kind
   message.value = ''
   error.value = ''
@@ -34,10 +34,7 @@ async function trigger(kind: 'channels' | 'tasks' | 'metrics' | 'planStatus' | '
     if (kind === 'channels') await apis.channels.sync()
     else if (kind === 'tasks') await apis.story.syncTasks()
     else if (kind === 'metrics') await apis.metrics.sync()
-    else if (kind === 'planStatus') {
-      // 调用推广计划审核状态同步
-      await http.post('/admin-tools/sync-plan-status')
-    } else if (kind === 'compositionStatus') {
+    else if (kind === 'compositionStatus') {
       // 调用作品审核状态同步
       await http.post('/admin-tools/sync-composition-status')
     }
@@ -139,10 +136,8 @@ onMounted(load)
               </button>
             </div>
             <div class="sync-row">
-              <div><strong>推广计划审核状态</strong><small>从知乎拉取计划的审核状态与拒绝原因</small></div>
-              <button class="row-action" :disabled="!!syncing" @click="trigger('planStatus')">
-                {{ syncing === 'planStatus' ? '入队中...' : '立即同步' }}
-              </button>
+              <div><strong>推广计划审核状态</strong><small>尚未接通官方计划查询，需取得知乎查询接口与授权后启用。</small></div>
+              <button class="row-action" disabled>尚未接通</button>
             </div>
             <div class="sync-row">
               <div><strong>作品审核状态</strong><small>从知乎拉取作品的审核状态与拒绝原因</small></div>

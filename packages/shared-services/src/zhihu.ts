@@ -211,7 +211,7 @@ export function createCallbacksApi(http: HttpClient) {
 export function createZhihuStoryApi(http: HttpClient) {
   return {
     /** 作品管理（compositions） */
-    listWorks: (params: { page?: number; pageSize?: number; planId?: string; status?: string } = {}) =>
+    listWorks: (params: { page?: number; pageSize?: number; planId?: string; status?: string; keyword?: string } = {}) =>
       http.get<PageResp<Composition>>('/compositions', params),
     createWork: (data: {
       planId: string

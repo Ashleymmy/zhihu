@@ -9,6 +9,7 @@ import { scopeFilter } from '../../../utils/scopeFilter';
 import { writeAudit } from '../../../services/audit.service';
 import { isCompositionCategoryValid } from '../zhihu/composition';
 import { DEV_DEMO_USER_IDS, isDevDemoAuthUser } from '../dev-demo';
+import { planAccountSql } from './plan-account';
 
 interface CountRow extends RowDataPacket {
   total: number;
@@ -95,10 +96,16 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
     where.push('c.status = ?');
     bindings.push(query.status);
   }
+  if (query.keyword) {
+    where.push('p.keyword LIKE ?');
+    bindings.push(`%${String(query.keyword)}%`);
+  }
   const clause = where.join(' AND ');
-  const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM compositions c WHERE ${clause}`, bindings);
+  const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM compositions c JOIN plans p ON p.id=c.plan_id WHERE ${clause}`, bindings);
   const list = await rows<ItemRow>(
     `SELECT c.*, p.keyword, p.channel_id, ch.name channel_name,
+            CAST(p.project_id AS CHAR) keyword_project_id,
+            CAST(${planAccountSql()} AS CHAR) keyword_account_id,
             u.display_name assignee_name
      FROM compositions c
      JOIN plans p ON p.id = c.plan_id
@@ -106,7 +113,7 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
        ON ch.project_id = p.project_id AND ch.zhihu_channel_id = p.channel_id
      JOIN users u ON u.id = c.owner_id
      WHERE ${clause}
-     ORDER BY c.created_at DESC
+     ORDER BY c.created_at DESC, c.id DESC
      LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );

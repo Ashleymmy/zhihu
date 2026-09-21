@@ -11,6 +11,14 @@ export interface Option {
   role?: string
   parentId?: string
   channelName?: string
+  zhihuTaskId?: string
+  zhihuChannelId?: string
+  unitPrice?: string | number | null
+  settleType?: string | null
+  status?: string | null
+  startTime?: string | null
+  endTime?: string | null
+  syncedAt?: string | null
 }
 export interface EngineOptions {
   integrationMode?: 'simulation' | 'upstream'

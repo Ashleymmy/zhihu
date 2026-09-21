@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { Composition, Plan } from '@zhihu-koc/shared-contracts/zhihu'
 import { useAuthStore, apis } from '../context'
+import { upstreamReview } from '@zhihu-koc/zhihu-module-views/work-status'
 
-const works = ref<Composition[]>([])
+const route=useRoute()
+type LinkedComposition=Composition & {keywordProjectId?:string;keywordAccountId?:string}
+const works = ref<LinkedComposition[]>([])
+const page=ref(1),pageSize=25,keywordFilter=ref(String(route.query.keyword||''))
+const selectedPlan=computed(()=>/^\d+$/.test(String(route.query.planId||''))?String(route.query.planId):undefined)
 const total = ref(0)
 const plans = ref<Plan[]>([])
 const loading = ref(true)
@@ -38,15 +44,18 @@ const subTypeOptions = computed(() => SUB_TYPES.filter((s) => s.parent === form.
 const statusLabels: Record<string, string> = { pending: '待审核', active: '已发布', rejected: '已拒绝', ended: '已结束' }
 const syncLabels: Record<string, string> = { local: '本地', syncing: '同步中', synced: '已同步', failed: '同步失败' }
 
+let loadVersion=0
 async function load() {
+  const version=++loadVersion
   loading.value = true
   error.value = ''
   try {
-    const data = await apis.story.listWorks({ page: 1, pageSize: 100, status: statusFilter.value || undefined })
+    const data = await apis.story.listWorks({ page: page.value, pageSize, planId: selectedPlan.value, keyword: keywordFilter.value || undefined, status: statusFilter.value || undefined })
+    if(version!==loadVersion)return
     works.value = data.list
     total.value = data.total
-  } catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loading.value = false }
+  } catch (e: any) { if(version===loadVersion)error.value = e?.message ?? String(e) }
+  finally { if(version===loadVersion)loading.value = false }
 }
 
 async function openCreate() {
@@ -80,7 +89,10 @@ async function submitCreate() {
   finally { creating.value = false }
 }
 
-onMounted(load)
+let poll:ReturnType<typeof setInterval>|undefined
+watch(()=>[route.query.planId,route.query.keyword],()=>{keywordFilter.value=String(route.query.keyword||'');page.value=1;void load()})
+onMounted(()=>{void load();poll=setInterval(()=>{if(!document.hidden&&!loading.value&&!showCreate.value)void load()},15000)})
+onUnmounted(()=>{loadVersion++;if(poll)clearInterval(poll)})
 </script>
 
 <template>
@@ -93,7 +105,7 @@ onMounted(load)
         <p>挂在推广计划下的内容与素材作品，跟踪审核与同步状态。</p>
       </div>
       <div class="page-actions">
-        <select v-model="statusFilter" @change="load">
+        <select v-model="statusFilter" @change="page=1;load()">
           <option value="">全部状态</option>
           <option value="pending">待审核</option>
           <option value="active">已发布</option>
@@ -106,6 +118,7 @@ onMounted(load)
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
+    <form class="page-actions" @submit.prevent="page=1;load()"><label>查找关键词<input v-model.trim="keywordFilter" maxlength="128" placeholder="与关键词管理使用相同关键词" /></label><button type="submit" :disabled="loading">搜索</button><button type="button" :disabled="loading" @click="load">刷新</button><router-link v-if="selectedPlan" to="/modules/zhihu/works">查看全部作品</router-link></form>
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
         <span class="toolbar-title">作品列表</span>
@@ -115,19 +128,21 @@ onMounted(load)
       <div v-else-if="!works.length" class="empty-panel"><span>还没有登记作品。点击「登记作品」开始。</span></div>
       <div v-else class="responsive-table">
         <table>
-          <thead><tr><th>标题</th><th>所属计划</th><th>媒体账号</th><th>分类</th><th>状态</th><th>同步</th></tr></thead>
+          <thead><tr><th>标题</th><th>所属计划</th><th>媒体账号</th><th>分类</th><th>本地状态</th><th>知乎审核</th><th>同步</th></tr></thead>
           <tbody>
             <tr v-for="w in works" :key="w.id">
               <td><strong>{{ w.title || '未命名作品' }}</strong><br /><a :href="w.promoUrl" target="_blank" style="color: var(--ink-soft); font-size: 12px;">{{ w.promoUrl.slice(0, 48) }}</a></td>
-              <td style="font-size: 13px;">{{ w.keyword ?? '—' }}</td>
+              <td style="font-size: 13px;"><router-link v-if="w.keywordProjectId&&w.keywordAccountId" :to="{path:'/modules/zhihu/operations',query:{projectId:w.keywordProjectId,accountId:w.keywordAccountId,keyword:w.keyword,tab:'keywords'}}">{{w.keyword}}</router-link><span v-else>{{w.keyword??'—'}}</span></td>
               <td style="font-size: 13px;">{{ w.mediaType }}<br /><small style="color: var(--ink-soft);">{{ w.mediaAccount }}</small></td>
               <td style="font-size: 13px;">{{ TYPE_OPTIONS.find(t => t.value === w.compositionType)?.label ?? '其他' }} / {{ SUB_TYPES.find(s => s.value === w.compositionSubType)?.label ?? '—' }}</td>
               <td><span :class="['status-badge', w.status]">{{ statusLabels[w.status] ?? w.status }}</span></td>
+              <td>{{ upstreamReview({...w,source:'composition'}).label }}<small style="display:block">{{ upstreamReview({...w,source:'composition'}).reason }}</small><router-link v-if="w.keywordProjectId&&w.keywordAccountId" :to="{path:'/modules/zhihu/operations',query:{projectId:w.keywordProjectId,accountId:w.keywordAccountId,tab:'works'}}">查看平台核验</router-link></td>
               <td><span :class="['status-badge', w.syncStatus === 'synced' ? 'active' : w.syncStatus === 'failed' ? 'rejected' : 'draft']">{{ syncLabels[w.syncStatus] ?? w.syncStatus }}</span></td>
             </tr>
           </tbody>
         </table>
       </div>
+    <nav class="page-actions" aria-label="作品分页"><button :disabled="page===1||loading" @click="page--;load()">上一页</button><span>第 {{page}} 页，共 {{total}} 条作品</span><button :disabled="page*pageSize>=total||loading" @click="page++;load()">下一页</button></nav>
     </article>
 
     <Teleport to="body">

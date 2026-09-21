@@ -21,7 +21,7 @@ export function registerJobs() {
   registerJob('sync-tasks', syncTasks);
   registerJob('settle-earnings', settleEarnings);
   registerJob('sync-plan-status', syncPlanStatus);
-  registerJob('sync-composition-status', syncCompositionStatus);
+  registerJob('sync-composition-status', async () => { await syncCompositionStatus(); });
 }
 
 export function startScheduler() {
@@ -45,13 +45,13 @@ export function startScheduler() {
     { timezone: config.timezone },
   );
 
-  // 每天凌晨 3 点同步推广计划和作品的审核状态
+  // 每天凌晨 3 点同步作品审核状态；计划查询须取得已验证的官方接口后再接入。
   settleTask = cron.schedule(
     '0 3 * * *',
     () => {
       void (async () => {
         const day = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone }).format(new Date());
-        await enqueue('sync-plan-status', { source: 'cron' }, { jobId: `sync-plan-status-${day}` });
+        // Resume plan synchronization only after a verified official query adapter is available.
         await enqueue('sync-composition-status', { source: 'cron' }, { jobId: `sync-composition-status-${day}` });
       })().catch((error) => {
         if (process.env.NODE_ENV !== 'test') {

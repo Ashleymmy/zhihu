@@ -2,21 +2,11 @@ import { RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../../../db';
 import { zhihuGet } from '../zhihu/client';
 import { config } from '../config';
+import { listPages } from './listPages';
+export { listOf } from './listPages';
 
 interface ChannelRow extends RowDataPacket {
   zhihu_channel_id: string;
-}
-
-export function listOf(response: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(response)) return response as Array<Record<string, unknown>>;
-  if (!response || typeof response !== 'object') return [];
-  const value = response as Record<string, unknown>;
-  if (Array.isArray(value.data)) return value.data as Array<Record<string, unknown>>;
-  const data = value.data && typeof value.data === 'object' ? (value.data as Record<string, unknown>) : value;
-  if (Array.isArray(data.list)) return data.list as Array<Record<string, unknown>>;
-  if (Array.isArray(data.items)) return data.items as Array<Record<string, unknown>>;
-  if (Array.isArray(value.list)) return value.list as Array<Record<string, unknown>>;
-  return [];
 }
 
 function nullableString(value: unknown): string | null {
@@ -57,8 +47,10 @@ export function normalizeTask(item: Record<string, unknown>) {
 }
 
 export async function syncChannels() {
-  const response = await zhihuGet('/alliance/api/get_agent_channels');
-  for (const item of listOf(response)) {
+  for await (const item of listPages(
+    (offset, limit) => zhihuGet('/alliance/api/get_agent_channels', { offset, limit }),
+    item => String(item.channel_id ?? item.channelId ?? item.id),
+  )) {
     const channel = normalizeChannel(item);
     if (!channel) continue;
     await db.query(
@@ -91,12 +83,10 @@ export async function syncTasks(data: Record<string, unknown> = {}) {
       ).map((row) => String(row.zhihu_channel_id));
 
   for (const channelId of channelIds) {
-    const response = await zhihuGet('/alliance/api/popularize_tasks', {
-      channel_id: channelId,
-      offset: 0,
-      limit: 100,
-    });
-    for (const item of listOf(response)) {
+    for await (const item of listPages(
+      (offset, limit) => zhihuGet('/alliance/api/popularize_tasks', { channel_id: channelId, offset, limit }),
+      item => String(item.task_id ?? item.taskId ?? item.id),
+    )) {
       const task = normalizeTask(item);
       if (!task) continue;
       await db.query(

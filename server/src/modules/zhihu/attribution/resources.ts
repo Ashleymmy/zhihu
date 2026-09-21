@@ -6,6 +6,9 @@ import { audit, authorize, bindingLock, insert, keywordLock, mutate, ownBinding,
 import { businessDay, day, fail, keywordText, type Scope } from './domain';
 import { logger } from '../../../utils/logger';
 import { ensurePoolMapping, keywordVisibility } from './plan-pool';
+import { officialPlanReadCapability } from '../zhihu/planReadCapability';
+import { planAccountSql } from '../services/plan-account';
+import { scopeFilter } from '../../../utils/scopeFilter';
 
 async function simulationScope(c: PoolConnection, scope: Scope) {
   const [setting] = await select(c, "SELECT JSON_UNQUOTE(JSON_EXTRACT(config_json,'$.mode')) mode FROM zhihu_account_settings WHERE project_id=? AND account_id=?", [scope.projectId, scope.accountId]);
@@ -104,12 +107,12 @@ export async function options(user: AuthUser, scope: Scope) {
   await authorize(user, scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
-    const tasks = await select(c, 'SELECT CAST(id AS CHAR) id,name FROM tasks WHERE project_id=? ORDER BY id', [
+    const tasks = await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_task_id,unit_price,settle_type,status,start_time,end_time,synced_at FROM tasks WHERE project_id=? ORDER BY id', [
       scope.projectId,
     ]);
     const channels =
       user.role === 'admin'
-        ? await select(c, 'SELECT CAST(id AS CHAR) id,name FROM channels WHERE project_id=? AND is_enabled=1', [
+        ? await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_channel_id,generation,synced_at FROM channels WHERE project_id=? AND is_enabled=1', [
             scope.projectId,
           ])
         : [];
@@ -242,24 +245,57 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
     const visibility = keywordVisibility(user);
-    const args = [scope.accountId, scope.projectId, `%${search}%`, ...visibility.bindings];
-    const where = `k.account_id=? AND k.project_id=? AND k.keyword LIKE ? AND ${visibility.clause}`;
+    const workScope = scopeFilter(user, 'cw.owner_id');
+    const planScope = scopeFilter(user, 'p.owner_id');
+    const compositionCount = `(SELECT COUNT(*) FROM compositions cw WHERE cw.plan_id=p.id AND ${workScope.clause})`;
+    const args = [scope.projectId, scope.accountId, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings];
+    const where = `p.project_id=? AND ${planAccountSql()}=? AND p.keyword LIKE ?
+      AND (k.id IS NULL OR k.project_id=p.project_id)
+      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0)`;
+    const from = `FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id
+      LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id`;
     const [total] = await select(c,
-      `SELECT COUNT(*) total FROM zh_keywords k LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id WHERE ${where}`,
+      `SELECT COUNT(*) total,
+        COALESCE(SUM(p.sync_status='local'),0) pending,
+        COALESCE(SUM(p.sync_status='syncing'),0) submitting,
+        COALESCE(SUM(p.sync_status='synced' AND p.zhihu_plan_id IS NOT NULL),0) created,
+        COALESCE(SUM(p.sync_status='failed'),0) failed,
+        COALESCE(SUM(p.sync_status='simulated'),0) simulated
+       ${from} WHERE ${where}`,
       args,
     );
     const list = await select(
       c,
-      `SELECT CAST(k.id AS CHAR) id,k.keyword,CAST(k.task_id AS CHAR) task_id,CAST(k.plan_id AS CHAR) plan_id,
-      k.lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,${user.role === 'admin' ? 'p.sync_error' : 'NULL'} AS sync_error,
+      `SELECT COALESCE(CAST(k.id AS CHAR),CONCAT('plan:',p.id)) id,p.keyword,
+      CAST(k.task_id AS CHAR) task_id,CAST(p.id AS CHAR) plan_id,
+      (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name,
+      COALESCE(k.lifecycle_status,'historical') lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,${user.role === 'admin' ? 'p.sync_error' : 'NULL'} AS sync_error,
+      (k.id IS NULL OR NOT (${visibility.clause})) read_only,
+      ${compositionCount} composition_count,
+      (SELECT u.display_name FROM users u WHERE u.id=p.owner_id) owner_name,
       DATE_FORMAT(TIMESTAMPADD(SECOND,TIMESTAMPDIFF(SECOND,NOW(),UTC_TIMESTAMP()),k.priority_until),'%Y-%m-%dT%H:%i:%s.%fZ') priority_until,k.used_ever_at,k.version,
       CAST(b.id AS CHAR) binding_id,b.path_type,CAST(b.leader_id AS CHAR) leader_id,CAST(b.executor_id AS CHAR) executor_id,b.verification_status,b.release_status,
       (k.priority_until<=NOW(3)) AS priority_ended
-      FROM zh_keywords k JOIN plans p ON p.id=k.plan_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
-      WHERE ${where} ORDER BY k.id DESC LIMIT ? OFFSET ?`,
-      [...args, pageSize, (page - 1) * pageSize],
+      ${from}
+      WHERE ${where} ORDER BY p.created_at DESC,p.id DESC LIMIT ? OFFSET ?`,
+      [...visibility.bindings, ...workScope.bindings, ...args, pageSize, (page - 1) * pageSize],
     );
-    return { list, total: Number(total.total), page, pageSize };
+    const summary = {
+      pending: Number(total.pending), submitting: Number(total.submitting),
+      created: Number(total.created), failed: Number(total.failed), simulated: Number(total.simulated),
+      unknown: 0,
+    };
+    summary.unknown = Number(total.total) - Object.values(summary).reduce((sum, count) => sum + count, 0);
+    for (const word of list) {
+      word.read_only = Number(word.read_only);
+      word.composition_count = Number(word.composition_count);
+    }
+    return {
+      list,
+      total: Number(total.total), page, pageSize, summary,
+      source: 'local', officialTotal: null, officialRead: officialPlanReadCapability,
+      readAt: new Date().toISOString(),
+    };
   });
 }
 export async function claim(user: AuthUser, scope: Scope, id: string, key: string) {

@@ -54,7 +54,7 @@ const patch = z.object({
   promoUrl: z.string().url().max(1024).optional(),
   releaseTime: releaseTime.nullable().optional(),
 });
-const list = paginationSchema.extend({ planId: id.optional(), status: z.string().optional() });
+const list = paginationSchema.extend({ planId: id.optional(), status: z.string().optional(), keyword: z.string().trim().max(128).optional() });
 export const compositionsRouter = Router();
 compositionsRouter.use(requireAuth);
 compositionsRouter.get(

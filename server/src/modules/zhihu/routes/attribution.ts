@@ -11,6 +11,7 @@ import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
+import { listWorks } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
 import { requirePermission } from '../permissions';
 import { XLSX_MAX_BYTES } from '../zhihu/allianceXlsx';
@@ -79,6 +80,10 @@ export const pagingSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 const key = (req: import('express').Request) => req.header('Idempotency-Key') ?? String(req.body?.requestKey ?? '');
+attributionRouter.get('/workbench/works', asyncHandler(async (req, res) => {
+  const query = scopeSchema.merge(pagingSchema).parse(req.query);
+  ok(res, await listWorks(req.user, query, query.page, query.pageSize));
+}));
 attributionRouter.get(
   '/attribution-options',
   asyncHandler(async (req, res) => ok(res, await resource.options(req.user, scopeSchema.parse(req.query)))),

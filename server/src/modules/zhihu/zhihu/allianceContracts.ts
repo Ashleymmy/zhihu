@@ -435,6 +435,9 @@ function projectCompositionList(
       compositionType: safeInteger(source.composition_type),
       compositionSubType: safeInteger(source.composition_sub_type),
       keyword: safeString(source.keyword),
+      // Some responses include review details. Preserve only explicitly returned
+      // fields; an absent review result must never become an approval.
+      ...optionalCompositionReview(source),
     };
   });
   const page = offset / upstreamLimit + 1;
@@ -446,7 +449,16 @@ function projectCompositionList(
     throw new AllianceProtocolError();
   }
   const meta = { page, pageSize, total };
-  return { data: items, clientData: { data: items }, message, meta };
+  return { data: items, clientData: { data: items, pagination: { total, offset, limit: upstreamLimit } }, message, meta };
+}
+
+function optionalCompositionReview(source: Record<string, unknown>) {
+  const result: Record<string, string | number | null> = {};
+  for (const [name, aliases] of Object.entries({status:['status'],auditStatus:['audit_status','auditStatus'],rejectReason:['reject_reason','rejectReason']})) {
+    const key = aliases.find(alias => hasOwn(source, alias));
+    if (key) result[name] = source[key] === null ? null : safeScalar(source[key]);
+  }
+  return result;
 }
 
 function projectRealtime(upstream: unknown, message: string): AllianceSuccessProjection {

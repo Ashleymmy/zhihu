@@ -73,6 +73,13 @@ const operations = [
 ] as const;
 
 describe('知乎联盟严格 contracts', () => {
+  it('retains optional upstream review and pagination without exposing extra fields', () => {
+    const result=projectAllianceSuccess(operations[5].endpoint,{
+      data:[{composition_id:'2071266138193975100',composition_url:'https://example.com/work',submit_time:'2026-09-20',composition_type:1,composition_sub_type:1,keyword:'词',audit_status:'rejected',reject_reason:'需修改',private_note:'must-not-leak'}],
+      pagination:{total:101,offset:100,limit:100},
+    },{});
+    expect(result.clientData).toEqual({data:[{compositionId:'2071266138193975100',compositionUrl:'https://example.com/work',submitTime:'2026-09-20',compositionType:1,compositionSubType:1,keyword:'词',auditStatus:'rejected',rejectReason:'需修改'}],pagination:{total:101,offset:100,limit:100}});
+  });
   it('P0007-R2A-SCHEMA-001 rejects malformed non-batch ingress while preserving offline batch schemas', () => {
     const invalidInputs = [
       [endpoint('POST', '/popularize_plan'), { keyword: '缺少字段' }],
@@ -222,6 +229,7 @@ describe('知乎联盟严格 contracts', () => {
             keyword: '关键词',
           },
         ],
+        pagination: { total: 1, offset: 20, limit: 20 },
       },
       message: ALLIANCE_OPERATION_CONTRACTS['GET /popularize_compositions'].message,
       meta: { page: 2, pageSize: 20, total: 1 },

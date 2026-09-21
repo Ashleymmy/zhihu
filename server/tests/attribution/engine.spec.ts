@@ -108,6 +108,27 @@ describe('独占资源数据库闭环', () => {
       word.planId,
     ]);
   });
+  it('本地统计按当前搜索和角色范围计数，不冒充官方总数', async () => {
+    const [word] = await c.query<mysql.RowDataPacket[]>('SELECT plan_id FROM zh_keywords WHERE id=?', [wordId]);
+    const planId = word[0].plan_id;
+    try {
+      for (const [syncStatus, bucket] of [['local','pending'],['syncing','submitting'],['failed','failed'],['simulated','simulated'],['synced','created']] as const) {
+        await c.query('UPDATE plans SET sync_status=? WHERE id=?', [syncStatus, planId]);
+        const result = await resource.listKeywords(admin, scope, 2, 1, '独占词甲');
+        expect(result).toMatchObject({ source: 'local', officialTotal: null, officialRead: { available: false }, total: 1, list: [] });
+        expect(result.summary[bucket]).toBe(1);
+        expect(Object.values(result.summary).reduce((sum, count) => sum + count, 0)).toBe(1);
+      }
+      await c.query('UPDATE plans SET zhihu_plan_id=NULL WHERE id=?', [planId]);
+      expect((await resource.listKeywords(admin, scope, 1, 25, '独占词甲')).summary.unknown).toBe(1);
+      expect((await resource.listKeywords(admin, scope, 1, 25, '不存在的词')).total).toBe(0);
+      const hidden = await resource.listKeywords(creator, scope, 1, 25, '独占词甲');
+      expect(hidden.total).toBe(0);
+      expect(Object.values(hidden.summary).every(count => count === 0)).toBe(true);
+    } finally {
+      await c.query("UPDATE plans SET sync_status='synced',zhihu_plan_id='external1' WHERE id=?", [planId]);
+    }
+  });
   it('50 个并发领取仅一次成功，同键重试返回同一绑定', async () => {
     await resource.synchronizeKeywords();
     const requests = Array.from({ length: 50 }, () => key());
@@ -881,5 +902,105 @@ describe('推广计划与关键词库贯通', () => {
     const solo=await resource.claim(direct,poolScope,fresh.id,key());
     await resource.changeBinding(direct,poolScope,solo.id,key(),{action:'activate'});
     await expect(resource.claim(leader,poolScope,fresh.id,key())).rejects.toThrow('已被占用');
+  });
+});
+
+describe('关键词与推广作品使用同一计划关联', () => {
+  const linkedScope={projectId:'992',accountId:'992'};
+  let historyPlan='',managedKeyword='';
+  it('历史关键词即时可见，130 条作品仅计一个关键词，保留归属', async () => {
+    await c.query("INSERT INTO projects(id,name,slug) VALUES(992,'两页关联测试','linked-pages-992')");
+    await c.query("INSERT INTO integration_accounts(id,module_id,account_key,name,status,created_by) VALUES(992,'zhihu','linked-pages-992','两页关联账号','active',1)");
+    await c.query('INSERT INTO project_integrations(project_id,account_id) VALUES(992,992)');
+    await c.query('INSERT INTO project_members(project_id,user_id) VALUES(992,2),(992,3),(992,4)');
+    await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(992,992,'linked-channel',1,'关联渠道')");
+    await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(992,992,'linked-task','关联任务',NOW())");
+    const [result]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status,zhihu_plan_id) VALUES(992,'linked-task','linked-channel','作品关联历史词','https://example.com/linked',0,3,1,'active','synced','2081752449271054865')");
+    historyPlan=String(result.insertId);
+    for(let i=0;i<130;i++)await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,sync_status,zhihu_composition_id) VALUES(?,3,'KOC抖音','linked-user',1,1,?,'synced',?)",[historyPlan,'https://example.com/linked/'+i,'linked-work-'+i]);
+    const words=await resource.listKeywords(creator,linkedScope,1,25,'作品关联历史词');
+    expect(words.total).toBe(1);
+    expect(words.list[0]).toMatchObject({id:'plan:'+historyPlan,plan_id:historyPlan,read_only:1,composition_count:130,lifecycle_status:'historical',task_name:'关联任务'});
+    const [bindings]=await c.query<mysql.RowDataPacket[]>('SELECT id FROM zh_keywords WHERE plan_id=?',[historyPlan]);expect(bindings).toHaveLength(0);
+    const [plans]=await c.query<mysql.RowDataPacket[]>('SELECT owner_id,zhihu_plan_id FROM plans WHERE id=?',[historyPlan]);expect(String(plans[0].owner_id)).toBe('3');expect(plans[0].zhihu_plan_id).toBe('2081752449271054865');
+    expect((await resource.listKeywords(direct,linkedScope,1,25,'作品关联历史词')).total).toBe(0);
+    expect((await resource.listKeywords(leader,linkedScope,1,25,'作品关联历史词')).total).toBe(1);
+  });
+  it('作品分页超过100条，并与关键词改名和筛选立即一致', async () => {
+    const {listCompositions}=await import('../../src/modules/zhihu/services/compositions.service');
+    const works=await listCompositions(creator,{planId:historyPlan,page:6,pageSize:25,keyword:'作品关联历史词'});
+    expect(works.total).toBe(130);expect(works.list).toHaveLength(5);
+    expect(works.list[0]).toMatchObject({keyword:'作品关联历史词',keyword_project_id:'992',keyword_account_id:'992'});
+    expect((await listCompositions(direct,{planId:historyPlan})).total).toBe(0);
+    await c.query('UPDATE plans SET keyword=? WHERE id=?',['作品关联改名词',historyPlan]);
+    expect((await resource.listKeywords(creator,linkedScope,1,25,'作品关联历史词')).total).toBe(0);
+    expect((await resource.listKeywords(creator,linkedScope,1,25,'作品关联改名词')).list[0].plan_id).toBe(historyPlan);
+    expect((await listCompositions(creator,{planId:historyPlan,keyword:'作品关联改名词'})).total).toBe(130);
+    await expect(resource.claim(creator,linkedScope,'plan:'+historyPlan,key())).rejects.toThrow();
+  });
+  it('无作品的旧计划也在新词库可见，仍按原归属隔离', async () => {
+    const [p]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by) VALUES(992,'linked-task','linked-channel','尚未登记作品的历史词','https://example.com/pending',0,3,1)");
+    for(const viewer of [admin,leader,creator]) {
+      const result=await resource.listKeywords(viewer,linkedScope,1,25,'尚未登记作品的历史词');
+      expect(result.total).toBe(1);
+      expect(result.list[0]).toMatchObject({id:'plan:'+p.insertId,read_only:1,composition_count:0});
+    }
+    expect((await resource.listKeywords(direct,linkedScope,1,25,'尚未登记作品的历史词')).total).toBe(0);
+  });
+  it('新作品页显示130条旧作品及最新知乎审核结果，支持分页与角色隔离', async () => {
+    const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
+    await c.query("UPDATE compositions SET zhihu_status_json=? WHERE plan_id=?",[JSON.stringify({auditStatus:'rejected',rejectReason:'补充关键词'}),historyPlan]);
+    const result=await listWorks(creator,linkedScope,6,25);
+    expect(result.total).toBe(130);expect(result.list).toHaveLength(5);
+    expect(result.list[0]).toMatchObject({source:'composition',keyword:'作品关联改名词',binding_id:null,executor_id:'3',executor_name:'达人'});
+    expect(JSON.parse(String(result.list[0].zhihu_status_json))).toEqual({auditStatus:'rejected',rejectReason:'补充关键词'});
+    expect((await listWorks(leader,linkedScope,1,25)).total).toBe(130);
+    expect((await listWorks(direct,linkedScope,1,25)).total).toBe(0);
+    await expect(listWorks(outsider,linkedScope,1,25)).rejects.toThrow();
+  });
+  it('同一作品关联两种审核但不重复，知乎通过不会自动通过平台审核', async () => {
+    const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
+    const {submitEvidence,reviewEvidence}=await import('../../src/modules/zhihu/attribution/statements');
+    const created=await resource.createKeyword(admin,linkedScope,key(),{keyword:'双审核关联词',taskId:'992',channelId:'992',landingUrl:'https://example.com/join',popularizeType:0});
+    await c.query("UPDATE plans SET status='active',sync_status='synced',zhihu_plan_id='linked-review-plan' WHERE id=?",[created.planId]);
+    await resource.synchronizeKeywords(linkedScope);
+    const binding=await resource.claim(leader,linkedScope,created.id,key());
+    await resource.changeBinding(leader,linkedScope,binding.id,key(),{action:'assign',executorId:'3'});
+    await resource.changeBinding(creator,linkedScope,binding.id,key(),{action:'activate'});
+    const evidence=await submitEvidence(creator,linkedScope,key(),{bindingId:binding.id,url:'https://example.com/joined-work',description:'联动核验'});
+    await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,sync_status,zhihu_status_json) VALUES(?,3,'KOC抖音','linked-user',1,1,'https://example.com/joined-work','synced',?)",[created.planId,JSON.stringify({auditStatus:'approved'})]);
+    const result=await listWorks(creator,linkedScope,1,100);
+    const joined=result.list.filter(w=>w.plan_id===created.planId);
+    expect(result.total).toBe(131);expect(joined).toHaveLength(1);
+    expect(joined[0]).toMatchObject({id:evidence.id,source:'evidence',status:'pending',verification_status:'pending'});
+    expect(joined[0].composition_id).not.toBeNull();
+    await reviewEvidence(admin,linkedScope,evidence.id,key(),true,'已核对');
+    expect((await listWorks(creator,linkedScope,1,100)).list.find(w=>w.id===evidence.id)?.status).toBe('passed');
+    expect((await listWorks(direct,linkedScope,1,25)).total).toBe(0);
+  });
+  it('渠道任务资料与旧表一致，旧同步写入后新接口立即更新', async () => {
+    await c.query("UPDATE tasks SET unit_price=8.25,status='开启',settle_type='按订单结算' WHERE id=992");
+    const options=await resource.options(admin,linkedScope);
+    expect(options.tasks[0]).toMatchObject({id:'992',zhihu_task_id:'linked-task',unit_price:8.25,status:'开启',settle_type:'按订单结算'});
+    expect(options.channels[0]).toMatchObject({id:'992',zhihu_channel_id:'linked-channel'});
+    await c.query("UPDATE tasks SET unit_price=9.25,status='暂停' WHERE id=992");
+    expect((await resource.options(admin,linkedScope)).tasks[0]).toMatchObject({unit_price:9.25,status:'暂停'});
+  });
+  it('同计划不重复显示，存在多个账号时不错误关联历史词', async () => {
+    const created=await resource.createKeyword(admin,linkedScope,key(),{keyword:'已有词库与作品',taskId:'992',channelId:'992',landingUrl:'https://example.com/managed',popularizeType:0});
+    managedKeyword=created.id;
+    await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,1,'KOC抖音','managed',1,1,'https://example.com/managed-work')",[created.planId]);
+    const words=await resource.listKeywords(admin,linkedScope,1,25,'已有词库与作品');
+    expect(words.total).toBe(1);expect(words.list[0].id).toBe(managedKeyword);expect(words.list[0].read_only).toBe(0);
+    await c.query("INSERT INTO integration_accounts(id,module_id,account_key,name,status,created_by) VALUES(993,'zhihu','linked-pages-993','另一个账号','active',1)");
+    await c.query('INSERT INTO project_integrations(project_id,account_id) VALUES(992,993)');
+    expect((await resource.listKeywords(admin,{projectId:'992',accountId:'993'},1,25,'作品关联改名词')).total).toBe(0);
+    expect((await resource.listKeywords(admin,linkedScope,1,25,'作品关联改名词')).total).toBe(1);
+    await c.query("INSERT INTO zh_channel_mappings(account_id,project_id,channel_id,channel_name,effective_from,created_by) VALUES(993,992,992,'另一个渠道映射','2020-01-01',1)");
+    expect((await resource.listKeywords(admin,linkedScope,1,25,'作品关联改名词')).total).toBe(0);
+    expect((await resource.listKeywords(admin,linkedScope,1,25,'已有词库与作品')).total).toBe(1);
+    const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
+    expect((await listWorks(admin,linkedScope,1,100)).list.every(w=>w.plan_id!==historyPlan)).toBe(true);
+    expect((await listWorks(admin,{projectId:'992',accountId:'993'},1,100)).list).toHaveLength(0);
   });
 });

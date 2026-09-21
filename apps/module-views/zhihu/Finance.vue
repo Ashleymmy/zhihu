@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import Issues from './Issues.vue'
 import {CashWallet} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
@@ -13,7 +13,7 @@ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(n
 const period=reactive({from:today.slice(0,7)+'-01',to:today})
 const view=ref<View|null>(null),busy=ref(false),error=ref(''),errorHelp=ref(''),errorAction=ref('none'),notice=ref(''),file=ref<File|null>(null),progress=ref(''),history=ref<Batch[]>([])
 const walletVersion=ref(0)
-const confirming=ref(false),checked=ref(false),selected=ref(''),detailPage=ref(1)
+const confirming=ref(false),checked=ref(false),selected=ref(''),detailPage=ref(1),detailsOpen=ref(false),detailPanel=ref<HTMLDetailsElement|null>(null)
 const money=(v:string|undefined)=>Number(v||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:4})
 const admin=computed(()=>props.context.role==='admin'&&props.context.adminDuty!=='operations'),creator=computed(()=>props.context.role==='creator')
 const visible=computed(()=>view.value?.entries.filter(e=>props.wallet?e.ownReceivable:e.ownPayable)??[])
@@ -60,6 +60,12 @@ async function confirm(){
  notice.value='已核对本期金额，确认 '+r.confirmed+' 条账单。'+(r.waiting?'其余账单待作品审核或数据问题处理完成后再确认。':'')
  await refresh();walletVersion.value++
 }
+function openDetails(payeeId:string){
+ selected.value=payeeId
+ detailPage.value=1
+ detailsOpen.value=true
+ void nextTick(()=>detailPanel.value?.scrollIntoView({behavior:'smooth',block:'start'}))
+}
 function exportBill(){
  if(!view.value)return
  const cell=(s:unknown)=>'"'+String(s??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"'
@@ -93,11 +99,11 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <div class="section-heading"><div><h2>{{admin?'本期财务账单':'团队应付账单'}}</h2><p>{{admin?'按团长（含团队达人）和独立达人汇总，便于核对和做账。':'只需核对你应付给团队达人的金额。'}}</p></div>
     <div class="engine-actions"><button :disabled="!view.groups.length||busy" @click="exportBill">导出对账单</button><button v-if="admin" class="primary" :disabled="busy||!view.entries.some(e=>e.ready)&&!(admin&&view.needsReview&&view.summary.records>0)" @click="confirming=true;checked=false">核对并确认账单</button></div>
    </div>
-   <div class="engine-table"><table><thead><tr><th>收款人</th><th>合计（元）</th><th>已确认</th><th>待确认</th><th>下一步</th><th></th></tr></thead><tbody><tr v-for="g in view.groups" :key="g.payeeId"><td>{{g.name}}</td><td>{{money(g.total)}}</td><td>{{money(g.confirmed)}}</td><td>{{money(g.pending)}}</td><td>{{g.blockers.join('；')||(g.ready?'可以确认':'已核对完成')}}</td><td><button @click="selected=g.payeeId;detailPage=1">看明细</button></td></tr></tbody></table></div>
+   <div class="engine-table"><table><thead><tr><th>收款人</th><th>合计（元）</th><th>已确认</th><th>待确认</th><th>下一步</th><th></th></tr></thead><tbody><tr v-for="g in view.groups" :key="g.payeeId"><td>{{g.name}}</td><td>{{money(g.total)}}</td><td>{{money(g.confirmed)}}</td><td>{{money(g.pending)}}</td><td>{{g.blockers.join('；')||(g.ready?'可以确认':'已核对完成')}}</td><td><button @click="openDetails(g.payeeId)">看明细</button></td></tr></tbody></table></div>
    <p class="empty-state" v-if="!view.groups.length">{{admin?'还没有账单，请先上传报表。':'财务上传报表后，这里会自动显示团队账单。'}}</p>
   </div>
   <div v-if="admin && confirming && view" class="confirm-box" role="region" aria-label="核对账单"><h2>确认本期账单</h2><p>{{period.from}} 至 {{period.to}}，本期应付合计 <strong>¥{{money(view.summary.payable)}}</strong>。</p><p>审核完成的账单会被确认；有待办的账单继续等待处理。此操作不会发起银行转账。</p><label class="check-label"><input type="checkbox" v-model="checked" />我已核对报表、人员和计算金额</label><div class="engine-actions"><button class="primary" :disabled="!checked||busy" @click="run(confirm)">确认核对结果</button><button :disabled="busy" @click="confirming=false">返回检查</button></div></div>
-  <details class="work-card" :open="wallet"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected" @click="selected='';detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
+  <details ref="detailPanel" class="work-card" :open="wallet||detailsOpen" @toggle="detailsOpen=($event.currentTarget as HTMLDetailsElement).open"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected" @click="selected='';detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
    <div class="engine-table"><table><thead><tr><th>日期</th><th>关键词</th><th>{{wallet?'付款方':'收款人'}}</th><th>金额（元）</th><th>状态</th></tr></thead><tbody><tr v-for="e in detailRows" :key="e.id"><td>{{e.date}}</td><td>{{e.keyword}}<small v-if="e.kind==='adjustment'">金额更正</small></td><td>{{wallet?e.payerName:e.payeeName}}</td><td>{{money(e.amount)}}</td><td>{{e.status==='confirmed'?'已确认':e.blocked||'待财务确认'}}</td></tr></tbody></table></div>
    <p class="empty-state" v-if="!details.length">暂无收入记录。报表处理完成后会自动显示。</p><div class="engine-actions" v-if="details.length>20"><button :disabled="detailPage===1" @click="detailPage--">上一页</button><span>第 {{detailPage}} 页</span><button :disabled="detailPage*20>=details.length" @click="detailPage++">下一页</button></div>
   </details>

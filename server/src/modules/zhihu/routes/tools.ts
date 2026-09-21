@@ -1,4 +1,5 @@
 import { siteInfo } from '../services/site-info';
+import { requireOfficialPlanRead } from '../zhihu/planReadCapability';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../../auth/middleware';
@@ -26,10 +27,8 @@ toolsRouter.post(
 );
 toolsRouter.post(
   '/sync-plan-status',
-  asyncHandler(async (_req, res) => {
-    const jobId = `sync-plan-status-manual-${Date.now()}`;
-    await enqueue('sync-plan-status', { source: 'manual' }, { jobId });
-    ok(res, { jobId, message: '推广计划审核状态同步任务已加入队列' }, 202);
+  asyncHandler(async () => {
+    requireOfficialPlanRead();
   }),
 );
 toolsRouter.post(

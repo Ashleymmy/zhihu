@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed,onMounted,reactive,ref,watch} from 'vue'
+import {computed,onMounted,onUnmounted,reactive,ref,watch} from 'vue'
 import type {HttpClient} from '@zhihu-koc/shared-services/core'
 import {StaffManager} from '@zhihu-koc/shared-components'
 import Keywords from './Keywords.vue'
@@ -9,7 +9,7 @@ import Works from './Works.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
 import {errorText,type EngineOptions,type Option} from './context'
-const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string}>()
+const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string}>()
 const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
@@ -21,7 +21,12 @@ const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...s
 const tabs=computed(()=>[{key:'keywords',label:'关键词'}, {key:'works',label:props.role==='creator'?'审核进度':'作品审核'},...(props.role==='creator'?[]:[{key:'prices',label:'定价规则'},{key:'people',label:'人员与权限'}]),...(admin.value?[{key:'channels',label:'渠道与任务'},{key:'issues',label:'数据待办'}]:[])])
 watch([()=>props.activeTab,tabs],()=>{tab.value=tabs.value.some(t=>t.key===props.activeTab)?props.activeTab!:'keywords'},{immediate:true})
 let generation=0
-async function refreshOptions(){const version=++generation;ready.value=false;loading.value=true;error.value='';try{const result=await props.http.get<EngineOptions>('/attribution-options',{...scope});if(version===generation){options.value=result;ready.value=true}}catch(e){if(version===generation)error.value=errorText(e)}finally{if(version===generation)loading.value=false}}
+async function refreshOptions(background=false){if(background&&loading.value)return;const version=++generation;if(!background)ready.value=false;loading.value=true;error.value='';try{const result=await props.http.get<EngineOptions>('/attribution-options',{...scope});if(version===generation){options.value=result;ready.value=true}}catch(e){if(version===generation)error.value=errorText(e)}finally{if(version===generation)loading.value=false}}
+function refreshVisibleOptions(){if(ready.value&&!document.hidden)void refreshOptions(true)}
+let optionsPoll:ReturnType<typeof setInterval>|undefined
+watch(tab,refreshVisibleOptions)
+onMounted(()=>{optionsPoll=setInterval(refreshVisibleOptions,15000);window.addEventListener('focus',refreshVisibleOptions)})
+onUnmounted(()=>{if(optionsPoll)clearInterval(optionsPoll);window.removeEventListener('focus',refreshVisibleOptions)})
 watch(()=>scope.projectId,async id=>{
  const version=++generation;ready.value=false;accounts.value=[];scope.accountId='';if(!id)return;loading.value=true;error.value=''
  try{
@@ -50,7 +55,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <template v-if="ready">
  <Finance v-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
  <template v-else><nav class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
- <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" @refresh="refreshOptions" />
+ <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" @refresh="refreshOptions" />
  <Works v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Prices v-if="tab==='prices'&&role!=='creator'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Channels v-if="tab==='channels'&&admin" :context="context" @refresh="refreshOptions" @projects="emit('navigate','/projects')" />

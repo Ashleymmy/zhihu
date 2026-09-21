@@ -226,6 +226,7 @@ onUnmounted(() => {
       <div>
         <p class="eyebrow">PROMOTION / CAMPAIGNS</p>
         <h1>推广计划</h1>
+        <p>当前显示本地已记录的计划，不是知乎官方全量列表；官方实时计划查询尚未接通。</p>
       </div>
       <div class="page-actions"><router-link to="/modules/zhihu/operations" class="ghost-aurora">关键词领取与分发</router-link>
         <button class="ghost-aurora" :disabled="syncingCatalog" @click="syncCatalog">

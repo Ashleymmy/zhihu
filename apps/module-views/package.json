@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./work-status": "./zhihu/work-status.ts",
     "./*": "./zhihu/*"
   },
   "dependencies": {

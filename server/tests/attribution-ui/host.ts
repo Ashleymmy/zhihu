@@ -56,6 +56,18 @@ async function main() {
     { db } = await import('../../src/db'),
     { registerJob, closeQueue } = await import('../../src/queue');
   const app = createApp();
+  if (process.env.ATTRIBUTION_LINKAGE_TEST === '1') {
+    await c.query("UPDATE tasks SET unit_price=8.25,status='开启',settle_type='按订单结算' WHERE id=1");
+    await c.query("INSERT INTO plans(id,project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status,zhihu_plan_id) VALUES(901,1,'ui-task','ui-channel','旧版作品联动词','https://example.com/linked',0,3,1,'active','synced','901'),(902,1,'ui-task','ui-channel','旧版无作品计划','https://example.com/pending',0,3,1,'pending','local',NULL)");
+    for(let i=0;i<27;i++)await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,title,promo_url,sync_status,zhihu_composition_id,zhihu_status_json) VALUES(901,3,'KOC抖音','test',1,1,?,?,'synced',?,?)",['旧作品 '+i,'https://example.com/works/'+i,'9'+String(i).padStart(3,'0'),JSON.stringify({auditStatus:'rejected',rejectReason:'请补充关键词'})]);
+    process.on('message', message => {
+      if(message==='linkage-update')void (async()=>{
+        await c.query("UPDATE tasks SET unit_price=9.25,status='暂停' WHERE id=1");
+        await c.query("UPDATE compositions SET zhihu_status_json=? WHERE plan_id=901",[JSON.stringify({auditStatus:'approved',rejectReason:null})]);
+        process.send?.({updated:true});
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    });
+  }
   // 模拟创建成功的上游结果，其余数据库、权限、业务接口及页面均使用实际实现。
   registerJob('zhihu.push-plan', async (data) => {
     await db.query(
