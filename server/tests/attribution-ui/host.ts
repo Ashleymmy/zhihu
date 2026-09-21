@@ -35,6 +35,9 @@ async function main() {
     DEV_DEMO_AUTH: '0',
   });
   const network = setupServer(
+    http.post('https://open.zhihu.com/alliance/api/popularize_plan', () =>
+      HttpResponse.json({ data: { plan_id: '2071265453767405' } }),
+    ),
     http.all('https://open.zhihu.com/*', () =>
       HttpResponse.json({ error: { message: '测试禁止真实上游请求' } }, { status: 503 }),
     ),
@@ -68,13 +71,9 @@ async function main() {
       })().catch(error=>{console.error(error);process.exitCode=1});
     });
   }
-  // 模拟创建成功的上游结果，其余数据库、权限、业务接口及页面均使用实际实现。
-  registerJob('zhihu.push-plan', async (data) => {
-    await db.query(
-      "UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=CONCAT('mock-',id) WHERE id=?",
-      [data.planId],
-    );
-  });
+  // 官方创建接口由 MSW 返回契约化成功回执；任务本身运行生产实现。
+  const { pushPlan } = await import('../../src/modules/zhihu/jobs/pushPlan');
+  registerJob('zhihu.push-plan', pushPlan);
   const demo = process.env.ATTRIBUTION_DEMO_OUT
     ? await (await import('./demo-seed')).seedAttributionDemo(process.env.ATTRIBUTION_DEMO_OUT)
     : undefined;

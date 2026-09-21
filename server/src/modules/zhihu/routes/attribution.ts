@@ -132,7 +132,7 @@ attributionRouter.post(
         mappingId: idSchema.optional(),
         channelId: idSchema.optional(),
         landingUrl: z.string().url().max(1024),
-        popularizeType: z.number().int(),
+        popularizeType: z.literal(0),
       })
       .parse(req.body);
     ok(res, await resource.createKeyword(req.user, input, key(req), input), 201);

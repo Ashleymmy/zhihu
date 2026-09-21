@@ -2,10 +2,17 @@ import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql, { type Connection } from 'mysql2/promise';
 import * as XLSX from 'xlsx';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
 import type { AuthUser } from '../../src/types';
 vi.mock('../../src/modules/zhihu/queue', () => ({ enqueue: vi.fn(async () => ({ id: 'test' })) }));
 let container: StartedMySqlContainer, c: Connection;
+const upstream = setupServer(
+  http.post('https://open.zhihu.com/alliance/api/popularize_plan', () =>
+    HttpResponse.json({ data: { plan_id: '2071265453767405' } }),
+  ),
+);
 let resource: typeof import('../../src/modules/zhihu/attribution/resources');
 let pool: typeof import('../../src/db').db;
 const user = (id: string, role: AuthUser['role'], parentId: string | null = null): AuthUser => ({
@@ -60,7 +67,11 @@ beforeAll(async () => {
     DB_USER: target.user,
     DB_PASS: target.password,
     OPC_MODULES: 'zhihu',
+    ZHIHU_API_BASE: 'https://open.zhihu.com',
+    ZHIHU_ACCESS_TOKEN: 'test_access_token',
+    ZHIHU_SECRET_KEY: 'test_secret_key',
   });
+  upstream.listen({ onUnhandledRequest: 'bypass' });
   await runOpcMigrations(target, ['zhihu']);
   c = await mysql.createConnection({ ...target, multipleStatements: false });
   await c.query(
@@ -86,6 +97,7 @@ afterAll(async () => {
   if (pool) await pool.end();
   if (c) await c.end();
   if (container) await container.stop({ remove: true, removeVolumes: true });
+  upstream.close();
 });
 describe('独占资源数据库闭环', () => {
   it('创建账号范围渠道映射和词库，禁止同代理跨渠道重复', async () => {
@@ -129,6 +141,51 @@ describe('独占资源数据库闭环', () => {
       await c.query("UPDATE plans SET sync_status='synced',zhihu_plan_id='external1' WHERE id=?", [planId]);
     }
   });
+  it('真实创建回执恢复线上卡住词，并允许管理员分发给三类成员', async () => {
+    const make = async (keyword: string) => {
+      const word = await resource.createKeyword(admin, scope, key(), {
+        keyword,
+        taskId: '1',
+        mappingId,
+        landingUrl: 'https://www.zhihu.com/market/real',
+        popularizeType: 0,
+      });
+      await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?", [`2071265453767405${word.planId}`, word.planId]);
+      return word;
+    };
+    const stuck = await make('线上回执待分发词');
+    const team = await make('管理员分发团队达人词');
+    const directWord = await make('管理员分发独立达人词');
+    expect((await c.query<mysql.RowDataPacket[]>('SELECT lifecycle_status FROM zh_keywords WHERE id=?', [stuck.id]))[0][0].lifecycle_status).toBe('pending');
+    await resource.synchronizeKeywords(scope);
+    expect((await resource.listKeywords(admin, scope, 1, 50, '线上回执待分发词')).list[0].allocation_ready).toBe(1);
+    const leaderBinding = await resource.distribute(admin, scope, stuck.id, key(), leader.sub);
+    const teamBinding = await resource.distribute(admin, scope, team.id, key(), creator.sub);
+    const directBinding = await resource.distribute(admin, scope, directWord.id, key(), direct.sub);
+    const [bindings] = await c.query<mysql.RowDataPacket[]>('SELECT id,path_type,leader_id,executor_id FROM zh_keyword_bindings WHERE id IN (?,?,?) ORDER BY id', [leaderBinding.id, teamBinding.id, directBinding.id]);
+    expect(bindings).toEqual([
+      expect.objectContaining({ path_type: 'reserved', leader_id: 2, executor_id: null }),
+      expect.objectContaining({ path_type: 'team_creator', leader_id: 2, executor_id: 3 }),
+      expect.objectContaining({ path_type: 'direct_creator', leader_id: null, executor_id: 4 }),
+    ]);
+  });
+  it('真实创建任务收到官方回执后立即开放领取', async () => {
+    const word = await resource.createKeyword(admin, scope, key(), {
+      keyword: '真实接口创建回执词',
+      taskId: '1',
+      mappingId,
+      landingUrl: 'https://www.zhihu.com/market/http',
+      popularizeType: 0,
+    });
+    const { pushPlan } = await import('../../src/modules/zhihu/jobs/pushPlan');
+    await pushPlan({ planId: word.planId, accountId: scope.accountId, projectId: scope.projectId });
+    const [plan] = await c.query<mysql.RowDataPacket[]>('SELECT sync_status,status,zhihu_plan_id FROM plans WHERE id=?', [word.planId]);
+    const [stored] = await c.query<mysql.RowDataPacket[]>('SELECT upstream_status,lifecycle_status,upstream_confirmed_at FROM zh_keywords WHERE id=?', [word.id]);
+    expect(plan[0]).toMatchObject({ sync_status: 'synced', status: 'active', zhihu_plan_id: '2071265453767405' });
+    expect(stored[0].lifecycle_status).toBe('available');
+    expect(stored[0].upstream_status).toBe('created');
+    expect(stored[0].upstream_confirmed_at).not.toBeNull();
+  });
   it('50 个并发领取仅一次成功，同键重试返回同一绑定', async () => {
     await resource.synchronizeKeywords();
     const requests = Array.from({ length: 50 }, () => key());
@@ -162,7 +219,7 @@ describe('独占资源数据库闭环', () => {
       landingUrl: 'https://www.zhihu.com/test',
       popularizeType: 1,
     });
-    await c.query("UPDATE plans SET sync_status='synced',status='active' WHERE id=?", [word.planId]);
+    await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=CONCAT('2071265453767',id) WHERE id=?", [word.planId]);
     await resource.synchronizeKeywords();
     await expect(resource.claim(direct, scope, word.id, key())).rejects.toThrow('优先期');
     await c.query('UPDATE zh_keywords SET priority_until=NOW(3) WHERE id=?', [word.id]);
@@ -812,7 +869,7 @@ describe('推广计划与关键词库贯通', () => {
     expect((await resource.listKeywords(direct,poolScope,1,25,'旧入口贯通甲')).total).toBe(0);
     await expect(planService.getPlan(outsider,created.id)).rejects.toThrow();
     await expect(resource.claim(leader,poolScope,String(word.id),key())).rejects.toThrow('不可领取');
-    await c.query("UPDATE plans SET sync_status='synced',status='active' WHERE id=?",[created.id]);
+    await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=CONCAT('2071265453767',id) WHERE id=?",[created.id]);
     const binding=await resource.claim(leader,poolScope,String(word.id),key());
     await resource.changeBinding(leader,poolScope,binding.id,key(),{action:'assign',executorId:'3'});
     expect(await visible(creator)).toContain(created.id);
@@ -824,7 +881,7 @@ describe('推广计划与关键词库贯通', () => {
     const created=await planService.createPlan(admin,input('旧入口贯通乙'));
     const [words]=await c.query<mysql.RowDataPacket[]>('SELECT id FROM zh_keywords WHERE plan_id=?',[created.id]);
     const id=String(words[0].id);
-    await c.query("UPDATE plans SET sync_status='synced',status='active' WHERE id=?",[created.id]);
+    await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=CONCAT('2071265453767',id) WHERE id=?",[created.id]);
     await c.query('UPDATE zh_keywords SET priority_until=TIMESTAMPADD(SECOND,30,NOW(3)) WHERE id=?',[id]);
     await expect(resource.claim(direct,poolScope,id,key())).rejects.toThrow('优先期');
     await c.query('UPDATE zh_keywords SET priority_until=NOW(3) WHERE id=?',[id]);

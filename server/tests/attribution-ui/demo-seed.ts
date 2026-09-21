@@ -26,7 +26,7 @@ export async function seedAttributionDemo(outputDir: string) {
   const bindings: Array<{ keyword: string; bindingId: string }> = [];
   for (const keyword of ['模拟独占词甲', '模拟独占词乙']) {
     const word = await resources.createKeyword(admin, scope, randomUUID(), {
-      keyword, taskId: '1', mappingId: mapping.id, landingUrl: 'https://www.zhihu.com/market/test', popularizeType: 1,
+      keyword, taskId: '1', mappingId: mapping.id, landingUrl: 'https://www.zhihu.com/market/test', popularizeType: 0,
     });
     // 等待隔离主机注册的模拟上游处理器完成，其余领取与报价均走实际业务服务。
     const deadline = Date.now() + 10000;

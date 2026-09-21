@@ -2,6 +2,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../../../db';
 import { zhihuPost, zhihuSyncErrorDetail } from '../zhihu/client';
 import { PLAN_UPDATE_UNSUPPORTED_ERROR } from '../zhihu/allianceVersionPolicy';
+import { synchronizeKeywords } from '../attribution/keyword-readiness';
 
 export interface PlanPayloadInput {
   zhihu_task_id: string;
@@ -86,9 +87,12 @@ export async function pushPlan(data: Record<string, unknown>) {
       return;
     }
     const response = await zhihuPost('/alliance/api/popularize_plan', body);
+    const planId = upstreamId(response);
+    if (!planId?.trim()) throw new Error('知乎未返回有效的计划 ID');
     await db.query(
-      `UPDATE plans SET sync_status = 'synced', zhihu_plan_id = COALESCE(?, zhihu_plan_id), sync_error = NULL WHERE id = ? AND keyword = ? AND sync_status = 'syncing'`,
-      [upstreamId(response), id, plan.keyword],
+      `UPDATE plans SET sync_status = 'synced', zhihu_plan_id = ?, sync_error = NULL,
+       status = IF(status = 'pending', 'active', status) WHERE id = ? AND keyword = ? AND sync_status = 'syncing'`,
+      [planId, id, plan.keyword],
     );
   } catch (error) {
     const message = zhihuSyncErrorDetail(error);
@@ -97,5 +101,8 @@ export async function pushPlan(data: Record<string, unknown>) {
       [message, id, plan.keyword],
     );
     throw error;
+  }
+  if (plan.account_id && plan.keyword_project_id) {
+    await synchronizeKeywords({accountId:String(plan.account_id),projectId:String(plan.keyword_project_id)},id);
   }
 }
