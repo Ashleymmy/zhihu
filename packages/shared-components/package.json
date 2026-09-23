@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@zhihu-koc/shared-contracts": "workspace:*",
+    "@zhihu-koc/shared-utils": "workspace:*",
     "vue": "^3.4.21"
   },
   "devDependencies": {

@@ -23,6 +23,9 @@ importers:
       '@zhihu-koc/shared-services':
         specifier: workspace:*
         version: link:../../packages/shared-services
+      '@zhihu-koc/shared-utils':
+        specifier: workspace:*
+        version: link:../../packages/shared-utils
       vue:
         specifier: ^3.4.21
         version: 3.5.41(typescript@5.9.3)
@@ -188,6 +191,9 @@ importers:
       '@zhihu-koc/shared-contracts':
         specifier: workspace:*
         version: link:../shared-contracts
+      '@zhihu-koc/shared-utils':
+        specifier: workspace:*
+        version: link:../shared-utils
       vue:
         specifier: ^3.4.21
         version: 3.5.41(typescript@5.9.3)

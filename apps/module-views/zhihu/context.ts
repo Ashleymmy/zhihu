@@ -1,4 +1,5 @@
 import type { HttpClient } from '@zhihu-koc/shared-services/core'
+import { createRequestKey } from '@zhihu-koc/shared-utils'
 export interface Scope {
   projectId: string
   accountId: string
@@ -42,5 +43,5 @@ export const errorText = (e: unknown) =>
     ? String(e.message)
     : '操作失败，请稍后重试'
 export function requestKey() {
-  return crypto.randomUUID()
+  return createRequestKey()
 }

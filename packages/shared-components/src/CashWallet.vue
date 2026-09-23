@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {onMounted,reactive,ref} from 'vue'
+import {createRequestKey} from '@zhihu-koc/shared-utils'
 interface Http{get<T>(path:string,params?:object):Promise<T>;post<T>(path:string,data?:unknown):Promise<T>;postForm<T>(path:string,data:FormData):Promise<T>;getBlob(path:string):Promise<Blob>}
 interface Scope{projectId:string;accountId:string;moduleId:string}
 interface Withdrawal{id:string;userId:string;displayName:string;amount:string;status:string;receiverName:string;bankName:string;bankAccount:string;remark:string;createdAt:string;paymentReference:string;paidOn:string;proofName:string}
 interface View{balance:{confirmed:string;held:string;available:string;offset:string;paid:string;processing:string}|null;withdrawals:Withdrawal[];total:number;funding:{amount:string;hash:string};canManage:boolean}
 const props=defineProps<{http:Http;scope:Scope}>()
-const view=ref<View|null>(null),page=ref(1),busy=ref(false),error=ref(''),notice=ref(''),applyOpen=ref(false),fundOpen=ref(false),reference=ref(''),request=ref(crypto.randomUUID())
+const view=ref<View|null>(null),page=ref(1),busy=ref(false),error=ref(''),notice=ref(''),applyOpen=ref(false),fundOpen=ref(false),reference=ref(''),request=ref(createRequestKey())
 const applicant=reactive({amount:'',receiverName:'',bankName:'',bankAccount:''})
 const selected=ref<Withdrawal|null>(null),action=ref(''),reason=ref(''),proof=ref<File|null>(null),ack=ref(false)
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
@@ -22,7 +23,7 @@ async function exportPayments(){
 }
 async function load(){view.value=await props.http.get<View>('/finance',{...props.scope,page:page.value})}
 async function run(fn:()=>Promise<unknown>){if(busy.value)return;busy.value=true;error.value='';try{await fn()}catch(e){error.value=e instanceof Error?e.message:'操作未完成，请重试'}finally{busy.value=false}}
-function openApply(){applyOpen.value=true;request.value=crypto.randomUUID()}
+function openApply(){applyOpen.value=true;request.value=createRequestKey()}
 async function apply(){await props.http.post('/finance/withdrawals',{...props.scope,...applicant,requestKey:request.value});applyOpen.value=false;notice.value='提现申请已提交，财务处理后会更新进度。';await load()}
 async function release(){if(!view.value)return;await props.http.post('/finance/funding',{...props.scope,hash:view.value.funding.hash,reference:reference.value});fundOpen.value=false;notice.value='已登记款项可用，相关人员可以申请提现。';await load()}
 function choose(w:Withdrawal,a:string){selected.value=w;action.value=a;reason.value='';proof.value=null;payment.reference='';payment.paidOn=today;ack.value=false}

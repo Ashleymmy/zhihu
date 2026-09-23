@@ -10,6 +10,7 @@
   "dependencies": {
     "vue": "^3.4.21",
     "@zhihu-koc/shared-services": "workspace:*",
+    "@zhihu-koc/shared-utils": "workspace:*",
     "@zhihu-koc/shared-components": "workspace:*"
   }
 }
