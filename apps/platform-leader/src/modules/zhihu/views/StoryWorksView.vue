@@ -90,7 +90,7 @@ async function loadPlans() {
   plansError.value = ''
   plans.value = []
   try {
-    const result = await fetchAllPages(params => apis.plans.list(params))
+    const result = await fetchAllPages(params => apis.plans.list({ ...params, purpose: 'composition' }))
     if (version !== planSearchVersion) return
     plans.value = result
     if (!result.some(plan => plan.id === form.value.planId)) form.value.planId = ''

@@ -12,6 +12,7 @@ import { pageOffset } from '../../../utils/pagination';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { writeAudit } from '../../../services/audit.service';
 import { config } from '../config';
+import { compositionPlanScope } from './composition-access';
 import {
   checkDevDemoKeyword,
   createDevDemoPlan,
@@ -148,7 +149,7 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
 
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? 20);
-  const scope = readablePlans(user);
+  const scope = query.purpose === 'composition' ? compositionPlanScope(user) : readablePlans(user);
   const where = [scope.clause, "p.status <> 'ended'"];
   const bindings: unknown[] = [...scope.bindings];
   for (const [sql, value] of [

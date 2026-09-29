@@ -28,6 +28,7 @@ const listSchema = paginationSchema.extend({
   channelId: z.string().optional(),
   keyword: z.string().optional(),
   status: z.string().optional(),
+  purpose: z.enum(['composition']).optional(),
 });
 const checkSchema = z.object({ channelId: z.string().min(1), keyword });
 const createSchema = z.object({

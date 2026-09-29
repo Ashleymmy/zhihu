@@ -474,6 +474,7 @@ export interface Plan {
 }
 
 export interface PlanListReq extends PageReq {
+  purpose?: 'composition'
   taskId?: string
   channelId?: string
   keyword?: string

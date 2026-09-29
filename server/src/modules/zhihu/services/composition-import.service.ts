@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { db } from '../../../db';
 import { AppError } from '../../../middleware/errors';
 import type { AuthUser } from '../../../types';
-import { scopeFilter } from '../../../utils/scopeFilter';
+import { compositionPlanScope } from './composition-access';
 import { writeAudit } from '../../../services/audit.service';
 import { enqueue } from '../queue';
 import { isDevDemoAuthUser } from '../dev-demo';
@@ -32,8 +32,8 @@ const valueText = (value: unknown) => value == null ? '' : String(value).trim();
 async function analyze(user: AuthUser, file: { originalname: string; buffer: Buffer }, options: ImportOptions, connection: PoolConnection) {
   if (isDevDemoAuthUser(user)) throw new AppError(409, 40900, '演示账号不支持真实导入，请使用正式账号登录');
   const parsed = parseCompositionFile(file, options);
-  const scope = scopeFilter(user, 'owner_id');
-  const [plans] = await connection.query<PlanRow[]>(`SELECT id, keyword, status FROM plans WHERE ${scope.clause}`, scope.bindings);
+  const scope = compositionPlanScope(user);
+  const [plans] = await connection.query<PlanRow[]>(`SELECT p.id, p.keyword, p.status FROM plans p WHERE ${scope.clause}`, scope.bindings);
   // Only equality matches are exposed: no account, plan or private metadata from other owners.
   const [existing] = await connection.query<ExistingRow[]>('SELECT id, promo_url FROM compositions');
   const existingKeys = new Set(existing.map(item => compositionUrlKey(item.promo_url)).filter(Boolean));
