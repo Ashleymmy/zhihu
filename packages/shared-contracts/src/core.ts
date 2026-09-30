@@ -20,6 +20,7 @@ export interface LoginReq {
 
 /** 公开注册不接受角色、归属或权限字段。 */
 export interface RegisterReq extends LoginReq {
+  invitationToken?: string
   displayName?: string
   phone?: string
 }
@@ -96,6 +97,19 @@ export interface Project {
 }
 
 export interface TeamMember {
+  adminDuty?: 'all' | 'operations' | 'finance'
+  parentName?: string | null
+  createdByName?: string | null
+  inviterName?: string | null
+  invitationLabel?: string | null
+  invitedAt?: string | null
+  registrationSource?: 'invitation' | 'managed' | 'registered'
+  invitedCount?: number
+  memberCount?: number
+  projectCount?: number
+  canManage?: boolean
+  editableRoles?: GlobalRole[]
+  permissions?: string[]
   id: string
   username: string
   role: GlobalRole
@@ -109,6 +123,8 @@ export interface TeamMember {
 }
 
 export type TeamApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+export interface MemberAccessPatch { displayName?: string; phone?: string | null; role?: GlobalRole; adminDuty?: 'all' | 'operations' | 'finance'; isActive?: boolean; parentId?: string | null }
+export interface MemberInvitation { id: string; label: string; ownerId: string; ownerName: string; teamName: string | null; maxUses: number; usedCount: number; expiresAt: string; revokedAt: string | null; createdAt: string; status: 'active' | 'expired' | 'revoked' | 'used' }
 
 export interface TeamApplication {
   id: string

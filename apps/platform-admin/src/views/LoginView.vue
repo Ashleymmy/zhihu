@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isApiError } from '@zhihu-koc/shared-services/core'
-import { useAuthStore } from '../stores/auth'
+import { apis, useAuthStore } from '../stores/auth'
 import { safeRedirect } from '../access'
 const auth = useAuthStore(),
   route = useRoute(),
@@ -15,8 +15,32 @@ const username = ref(''),
   phone = ref('')
 const submitting = ref(false),
   errorMessage = ref('')
+const invitationToken = computed(() => new URLSearchParams(route.hash.slice(1)).get('invite') ?? '')
+const invitation = ref<{ inviterName: string; teamName: string | null } | null>(null)
+const invitationLoading = ref(false), invitationError = ref('')
+let invitationVersion = 0
+watch([registering, invitationToken], async ([isRegister, token]) => {
+  const version = ++invitationVersion
+  invitation.value = null
+  invitationError.value = ''
+  invitationLoading.value = false
+  if (!isRegister || !token) return
+  invitationLoading.value = true
+  try {
+    const result = await apis.auth.invitation(token)
+    if (version === invitationVersion) invitation.value = result
+  } catch (error) {
+    if (version === invitationVersion) invitationError.value = isApiError(error) || error instanceof Error ? error.message : '邀请链接不可用，请联系邀请人'
+  } finally {
+    if (version === invitationVersion) invitationLoading.value = false
+  }
+}, { immediate: true })
 watch(registering, () => {
   errorMessage.value = ''
+  if (registering.value && invitationToken.value && !invitation.value) {
+    errorMessage.value = invitationError.value || '正在核验邀请链接，请稍候'
+    return
+  }
   password.value = ''
   confirmPassword.value = ''
 })
@@ -42,6 +66,7 @@ async function submit() {
         password: password.value,
         displayName: displayName.value,
         ...(phone.value ? { phone: phone.value } : {}),
+        ...(invitationToken.value ? { invitationToken: invitationToken.value } : {}),
       })
       await router.replace({
         name: 'login',
@@ -87,10 +112,10 @@ async function submit() {
 
       <div class="manifesto-note">
         <div>
-          <strong>数据安全</strong>
-          <span>所有数据传输均经过加密处理</span>
+          <strong>账号与权限</strong>
+          <span>按角色分配权限，管理登录设备</span>
         </div>
-        <b>SSL</b>
+        <b>OPC</b>
       </div>
     </aside>
 
@@ -118,6 +143,11 @@ async function submit() {
           注册成功，请使用新账号登录。
         </p>
         <p v-if="!registering && route.query.passwordChanged === '1'" class="auth-success" role="status">密码已修改，请使用新密码登录。</p>
+        <div v-if="registering && invitationToken" class="invitation-note" role="status">
+          <p v-if="invitationLoading">正在核验邀请链接…</p>
+          <p v-else-if="invitationError" role="alert">{{ invitationError }}</p>
+          <template v-else-if="invitation"><strong>{{ invitation.inviterName }} 邀请你注册</strong><p>角色：达人 · {{ invitation.teamName ? '加入团队：' + invitation.teamName : '独立达人' }}</p><small>注册后，业务项目由运营人员单独授权。</small></template>
+        </div>
         <form @submit.prevent="submit">
           <div
             class="form-grid"
@@ -214,7 +244,7 @@ async function submit() {
           <button
             type="submit"
             class="access-action primary-action"
-            :disabled="submitting"
+            :disabled="submitting || (registering && !!invitationToken && !invitation)"
             style="margin-top: 24px"
           >
             {{ submitting ? '提交中...' : registering ? '注册' : '登录' }}
@@ -227,6 +257,7 @@ async function submit() {
             :to="{
               name: registering ? 'login' : 'register',
               query: { redirect: safeRedirect(route.query.redirect) },
+              hash: route.hash,
             }"
             >{{ registering ? '立即登录' : '立即注册' }}</router-link
           >
@@ -299,6 +330,9 @@ async function submit() {
 </template>
 
 <style scoped>
+.invitation-note { margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--paper);line-height:1.6 }
+.invitation-note p { margin:8px 0 }
+.invitation-note [role=alert] { color:#964639 }
 .auth-switch {
   margin-top: 20px;
   text-align: center;

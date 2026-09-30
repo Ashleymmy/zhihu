@@ -14,6 +14,8 @@ import type {
   ProjectMember,
   ProjectCourse,
   TeamMember,
+  MemberAccessPatch,
+  MemberInvitation,
   TeamApplication,
   ApplyTeamReq,
   LeaderOption,
@@ -36,6 +38,7 @@ import type { HttpClient } from './http'
 export function createAuthApi(http: HttpClient) {
   return {
     register: (data: RegisterReq) => http.post<RegisterResp>('/auth/register', data),
+    invitation: (token: string) => http.post<{ inviterName: string; teamName: string | null; role: string; expiresAt: string }>('/auth/invitation', { token }),
     login: (data: LoginReq) => http.post<LoginResp>('/auth/login', data),
     refresh: () => http.post<RefreshResp>('/auth/refresh'),
     me: () => http.get<MeResp>('/auth/me'),
@@ -77,6 +80,10 @@ export function createProjectsApi(http: HttpClient) {
 export function createTeamApi(http: HttpClient) {
   return {
     listMembers: () => http.get<TeamMember[]>('/team/members'),
+    manageMember: (id: string, data: MemberAccessPatch) => http.patch<void>(`/team/members/${id}/access`, data),
+    invitations: () => http.get<MemberInvitation[]>('/team/invitations'),
+    createInvitation: (data: {label:string;validDays:number;maxUses:number}) => http.post<{id:string;token:string}>('/team/invitations',data),
+    revokeInvitation: (id:string) => http.post<void>(`/team/invitations/${id}/revoke`),
     createMember: (data: CreateMemberReq) => http.post<CreateMemberResp>('/team/members', data),
     updateMember: (id: string, data: { displayName?: string; phone?: string | null }) =>
       http.patch<void>(`/team/members/${id}`, data),

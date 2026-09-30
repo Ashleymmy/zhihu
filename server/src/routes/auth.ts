@@ -7,6 +7,7 @@ import { validateBody } from '../middleware/validate';
 import { changePassword, login, logout, me, refresh, register } from '../services/auth.service';
 import { ok } from '../utils/response';
 import { clientIdentity } from '../auth/clientIdentity';
+import { invitationPreview } from '../services/invitations.service';
 
 const loginSchema = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(128) });
 const registerSchema = z.object({
@@ -14,6 +15,7 @@ const registerSchema = z.object({
   password: z.string().min(8).max(72).refine(value => Buffer.byteLength(value, 'utf8') <= 72),
   displayName: z.string().trim().min(1).max(64).optional(),
   phone: z.string().trim().regex(/^\+?[0-9 -]{6,20}$/).optional(),
+  invitationToken: z.string().regex(/^[a-zA-Z0-9_-]{43}$/).optional(),
 }).strict();
 const passwordSchema = z.object({ oldPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(72).refine(value=>Buffer.byteLength(value,'utf8')<=72) });
 
@@ -53,6 +55,7 @@ const clearRefreshCookie = (res: Response) => {
 };
 
 export const authRouter = Router();
+authRouter.post('/invitation', validateBody(z.object({token:z.string().regex(/^[a-zA-Z0-9_-]{43}$/)}).strict()), asyncHandler(async(req,res)=>ok(res,await invitationPreview(req.body.token))));
 
 authRouter.post(
   '/register',

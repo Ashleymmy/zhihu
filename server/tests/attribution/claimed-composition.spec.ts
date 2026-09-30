@@ -149,6 +149,9 @@ describe('领取关键词后登记作品', () => {
     expect(state[0].used_at).not.toBeNull();
     const [p] = await c.query<RowDataPacket[]>('SELECT owner_id FROM plans WHERE id=?', [word.planId]);
     expect(Number(p[0].owner_id)).toBe(1);
+    const { updateMemberAccess } = await import('../../src/services/member-access.service');
+    await expect(updateMemberAccess(admin, direct.sub, {role:'leader'})).rejects.toMatchObject({httpStatus:409});
+    await expect(updateMemberAccess(admin, direct.sub, {parentId:leader.sub})).rejects.toMatchObject({httpStatus:409});
   });
   it('团队达人、团长自用、团长及管理员代登记均归当前执行人', async () => {
     for (const [executor, submitter] of [

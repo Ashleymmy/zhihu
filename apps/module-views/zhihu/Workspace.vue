@@ -56,7 +56,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <template v-if="ready">
  <Finance v-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
  <template v-else><nav class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
- <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" @refresh="refreshOptions" />
+ <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
  <Works v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Prices v-if="tab==='prices'&&role!=='creator'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Channels v-if="tab==='channels'&&admin" :context="context" @refresh="refreshOptions" @projects="emit('navigate','/projects')" />

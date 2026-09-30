@@ -33,7 +33,7 @@ export const workspaceRoutes: RouteRecordRaw[] = [
   {
     path: 'team',
     name: 'team',
-    component: () => import('./views/TeamView.vue'),
+    component: () => import('../../platform-admin/src/views/TeamView.vue'),
     meta: { title: '达人管理' },
   },
   {

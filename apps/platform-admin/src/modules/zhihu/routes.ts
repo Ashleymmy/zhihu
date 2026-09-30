@@ -1,6 +1,9 @@
 import type { RouteRecordRaw } from 'vue-router'
 import {useAuthStore} from './context'
+import {businessPages} from '@zhihu-koc/zhihu-module-views/navigation'
 export const modulePages: RouteRecordRaw[] = [
+{path:'more',name:'zhihu-more',component:()=>import('./views/MoreFunctionsView.vue'),meta:{moduleId:'zhihu',title:'更多功能'}},
+{path:'works/new',name:'zhihu-register-work',component:()=>import('./views/StoryWorksView.vue'),meta:{moduleId:'zhihu',title:'登记作品'}},
 {path:'operations',name:'zhihu-operations',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'operations',title:'运营管理'}},
 {path:'wallet',name:'zhihu-wallet',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'wallet',title:'收入与提现'}},
 {path:'finance',name:'zhihu-finance',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'finance',title:'财务做账'}},
@@ -167,7 +170,7 @@ export const zhihuRoutes: RouteRecordRaw[] = [
     path: 'modules/zhihu',
     component: () => import('./ModuleLayout.vue'),
     meta: { moduleId: 'zhihu' },
-    children: [{path:'',redirect:'/modules/zhihu/dashboard'},...modulePages.map(p=>({...p,beforeEnter:()=>{const duty=useAuthStore().user?.adminDuty??'all';if(duty==='finance'&&!['dashboard','finance','data-import','settlements','earnings','withdrawals','appeals','orders'].includes(p.path))return '/modules/zhihu/finance';if(duty==='operations'&&['finance','wallet','data-import','settlements','earnings','withdrawals','appeals'].includes(p.path))return '/modules/zhihu/operations';return true}}))],
+    children: [{path:'',redirect:'/modules/zhihu/operations'},...modulePages.map(p=>({...p,beforeEnter:()=>{const user=useAuthStore().user;if(p.path==='more')return true;const path=p.path==='works/new'?'works':p.path==='keywords'?'operations':p.path;if(!businessPages([{path}],user?.role??'',user?.adminDuty).length)return user?.adminDuty==='finance'?'/modules/zhihu/finance':'/modules/zhihu/operations';return true}}))],
   },
   { path: 'orders', redirect: (to) => ({ path: '/modules/zhihu/orders', query: to.query, hash: to.hash }) },
   {

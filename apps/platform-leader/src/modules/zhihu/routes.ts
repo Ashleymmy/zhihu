@@ -1,5 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 export const modulePages: RouteRecordRaw[] = [
+{path:'more',name:'zhihu-more',component:()=>import('./views/MoreFunctionsView.vue'),meta:{moduleId:'zhihu',title:'更多功能'}},
+{path:'works/new',name:'zhihu-register-work',component:()=>import('./views/StoryWorksView.vue'),meta:{moduleId:'zhihu',title:'登记作品'}},
 {path:'operations',name:'zhihu-operations',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'operations',title:'团队业务'}},
 {path:'wallet',name:'zhihu-wallet',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'wallet',title:'收入与提现'}},
 
@@ -135,7 +137,7 @@ export const zhihuRoutes: RouteRecordRaw[] = [
     path: 'modules/zhihu',
     component: () => import('./ModuleLayout.vue'),
     meta: { moduleId: 'zhihu' },
-    children: [{path:'',redirect:'/modules/zhihu/dashboard'},...modulePages],
+    children: [{path:'',redirect:'/modules/zhihu/operations'},...modulePages],
   },
   { path: 'orders', redirect: (to) => ({ path: '/modules/zhihu/orders', query: to.query, hash: to.hash }) },
   {

@@ -313,7 +313,8 @@ export async function claim(user: AuthUser, scope: Scope, id: string, key: strin
     if (word.current_binding_id || word.lifecycle_status !== 'available') fail('关键词不可领取或已被占用', 409);
     const [plan] = await select(c, 'SELECT status,sync_status,zhihu_plan_id FROM plans WHERE id=? FOR SHARE', [word.plan_id]);
     if (plan.status !== 'active' || !(plan.sync_status === 'synced' && String(plan.zhihu_plan_id ?? '').trim() || plan.sync_status === 'simulated' && word.upstream_status === 'simulated' && await simulationScope(c, scope))) fail('关键词当前不可用，请联系管理员核对接入', 409);
-    const [actor] = await select(c, 'SELECT id,role,parent_id FROM users WHERE id=? FOR SHARE', [user.sub]);
+    const [actor] = await select(c, 'SELECT id,role,parent_id,is_active FROM users WHERE id=? FOR SHARE', [user.sub]);
+    if (!actor?.is_active || actor.role !== user.role) fail('账号权限已变化，请重新登录', 403);
     const [time] = await select(c, 'SELECT (priority_until<=NOW(3)) AS ended FROM zh_keywords WHERE id=?', [id]);
     if (user.role === 'creator' && (actor.parent_id !== null || Number(time.ended) !== 1))
       fail('仅优先期结束后的直属达人可领取', 403);
@@ -448,11 +449,11 @@ export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,
   if(word.current_binding_id||word.lifecycle_status!=='available')fail('关键词已分配或尚不可用',409);
   const [plan]=await select(c,'SELECT status,sync_status,zhihu_plan_id FROM plans WHERE id=? FOR SHARE',[word.plan_id]);
   if(plan.status!=='active'||!(plan.sync_status==='synced'&&String(plan.zhihu_plan_id??'').trim()||plan.sync_status==='simulated'&&word.upstream_status==='simulated'&&await simulationScope(c,scope)))fail('关键词尚未创建成功');
-  const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL',[targetId,scope.projectId]);
+  const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE',[targetId,scope.projectId]);
   if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择有效的团长或达人');
   const leader=target.role==='leader'?targetId:target.parent_id===null?null:String(target.parent_id);
   if(leader&&target.role==='creator'){
-   const parents=await select(c,"SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.role='leader' AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL",[leader,scope.projectId]);
+   const parents=await select(c,"SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.role='leader' AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE",[leader,scope.projectId]);
    if(!parents.length)fail('请先将该达人的团长加入项目');
   }
   const reserved=target.role==='leader';

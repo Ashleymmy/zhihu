@@ -16,6 +16,7 @@ import {
 } from '../auth/tokenSessions';
 import { writeAudit } from './audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
+import { lockInvitation, consumeInvitation } from './invitations.service';
 import {
   devDemoLoginUser,
   devDemoPublicUser,
@@ -82,7 +83,7 @@ async function issueAccessToken(user: UserRow, role: Role, sessionId: string) {
 
 /** 公开注册固定创建未入团达人；与审计写入保持同一事务。 */
 export async function register(
-  input: { username: string; password: string; displayName?: string; phone?: string },
+  input: { username: string; password: string; displayName?: string; phone?: string; invitationToken?: string },
   ip?: string,
 ) {
   const limit = await incrRateLimit(`register:ip:${ip ?? 'unknown'}`, 5, 3600);
@@ -92,12 +93,14 @@ export async function register(
   const hash = await bcrypt.hash(input.password, 12);
   try {
     const id = await withTransaction(async connection => {
+      const invitation = input.invitationToken ? await lockInvitation(connection, input.invitationToken) : null;
       const [result] = await connection.query<ResultSetHeader>(
-        `INSERT INTO users (username, password_hash, role, role_id, parent_id, display_name, phone, is_active, must_change_pwd)
-         VALUES (?, ?, 'creator', (SELECT id FROM roles WHERE role_key = 'creator'), NULL, ?, ?, 1, 0)`,
-        [input.username, hash, input.displayName?.trim() || input.username, input.phone ?? null],
+        `INSERT INTO users (username, password_hash, role, role_id, parent_id, display_name, phone, is_active, must_change_pwd,created_by)
+         VALUES (?, ?, 'creator', (SELECT id FROM roles WHERE role_key = 'creator'), ?, ?, ?, 1, 0,?)`,
+        [input.username, hash, invitation?.team_leader_id ?? null, input.displayName?.trim() || input.username, input.phone ?? null, invitation?.owner_user_id ?? null],
       );
       const id = String(result.insertId);
+      if (invitation) await consumeInvitation(connection, invitation, id);
       await writeAudit({ userId: id, action: 'auth.register', resourceType: 'user', resourceId: id, ip }, connection);
       return id;
     });

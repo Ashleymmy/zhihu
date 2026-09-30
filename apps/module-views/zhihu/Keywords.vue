@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {computed,onMounted,reactive,ref,watch,onUnmounted} from 'vue'
 import {fetchAllPages} from '@zhihu-koc/shared-services'
+import {ActionDialog} from '@zhihu-koc/shared-components'
 import {errorText,requestKey,type EngineContext} from './context'
 import {keywordProgress,type KeywordSummary} from './keyword-progress'
-const props=defineProps<{context:EngineContext;initialSearch?:string}>(),emit=defineEmits<{refresh:[]}>()
+const props=defineProps<{context:EngineContext;initialSearch?:string}>(),emit=defineEmits<{refresh:[];navigate:[path:string]}>()
 interface Word{allocationReady:number;planStatus?:string;hasUpstreamPlan?:number;readOnly?:number;planId:string;taskName?:string;compositionCount?:number;ownerName?:string;id:string;keyword:string;taskId:string;lifecycleStatus:string;upstreamStatus:string;syncStatus:string;syncError:string|null;priorityEnded:number;bindingId:string|null;executorId:string|null;leaderId:string|null;releaseStatus:string;usedEverAt:string|null;verificationStatus:string;executorName?:string}
 const list=ref<Word[]>([]),total=ref(0),page=ref(1),search=ref(props.initialSearch??''),busy=ref(false),error=ref(''),notice=ref(''),createOpen=ref(false)
-const selected=ref<Word|null>(null),action=ref(''),target=ref(''),reason=ref(''),work=reactive({url:'',description:''}),operationKey=ref(requestKey())
+const selected=ref<Word|null>(null),action=ref(''),target=ref(''),reason=ref(''),operationKey=ref(requestKey())
 const form=reactive({keyword:'',taskId:props.context.options.tasks[0]?.id||'',mappingId:props.context.options.mappings[0]?.id||'',channelId:props.context.options.channels[0]?.id||'',landingUrl:'',popularizeType:0})
 const prices=ref<{versionId:string;taskId:string;payeeId:string;price:string;priceStatus:string;startDay:string;endDay:string|null}[]>([])
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
@@ -23,10 +24,12 @@ function price(w:Word){const p=prices.value.find(p=>p.taskId===w.taskId&&p.payee
 async function load(){const r=await props.context.http.get<{list:Word[];total:number;summary?:KeywordSummary;readAt?:string}>('/keywords',{...props.context.scope,page:page.value,pageSize:25,search:search.value});list.value=r.list;total.value=r.total;summary.value=r.summary??null;readAt.value=r.readAt??''}
 async function run(fn:()=>Promise<unknown>){if(busy.value)return;busy.value=true;error.value='';try{await fn();await load()}catch(e){error.value=errorText(e)}finally{busy.value=false}}
 function post(path:string,data:object={},key:string=requestKey()){return props.context.http.post(path,{...props.context.scope,...data,requestKey:key})}
-function choose(w:Word,a:string){selected.value=w;action.value=a;target.value='';reason.value='';work.url='';work.description='';operationKey.value=requestKey()}
+function choose(w:Word,a:string){
+ if(a==='work'){emit('navigate','/modules/zhihu/works/new?'+new URLSearchParams({planId:w.planId,keyword:w.keyword,...props.context.scope}));return}
+ selected.value=w;action.value=a;target.value='';reason.value='';error.value='';operationKey.value=requestKey()
+}
 async function perform(){const w=selected.value;if(!w)return;
- if(action.value==='work'){if(!w.usedEverAt)await post('/bindings/'+w.bindingId+'/activate',{},operationKey.value+'-use');await post('/evidence',{bindingId:w.bindingId,url:work.url,description:work.description||'已使用关键词 '+w.keyword},operationKey.value+'-work');notice.value='作品已提交，审核结果会显示在“审核进度”中。'}
- else if(action.value==='distribute')await post('/keywords/'+w.id+'/distribute',{targetId:target.value},operationKey.value)
+ if(action.value==='distribute')await post('/keywords/'+w.id+'/distribute',{targetId:target.value},operationKey.value)
  else await post('/bindings/'+w.bindingId+'/'+action.value,{executorId:target.value||undefined,reason:reason.value||undefined},operationKey.value)
  selected.value=null
 }
@@ -57,11 +60,14 @@ onMounted(()=>run(async()=>{prices.value=await fetchAllPages(params=>props.conte
 <button v-if="w.bindingId&&w.executorId===context.userId&&w.lifecycleStatus!=='retired'" class="primary" :disabled="busy" @click="choose(w,'work')">{{w.usedEverAt?'提交 / 补充作品':'提交作品并开始使用'}}</button>
 <details v-if="w.bindingId"><summary>更多</summary><button v-if="!w.usedEverAt&&w.releaseStatus!=='requested'" :disabled="busy" @click="choose(w,'request-release')">退回未使用关键词</button><button v-if="admin&&w.releaseStatus==='requested'" :disabled="busy" @click="choose(w,'release')">审核退回</button><button v-if="w.usedEverAt&&w.lifecycleStatus!=='retired'" :disabled="busy" @click="choose(w,'stop')">停止使用</button></details>
 </div></td></tr></tbody></table></div><p v-if="!list.length" class="empty-state">{{admin?'还没有关键词，请先创建。':context.role==='creator'?context.parentId?'还没有团长分发给你的关键词。':'暂时没有可领取的关键词；新词前 30 分钟仅对团长开放。':'暂时没有可领取或已分发的关键词。'}}</p>
-<form v-if="selected" class="confirm-box" @submit.prevent="run(perform)"><h2>{{selected.keyword}}</h2><template v-if="action==='work'"><label>作品链接<input v-model="work.url" type="url" required maxlength="2048" /></label><label>补充说明（可选）<input v-model="work.description" maxlength="1000" /></label></template><label v-else-if="action==='assign'||action==='distribute'">分发给<select v-model="target" required><option value="">选择成员</option><option v-for="u in members" :key="u.id" :value="u.id">{{u.displayName}}（{{u.role==='leader'?'团长':'达人'}}）</option></select></label><template v-else><p>{{action==='stop'?'停止后保留历史归属和收入，请确认不再新增使用。':'未使用的关键词经运营审核后可以重新分发。'}}</p><label>原因<input v-model="reason" required maxlength="500" /></label></template><button class="primary" :disabled="busy">{{action==='work'?'提交作品':'确认'}}</button><button type="button" @click="selected=null">取消</button></form>
+<ActionDialog :open="!!selected" :title="selected ? (action==='assign'||action==='distribute'?'分配关键词 · ':'处理关键词 · ')+selected.keyword : '关键词操作'" :busy="busy" @close="selected=null">
+ <form v-if="selected" @submit.prevent="run(perform)"><p v-if="error" role="alert">{{error}}</p><label v-if="action==='assign'||action==='distribute'">分配给<select v-model="target" required><option value="">选择成员</option><option v-for="u in members" :key="u.id" :value="u.id">{{u.displayName}}（{{u.role==='leader'?'团长':'达人'}}）</option></select></label><template v-else><p>{{action==='stop'?'停止后保留历史归属和收入，请确认不再新增使用。':'未使用的关键词经运营审核后可以重新分发。'}}</p><label>原因<input v-model="reason" required maxlength="500" /></label></template><div class="dialog-actions"><button type="button" :disabled="busy" @click="selected=null">取消</button><button class="primary" :disabled="busy">{{busy?'正在保存…':'确认'}}</button></div></form>
+</ActionDialog>
 <div class="engine-actions" v-if="total>25"><button :disabled="page===1||busy" @click="page--;run(load)">上一页</button><span>第 {{page}} 页，本地共 {{total}} 条</span><button :disabled="page*25>=total||busy" @click="page++;run(load)">下一页</button></div>
 </section></template>
 
 <style scoped>
 .keyword-source{padding:16px;margin:16px 0;border:1px solid var(--line,#dce3e5);border-radius:8px;background:var(--paper,#fff)}
 .keyword-source p{margin:8px 0;line-height:1.6}.keyword-source button{margin-top:12px}
+.engine-table th:last-child,.engine-table td:last-child{text-align:right;width:1%;min-width:220px;padding-right:12px}.engine-table td:last-child .engine-actions{justify-content:flex-end;flex-wrap:wrap}.engine-table td:last-child> a{display:block;margin-bottom:8px}.engine-table td:last-child details{text-align:right}.engine-table table{width:100%}
 </style>

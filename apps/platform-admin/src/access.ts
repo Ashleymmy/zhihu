@@ -17,6 +17,7 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
     user.permissions?.includes(permission) ?? false
   const duty = user.role === 'operator' ? 'operations' : user.role === 'admin' ? (user.adminDuty ?? 'all') : 'all'
   if (path === '/account/security') return true
+  if (user.role === 'creator' && ['/projects', '/modules', '/finance'].some(p => path === p || path.startsWith(p + '/') && p !== '/modules')) return false
   if (
     duty === 'finance' &&
     !['/dashboard', '/finance', '/modules'].includes(path) &&

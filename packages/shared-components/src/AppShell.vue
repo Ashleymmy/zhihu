@@ -5,6 +5,7 @@ export interface NavItem {
   key: string
   label: string
   path: string
+  children?: NavItem[]
 }
 
 export interface NavGroup {
@@ -35,6 +36,15 @@ const mobileOpen = ref(false)
 const searchOpen = ref(false)
 const searchQuery = ref('')
 const openGroups = ref<Set<number>>(new Set(props.groups.map((_, i) => i)))
+const openItems = ref(new Set<string>())
+watch(() => props.currentPath, path => {
+  for (const group of props.groups) for (const item of group.items)
+    if (item.children?.some(child => path === child.path || path.startsWith(child.path + '/'))) openItems.value.add(item.key)
+}, { immediate: true })
+function toggleItem(key: string) {
+  if (openItems.value.has(key)) openItems.value.delete(key)
+  else openItems.value.add(key)
+}
 
 watch(
   () => props.groups.map((group) => group.label).join('|'),
@@ -45,10 +55,10 @@ watch(
 
 /** 拍平导航，为每个条目分配全局序号（01 / 02 / ...） */
 const flatItems = computed(() =>
-  props.groups.flatMap((group) => group.items.map((item) => ({ ...item, group: group.label }))),
+  props.groups.flatMap((group) => group.items.flatMap((item) => [...(item.children ?? []), item].map(child => ({ ...child, group: group.label })))),
 )
 
-const currentItem = computed(() => flatItems.value.find((item) => isActive(item.path)) ?? flatItems.value[0])
+const currentItem = computed(() => flatItems.value.filter((item) => isActive(item.path)).sort((a, b) => b.path.length - a.path.length)[0] ?? flatItems.value[0])
 
 const currentIndex = computed(() => {
   const idx = flatItems.value.findIndex((item) => item.key === currentItem.value?.key)
@@ -143,16 +153,19 @@ const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
             </svg>
           </button>
           <template v-if="openGroups.has(gi)">
-            <button
-              v-for="item in group.items"
-              :key="item.key"
+            <template v-for="item in group.items" :key="item.key"><button
               type="button"
               class="studio-nav-item"
-              :data-active="isActive(item.path)"
-              @click="handleNav(item.path)"
+              :data-active="item.children ? isActive(item.path) : currentItem?.key === item.key"
+              :aria-expanded="item.children ? openItems.has(item.key) : undefined"
+              @click="item.children ? toggleItem(item.key) : handleNav(item.path)"
             >
               {{ item.label }}
+              <span v-if="item.children" class="nav-chevron" aria-hidden="true">{{ openItems.has(item.key) ? '⌄' : '›' }}</span>
             </button>
+            <div v-if="item.children && openItems.has(item.key)" class="nav-children">
+              <button v-for="child in item.children" :key="child.key" type="button" class="studio-nav-item" :data-active="isActive(child.path)" :aria-current="isActive(child.path) ? 'page' : undefined" @click="handleNav(child.path)">{{ child.label }}</button>
+            </div></template>
           </template>
         </div>
       </nav>
@@ -262,3 +275,4 @@ const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
     </div>
   </div>
 </template>
+<style scoped>.nav-chevron{margin-left:auto}.nav-children{margin-left:16px;border-left:1px solid var(--line);padding-left:8px}.nav-children .studio-nav-item{font-size:13px}</style>

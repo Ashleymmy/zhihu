@@ -32,9 +32,10 @@ async function loadSummary() {
                 to: to.value,
               })),
               name: a.name,
+              moduleId: a.moduleId,
             }
           } catch {
-            return { name: a.name, status: 'unavailable', metrics: [] }
+            return { name: a.name, moduleId: a.moduleId, status: 'unavailable', metrics: [] }
           }
         }),
     )
@@ -66,7 +67,7 @@ watch(w.projectId, loadSummary)
         <h1>工作台</h1>
         <p>按项目查看业务模块与运营数据。</p>
       </div>
-      <router-link to="/modules">管理业务模块</router-link>
+      <router-link v-if="w.role.value !== 'creator'" to="/modules">管理业务模块</router-link>
     </header>
     <p v-if="error" role="alert">{{ error }}</p>
     <article class="panel" style="padding: 24px">
@@ -82,7 +83,7 @@ watch(w.projectId, loadSummary)
           查询
         </button>
       </div>
-      <p v-if="!projects.length">还没有业务项目，请先在项目管理中创建项目。</p>
+      <p v-if="!projects.length">{{ w.role.value === 'creator' ? '暂无可参与的项目，请联系运营人员或所属团长。' : '还没有业务项目，请先在项目管理中创建项目。' }}</p>
     </article>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px">
       <article
@@ -92,19 +93,15 @@ watch(w.projectId, loadSummary)
         style="padding: 24px"
       >
         <h2>{{ m.name }}</h2>
-        <router-link :to="m.entryPath">进入业务模块</router-link>
+        <p>{{ m.id === 'zhihu' ? '领取关键词、登记作品，查看推广计划与收入。' : '进入业务工作区' }}</p>
+        <router-link class="primary-action module-entry" :to="m.id === 'zhihu' ? '/modules/zhihu/operations' : m.entryPath">{{ m.id === 'zhihu' ? '进入知乎工作台' : '进入业务模块' }} →</router-link>
+        <div v-for="(s, i) in summaries.filter(s => s.moduleId === m.id && s.status === 'ready')" :key="i" class="module-metrics">
+          <span v-for="metric in s.metrics" :key="metric.key">{{ metric.label }} <strong>{{ metric.value === null ? '暂无数据' : metric.value }}</strong> {{ metric.unit }}</span>
+        </div>
       </article>
     </div>
     <p v-if="loading">正在加载项目数据…</p>
     <p v-else-if="w.projectId.value && !summaries.length">此项目尚未关联可用接入账号。</p>
-    <article v-for="(s, i) in summaries" :key="i" class="panel" style="padding: 24px">
-      <h2>{{ s.name }}</h2>
-      <p v-if="s.status === 'unavailable'">此业务尚未提供公共汇总，或当前暂时不可用。可进入业务模块查看。</p>
-      <p v-else-if="s.status === 'empty'">该时间范围暂无数据。</p>
-      <div v-else v-for="metric in s.metrics" :key="metric.key">
-        <span>{{ metric.label }}：</span
-        ><strong>{{ metric.value === null ? '暂无数据' : metric.value }}</strong> {{ metric.unit }}
-      </div>
-    </article>
   </section>
 </template>
+<style scoped>.module-entry{display:inline-flex;margin-top:12px;text-decoration:none}.module-metrics{display:flex;flex-wrap:wrap;gap:20px;margin-top:22px;font-size:14px}</style>

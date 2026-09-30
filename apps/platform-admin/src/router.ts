@@ -105,7 +105,7 @@ export function createAppRouter(
         (m) => m.id === to.meta.moduleId && m.status === 'enabled',
       )
     )
-      return '/modules'
+      return auth.user.role === 'creator' ? '/dashboard' : '/modules'
     if (
       auth.user.role === 'admin' &&
       auth.user.adminDuty === 'finance' &&

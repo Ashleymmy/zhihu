@@ -22,3 +22,4 @@ export type {CoreWorkspace} from './core-workspace'
 
 export { default as CashWallet } from './CashWallet.vue'
 export { default as StaffManager } from './StaffManager.vue'
+export { default as ActionDialog } from './ActionDialog.vue'

@@ -6,6 +6,8 @@ import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { createMember, deleteMember, disableMember, listMembers, resetPassword, updateMember, listLeaders, myTeam, applyToTeam, listMyApplications, listApplications, reviewApplication, cancelMyApplication } from '../services/team.service';
 import { ok } from '../utils/response';
+import { createInvitation, listInvitations, revokeInvitation } from '../services/invitations.service';
+import { updateMemberAccess } from '../services/member-access.service';
 
 const id = z.string().regex(/^\d+$/);
 const create = z.object({
@@ -34,6 +36,10 @@ const review = z.object({
 });
 export const teamRouter = Router();
 teamRouter.use(requireAuth);
+teamRouter.get('/invitations',requirePermission('team.create_member'),asyncHandler(async(req,res)=>ok(res,await listInvitations(req.user))));
+teamRouter.post('/invitations',requirePermission('team.create_member'),validateBody(z.object({label:z.string().trim().min(1).max(100),validDays:z.number().int().min(1).max(30).default(7),maxUses:z.number().int().min(1).max(1000).default(20)}).strict()),asyncHandler(async(req,res)=>ok(res,await createInvitation(req.user,req.body),201)));
+teamRouter.post('/invitations/:id/revoke',requirePermission('team.create_member'),asyncHandler(async(req,res)=>{await revokeInvitation(req.user,id.parse(req.params.id));ok(res,null)}));
+teamRouter.patch('/members/:id/access',requirePermission('team.create_member'),validateBody(z.object({displayName:z.string().trim().min(1).max(64).optional(),phone:z.string().max(20).nullable().optional(),role:z.enum(['developer','admin','operator','leader','creator']).optional(),adminDuty:z.enum(['all','operations','finance']).optional(),isActive:z.boolean().optional(),parentId:id.nullable().optional()}).strict().refine(v=>Object.keys(v).length>0)),asyncHandler(async(req,res)=>{await updateMemberAccess(req.user,id.parse(req.params.id),req.body);ok(res,null)}));
 teamRouter.get(
   '/members',
   requirePermission('team.view'),

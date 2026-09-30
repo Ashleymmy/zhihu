@@ -52,6 +52,7 @@ projectsRouter.patch(
 );
 projectsRouter.get(
   '/:projectId/members',
+  requirePermission('team.view'),
   asyncHandler(async (req, res) => ok(res, await listProjectMembers(req.user, id.parse(req.params.projectId)))),
 );
 projectsRouter.post(

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { Composition, Plan } from '@zhihu-koc/shared-contracts/zhihu'
 import { SearchableSelect } from '@zhihu-koc/shared-components'
 import { fetchAllPages } from '@zhihu-koc/shared-services'
@@ -10,7 +10,9 @@ import WorkImportDialog from '@zhihu-koc/zhihu-module-views/WorkImportDialog.vue
 import WorkImportDrafts from '@zhihu-koc/zhihu-module-views/WorkImportDrafts.vue'
 import type { WorkImportOptions } from '@zhihu-koc/shared-services/zhihu'
 
-const route=useRoute()
+const route=useRoute(), router=useRouter()
+const registrationPage=computed(()=>route.path.endsWith('/works/new'))
+function cancelRegistration(){showCreate.value=false;if(registrationPage.value)void router.push({path:'/modules/zhihu/works',query:{planId:selectedPlan.value,keyword:route.query.keyword}})}
 type LinkedComposition=Composition & {keywordProjectId?:string;keywordAccountId?:string}
 const works = ref<LinkedComposition[]>([])
 const page=ref(1),pageSize=25,keywordFilter=ref(String(route.query.keyword||''))
@@ -81,6 +83,7 @@ async function load() {
 async function openCreate() {
   showCreate.value = true
   createError.value = ''
+  form.value.planId=selectedPlan.value ?? ''
   await loadPlans()
 }
 
@@ -93,7 +96,10 @@ async function loadPlans() {
     const result = await fetchAllPages(params => apis.plans.list({ ...params, purpose: 'composition' }))
     if (version !== planSearchVersion) return
     plans.value = result
-    if (!result.some(plan => plan.id === form.value.planId)) form.value.planId = ''
+    if (!result.some(plan => plan.id === form.value.planId)) {
+      if (form.value.planId) plansError.value = '所选关键词当前不可登记作品，请返回关键词页面检查归属与状态。'
+      form.value.planId = ''
+    }
   } catch (e) {
     if (version === planSearchVersion) plansError.value = e instanceof Error ? e.message : '计划加载失败，请重试'
   } finally {
@@ -122,11 +128,13 @@ async function submitCreate() {
     })
     showCreate.value = false
     form.value = { planId: '', mediaType: 'KOC抖音', mediaAccount: '', compositionType: 1, compositionSubType: 1, title: '', promoUrl: '', releaseTime: '' }
+    if(registrationPage.value)await router.replace({path:'/modules/zhihu/works',query:{planId:selectedPlan.value,keyword:route.query.keyword}})
     await load()
   } catch (e: any) { createError.value = e?.message ?? String(e) }
   finally { creating.value = false }
 }
 
+watch(registrationPage,value=>{if(value)void openCreate();else showCreate.value=false},{immediate:true})
 let poll:ReturnType<typeof setInterval>|undefined
 watch(()=>[route.query.planId,route.query.keyword],()=>{keywordFilter.value=String(route.query.keyword||'');page.value=1;void load()})
 onMounted(()=>{void load();poll=setInterval(()=>{if(!document.hidden&&!loading.value&&!showCreate.value&&!showImport.value)void load()},15000)})
@@ -139,10 +147,10 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
     <header class="page-header">
       <div>
         <p class="section-index">02 / 作品管理</p>
-        <h1>推广作品</h1>
+        <h1>{{registrationPage?'登记作品':'推广作品'}}</h1>
         <p>挂在推广计划下的内容与素材作品，跟踪审核与同步状态。</p>
       </div>
-      <div class="page-actions">
+      <div v-if="!registrationPage" class="page-actions">
         <select v-model="statusFilter" @change="page=1;load()">
           <option value="">全部状态</option>
           <option value="pending">待审核</option>
@@ -150,13 +158,13 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
           <option value="rejected">已拒绝</option>
           <option value="ended">已结束</option>
         </select>
-        <button class="primary-action" @click="openCreate">登记作品</button>
+        <button v-if="!registrationPage" class="primary-action" @click="router.push('/modules/zhihu/works/new')">登记作品</button>
       </div>
     </header>
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <form class="page-actions" @submit.prevent="page=1;load()"><label>查找关键词<input v-model.trim="keywordFilter" maxlength="128" placeholder="与关键词管理使用相同关键词" /></label><button type="submit" :disabled="loading">搜索</button><button type="button" :disabled="loading" @click="load">刷新</button><router-link v-if="selectedPlan" to="/modules/zhihu/works">查看全部作品</router-link></form>
+    <template v-if="!registrationPage"><form class="page-actions" @submit.prevent="page=1;load()"><label>查找关键词<input v-model.trim="keywordFilter" maxlength="128" placeholder="与关键词管理使用相同关键词" /></label><button type="submit" :disabled="loading">搜索</button><button type="button" :disabled="loading" @click="load">刷新</button><router-link v-if="selectedPlan" to="/modules/zhihu/works">查看全部作品</router-link></form>
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
         <span class="toolbar-title">作品列表</span>
@@ -183,13 +191,14 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
     <nav class="page-actions" aria-label="作品分页"><button :disabled="page===1||loading" @click="page--;load()">上一页</button><span>第 {{page}} 页，共 {{total}} 条作品</span><button :disabled="page*pageSize>=total||loading" @click="page++;load()">下一页</button></nav>
     </article>
 
-    <Teleport to="body">
-      <div v-if="showCreate" class="dialog-overlay" @click.self="showCreate = false">
-        <div class="dialog-card" style="width: min(520px, 92vw);">
+    </template>
+    <Teleport to="body" :disabled="registrationPage">
+      <div v-if="showCreate" :class="registrationPage ? 'registration-page' : 'dialog-overlay'" @click.self="!registrationPage && cancelRegistration()">
+        <div class="dialog-card" :style="{width:registrationPage?'min(760px, 100%)':'min(520px, 92vw)'}">
           <div class="dialog-header">
-            <h3>登记作品</h3>
+            <h3>作品信息</h3>
             <button type="button" class="work-batch-button" :disabled="creating" @click="showCreate = false; importInitialFile = undefined; importInitialOptions = undefined; showImport = true; loadPlans()">批量上传</button>
-            <button type="button" class="dialog-close" @click="showCreate = false">×</button>
+            <button type="button" class="dialog-close" @click="cancelRegistration">×</button>
           </div>
           <div class="dialog-body">
             <p v-if="createError" role="alert" style="color: var(--clay)">{{ createError }}</p>
@@ -234,14 +243,14 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
             </div>
           </div>
           <div class="dialog-footer">
-            <button class="ghost-aurora" @click="showCreate = false">取消</button>
+            <button class="ghost-aurora" @click="cancelRegistration">取消</button>
             <button class="primary-action" :disabled="creating || plansLoading || !!plansError || !form.planId" @click="submitCreate">{{ creating ? '提交中...' : '确认登记' }}</button>
           </div>
         </div>
       </div>
     </Teleport>
     <WorkImportDrafts :api="apis.story" :refresh-key="draftsVersion" @resume="resumeImport" />
-    <WorkImportDialog v-if="showImport" :api="apis.story" :plans="plans" :initial-plan-id="form.planId" :initial-file="importInitialFile" :initial-options="importInitialOptions" @close="showImport = false" @imported="page = 1; load(); draftsVersion++" @saved="draftsVersion++" />
+    <WorkImportDialog v-if="showImport" :api="apis.story" :plans="plans" :initial-plan-id="form.planId" :initial-file="importInitialFile" :initial-options="importInitialOptions" @close="showImport = false; if(registrationPage) showCreate = true" @imported="page = 1; load(); draftsVersion++" @saved="draftsVersion++" />
   </div>
 </template>
 
@@ -250,3 +259,5 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
 .work-batch-button:hover { background: var(--paper, #f2f0ec); border-color: var(--ink-soft, #807b73); }
 .work-batch-button:disabled { opacity: .5; cursor: wait; }
 </style>
+
+<style scoped>.registration-page{max-width:760px}.registration-page .dialog-card{max-height:none;box-shadow:none;border:1px solid var(--line);border-radius:12px}.registration-page .dialog-body{max-height:none}.registration-page .dialog-close{display:none}</style>

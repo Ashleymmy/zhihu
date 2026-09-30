@@ -9,6 +9,7 @@ import { AuthUser, Role } from '../types';
 import { normalizeRole, canManageRole } from '../auth/roles';
 import { writeAudit } from './audit.service';
 import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser, isDevDemoEnabled } from '../core/demo';
+import { listManagedMembers } from './member-access.service';
 
 interface MemberRow extends RowDataPacket {
   id: string;
@@ -89,14 +90,7 @@ export async function listMembers(user: AuthUser) {
     return members.filter((item) => item.id === user.sub || item.parentId === user.sub);
   }
 
-  if (isStaffRole(user.role))
-    return rows(
-      'SELECT id, username, role, parent_id, display_name, phone, is_active, must_change_pwd, last_login_at, created_at FROM users ORDER BY created_at DESC',
-    );
-  return rows(
-    'SELECT id, username, role, parent_id, display_name, phone, is_active, must_change_pwd, last_login_at, created_at FROM users WHERE parent_id = ? OR id = ? ORDER BY created_at DESC',
-    [user.sub, user.sub],
-  );
+  return listManagedMembers(user);
 }
 
 export async function createMember(
@@ -213,6 +207,9 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
   await withTransaction(async (connection) => {
     const current=await target(user,id,connection);
     if(isStaffRole(current.role))throw new AppError(422,42212,'管理账号不可删除');
+    const [[invitation]] = await connection.query<RowDataPacket[]>('SELECT id FROM member_invitations WHERE owner_user_id=? OR team_leader_id=? LIMIT 1 FOR UPDATE', [id,id]);
+    const [[use]] = await connection.query<RowDataPacket[]>('SELECT user_id FROM member_invitation_uses WHERE user_id=? LIMIT 1 FOR UPDATE', [id]);
+    if (invitation || use) throw new AppError(422,42213,'该账号存在邀请记录，不可删除；如不再使用请改为停用');
     // 入团申请是低价值流程记录，随账号一并清除（其他业务数据已在上方拦截）
     await connection.query('DELETE FROM team_applications WHERE creator_id = ? OR leader_id = ?', [id, id]);
     await connection.query('DELETE FROM users WHERE id = ?', [id]);

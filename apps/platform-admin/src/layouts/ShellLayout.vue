@@ -48,7 +48,12 @@ const navigation = computed<NavGroup[]>(() => {
   if (enabled.length)
     groups.push({
       label: '已接入业务',
-      items: enabled.map((m) => ({ key: m.id, label: m.name, path: m.entryPath })),
+      items: enabled.map((m) => m.id === 'zhihu' ? {
+        key: m.id, label: m.name, path: '/modules/zhihu', children: [
+          ...(auth.user?.adminDuty === 'finance' ? [] : [{ key: 'zhihu-story', label: '知乎故事', path: '/modules/zhihu/history' }]),
+          { key: 'zhihu-more', label: '更多功能', path: '/modules/zhihu/more' },
+        ],
+      } : ({ key: m.id, label: m.name, path: m.entryPath })),
     })
   return groups.map(group => ({ ...group, items: group.items.filter(item => canAccessPath(auth.user, item.path)) })).filter(group => group.items.length)
 
