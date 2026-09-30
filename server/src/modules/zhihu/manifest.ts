@@ -1,10 +1,5 @@
 import type { ModuleManifest } from '../../core/contracts';
 const creator = [
-  'catalog.sync',
-  'plan.create',
-  'plan.edit',
-  'plan.delete',
-  'keyword.bind',
   'keyword.read',
   'keyword.claim',
   'binding.use',
@@ -19,6 +14,11 @@ const creator = [
 ];
 const leader = [
   ...creator,
+  'catalog.sync',
+  'plan.create',
+  'plan.edit',
+  'plan.delete',
+  'keyword.bind',
   'earning.view_team',
   'withdraw.review',
   'binding.assign',

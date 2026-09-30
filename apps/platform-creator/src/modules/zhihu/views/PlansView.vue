@@ -1,462 +1,326 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import type { Plan } from '@zhihu-koc/shared-contracts/zhihu'
-import { fetchAllPages } from '@zhihu-koc/shared-services'
-import { useAuthStore, apis } from '../context'
-
-const route = useRoute()
-/** 从知乎故事聚合页进入（/zhihu-story/plans）时显示返回入口 */
-const fromStoryHub = route.path.startsWith('/zhihu-story') || route.query.from === 'story'
-
-type PoolPlan = Plan & {keywordId?:string;keywordProjectId?:string;keywordAccountId?:string}
-const plans = ref<PoolPlan[]>([])
-const loading = ref(true)
-const error = ref('')
-const showModal = ref(false)
-
-interface ChannelOption { id: string; zhihuChannelId: string; name: string }
-interface TaskOption { id: string; zhihuTaskId: string; name: string }
-
-const fmt = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
-const statusLabels: Record<string, string> = { pending: '待审核', active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝', archived: '已归档' }
-
-/** picker blur 延迟收起（让点击选项先生效） */
-function closeTaskPicker() { setTimeout(() => { taskPickerOpen.value = false }, 150) }
-function closeChannelPicker() { setTimeout(() => { channelPickerOpen.value = false }, 150) }
-
-const channels = ref<ChannelOption[]>([])
-const tasks = ref<TaskOption[]>([])
-const submitting = ref(false)
-const catalogLoading = ref(false)
-
-/** 可搜索下拉（任务/渠道） */
-const taskQuery = ref('')
-const channelQuery = ref('')
-const taskPickerOpen = ref(false)
-const channelPickerOpen = ref(false)
-
-const filteredTasks = computed(() => {
-  const q = taskQuery.value.trim().toLowerCase()
-  if (!q) return tasks.value
-  return tasks.value.filter((t) => `${t.name}${t.zhihuTaskId}`.toLowerCase().includes(q))
-})
-const filteredChannels = computed(() => {
-  const q = channelQuery.value.trim().toLowerCase()
-  if (!q) return channels.value
-  return channels.value.filter((c) => `${c.name}${c.zhihuChannelId}`.toLowerCase().includes(q))
-})
-
-const selectedTask = computed(() => tasks.value.find((t) => t.zhihuTaskId === form.value.taskId))
-const selectedChannel = computed(() => channels.value.find((c) => c.zhihuChannelId === form.value.channelId))
-
-const form = ref({ keyword: '', taskId: '', channelId: '', landingUrl: '', name: '', dailyBudgetYuan: '', startDate: '', endDate: '' })
-
-/** 关键词实时校验 */
-const keywordCheck = ref<{ checking: boolean; available: boolean | null }>({ checking: false, available: null })
-let keywordTimer: ReturnType<typeof setTimeout> | null = null
-
-function onKeywordInput() {
-  keywordCheck.value = { checking: false, available: null }
-  if (keywordTimer) clearTimeout(keywordTimer)
-  const kw = form.value.keyword.trim()
-  const channelId = form.value.channelId
-  if (!kw || !channelId) return
-  const stillCurrent = () => form.value.keyword.trim() === kw && form.value.channelId === channelId
-  keywordTimer = setTimeout(async () => {
-    keywordTimer = null
-    if (!stillCurrent()) return
-    keywordCheck.value = { checking: true, available: null }
-    try {
-      const r = await apis.plans.checkKeyword(channelId, kw)
-      if (stillCurrent()) keywordCheck.value = { checking: false, available: r.available }
-    } catch { if (stillCurrent()) keywordCheck.value = { checking: false, available: null } }
-  }, 600)
-}
-
-function pickTask(t: TaskOption) {
-  form.value.taskId = t.zhihuTaskId
-  taskQuery.value = `${t.name}（${t.zhihuTaskId}）`
-  taskPickerOpen.value = false
-}
-
-function pickChannel(c: ChannelOption) {
-  form.value.channelId = c.zhihuChannelId
-  channelQuery.value = `${c.name}（${c.zhihuChannelId}）`
-  channelPickerOpen.value = false
-  // 渠道变化后重新校验关键词
-  if (form.value.keyword.trim()) onKeywordInput()
-}
-
-/** 渠道/任务目录同步（需要时可手动触发，通常每天自动跑一次） */
-const syncingCatalog = ref(false)
-const catalogSyncedAt = ref('')
-const catalogMessage = ref('')
-async function syncCatalog() {
-  syncingCatalog.value = true
-  error.value = ''
-  catalogMessage.value = '同步任务已提交，正在从知乎拉取…'
-  try {
-    await Promise.all([apis.channels.sync(), apis.story.syncTasks()])
-    // 同步是异步任务：等待执行后刷新目录与计划，并给出数量反馈
-    setTimeout(async () => {
-      try {
-        const [channelList, taskList] = await Promise.all([
-          fetchAllPages((params) => apis.channels.list(params)),
-          fetchAllPages((params) => apis.story.listTasks(params)),
-        ])
-        channels.value = channelList as unknown as ChannelOption[]
-        tasks.value = taskList as TaskOption[]
-        catalogMessage.value = `已刷新目录：${channels.value.length} 个渠道、${tasks.value.length} 个任务可用；同步任务已提交，请稍后刷新核对`
-        await load()
-      } catch { catalogMessage.value = '同步已提交，下拉数据稍后自动更新' }
-      syncingCatalog.value = false
-    }, 6000)
-  } catch (e: any) {
-    error.value = e?.message ?? String(e)
-    catalogMessage.value = ''
-    syncingCatalog.value = false
-  }
-}
-
+import { onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
+import type { Plan } from "@zhihu-koc/shared-contracts/zhihu";
+import { apis } from "../context";
+type MyPlan = Plan & {
+  canRegister?: boolean;
+  keywordProjectId?: string;
+  keywordAccountId?: string;
+};
+const route = useRoute();
+const plans = ref<MyPlan[]>([]),
+  total = ref(0),
+  page = ref(1),
+  pageSize = 20;
+const search = ref(""),
+  loading = ref(false),
+  error = ref("");
+const statusLabels: Record<string, string> = {
+  pending: "待确认",
+  active: "进行中",
+  paused: "已暂停",
+  ended: "已结束",
+  rejected: "暂不可用",
+};
+let generation = 0;
 async function load() {
-  loading.value = true
-  error.value = ''
+  const version = ++generation;
+  loading.value = true;
+  error.value = "";
   try {
-    plans.value = await fetchAllPages((params) => apis.plans.list(params))
-  } catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { loading.value = false }
-}
-
-async function openCreate() {
-  showModal.value = true
-  if (catalogLoading.value) return
-  catalogLoading.value = true
-  error.value = ''
-  channels.value = []
-  tasks.value = []
-  keywordCheck.value = { checking: false, available: null }
-  if (!channels.value.length || !tasks.value.length) {
-    try {
-      const [channelList, taskList] = await Promise.all([
-          fetchAllPages((params) => apis.channels.list(params)),
-          fetchAllPages((params) => apis.story.listTasks(params)),
-        ])
-        channels.value = channelList as unknown as ChannelOption[]
-        tasks.value = taskList as TaskOption[]
-    } catch (e: any) { error.value = '渠道/任务目录加载失败：' + (e?.message ?? String(e)) }
-    finally { catalogLoading.value = false }
+    const result = await apis.plans.list({
+      page: page.value,
+      pageSize,
+      keyword: search.value.trim() || undefined,
+    });
+    if (version !== generation) return;
+    plans.value = result.list;
+    total.value = result.total;
+  } catch (e: any) {
+    if (version === generation)
+      error.value = e?.message || "计划加载失败，请重试";
+  } finally {
+    if (version === generation) loading.value = false;
   }
 }
-
-async function createPlan() {
-  if (submitting.value || catalogLoading.value) return
-  error.value = ''
-  if (!tasks.value.some(t => t.zhihuTaskId === form.value.taskId) || !channels.value.some(c => c.zhihuChannelId === form.value.channelId) || !form.value.keyword.trim() || !form.value.landingUrl.trim()) {
-    error.value = '请完整填写任务、渠道、关键词和推广内容地址'
-    return
-  }
-  submitting.value = true
-  try {
-    await apis.plans.create({
-      taskId: form.value.taskId,
-      channelId: form.value.channelId,
-      keyword: form.value.keyword.trim(),
-      landingUrl: form.value.landingUrl.trim(),
-      popularizeType: 0,
-      name: form.value.name.trim() || null,
-      dailyBudget: form.value.dailyBudgetYuan ? Math.round(Number(form.value.dailyBudgetYuan) * 100) : null,
-      startDate: form.value.startDate || null,
-      endDate: form.value.endDate || null,
-    })
-    if (keywordTimer) clearTimeout(keywordTimer)
-    keywordTimer = null
-    showModal.value = false
-    form.value = { keyword: '', taskId: '', channelId: '', landingUrl: '', name: '', dailyBudgetYuan: '', startDate: '', endDate: '' }
-    taskQuery.value = ''
-    channelQuery.value = ''
-    keywordCheck.value = { checking: false, available: null }
-    await load()
-  } catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { submitting.value = false }
-}
-
-const retrying = ref<string | null>(null)
-async function retrySync(id: string) {
-  if (retrying.value) return
-  retrying.value = id
-  error.value = ''
-  try { await apis.plans.retry(id); await load() }
-  catch (e: any) { error.value = e?.message ?? String(e) }
-  finally { retrying.value = null }
-}
-
-async function deletePlan(id: string) {
-  if (!confirm('确定要删除这个推广计划吗？')) return
-  try { await apis.plans.remove(id); await load() }
-  catch (e: any) { error.value = e?.message ?? String(e) }
-}
-
-let syncPoll: ReturnType<typeof setInterval> | undefined
-onMounted(() => {
-  void load()
-  syncPoll = setInterval(() => {
-    if (!loading.value && !showModal.value && !retrying.value && plans.value.some(p => p.syncStatus === 'local' || p.syncStatus === 'syncing')) void load()
-  }, 5000)
-})
-onUnmounted(() => {
-  if (keywordTimer) clearTimeout(keywordTimer)
-  if (syncPoll) clearInterval(syncPoll)
-})
+onMounted(load);
 </script>
-
 <template>
-  <div class="page-stack">
-    <router-link v-if="fromStoryHub" to="/zhihu-story" class="back-link">← 返回知乎故事</router-link>
+  <section class="page-stack my-plans">
+    <router-link v-if="route.query.from === 'story'" to="/modules/zhihu/history"
+      >← 返回知乎故事</router-link
+    >
     <header class="page-header">
       <div>
-        <p class="eyebrow">PROMOTION / CAMPAIGNS</p>
-        <h1>推广计划</h1>
-        <p>当前显示本地已记录的计划，不是知乎官方全量列表；官方实时计划查询尚未接通。</p>
+        <p class="eyebrow">我的业务</p>
+        <h1>我的计划</h1>
+        <p>仅展示归属本人、已领取或已有本人作品记录的计划。</p>
       </div>
-      <div class="page-actions"><router-link to="/modules/zhihu/operations" class="ghost-aurora">关键词领取与分发</router-link>
-        <button class="ghost-aurora" :disabled="syncingCatalog" @click="syncCatalog">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
-          {{ syncingCatalog ? '同步中...' : '同步渠道/任务' }}
-        </button>
-        <button class="ghost-aurora" @click="load">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
-          刷新
-        </button>
-        <button class="primary-action" @click="openCreate">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          创建计划
-        </button>
-      </div>
+      <router-link class="primary-action" to="/modules/zhihu/operations"
+        >查看 / 领取关键词</router-link
+      >
     </header>
-
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="catalogMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ catalogMessage }}</div>
-
-    <article class="panel data-panel" style="min-height: 300px;">
-      <div class="list-toolbar">
-        <div>
-          <span class="toolbar-title">计划列表</span>
-          <span class="toolbar-count">{{ plans.length }}</span>
-        </div>
+    <form
+      class="plan-search"
+      @submit.prevent="
+        page = 1;
+        load();
+      "
+    >
+      <label
+        >搜索我的计划<input
+          v-model="search"
+          type="search"
+          placeholder="输入关键词"
+          maxlength="128" /></label
+      ><button :disabled="loading">搜索</button
+      ><button type="button" :disabled="loading" @click="load">刷新</button>
+    </form>
+    <p v-if="error" role="alert">{{ error }}</p>
+    <article class="panel">
+      <div class="plan-heading">
+        我的计划 <span>{{ total }}</span>
       </div>
-
-      <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
-
-      <div v-else-if="!plans.length" class="empty-panel">
-        <span>目前还没有推广计划。点击「创建计划」开始。</span>
-      </div>
-
-      <div v-else class="responsive-table">
+      <p v-if="loading" class="plan-empty" role="status">正在加载计划…</p>
+      <p v-else-if="!plans.length" class="plan-empty">
+        {{
+          search
+            ? "没有匹配的本人计划。"
+            : "暂时没有与你相关的计划。可前往关键词页面领取，或等待团长分配。"
+        }}
+      </p>
+      <div v-else class="plan-table">
         <table>
           <thead>
             <tr>
               <th>关键词</th>
               <th>渠道</th>
-              <th>负责人</th>
-              <th>日预算</th>
               <th>状态</th>
-              <th>同步</th>
-              <th>操作</th>
+              <th class="plan-actions">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="plan in plans" :key="plan.id">
-              <td><strong>{{ plan.keyword }}</strong><router-link v-if="plan.keywordId" :to="{path:'/modules/zhihu/operations',query:{projectId:plan.keywordProjectId,accountId:plan.keywordAccountId}}" style="display:block">查看关键词归属 / 领取</router-link></td>
-              <td>{{ plan.channelName }}</td>
-              <td>{{ plan.ownerName }}</td>
-              <td>{{ plan.dailyBudget != null ? fmt.format(plan.dailyBudget / 100) : '—' }}</td>
-              <td><span :class="['status-badge', plan.status]">{{ statusLabels[plan.status] }}</span></td>
               <td>
-                <span :class="['status-badge', plan.syncStatus === 'synced' ? 'active' : plan.syncStatus === 'failed' ? 'rejected' : 'draft']">
-                  {{ { local: '本地', syncing: '同步中', synced: '已同步', failed: '失败', simulated: '联测就绪（未提交知乎）' }[plan.syncStatus] }}
-                </span>
-                <small v-if="plan.syncError" style="display: block; margin-top: 4px; font-size: 11px; color: var(--clay);">{{ plan.syncError }}</small>
+                <strong>{{ plan.keyword }}</strong
+                ><small>计划编号：{{ plan.id }}</small>
               </td>
-              <td>
-                <div style="display: flex; gap: 6px;">
-                  <button v-if="plan.syncStatus === 'failed'" :disabled="retrying !== null" class="row-action" @click="retrySync(plan.id)">重试同步</button>
-                  <button class="row-action danger" @click="deletePlan(plan.id)">删除</button>
+              <td>{{ plan.channelName || "—" }}</td>
+              <td>{{ statusLabels[plan.status] || "待确认" }}</td>
+              <td class="plan-actions">
+                <div>
+                  <router-link
+                    :to="{
+                      path: '/modules/zhihu/works',
+                      query: { planId: plan.id, keyword: plan.keyword },
+                    }"
+                    >查看我的作品</router-link
+                  >
+                  <router-link
+                    v-if="plan.canRegister"
+                    :to="{
+                      path: '/modules/zhihu/works/new',
+                      query: {
+                        planId: plan.id,
+                        keyword: plan.keyword,
+                        projectId: plan.keywordProjectId,
+                        accountId: plan.keywordAccountId,
+                      },
+                    }"
+                    >登记作品</router-link
+                  >
+                  <span v-else class="plan-note">当前不可新增登记</span>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <footer class="plan-pagination">
+        <span
+          >共 {{ total }} 条 · 第 {{ page }} /
+          {{ Math.max(1, Math.ceil(total / pageSize)) }} 页</span
+        ><button
+          :disabled="loading || page === 1"
+          @click="
+            page--;
+            load();
+          "
+        >
+          上一页</button
+        ><button
+          :disabled="loading || page * pageSize >= total"
+          @click="
+            page++;
+            load();
+          "
+        >
+          下一页
+        </button>
+      </footer>
     </article>
-
-    <!-- 创建计划对话框 -->
-    <Teleport to="body">
-      <div v-if="showModal" class="plan-dialog-overlay" @click.self="showModal = false">
-        <div class="plan-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
-          <h2 id="plan-dialog-title" style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">创建推广计划</h2>
-          <form class="form-grid" @submit.prevent="createPlan" style="gap: 16px;">
-            <p v-if="error" class="full-span" role="alert">{{ error }}</p>
-            <p v-if="catalogLoading" class="full-span" role="status">正在加载全部渠道和任务…</p>
-            <!-- 推广渠道（可搜索） -->
-            <div class="full-span picker-field">
-              <label>推广渠道 <span class="required">*</span></label>
-              <div class="picker-wrap">
-                <input v-model="channelQuery" placeholder="搜索渠道名称或 ID" @focus="channelPickerOpen = true" @blur="closeChannelPicker" @input="form.channelId = ''" />
-                <div v-if="channelPickerOpen" class="picker-options">
-                  <button v-for="c in filteredChannels" :key="c.id" type="button" class="picker-option" @mousedown.prevent="pickChannel(c)">
-                    <strong>{{ c.name }}</strong>
-                    <span class="picker-meta">{{ c.zhihuChannelId }}</span>
-                  </button>
-                  <p v-if="!filteredChannels.length" class="picker-empty">没有匹配的渠道。请先在「系统工具 → 数据处理」同步渠道。</p>
-                </div>
-              </div>
-              <small v-if="selectedChannel" style="color: var(--ink-soft);">已选：{{ selectedChannel.name }}</small>
-            </div>
-
-            <!-- 推广任务（可搜索） -->
-            <div class="full-span picker-field">
-              <label>推广任务 <span class="required">*</span></label>
-              <div class="picker-wrap">
-                <input v-model="taskQuery" placeholder="搜索任务名称或 ID" @focus="taskPickerOpen = true" @blur="closeTaskPicker" @input="form.taskId = ''" />
-                <div v-if="taskPickerOpen" class="picker-options">
-                  <button v-for="t in filteredTasks" :key="t.id" type="button" class="picker-option" @mousedown.prevent="pickTask(t)">
-                    <strong>{{ t.name }}</strong>
-                    <span class="picker-meta">{{ t.zhihuTaskId }}</span>
-                  </button>
-                  <p v-if="!filteredTasks.length" class="picker-empty">没有匹配的任务。请先在「系统工具 → 数据处理」同步任务。</p>
-                </div>
-              </div>
-              <small v-if="selectedTask" style="color: var(--ink-soft);">已选：{{ selectedTask.name }}</small>
-            </div>
-
-            <!-- 关键词 -->
-            <div class="full-span">
-              <label>推广关键词 <span class="required">*</span></label>
-              <input v-model="form.keyword" placeholder="例：夸克网盘" required @input="onKeywordInput" />
-              <small style="color: var(--ink-soft);">仅支持单个关键词；最终是否符合词根规则由知乎接口校验。</small>
-              <small v-if="keywordCheck.checking" style="color: var(--ink-soft);">校验中...</small>
-              <small v-else-if="keywordCheck.available === true" style="color: var(--moss);">✓ 关键词可用</small>
-              <small v-else-if="keywordCheck.available === false" style="color: var(--clay);">✗ 关键词不可用（可能已被占用或含通用词根）</small>
-            </div>
-
-            <!-- 推广内容地址 -->
-            <div class="full-span">
-              <label>推广内容地址 <span class="required">*</span></label>
-              <input v-model="form.landingUrl" type="url" placeholder="https://www.zhihu.com/question/..." required />
-            </div>
-
-            <!-- 推广类型（固定 0，信息流） -->
-            <div>
-              <label>推广类型</label>
-              <input value="信息流（0）" disabled />
-            </div>
-
-            <!-- 日预算（元） -->
-            <div>
-              <label>日预算（元）</label>
-              <input v-model="form.dailyBudgetYuan" type="number" min="0" step="0.01" placeholder="100.00" />
-            </div>
-
-            <!-- 开始/结束日期 -->
-            <div>
-              <label>开始日期（可选）</label>
-              <input v-model="form.startDate" type="date" />
-            </div>
-            <div>
-              <label>结束日期（可选）</label>
-              <input v-model="form.endDate" type="date" />
-            </div>
-
-            <!-- 计划名称 -->
-            <div class="full-span">
-              <label>计划名称（可选）</label>
-              <input v-model="form.name" placeholder="便于识别的内部名称" />
-            </div>
-
-            <div class="form-submit" style="display: flex; gap: 10px; margin-top: 8px;">
-              <button type="submit" class="primary-action" style="flex: 1;" :disabled="submitting || catalogLoading || !channels.length || !tasks.length">{{ submitting ? '创建中...' : '确认创建' }}</button>
-              <button type="button" class="ghost-aurora" @click="showModal = false">取消</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </Teleport>
-  </div>
-
+  </section>
 </template>
-
 <style scoped>
-.required { color: var(--clay); }
-.picker-wrap { position: relative; }
-.picker-wrap input { width: 100%; }
-.picker-options {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: var(--white);
-  box-shadow: var(--shadow-float);
-  overflow: hidden;
-}
-.picker-option {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--paper-deep);
-  background: transparent;
-  text-align: left;
-  transition: background 0.15s ease;
-}
-.picker-option:last-child { border-bottom: 0; }
-.picker-option:hover { background: var(--paper-deep); }
-.picker-option strong { font-size: 12px; font-weight: 500; }
-.picker-meta { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
-.picker-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 13px; }
-
-.plan-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  overflow-y: auto;
-  padding: 16px;
-  background: rgba(33, 33, 33, 0.4);
-  backdrop-filter: blur(2px);
-}
-.plan-dialog {
-  box-sizing: border-box;
-  width: min(480px, 100%);
+.my-plans {
   min-width: 0;
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 28px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.my-plans > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.my-plans p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.my-plans [role="alert"] {
+  color: #9b3434;
+}
+.my-plans button,
+.my-plans .primary-action {
+  min-height: 42px;
+  padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--white);
-  box-shadow: var(--shadow-float);
+  border-radius: 7px;
+  cursor: pointer;
+  text-decoration: none;
 }
-.plan-dialog .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.plan-dialog .form-grid > div, .picker-option > * { min-width: 0; }
-.picker-option > * { overflow-wrap: anywhere; }
-.picker-options { max-height: min(280px, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
-@media (max-width: 700px) {
-  .plan-dialog-overlay { padding: 12px; }
-  .plan-dialog { padding: 16px; max-height: calc(100dvh - 24px); }
-  .plan-dialog .form-grid { grid-template-columns: minmax(0, 1fr); }
-  .plan-dialog input { width: 100%; min-width: 0; font-size: 16px; }
-  .plan-dialog button { min-height: 44px; }
-  .picker-option { flex-wrap: wrap; gap: 4px; }
-  .picker-option > * { flex: 1 1 100%; }
+.my-plans button {
+  color: inherit;
+  background: var(--paper);
 }
-
+.my-plans button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.plan-search {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.plan-search label {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  max-width: 480px;
+  min-width: 160px;
+}
+.plan-search input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  min-height: 42px;
+  background: var(--paper);
+  color: inherit;
+}
+.plan-heading,
+.plan-pagination {
+  padding: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.plan-heading span {
+  color: var(--ink-soft);
+  margin-left: 8px;
+}
+.plan-table {
+  overflow: auto;
+}
+.plan-table table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.plan-table td,
+.plan-table th {
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.plan-table th {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.plan-table small {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.plan-actions {
+  text-align: right;
+}
+.plan-actions div {
+  display: flex;
+  gap: 14px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.plan-actions a {
+  color: #195e62;
+  white-space: nowrap;
+}
+.plan-note {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.plan-empty {
+  padding: 30px;
+  color: var(--ink-soft);
+}
+.plan-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.plan-pagination span {
+  margin-right: auto;
+}
+@media (max-width: 650px) {
+  .plan-table table,
+  .plan-table tbody {
+    display: block;
+  }
+  .plan-table thead {
+    display: none;
+  }
+  .plan-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 18px;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .plan-table td {
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .plan-table td:first-child,
+  .plan-table .plan-actions {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+  .plan-actions div {
+    justify-content: flex-start;
+    align-items: center;
+  }
+  .plan-actions a {
+    padding: 10px 0;
+  }
+  .plan-search label {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .plan-search input {
+    font-size: 16px;
+  }
+  .plan-pagination {
+    padding: 14px;
+  }
+}
 </style>

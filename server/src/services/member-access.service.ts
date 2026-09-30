@@ -6,6 +6,7 @@ import { permissionsFor } from '../auth/permissions';
 import { AppError } from '../middleware/errors';
 import { config } from '../config';
 import { writeAudit } from './audit.service';
+import { assignMemberProjects, canAssignMemberProjects } from './member-projects.service';
 
 const roles: Role[] = ['developer', 'admin', 'operator', 'leader', 'creator'];
 type MemberRecord = RowDataPacket & { id: string; role: string; parent_id?: string | null };
@@ -42,8 +43,13 @@ export async function listManagedMembers(actor: AuthUser) {
     WHERE ${isStaffRole(actor.role) ? '1=1' : 'u.id=? OR u.parent_id=?'} ORDER BY u.created_at DESC,u.id DESC`,
     isStaffRole(actor.role) ? [] : [actor.sub, actor.sub],
   );
+  const memberships = await rows<RowDataPacket>(`SELECT CAST(pm.user_id AS CHAR) user_id,CAST(p.id AS CHAR) id,p.name,p.is_enabled,pm.member_role
+    FROM project_members pm JOIN projects p ON p.id=pm.project_id JOIN users u ON u.id=pm.user_id
+    WHERE pm.left_at IS NULL AND ${isStaffRole(actor.role) ? '1=1' : '(u.id=? OR u.parent_id=?)'} ORDER BY p.id`, isStaffRole(actor.role) ? [] : [actor.sub,actor.sub]);
   return list.map((member) => ({
     ...member,
+    projects: memberships.filter(p => String(p.user_id) === String(member.id)).map(p => ({id:String(p.id),name:p.name,isEnabled:Boolean(p.is_enabled),memberRole:p.member_role})),
+    canAssignProjects: canManageMember(actor,member) && canAssignMemberProjects(actor),
     canManage: canManageMember(actor, member),
     editableRoles: canManageMember(actor, member) ? editableMemberRoles(actor) : [],
     permissions: permissionsFor(normalizeRole(member.role)!).filter((p) =>
@@ -62,6 +68,7 @@ export interface MemberAccessPatch {
   adminDuty?: 'all' | 'operations' | 'finance';
   isActive?: boolean;
   parentId?: string | null;
+  projectIds?: string[];
 }
 export async function updateMemberAccess(auth: AuthUser, id: string, patch: MemberAccessPatch) {
   await withTransaction(async (c) => {
@@ -132,7 +139,8 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
         id,
       ],
     );
-    if (role !== member.role || duty !== member.admin_duty || active !== Boolean(member.is_active) || changesTeam) {
+    const projectsChanged = patch.projectIds !== undefined ? await assignMemberProjects(c,current,id,role,patch.projectIds) : false;
+    if (role !== member.role || duty !== member.admin_duty || active !== Boolean(member.is_active) || changesTeam || projectsChanged) {
       await c.query(
         "UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='member_access_changed' WHERE user_id=? AND revoked_at IS NULL",
         [id],
@@ -148,7 +156,7 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
         action: 'user.access_update',
         resourceType: 'user',
         resourceId: id,
-        detail: { from: member.role, to: role, duty, isActive: active, parentId },
+        detail: { from: member.role, to: role, duty, isActive: active, parentId, projectsChanged },
       },
       c,
     );

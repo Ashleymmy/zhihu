@@ -50,6 +50,7 @@ export function businessPages<T extends BusinessPage>(
   });
 }
 export const businessLabel = (page: BusinessPage, role: string) =>
+  page.path === 'plans' && role === 'creator' ? '我的计划' :
   page.path === "operations"
     ? role === "creator"
       ? "我的关键词"

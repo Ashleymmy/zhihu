@@ -12,7 +12,13 @@ export function keywordVisibility(user: AuthUser) {
     bindings: [user.sub, user.sub],
   };
   return {
-    clause: "(b.executor_id=? OR (k.current_binding_id IS NULL AND k.lifecycle_status<>'retired' AND k.priority_until<=NOW(3) AND EXISTS(SELECT 1 FROM users viewer WHERE viewer.id=? AND viewer.parent_id IS NULL)))",
+    clause: `(b.executor_id=? OR (k.current_binding_id IS NULL AND k.lifecycle_status='available' AND k.priority_until<=NOW(3)
+      AND EXISTS(SELECT 1 FROM users viewer WHERE viewer.id=? AND viewer.parent_id IS NULL)
+      AND NOT EXISTS(SELECT 1 FROM zh_engine_routes route WHERE route.project_id=k.project_id AND route.account_id=k.account_id AND route.mode='stopped')
+      AND EXISTS(SELECT 1 FROM plans ready WHERE ready.id=k.plan_id AND ready.status='active' AND (
+        (ready.sync_status='synced' AND NULLIF(TRIM(ready.zhihu_plan_id),'') IS NOT NULL)
+        OR (ready.sync_status='simulated' AND k.upstream_status='simulated' AND EXISTS(
+          SELECT 1 FROM zhihu_account_settings settings WHERE settings.project_id=k.project_id AND settings.account_id=k.account_id AND JSON_UNQUOTE(JSON_EXTRACT(settings.config_json,'$.mode'))='simulation'))))))`,
     bindings: [user.sub, user.sub],
   };
 }

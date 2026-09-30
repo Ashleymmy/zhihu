@@ -223,3 +223,85 @@ it('team leaders with children cannot be reclassified and creators cannot join i
   expect((await call('developer', 'patch', '/team/members/5/access').send({ parentId: '2' })).status).toBe(422);
   expect((await call('developer', 'delete', '/team/members/4')).status).toBe(422);
 });
+
+it('member editing assigns multiple projects atomically and revokes old sessions', async () => {
+  await c.query(
+    "INSERT INTO projects(id,name,slug,is_enabled) VALUES(901,'项目甲','member-project-a',1),(902,'项目乙','member-project-b',1),(903,'停用项目','member-project-off',0)",
+  );
+  const r = await call('admin', 'patch', '/team/members/5/access').send({
+    displayName: '项目达人',
+    projectIds: ['901', '902'],
+  });
+  expect(r.status, JSON.stringify(r.body)).toBe(200);
+  expect((await call('creator', 'get', '/auth/me')).status).toBe(401);
+  await login('creator');
+  expect((await call('creator', 'get', '/projects')).body.data.map((p: any) => p.id).sort()).toEqual(['901', '902']);
+  const member = (await call('admin', 'get', '/team/members')).body.data.find((m: any) => m.id === '5');
+  expect(member).toMatchObject({ displayName: '项目达人', canAssignProjects: true });
+  expect(member.projects).toEqual([
+    { id: '901', name: '项目甲', isEnabled: true, memberRole: 'member' },
+    { id: '902', name: '项目乙', isEnabled: true, memberRole: 'member' },
+  ]);
+  for (const ids of [
+    ['901', '903'],
+    ['901', '999999'],
+    ['901', '901'],
+  ]) {
+    expect(
+      (await call('admin', 'patch', '/team/members/5/access').send({ displayName: '应回滚', projectIds: ids })).status,
+    ).toBe(422);
+    const [[u]] = await c.query<RowDataPacket[]>('SELECT display_name FROM users WHERE id=5');
+    expect(u.display_name).toBe('项目达人');
+    expect((await call('creator', 'get', '/auth/me')).status).toBe(200);
+    expect((await call('creator', 'get', '/projects')).body.data).toHaveLength(2);
+  }
+});
+
+it('project assignment cannot be smuggled through profile or role edits by unauthorized actors', async () => {
+  // Role changes clear team membership; explicitly attach the creator for this scope check.
+  expect((await call('admin', 'patch', '/team/members/5/access').send({ parentId: '6' })).status).toBe(200);
+  await login('creator');
+  for (const actor of ['operator', 'other_leader']) {
+    expect((await call(actor, 'get', '/team/members')).body.data.find((m: any) => m.id === '5').canAssignProjects).toBe(
+      false,
+    );
+    expect((await call(actor, 'patch', '/team/members/5/access').send({ projectIds: [] })).status).toBe(403);
+  }
+  expect(
+    (await call('operator', 'patch', '/team/members/5/access').send({ role: 'leader', projectIds: ['901'] })).status,
+  ).toBe(403);
+  const [[u]] = await c.query<RowDataPacket[]>('SELECT role,parent_id FROM users WHERE id=5');
+  expect(u.role).toBe('creator');
+  expect(String(u.parent_id)).toBe('6');
+  expect((await call('developer', 'patch', '/team/members/3/access').send({ projectIds: ['901'] })).status).toBe(422);
+});
+
+it('unchanged project roles are retained, new access is ordinary membership, and owners cannot be removed here', async () => {
+  await c.query("UPDATE project_members SET member_role='admin' WHERE project_id=901 AND user_id=5");
+  expect((await call('admin', 'patch', '/team/members/5/access').send({ projectIds: ['902', '901'] })).status).toBe(
+    200,
+  );
+  expect((await call('creator', 'get', '/auth/me')).status).toBe(200);
+  const [[preserved]] = await c.query<RowDataPacket[]>(
+    'SELECT member_role FROM project_members WHERE project_id=901 AND user_id=5',
+  );
+  expect(preserved.member_role).toBe('admin');
+  expect((await call('admin', 'patch', '/team/members/5/access').send({ projectIds: ['902'] })).status).toBe(200);
+  expect((await call('creator', 'get', '/auth/me')).status).toBe(401);
+  await login('creator');
+  expect((await call('creator', 'get', '/projects')).body.data.map((p: any) => p.id)).toEqual(['902']);
+  expect((await call('admin', 'patch', '/team/members/5/access').send({ projectIds: ['901', '902'] })).status).toBe(
+    200,
+  );
+  const [[rejoined]] = await c.query<RowDataPacket[]>(
+    'SELECT member_role,left_at FROM project_members WHERE project_id=901 AND user_id=5',
+  );
+  expect(rejoined.member_role).toBe('member');
+  expect(rejoined.left_at).toBeNull();
+  await c.query("UPDATE project_members SET member_role='owner' WHERE project_id=902 AND user_id=5");
+  expect((await call('admin', 'patch', '/team/members/5/access').send({ projectIds: [] })).status).toBe(409);
+  const [[stillThere]] = await c.query<RowDataPacket[]>(
+    'SELECT COUNT(*) n FROM project_members WHERE user_id=5 AND left_at IS NULL',
+  );
+  expect(stillThere.n).toBe(2);
+});

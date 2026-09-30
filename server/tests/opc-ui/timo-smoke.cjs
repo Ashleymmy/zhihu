@@ -34,9 +34,8 @@ async function scenario(browser, base, role, width = 1440) {
             'team.review',
             'team.delete',
             'team.reset_pwd',
-            'project.manage',
-            'staff.manage',
-            'system.develop',
+            ...(['admin', 'developer'].includes(role) ? ['project.manage', 'staff.manage'] : []),
+            ...(role === 'developer' ? ['system.develop'] : []),
           ],
   };
   const members = [
@@ -57,6 +56,8 @@ async function scenario(browser, base, role, width = 1440) {
       canManage: true,
       editableRoles: role === 'leader' ? ['creator'] : ['creator', 'leader'],
       permissions: ['team.apply'],
+      projects: [{ id: '1', name: '知乎业务', isEnabled: true, memberRole: 'member' }],
+      canAssignProjects: ['admin', 'developer'].includes(role),
     },
     { id: '9', username: 'leader', displayName: '邀请团长', role: 'leader', isActive: 1, canManage: false },
   ];
@@ -66,7 +67,12 @@ async function scenario(browser, base, role, width = 1440) {
       p = url.pathname;
     if (url.origin !== base) return route.abort();
     if (!p.startsWith('/api/')) return route.continue();
-    requests.push({ path: p, method: req.method(), body: req.postDataJSON() });
+    requests.push({
+      path: p,
+      method: req.method(),
+      body: req.postDataJSON(),
+      query: Object.fromEntries(url.searchParams),
+    });
     let data = null,
       status = 200;
     if (p.endsWith('/auth/refresh')) {
@@ -81,7 +87,11 @@ async function scenario(browser, base, role, width = 1440) {
       status = 201;
     } else if (p.endsWith('/core/modules'))
       data = [{ id: 'zhihu', name: '知乎', status: 'enabled', entryPath: '/modules/zhihu/operations' }];
-    else if (p.endsWith('/projects')) data = [{ id: '1', name: '知乎业务' }];
+    else if (p.endsWith('/projects'))
+      data = [
+        { id: '1', name: '知乎业务', isEnabled: true },
+        { id: '2', name: '第二业务', isEnabled: true },
+      ];
     else if (p.endsWith('/integrations')) data = [{ id: '1', moduleId: 'zhihu', status: 'active', name: '知乎接入' }];
     else if (p.endsWith('/summary')) data = { status: 'ready', metrics: [] };
     else if (p.endsWith('/attribution-options'))
@@ -107,7 +117,26 @@ async function scenario(browser, base, role, width = 1440) {
       };
     else if (p.endsWith('/price-agreements')) data = { list: [], total: 0 };
     else if (p.endsWith('/plans'))
-      data = { list: [{ id: '42', keyword: '薄雾颠覆瓦', channelName: '测试渠道' }], total: 1 };
+      data =
+        url.searchParams.get('keyword') === '无匹配'
+          ? { list: [], total: 0 }
+          : {
+              list: [
+                { id: '42', keyword: '薄雾颠覆瓦', channelName: '测试渠道', status: 'active', canRegister: true },
+                ...(url.searchParams.get('purpose') === 'composition'
+                  ? []
+                  : [
+                      {
+                        id: '43',
+                        keyword: '本人历史关键词',
+                        channelName: '历史渠道',
+                        status: 'ended',
+                        canRegister: false,
+                      },
+                    ]),
+              ],
+              total: url.searchParams.get('purpose') === 'composition' ? 1 : 2,
+            };
     else if (p.endsWith('/team/members')) data = members;
     else if (p.endsWith('/team/invitations')) {
       data = req.method() === 'POST' ? { id: '1', token } : [];
@@ -169,6 +198,32 @@ async function scenario(browser, base, role, width = 1440) {
         // Close the import dialog and ensure the dedicated registration page remains usable.
         await page.getByRole('button', { name: '关闭批量上传', exact: true }).click();
         await page.locator('.registration-page').waitFor();
+        await page.goto(base + '/app/modules/zhihu/plans');
+        await page.getByRole('heading', { name: '我的计划', exact: true }).waitFor();
+        await page.getByText('本人历史关键词', { exact: true }).waitFor();
+        assert.equal(await page.getByRole('link', { name: '登记作品', exact: true }).count(), 1);
+        assert.equal(await page.getByRole('link', { name: '查看我的作品', exact: true }).count(), 2);
+        for (const name of ['新建计划', '创建计划', '删除', '重试同步', '同步渠道'])
+          assert.equal(await page.getByRole('button', { name, exact: true }).count(), 0);
+        assert.equal(await page.getByText('每日预算', { exact: true }).count(), 0);
+        await snap('my-plans');
+        if (width < 600)
+          assert.ok(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+            'plans overflow viewport',
+          );
+        await page.getByLabel('搜索我的计划').fill('无匹配');
+        await page.getByRole('button', { name: '搜索', exact: true }).click();
+        await page.getByText('没有匹配的本人计划。', { exact: true }).waitFor();
+        assert.ok(
+          requests.some(
+            (r) =>
+              r.path.endsWith('/plans') &&
+              r.query.keyword === '无匹配' &&
+              r.query.page === '1' &&
+              r.query.pageSize === '20',
+          ),
+        );
       } else {
         await page.getByRole('button', { name: role === 'leader' ? '分发给达人' : '分发给成员', exact: true }).click();
         const dialog = page.getByRole('dialog');
@@ -189,10 +244,23 @@ async function scenario(browser, base, role, width = 1440) {
         await page.getByText('天舒', { exact: true }).waitFor();
         await page.getByRole('button', { name: '编辑', exact: true }).click();
         const dialog = page.getByRole('dialog');
+        if (role === 'admin') {
+          await dialog.getByLabel('搜索项目').fill('第二');
+          await dialog.getByRole('checkbox', { name: '第二业务', exact: true }).check();
+          await dialog.getByLabel('搜索项目').fill('');
+          assert.equal(await dialog.getByRole('checkbox', { name: '知乎业务', exact: true }).isChecked(), true);
+          await snap('member-projects');
+        } else {
+          assert.equal(await dialog.getByRole('checkbox').count(), 0);
+          await dialog.getByText('修改需要项目管理权限。', { exact: false }).waitFor();
+        }
         await dialog.getByLabel(/^状态/).selectOption('false');
         await dialog.getByRole('button', { name: '保存修改' }).click();
         await dialog.waitFor({ state: 'hidden' });
         assert.equal(requests.find((r) => r.path.endsWith('/8/access')).body.isActive, false);
+        if (role === 'admin')
+          assert.deepEqual(requests.find((r) => r.path.endsWith('/8/access')).body.projectIds, ['1', '2']);
+        else assert.equal(requests.find((r) => r.path.endsWith('/8/access')).body.projectIds, undefined);
         await page.getByRole('button', { name: '详情', exact: true }).first().click();
         await snap('member-details');
         await page.keyboard.press('Escape');

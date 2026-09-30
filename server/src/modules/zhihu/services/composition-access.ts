@@ -25,7 +25,8 @@ export function compositionPlanScope(user: AuthUser, currentRead = false) {
   const actorBindings = isStaffRole(user.role) ? [] : user.role === 'leader' ? [user.sub, user.sub] : [user.sub];
   return {
     clause: `(p.status<>'ended' AND (
-      (NOT EXISTS(SELECT 1 FROM zh_keywords legacy WHERE legacy.plan_id=p.id${lock}) AND ${legacy.clause})
+      (NOT EXISTS(SELECT 1 FROM zh_keywords legacy WHERE legacy.plan_id=p.id${lock}) AND ${legacy.clause}
+        ${isStaffRole(user.role) ? '' : `AND EXISTS(SELECT 1 FROM project_members legacy_member JOIN projects legacy_project ON legacy_project.id=legacy_member.project_id AND legacy_project.is_enabled=1 WHERE legacy_member.project_id=p.project_id AND legacy_member.user_id=? AND legacy_member.left_at IS NULL${lock})`})
       OR EXISTS(
         SELECT 1 FROM zh_keywords ck
         JOIN projects cp ON cp.id=ck.project_id AND cp.is_enabled=1
@@ -48,6 +49,6 @@ export function compositionPlanScope(user: AuthUser, currentRead = false) {
         )${lock}
       )
     ))`,
-    bindings: [...legacy.bindings, ...(isStaffRole(user.role) ? [] : [user.sub]), ...actorBindings],
+    bindings: [...legacy.bindings, ...(isStaffRole(user.role) ? [] : [user.sub, user.sub]), ...actorBindings],
   };
 }

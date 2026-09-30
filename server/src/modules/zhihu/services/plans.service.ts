@@ -82,8 +82,12 @@ export function publicPlanSyncError(value: unknown): string | null {
   return prefix;
 }
 
-function publicPlan(plan: PlanRow): PlanRow {
-  return { ...plan, sync_error: publicPlanSyncError(plan.sync_error) };
+function publicPlan(plan: PlanRow, user: AuthUser): PlanRow {
+  return { ...plan, sync_error: user.role === 'creator' ? null : publicPlanSyncError(plan.sync_error) };
+}
+
+function assertPlanWriter(user: AuthUser) {
+  if (user.role === 'creator') throw new AppError(403, 40301, '达人只能领取关键词和登记作品，计划维护请联系运营人员');
 }
 
 async function getPlanForUpdate(connection: PoolConnection, user: AuthUser, id: string): Promise<PlanRow> {
@@ -112,6 +116,7 @@ function translateBindingConflict(error: unknown): never {
 }
 
 export async function checkKeyword(user: AuthUser, channelId: string, keyword: string) {
+  assertPlanWriter(user);
   if (isDevDemoAuthUser(user)) return checkDevDemoKeyword(user, channelId, keyword);
 
   const [plan] = await rows<RowDataPacket & { id: string; owner_id: string; display_name: string }>(
@@ -135,6 +140,14 @@ export async function checkKeyword(user: AuthUser, channelId: string, keyword: s
 function readablePlans(user: AuthUser) {
   const owned = scopeFilter(user, 'p.owner_id');
   if (isStaffRole(user.role)) return owned;
+  if (user.role === 'creator') return {
+    clause: `EXISTS(SELECT 1 FROM project_members pm JOIN projects pr ON pr.id=pm.project_id AND pr.is_enabled=1
+      WHERE pm.project_id=p.project_id AND pm.user_id=? AND pm.left_at IS NULL)
+      AND (p.owner_id=? OR EXISTS(SELECT 1 FROM zh_keywords k JOIN zh_keyword_bindings b ON b.id=k.current_binding_id AND b.keyword_id=k.id
+        WHERE k.plan_id=p.id AND k.project_id=p.project_id AND b.executor_id=?)
+      OR EXISTS(SELECT 1 FROM compositions cw WHERE cw.plan_id=p.id AND cw.owner_id=?))`,
+    bindings: [user.sub,user.sub,user.sub,user.sub],
+  };
   const visible = keywordVisibility(user);
   return { clause: `((NOT EXISTS(SELECT 1 FROM zh_keywords legacy_word WHERE legacy_word.plan_id=p.id) AND ${owned.clause}) OR EXISTS(
     SELECT 1 FROM zh_keywords k LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
@@ -151,7 +164,9 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? 20);
   const scope = query.purpose === 'composition' ? compositionPlanScope(user) : readablePlans(user);
-  const where = [scope.clause, "p.status <> 'ended'"];
+  const where = [scope.clause];
+  // Creators keep access to their own history; ended plans are never registration choices.
+  if (user.role !== 'creator' || query.purpose === 'composition') where.push("p.status <> 'ended'");
   const bindings: unknown[] = [...scope.bindings];
   for (const [sql, value] of [
     ['p.zhihu_task_id = ?', query.taskId],
@@ -173,7 +188,13 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
     `SELECT p.*, c.name AS channel_name,CAST(k.id AS CHAR) keyword_id,CAST(k.project_id AS CHAR) keyword_project_id,CAST(k.account_id AS CHAR) keyword_account_id FROM plans p LEFT JOIN channels c ON c.zhihu_channel_id = p.channel_id AND c.project_id=p.project_id LEFT JOIN zh_keywords k ON k.plan_id=p.id WHERE ${clause} ORDER BY p.created_at DESC,p.id DESC LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
-  return { list: list.map(publicPlan), total: Number(count?.total ?? 0), page, pageSize };
+  let writable = new Set<string>();
+  if (user.role === 'creator' && list.length) {
+    const allowed = compositionPlanScope(user);
+    const ids = await rows<RowDataPacket>(`SELECT p.id FROM plans p WHERE p.id IN (${list.map(() => '?').join(',')}) AND ${allowed.clause}`, [...list.map(p => p.id), ...allowed.bindings]);
+    writable = new Set(ids.map(p => String(p.id)));
+  }
+  return { list: list.map(p => ({...publicPlan(p,user), ...(user.role === 'creator' ? {can_register: writable.has(String(p.id))} : {})})), total: Number(count?.total ?? 0), page, pageSize };
 }
 
 export async function getPlan(user: AuthUser, id: string) {
@@ -185,10 +206,11 @@ export async function getPlan(user: AuthUser, id: string) {
     ...scope.bindings,
   ]);
   if (!plan) throw new AppError(404, 40401, '推广计划不存在');
-  return publicPlan(plan);
+  return publicPlan(plan,user);
 }
 
 export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) {
+  assertPlanWriter(user);
   if (isDevDemoAuthUser(user)) return createDevDemoPlan(user, input as unknown as Record<string, unknown>);
 
   if (isStaffRole(user.role) && (!input.ownerId || input.ownerId === user.sub)) {
@@ -250,6 +272,7 @@ export async function updatePlan(
   patch: { keyword?: string; landingUrl?: string; name?: string | null; dailyBudget?: number | null },
   ip?: string,
 ) {
+  assertPlanWriter(user);
   if (isDevDemoAuthUser(user)) return updateDevDemoPlan(user, id, patch);
 
   const fields: string[] = [];
@@ -319,6 +342,7 @@ export async function updatePlan(
 }
 
 export async function deletePlan(user: AuthUser, id: string, ip?: string) {
+  assertPlanWriter(user);
   if (isDevDemoAuthUser(user)) return deleteDevDemoPlan(user, id);
 
   await getPlan(user, id);
@@ -339,6 +363,7 @@ export async function deletePlan(user: AuthUser, id: string, ip?: string) {
 }
 
 export async function retryPlan(user: AuthUser, id: string, ip?: string, requestKey?: string) {
+  assertPlanWriter(user);
   if (isDevDemoAuthUser(user)) return retryDevDemoPlan(user, id);
 
   const plan = (await getPlan(user, id)) as PlanRow;

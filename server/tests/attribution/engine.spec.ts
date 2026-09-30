@@ -910,7 +910,7 @@ describe('推广计划与关键词库贯通', () => {
     expect((await withTransaction(conn=>registerUnusedAdminPlan(conn,admin,id))).id).toBe(repaired.id);
     const [rows]=await c.query<mysql.RowDataPacket[]>('SELECT project_id,sync_status FROM plans WHERE id=?',[id]);
     expect(String(rows[0].project_id)).toBe('91');expect(rows[0].sync_status).toBe('failed');
-    expect((await resource.listKeywords(direct,poolScope,1,25,'修复既有词')).total).toBe(1);
+    expect((await resource.listKeywords(direct,poolScope,1,25,'修复既有词')).total).toBe(0);
     await expect(resource.claim(direct,poolScope,repaired.id,key())).rejects.toThrow('不可领取');
     await c.query("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by) VALUES(1,'pool-task','pool-channel','保留历史词','https://example.com/history',0,1,1)");
     const [used]=await c.query<mysql.RowDataPacket[]>("SELECT id FROM plans WHERE keyword='保留历史词'");

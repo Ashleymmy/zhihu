@@ -9,9 +9,30 @@ import {
   type MemberInvitation,
   type TeamApplication,
   type MemberAccessPatch,
+  type Project,
 } from "@zhihu-koc/shared-contracts/core";
 import { apis, http, useAuthStore } from "../stores/auth";
 const auth = useAuthStore();
+const projects = ref<Project[]>([]),
+  projectSearch = ref("");
+const canManageProjects = computed(
+  () =>
+    auth.user?.permissions?.includes("project.manage") &&
+    auth.user?.adminDuty !== "finance",
+);
+const projectOptions = computed(() => {
+  const all = new Map(
+    projects.value.map((p) => [
+      p.id,
+      { id: p.id, name: p.name, isEnabled: p.isEnabled },
+    ]),
+  );
+  for (const p of selected.value?.projects ?? [])
+    if (!all.has(p.id)) all.set(p.id, p);
+  return [...all.values()].filter((p) =>
+    p.name.toLowerCase().includes(projectSearch.value.trim().toLowerCase()),
+  );
+});
 const members = ref<TeamMember[]>([]),
   invitations = ref<MemberInvitation[]>([]),
   applications = ref<TeamApplication[]>([]);
@@ -45,6 +66,7 @@ const edit = reactive({
   adminDuty: "all" as "all" | "operations" | "finance",
   isActive: true,
   parentId: "",
+  projectIds: [] as string[],
 });
 const create = reactive({
   username: "",
@@ -116,14 +138,16 @@ const title = computed(
 async function load() {
   loading.value = true;
   try {
-    const [m, i, a] = await Promise.all([
+    const [m, i, a, p] = await Promise.all([
       apis.team.listMembers(),
       apis.team.invitations(),
       apis.team.listApplications(),
+      canManageProjects.value ? apis.projects.list() : Promise.resolve([]),
     ]);
     members.value = m;
     invitations.value = i;
     applications.value = a;
+    projects.value = p;
     page.value = Math.min(
       page.value,
       Math.max(1, Math.ceil(filtered.value.length / pageSize)),
@@ -149,6 +173,7 @@ function open(kind: typeof dialog.value, member?: TeamMember) {
   dialog.value = kind;
   selected.value = member ?? null;
   resetPassword.value = "";
+  projectSearch.value = "";
   if (member)
     Object.assign(edit, {
       displayName: member.displayName,
@@ -157,6 +182,7 @@ function open(kind: typeof dialog.value, member?: TeamMember) {
       adminDuty: member.adminDuty ?? "all",
       isActive: Boolean(member.isActive),
       parentId: member.parentId ?? "",
+      projectIds: (member.projects ?? []).map((p) => p.id),
     });
 }
 async function save() {
@@ -172,9 +198,17 @@ async function save() {
     patch.adminDuty = edit.adminDuty;
   if (edit.role === "creator" && isStaffRole(auth.user?.role))
     patch.parentId = edit.parentId || null;
+  if (
+    m.canAssignProjects &&
+    !isStaffRole(edit.role) &&
+    JSON.stringify([...edit.projectIds].sort()) !==
+      JSON.stringify((m.projects ?? []).map((p) => p.id).sort())
+  )
+    patch.projectIds = [...edit.projectIds];
   await apis.team.manageMember(m.id, patch);
   dialog.value = null;
-  notice.value = "成员已更新；角色、团队或状态发生变化时，原登录会话会退出。";
+  notice.value =
+    "成员已更新；角色、团队、项目或状态发生变化时，原登录会话会退出。";
   await load();
 }
 async function createMember() {
@@ -619,6 +653,55 @@ onMounted(() => run(load));
             </option>
           </select></label
         >
+        <fieldset class="member-projects">
+          <legend>分配项目</legend>
+          <p v-if="isStaffRole(edit.role)">
+            管理角色按角色和职责访问全部项目，无需单独加入。
+          </p>
+          <template v-else-if="selected.canAssignProjects && canManageProjects">
+            <label
+              >搜索项目<input
+                v-model="projectSearch"
+                type="search"
+                placeholder="输入项目名称"
+            /></label>
+            <div class="project-choices">
+              <label
+                v-for="project in projectOptions"
+                :key="project.id"
+                class="project-choice"
+                ><input
+                  v-model="edit.projectIds"
+                  type="checkbox"
+                  :value="project.id"
+                  :disabled="
+                    busy ||
+                    (!project.isEnabled &&
+                      !edit.projectIds.includes(project.id))
+                  "
+                />
+                <span
+                  >{{ project.name
+                  }}{{ project.isEnabled ? "" : "（已停用）" }}</span
+                ></label
+              >
+            </div>
+            <p v-if="!projectOptions.length">没有匹配的项目。</p>
+            <small
+              >已选择
+              {{
+                edit.projectIds.length
+              }}
+              个项目，保存后生效。新增成员权限为普通项目成员；有使用中关键词的项目需先处理后才能移出。</small
+            >
+          </template>
+          <p v-else>
+            {{
+              selected.projects?.map((p) => p.name).join("、") ||
+              "尚未分配项目"
+            }}。修改需要项目管理权限。
+          </p>
+        </fieldset>
         <p>
           权限按角色和职责生效。调整角色或团队前，需先处理该成员使用中的关键词及下属成员。
         </p>
@@ -666,6 +749,15 @@ onMounted(() => run(load));
             {{ format(selected.lastLoginAt) }}
           </dd>
           <dt>业务范围</dt>
+          <dd>
+            {{
+              isStaffRole(selected.role)
+                ? "管理角色按职责访问项目"
+                : selected.projects?.map((p) => p.name).join("、") ||
+                  "尚未分配项目"
+            }}
+          </dd>
+          <dt>成员统计</dt>
           <dd>
             项目 {{ selected.projectCount ?? 0 }} · 下属成员
             {{ selected.memberCount ?? 0 }} · 已邀请
@@ -990,5 +1082,39 @@ onMounted(() => run(load));
   .member-pagination {
     flex-wrap: wrap;
   }
+}
+</style>
+<style scoped>
+.member-projects {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+.member-projects legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.project-choices {
+  max-height: 180px;
+  overflow: auto;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+.project-choice {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  min-height: 36px;
+}
+.project-choice input {
+  width: 18px !important;
+  min-height: 18px !important;
+  height: 18px;
+  flex: 0 0 18px;
+}
+.project-choice span {
+  overflow-wrap: anywhere;
 }
 </style>

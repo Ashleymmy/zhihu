@@ -152,6 +152,7 @@ describe('领取关键词后登记作品', () => {
     const { updateMemberAccess } = await import('../../src/services/member-access.service');
     await expect(updateMemberAccess(admin, direct.sub, {role:'leader'})).rejects.toMatchObject({httpStatus:409});
     await expect(updateMemberAccess(admin, direct.sub, {parentId:leader.sub})).rejects.toMatchObject({httpStatus:409});
+    await expect(updateMemberAccess(admin, direct.sub, {projectIds:[]})).rejects.toMatchObject({httpStatus:409});
   });
   it('团队达人、团长自用、团长及管理员代登记均归当前执行人', async () => {
     for (const [executor, submitter] of [
@@ -166,12 +167,14 @@ describe('领取关键词后登记作品', () => {
       expect(String(rows[0].owner_id)).toBe(executor.sub);
     }
   });
-  it('可查看的未领词不能提交，不能冒用他人的绑定', async () => {
+  it('可领取词只在关键词入口出现，我的计划不能浏览未领取和他人绑定', async () => {
     const free = await keyword(),
       taken = await keyword(other);
     expect(
       (await plans.listPlans(direct, { keyword: '登记回归' })).list.some((p) => String(p.id) === free.planId),
-    ).toBe(true);
+    ).toBe(false);
+    expect((await resources.listKeywords(direct,scope,1,100)).list.some(w => String(w.plan_id) === free.planId)).toBe(true);
+    await expect(plans.getPlan(direct,free.planId)).rejects.toMatchObject({httpStatus:404});
     for (const id of [free.planId, taken.planId])
       await expect(works.createComposition(direct, input(id))).rejects.toMatchObject({ httpStatus: 404 });
   });
@@ -183,6 +186,23 @@ describe('领取关键词后登记作品', () => {
     expect(result.status).toBe(200);
     expect(result.body.data.list.some((p: any) => String(p.id) === mine.planId)).toBe(true);
     expect(result.body.data.list.some((p: any) => String(p.id) === free.planId)).toBe(false);
+  });
+  it('达人计划维护接口拒绝写入，关键词入口隐藏不可领取词且保留本人历史', async () => {
+    const free=await keyword(), mine=await keyword(direct), taken=await keyword(other);
+    actor=direct;
+    for(const result of [await request(app).post('/plans').send({}),await request(app).patch('/plans/'+mine.planId).send({name:'forbidden'}),await request(app).delete('/plans/'+mine.planId),await request(app).post('/plans/'+mine.planId+'/retry-sync').send({})])expect(result.status).toBe(403);
+    await c.query("UPDATE plans SET sync_status='failed',sync_error='upstream diagnostic' WHERE id=?",[free.planId]);
+    expect((await resources.listKeywords(direct,scope,1,100)).list.some(w=>String(w.plan_id)===free.planId)).toBe(false);
+    await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,4,'KOC抖音','historical',1,1,'https://example.com/historical-scope')",[taken.planId]);
+    await c.query("UPDATE plans SET status='ended' WHERE id=?",[taken.planId]);
+    const visible=await plans.listPlans(direct,{pageSize:100});
+    expect(visible.list.find(p=>String(p.id)===mine.planId)).toMatchObject({can_register:true});
+    expect(visible.list.find(p=>String(p.id)===taken.planId)).toMatchObject({can_register:false});
+    for(const plan of visible.list) expect(plan).toMatchObject({sync_error:null});
+    await c.query('UPDATE project_members SET left_at=NOW(3) WHERE project_id=1 AND user_id=4');
+    expect((await plans.listPlans(direct,{pageSize:100})).total).toBe(0);
+    expect((await plans.listPlans(direct,{purpose:'composition',pageSize:100})).total).toBe(0);
+    await c.query('UPDATE project_members SET left_at=NULL WHERE project_id=1 AND user_id=4');
   });
   it('Excel 分析、导入和重复导入支持已领取词并保持执行人归属', async () => {
     const word = await keyword(direct);
