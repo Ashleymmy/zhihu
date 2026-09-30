@@ -2,7 +2,8 @@
 import {computed,onMounted,onUnmounted,reactive,ref,watch} from 'vue'
 import type {HttpClient} from '@zhihu-koc/shared-services/core'
 import { isStaffRole } from '@zhihu-koc/shared-contracts/core'
-import {StaffManager} from '@zhihu-koc/shared-components'
+import {StaffManager,OperationGuide} from '@zhihu-koc/shared-components'
+import {zhihuOperationGuide} from './operation-guide'
 import Keywords from './Keywords.vue'
 import Prices from './Prices.vue'
 import Finance from './Finance.vue'
@@ -10,12 +11,13 @@ import Works from './Works.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
 import {errorText,type EngineOptions,type Option} from './context'
-const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string}>()
+const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string}>()
 const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
 const options=ref<EngineOptions>({tasks:[],channels:[],mappings:[],users:[]})
 const section=computed(()=>props.section||'operations'),admin=computed(()=>isStaffRole(props.role))
+const guide=computed(()=>section.value==='operations'?zhihuOperationGuide({id:props.userId,role:props.role,parentId:props.parentId,adminDuty:props.adminDuty,permissions:props.permissions},scope):null)
 const title=computed(()=>section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'运营管理':props.role==='leader'?'团队业务':'我的关键词')
 const intro=computed(()=>section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与审核待办。':props.role==='leader'?'分发关键词、管理团队单价和审核作品。':'选择关键词，提交作品，查看审核结果。')
 const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...scope},role:isStaffRole(props.role)?'admin':props.role,userId:props.userId,parentId:props.parentId??null,adminDuty:props.adminDuty??'all',options:options.value}))
@@ -52,6 +54,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <template><section class="engine page-stack">
 <header class="business-heading"><div><p class="business-eyebrow">知乎业务</p><h1>{{title}}</h1><p>{{intro}}</p></div><div class="project-picker"><label v-if="projects.length>1">业务项目<select v-model="scope.projectId"><option v-for="p in projects" :key="p.id" :value="p.id">{{p.name}}</option></select></label><span v-else>{{projects[0]?.name}}</span><label v-if="accounts.length>1">接入账号<select v-model="scope.accountId"><option v-for="a in accounts" :key="a.id" :value="a.id">{{a.name}}</option></select></label></div></header>
 <p v-if="error" role="alert" class="engine-error">{{error}}</p><p v-if="loading" role="status">正在加载业务资料…</p>
+<OperationGuide v-if="guide" :guide="guide" />
 <div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先关联知乎接入账号并添加项目成员。':'请联系运营人员，将你加入业务项目并分配关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">管理项目接入</button></div>
 <template v-if="ready">
  <Finance v-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />

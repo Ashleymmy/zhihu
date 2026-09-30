@@ -11,7 +11,7 @@ const app = express().use('/app', express.static(dist));
 app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 const token = 'a'.repeat(43),
   results = [];
-async function scenario(browser, base, role, width = 1440) {
+async function scenario(browser, base, role, width = 1440, options = {}) {
   const context = await browser.newContext({ viewport: { width, height: 1000 } }),
     page = await context.newPage(),
     errors = [],
@@ -23,7 +23,7 @@ async function scenario(browser, base, role, width = 1440) {
     displayName: '测试' + role,
     role,
     adminDuty: role === 'operator' ? 'operations' : 'all',
-    parentId: null,
+    parentId: options.parentId ?? null,
     mustChangePwd: false,
     permissions:
       role === 'creator'
@@ -142,7 +142,7 @@ async function scenario(browser, base, role, width = 1440) {
       data = req.method() === 'POST' ? { id: '1', token } : [];
       status = req.method() === 'POST' ? 201 : 200;
     } else if (p.endsWith('/team/applications') || p.endsWith('/announcements/active')) data = [];
-    else if (/\/compositions|\/story-items/.test(p)) data = { list: [], total: 0 };
+    else if (/\/compositions|\/story-items|\/workbench\/works/.test(p)) data = { list: [], total: 0 };
     else if (req.method() === 'GET') data = [];
     return route.fulfill({
       status,
@@ -155,7 +155,11 @@ async function scenario(browser, base, role, width = 1440) {
     });
   });
   const snap = async (name) =>
-    page.screenshot({ path: path.join(out, `${role}-${width}-${name}.png`), fullPage: true, animations: 'disabled' });
+    page.screenshot({
+      path: path.join(out, `${role}${options.parentId ? '-team' : ''}-${width}-${name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
   try {
     if (role === 'guest') {
       await page.goto(base + '/app/register#invite=' + token);
@@ -174,6 +178,56 @@ async function scenario(browser, base, role, width = 1440) {
     } else {
       await page.goto(base + '/app/dashboard');
       await page.getByRole('heading', { name: '工作台', exact: true }).waitFor();
+      const guide = page.getByRole('region', { name: '操作引导', exact: true });
+      await guide.waitFor();
+      assert.equal(await guide.locator('[data-step]').count(), 3);
+      assert.equal(await guide.locator('[data-guide]').count(), role === 'creator' ? 0 : 3);
+      const firstLabel =
+        role === 'creator'
+          ? options.parentId
+            ? '接收关键词'
+            : '领取关键词'
+          : role === 'leader'
+            ? '领取关键词'
+            : '创建关键词';
+      assert.equal(await guide.locator('[data-step="keyword"] h3').innerText(), firstLabel);
+      if (['leader', 'operator'].includes(role)) {
+        await guide
+          .getByText('由管理员为成员开通业务项目。分发前确认相关成员已加入同一个项目。', { exact: true })
+          .waitFor();
+        assert.equal(await guide.getByRole('link', { name: '分配成员项目', exact: false }).count(), 0);
+      }
+      await guide.locator('[data-step="return"] summary').focus();
+      await page.keyboard.press('Enter');
+      await guide
+        .getByText('在作品列表查看“同步”和“知乎审核”；“已同步”表示已提交，不等于审核通过。', { exact: true })
+        .waitFor();
+      await snap('guide-expanded');
+      assert.ok(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        'guide overflows viewport',
+      );
+      const screenshotGuide = await guide.boundingBox();
+      assert.ok(screenshotGuide.width <= width);
+      await guide.getByRole('link', { name: '去登记作品', exact: false }).click();
+      await page.locator('.registration-page').waitFor();
+      assert.equal(new URL(page.url()).searchParams.get('projectId'), '1');
+      await page.goto(base + '/app/dashboard');
+      await guide.getByRole('link', { name: '查看回传结果', exact: false }).click();
+      await page.getByRole('heading', { name: '推广作品', exact: true }).waitFor();
+      await page.goto(base + '/app/dashboard');
+      await guide.getByRole('button', { name: '收起引导', exact: false }).click();
+      assert.equal(await guide.locator('[data-step]').count(), 0);
+      await page.reload();
+      await guide.getByRole('button', { name: '展开引导', exact: false }).waitFor();
+      // Dismissal belongs to this account; another account on the same browser starts expanded.
+      user.id = '55';
+      await page.reload();
+      await guide.locator('[data-step="keyword"]').waitFor();
+      user.id = '5';
+      await page.reload();
+      await guide.getByRole('button', { name: '展开引导', exact: false }).waitFor();
+      await guide.getByRole('button', { name: '展开引导', exact: false }).click();
       assert.equal(await page.getByText('知乎历史接入', { exact: true }).count(), 0);
       if (role === 'creator')
         for (const label of ['业务项目', '业务模块', '财务中心'])
@@ -181,6 +235,21 @@ async function scenario(browser, base, role, width = 1440) {
       await snap('dashboard');
       await page.getByRole('link', { name: '进入知乎工作台', exact: false }).click();
       await page.locator('.engine-table tbody tr').first().waitFor();
+      await guide.getByRole('link', { name: '查看审核进度', exact: true }).click();
+      await page
+        .getByRole('heading', { name: role === 'creator' ? '作品审核进度' : '作品审核', exact: true })
+        .waitFor();
+      assert.equal(new URL(page.url()).searchParams.get('tab'), 'works');
+      await guide.locator('[data-step="keyword"] a').click();
+      await page.locator('.engine-table tbody tr').first().waitFor();
+      // Storage failures must not prevent use, dismissal, or reopening of the cards.
+      await page.evaluate(() => {
+        Storage.prototype.setItem = function () {
+          throw new DOMException('blocked', 'SecurityError');
+        };
+      });
+      await guide.getByRole('button', { name: '收起引导', exact: false }).click();
+      await guide.getByRole('button', { name: '展开引导', exact: false }).click();
       const nav = page.getByRole('navigation', { name: '知乎业务导航' });
       assert.equal(await nav.locator('a[href$="/works"]').count(), 1);
       assert.equal(await nav.locator('a[href$="/tasks"]').count(), 1);
@@ -244,7 +313,7 @@ async function scenario(browser, base, role, width = 1440) {
         await page.getByText('天舒', { exact: true }).waitFor();
         await page.getByRole('button', { name: '编辑', exact: true }).click();
         const dialog = page.getByRole('dialog');
-        if (role === 'admin') {
+        if (['admin', 'developer'].includes(role)) {
           await dialog.getByLabel('搜索项目').fill('第二');
           await dialog.getByRole('checkbox', { name: '第二业务', exact: true }).check();
           await dialog.getByLabel('搜索项目').fill('');
@@ -258,7 +327,7 @@ async function scenario(browser, base, role, width = 1440) {
         await dialog.getByRole('button', { name: '保存修改' }).click();
         await dialog.waitFor({ state: 'hidden' });
         assert.equal(requests.find((r) => r.path.endsWith('/8/access')).body.isActive, false);
-        if (role === 'admin')
+        if (['admin', 'developer'].includes(role))
           assert.deepEqual(requests.find((r) => r.path.endsWith('/8/access')).body.projectIds, ['1', '2']);
         else assert.equal(requests.find((r) => r.path.endsWith('/8/access')).body.projectIds, undefined);
         await page.getByRole('button', { name: '详情', exact: true }).first().click();
@@ -279,7 +348,7 @@ async function scenario(browser, base, role, width = 1440) {
         );
     }
     assert.deepEqual(errors, []);
-    results.push({ role, width, status: 'passed' });
+    results.push({ role, width, parentId: options.parentId ?? null, status: 'passed' });
   } catch (error) {
     await snap('failure');
     throw error;
@@ -293,16 +362,18 @@ async function scenario(browser, base, role, width = 1440) {
   const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({ headless: true, channel: process.env.OPC_BROWSER_CHANNEL || 'msedge' });
   try {
-    for (const [role, width] of [
+    for (const [role, width, options] of [
       ['creator', 1440],
       ['admin', 1440],
+      ['developer', 1440],
       ['leader', 1440],
       ['operator', 1440],
       ['admin', 390],
       ['creator', 390],
+      ['creator', 390, { parentId: '9' }],
       ['guest', 390],
     ])
-      await scenario(browser, base, role, width);
+      await scenario(browser, base, role, width, options);
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(results, null, 2));
     console.log(results);
   } finally {

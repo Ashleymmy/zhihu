@@ -1,4 +1,5 @@
 import type { Ref, ComputedRef } from 'vue'
+import type { OperationGuideModel } from './operation-guide'
 export interface WorkspaceModule {
   id: string
   name: string
@@ -21,5 +22,6 @@ export interface CoreWorkspace {
   role: ComputedRef<string>
   modules: Ref<WorkspaceModule[]>
   projectId: Ref<string>
+  operationGuide?: ComputedRef<OperationGuideModel | null>
   refreshModules(): Promise<void>
 }

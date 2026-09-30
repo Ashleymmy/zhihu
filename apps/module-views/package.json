@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./operation-guide": "./zhihu/operation-guide.ts",
     "./navigation": "./zhihu/navigation.ts",
     "./work-status": "./zhihu/work-status.ts",
     "./*": "./zhihu/*"

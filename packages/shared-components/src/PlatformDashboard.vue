@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, ref, watch } from 'vue'
 import type { CoreWorkspace } from './core-workspace'
+import OperationGuide from './OperationGuide.vue'
 const w = inject<CoreWorkspace>('opc')!
 const projects = ref<Array<{ id: string; name: string }>>([]),
   summaries = ref<any[]>([]),
@@ -70,6 +71,7 @@ watch(w.projectId, loadSummary)
       <router-link v-if="w.role.value !== 'creator'" to="/modules">管理业务模块</router-link>
     </header>
     <p v-if="error" role="alert">{{ error }}</p>
+    <OperationGuide v-if="w.operationGuide?.value" :guide="w.operationGuide.value" />
     <article class="panel" style="padding: 24px">
       <div class="form-grid">
         <label
