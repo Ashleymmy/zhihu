@@ -90,8 +90,8 @@ export async function disputeBinding(
 export async function listEvidence(user: AuthUser, scope: Scope, page: number, pageSize: number) {
   await authorize(user, scope);
   return withTransaction(async (c) => {
-    const args = [scope.accountId, scope.projectId, user.role, user.sub, user.sub];
-    const from = `FROM zh_evidence e JOIN zh_keyword_bindings b ON b.id=e.binding_id JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.account_id=? AND k.project_id=? AND (?='admin' OR b.leader_id=? OR b.executor_id=?)`;
+    const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];
+    const from = `FROM zh_evidence e JOIN zh_keyword_bindings b ON b.id=e.binding_id JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.account_id=? AND k.project_id=? AND (?=1 OR b.leader_id=? OR b.executor_id=?)`;
     const [total] = await select(c, `SELECT COUNT(*) total ${from}`, args);
     const list = await select(
       c,
@@ -253,8 +253,8 @@ export async function previewPeriod(user: AuthUser, scope: Scope, key: string, i
     const facts = await select(
       c,
       `SELECT f.* FROM zh_metric_facts f JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
-      WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ? AND (?='admin' OR b.leader_id=?) ORDER BY f.id LIMIT 501 FOR UPDATE`,
-      [scope.accountId, scope.projectId, input.from, input.to, user.role, user.sub],
+      WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ? AND (?=1 OR b.leader_id=?) ORDER BY f.id LIMIT 501 FOR UPDATE`,
+      [scope.accountId, scope.projectId, input.from, input.to, Number(isStaffRole(user.role)), user.sub],
     );
     if (facts.length > 500) fail('单次最多预览 500 条事实，请缩小日期范围');
     const entries = [];
@@ -297,8 +297,8 @@ export async function confirmBatch(
 export async function listStatements(user: AuthUser, scope: Scope, page: number, pageSize: number) {
   await authorize(user, scope);
   return withTransaction(async (c) => {
-    const args = [scope.accountId, scope.projectId, user.role, user.sub, user.sub];
-    const where = "account_id=? AND project_id=? AND (?='admin' OR payee_id=? OR (payer_kind='user' AND payer_id=?))";
+    const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];
+    const where = "account_id=? AND project_id=? AND (?=1 OR payee_id=? OR (payer_kind='user' AND payer_id=?))";
     const [total] = await select(c, `SELECT COUNT(*) total FROM zh_statement_entries WHERE ${where}`, args);
     const list = await select(
       c,

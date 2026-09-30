@@ -640,8 +640,8 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
 export async function listAttributions(user: AuthUser, scope: Scope, page: number, pageSize: number) {
   await authorize(user, scope);
   return withTransaction(async (c) => {
-    const where = `f.account_id=? AND f.project_id=? AND (?='admin' OR b.executor_id=? OR b.leader_id=?)`;
-    const args = [scope.accountId, scope.projectId, user.role, user.sub, user.sub];
+    const where = `f.account_id=? AND f.project_id=? AND (?=1 OR b.executor_id=? OR b.leader_id=?)`;
+    const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];
     const joins = `FROM zh_metric_facts f JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id`;
     const [count] = await select(c, `SELECT COUNT(*) total ${joins} WHERE ${where}`, args);
     const records = await select(

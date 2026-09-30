@@ -1,4 +1,5 @@
 import type { AuthUser } from '../../../types';
+import { isStaffRole } from '../../../auth/roles';
 import { withTransaction } from '../../../db';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { planAccountSql } from '../services/plan-account';
@@ -21,7 +22,7 @@ export async function listWorks(user: AuthUser, scope: Scope, page: number, page
       LEFT JOIN compositions c ON c.id=(SELECT MAX(linked.id) FROM compositions linked
         WHERE linked.plan_id=p.id AND linked.owner_id=b.executor_id AND BINARY linked.promo_url=BINARY e.work_url)
       WHERE k.account_id=? AND k.project_id=? AND p.project_id=k.project_id
-        AND (?='admin' OR b.leader_id=? OR b.executor_id=?)
+        AND (?=1 OR b.leader_id=? OR b.executor_id=?)
       UNION ALL
       SELECT CONCAT('composition:',c.id) id,'composition' source,NULL binding_id,
         CAST(p.id AS CHAR) plan_id,p.keyword,c.promo_url work_url,c.title description,
@@ -34,10 +35,10 @@ export async function listWorks(user: AuthUser, scope: Scope, page: number, page
           JOIN zh_keywords k ON k.id=b.keyword_id
           WHERE k.plan_id=p.id AND k.account_id=? AND k.project_id=?
             AND b.executor_id=c.owner_id AND BINARY e.work_url=BINARY c.promo_url
-            AND (?='admin' OR b.leader_id=? OR b.executor_id=?))`;
-    const args = [scope.accountId, scope.projectId, user.role, user.sub, user.sub,
+            AND (?=1 OR b.leader_id=? OR b.executor_id=?))`;
+    const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub,
       scope.projectId, scope.accountId, ...visibility.bindings,
-      scope.accountId, scope.projectId, user.role, user.sub, user.sub];
+      scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];
     const [count] = await select(c, `SELECT COUNT(*) total FROM (${query}) works`, args);
     const list = await select(c, `SELECT * FROM (${query}) works ORDER BY created_at DESC,source,id DESC LIMIT ? OFFSET ?`,
       [...args, pageSize, (page - 1) * pageSize]);

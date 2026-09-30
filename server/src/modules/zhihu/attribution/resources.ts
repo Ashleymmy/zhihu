@@ -128,8 +128,8 @@ export async function options(user: AuthUser, scope: Scope) {
             c,
             `SELECT CAST(u.id AS CHAR) id,u.display_name,u.role,CAST(u.parent_id AS CHAR) parent_id FROM users u
       JOIN project_members pm ON pm.user_id=u.id WHERE pm.project_id=? AND pm.left_at IS NULL AND u.is_active=1
-      AND (?='admin' OR u.parent_id=? OR u.id=?) ORDER BY u.id`,
-            [scope.projectId, user.role, user.sub, user.sub],
+      AND (?=1 OR u.parent_id=? OR u.id=?) ORDER BY u.id`,
+            [scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub],
           );
     return { tasks, channels, mappings, users, integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
   });

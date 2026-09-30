@@ -149,8 +149,8 @@ export async function listPrices(user: AuthUser, scope: Scope, page: number, pag
   await authorize(user, scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
-    const where = `a.account_id=? AND a.project_id=? AND (?='admin' OR a.payee_id=? OR (a.payer_kind='user' AND a.payer_id=?))`;
-    const args = [scope.accountId, scope.projectId, user.role, user.sub, user.sub];
+    const where = `a.account_id=? AND a.project_id=? AND (?=1 OR a.payee_id=? OR (a.payer_kind='user' AND a.payer_id=?))`;
+    const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];
     const [total] = await select(
       c,
       `SELECT COUNT(*) total FROM zh_price_agreements a JOIN zh_price_versions v ON v.agreement_id=a.id WHERE ${where}`,

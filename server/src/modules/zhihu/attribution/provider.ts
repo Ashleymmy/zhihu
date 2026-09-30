@@ -1,4 +1,5 @@
 import type { ModuleDataProvider } from '../../../core/contracts';
+import { isStaffRole } from '../../../auth/roles';
 import { withTransaction } from '../../../db';
 import { authorize, select } from './store';
 import { day, fail } from './domain';
@@ -17,8 +18,8 @@ export const attributionDataProvider: ModuleDataProvider = {
       CAST(SUM(CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(v.snapshot_json,'$.search')),'null') AS DECIMAL(30,0))) AS CHAR) searches
       FROM zh_metric_facts f JOIN zh_metric_revisions v ON v.id=f.current_revision_id JOIN zh_keywords k ON k.id=f.keyword_id
       LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ?
-      AND (?='admin' OR b.executor_id=? OR b.leader_id=?)`,
-        [scope.accountId, scope.projectId, scope.from, scope.to, user.role, user.sub, user.sub],
+      AND (?=1 OR b.executor_id=? OR b.leader_id=?)`,
+        [scope.accountId, scope.projectId, scope.from, scope.to, Number(isStaffRole(user.role)), user.sub, user.sub],
       ),
     );
     return {

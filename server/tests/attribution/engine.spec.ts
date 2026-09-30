@@ -28,6 +28,7 @@ const admin = user('1', 'admin'),
   creator = user('3', 'creator', '2'),
   direct = user('4', 'creator'),
   outsider = user('5', 'leader');
+const operator = user('71', 'operator'), developer = user('72', 'developer');
 let scope = { projectId: '1', accountId: '' },
   mappingId = '',
   wordId = '',
@@ -78,6 +79,7 @@ beforeAll(async () => {
     "INSERT INTO users(id,username,password_hash,role,display_name,parent_id) VALUES(1,'admin','unused','admin','管理员',NULL),(2,'leader','unused','leader','团长',NULL),(3,'creator','unused','creator','达人',2),(4,'direct','unused','creator','直属达人',NULL),(5,'outsider','unused','leader','其他团长',NULL)",
   );
   await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,4),(1,5)');
+  await c.query("INSERT INTO users(id,username,password_hash,role,display_name) VALUES(71,'scope-operator','unused','operator','运营'),(72,'scope-developer','unused','developer','开发者')");
   const [accounts] = await c.query<mysql.RowDataPacket[]>('SELECT id FROM integration_accounts LIMIT 1');
   scope.accountId = String(accounts[0].id);
   await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'ch1',1,'渠道甲')");
@@ -465,6 +467,9 @@ describe('首次核验、对账及不可变差额', () => {
     expect(
       (await s.previewPeriod(leader, scope, key(), { from: statementDay(), to: statementDay() })).entries[0].id,
     ).toBe(low.id);
+    expect(
+      (await s.previewPeriod(developer, scope, key(), { from: statementDay(), to: statementDay() })).entries[0].id,
+    ).toBe(up.id);
     await expect(
       s.confirmBatch(leader, scope, key(), [
         { id: low.id, expectedHash: await hash(low.id) },
@@ -527,6 +532,25 @@ describe('首次核验、对账及不可变差额', () => {
     expect(Number(legacy[0].n)).toBe(0);
   });
 });
+describe('管理角色的项目业务查询范围一致', () => {
+  it.each([operator, developer])('$role 无上下级绑定也能读取项目报价、归因和对账记录', async viewer => {
+    const { listPrices } = await import('../../src/modules/zhihu/attribution/pricing');
+    const { listAttributions } = await import('../../src/modules/zhihu/attribution/facts');
+    const { listStatements } = await import('../../src/modules/zhihu/attribution/statements');
+    for (const list of [listPrices, listAttributions, listStatements]) {
+      const expected = await list(admin, scope, 1, 100);
+      expect(expected.total).toBeGreaterThan(0);
+      expect(await list(viewer, scope, 1, 100)).toEqual(expected);
+    }
+    const { attributionDataProvider } = await import('../../src/modules/zhihu/attribution/provider');
+    const { businessDay } = await import('../../src/modules/zhihu/attribution/domain');
+    const range = { ...scope, from: businessDay(), to: businessDay() };
+    const expected = await attributionDataProvider.summary(range, admin);
+    expect(expected.status).toBe('ready');
+    expect(await attributionDataProvider.summary(range, viewer)).toEqual(expected);
+  });
+});
+
 describe('队列恢复、公共摘要和切换保护', () => {
   it('不同账号与项目的同名渠道不会引用另一范围的关键词、报价或事实', async () => {
     const facts = await import('../../src/modules/zhihu/attribution/facts'),
