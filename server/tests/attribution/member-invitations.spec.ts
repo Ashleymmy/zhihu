@@ -156,7 +156,7 @@ it('concurrent registrations cannot overdraw the final invitation slot', async (
   expect(row.used_count).toBe(1);
   expect((await preview(i.token)).status).toBe(422);
 });
-it('invitation listing is private, tokens are never returned again, and another owner cannot revoke it', async () => {
+it('invitation listing is private, tokens are excluded from lists, and another owner cannot revoke it', async () => {
   const i = await invite();
   expect((await call('other_leader', 'post', '/team/invitations/' + i.id + '/revoke')).status).toBe(403);
   expect((await call('developer', 'get', '/team/invitations')).body.data.some((r: any) => r.id === i.id)).toBe(false);
@@ -166,6 +166,67 @@ it('invitation listing is private, tokens are never returned again, and another 
   expect((await call('leader', 'post', '/team/invitations/' + i.id + '/revoke')).status).toBe(200);
   expect((await preview(i.token)).status).toBe(422);
   expect((await register(i.token)).status).toBe(422);
+});
+
+it('owner can copy the same encrypted link repeatedly; other accounts cannot read, edit, rotate or delete it', async () => {
+  const i = await invite();
+  for (let n=0;n<2;n++) {
+    const r=await call('leader','get',`/team/invitations/${i.id}/link`);
+    expect(r.status).toBe(200);expect(r.body.data.token).toBe(i.token);
+    expect(r.headers['cache-control']).toBe('no-store');
+  }
+  const [[stored]]=await c.query<RowDataPacket[]>('SELECT token_cipher FROM member_invitations WHERE id=?',[i.id]);
+  expect(stored.token_cipher).not.toContain(i.token);
+  for(const actor of ['other_leader','admin','creator']) {
+    expect((await call(actor,'get',`/team/invitations/${i.id}/link`)).status).toBe(403);
+    expect((await call(actor,'patch',`/team/invitations/${i.id}`).send({label:'越权'})).status).toBe(403);
+    expect((await call(actor,'post',`/team/invitations/${i.id}/regenerate`)).status).toBe(403);
+    expect((await call(actor,'delete',`/team/invitations/${i.id}`)).status).toBe(403);
+  }
+});
+
+it('editing invitation capacity and expiry keeps its link and attribution, with strict immutable owner fields', async () => {
+  const i=await invite('leader',1);
+  const joined=await register(i.token);
+  expect(joined.status).toBe(201);
+  expect((await preview(i.token)).status).toBe(422);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({label:'新版邀请',maxUses:2,expiresAt:new Date(Date.now()+86400000).toISOString()})).status).toBe(200);
+  expect((await preview(i.token)).status).toBe(200);
+  expect((await register(i.token)).status).toBe(201);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({maxUses:1})).status).toBe(422);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({teamLeaderId:'6'})).status).toBe(422);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({expiresAt:new Date(Date.now()-1000).toISOString()})).status).toBe(422);
+  const [[u]]=await c.query<RowDataPacket[]>('SELECT parent_id FROM users WHERE id=?',[joined.body.data.id]);
+  expect(String(u.parent_id)).toBe('4');
+});
+
+it('disable, re-enable, regenerate and delete links invalidate only future registration, retaining provenance', async () => {
+  const i=await invite();
+  const joined=await register(i.token);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({enabled:false})).status).toBe(200);
+  expect((await register(i.token)).status).toBe(422);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({enabled:true})).status).toBe(200);
+  const rotated=await call('leader','post',`/team/invitations/${i.id}/regenerate`);
+  expect(rotated.status).toBe(200);expect(rotated.body.data.token).not.toBe(i.token);
+  expect((await preview(i.token)).status).toBe(422);
+  expect((await preview(rotated.body.data.token)).status).toBe(200);
+  expect((await call('leader','delete',`/team/invitations/${i.id}`)).status).toBe(200);
+  expect((await preview(rotated.body.data.token)).status).toBe(422);
+  expect((await register(rotated.body.data.token)).status).toBe(422);
+  expect((await call('leader','get','/team/invitations')).body.data.some((r:any)=>r.id===i.id)).toBe(false);
+  expect((await call('leader','patch',`/team/invitations/${i.id}`).send({enabled:true})).status).toBe(403);
+  const [[history]]=await c.query<RowDataPacket[]>('SELECT u.parent_id,iu.invitation_id FROM users u JOIN member_invitation_uses iu ON iu.user_id=u.id WHERE u.id=?',[joined.body.data.id]);
+  expect(String(history.parent_id)).toBe('4');expect(String(history.invitation_id)).toBe(i.id);
+});
+
+it('legacy hash-only invitations keep working and are rotated only on explicit regeneration', async () => {
+  const i=await invite();
+  await c.query('UPDATE member_invitations SET token_cipher=NULL WHERE id=?',[i.id]);
+  expect((await preview(i.token)).status).toBe(200);
+  expect((await call('leader','get',`/team/invitations/${i.id}/link`)).status).toBe(409);
+  const rotated=await call('leader','post',`/team/invitations/${i.id}/regenerate`);
+  expect((await preview(i.token)).status).toBe(422);
+  expect((await preview(rotated.body.data.token)).status).toBe(200);
 });
 it('expired invitations and disabled or changed team owners cannot enroll users', async () => {
   const i = await invite();

@@ -6,10 +6,10 @@ describe('operation guidance respects current responsibilities', () => {
   it('creators see their workflow without member or project management', () => {
     const guide = zhihuOperationGuide({ ...user, permissions: ['project.manage', 'team.view'] })!
     expect(guide.steps.map(s => s.id)).toEqual(['keyword', 'register', 'return'])
-    expect(guide.steps[0]!.title).toBe('领取关键词')
+    expect(guide.steps[0]!.title).toBe('创建或领取关键词')
     expect(guide.management).toEqual([])
-    expect(JSON.stringify(guide)).not.toContain('去创建关键词')
-    expect(zhihuOperationGuide({ ...user, parentId: '2' })!.steps[0]!.title).toBe('接收关键词')
+    expect(JSON.stringify(guide)).toContain('自主创建关键词')
+    expect(zhihuOperationGuide({ ...user, parentId: '2' })!.steps[0]!.title).toBe('创建或接收关键词')
   })
   it('leaders and operators are directed to admins for project authorization', () => {
     for (const role of ['leader', 'operator']) {

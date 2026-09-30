@@ -5,6 +5,17 @@ import type { Scope } from './domain';
 // This does not claim to have queried the plan's current official audit status.
 // Also repairs previously saved receipts that were left in pending by old workers.
 export async function synchronizeKeywords(scope?: Scope, planId?: string) {
+  // Self-created keywords are already exclusively bound; a receipt must not put them in the public pool.
+  await db.query(
+    `UPDATE zh_keywords k JOIN plans p ON p.id=k.plan_id AND p.project_id=k.project_id
+     JOIN zh_keyword_bindings b ON b.id=k.current_binding_id AND b.keyword_id=k.id
+     SET k.upstream_status='created',k.upstream_confirmed_at=COALESCE(k.upstream_confirmed_at,NOW(3)),k.version=k.version+1
+     WHERE p.sync_status='synced' AND NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL AND p.status='active'
+       AND k.upstream_status='pending' AND k.lifecycle_status IN ('reserved','assigned')
+       AND b.released_at IS NULL AND k.used_ever_at IS NULL
+       AND (? IS NULL OR k.account_id=?) AND (? IS NULL OR k.project_id=?) AND (? IS NULL OR p.id=?)`,
+    [scope?.accountId ?? null,scope?.accountId ?? null,scope?.projectId ?? null,scope?.projectId ?? null,planId ?? null,planId ?? null],
+  );
   await db.query(
     `UPDATE zh_keywords k JOIN plans p ON p.id=k.plan_id AND p.project_id=k.project_id
      JOIN integration_accounts a ON a.id=k.account_id AND a.module_id='zhihu' AND a.status='active'

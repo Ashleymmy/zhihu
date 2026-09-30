@@ -126,7 +126,7 @@ export interface TeamMember {
 
 export type TeamApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 export interface MemberAccessPatch { displayName?: string; phone?: string | null; role?: GlobalRole; adminDuty?: 'all' | 'operations' | 'finance'; isActive?: boolean; parentId?: string | null; projectIds?: string[] }
-export interface MemberInvitation { id: string; label: string; ownerId: string; ownerName: string; teamName: string | null; maxUses: number; usedCount: number; expiresAt: string; revokedAt: string | null; createdAt: string; status: 'active' | 'expired' | 'revoked' | 'used' }
+export interface MemberInvitation { id: string; label: string; ownerId: string; ownerName: string; teamName: string | null; maxUses: number; usedCount: number; expiresAt: string; revokedAt: string | null; createdAt: string; canCopy?: number; status: 'active' | 'expired' | 'revoked' | 'used' }
 
 export interface TeamApplication {
   id: string

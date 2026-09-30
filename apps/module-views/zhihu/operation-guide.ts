@@ -7,6 +7,7 @@ interface GuideUser {
   id: string;
   role: string;
   parentId?: string | null;
+  hasTeamLeader?: boolean;
   adminDuty?: string;
   permissions?: string[];
 }
@@ -24,7 +25,7 @@ export function zhihuOperationGuide(
   const creator = user.role === "creator";
   const leader = user.role === "leader";
   const staff = !creator && !leader;
-  const assigned = creator && Boolean(user.parentId);
+  const assigned = creator && (user.hasTeamLeader ?? Boolean(user.parentId));
   const has = (permission: string) =>
     user.permissions?.includes(permission) ?? false;
   const businessPath = (path: string, extra: Record<string, string> = {}) => {
@@ -48,7 +49,7 @@ export function zhihuOperationGuide(
       }
     : {
         id: "keyword",
-        title: assigned ? "接收关键词" : "领取关键词",
+        title: assigned ? "创建或接收关键词" : "创建或领取关键词",
         description: assigned
           ? "团长分发后，在“我的关键词”中确认分给你的词，再开始创作。"
           : leader
@@ -58,14 +59,14 @@ export function zhihuOperationGuide(
           ? [
               "进入“我的关键词”，查看团长已分发给你的关键词。",
               "没有记录时，联系团长确认关键词分发，并由管理员核对项目权限。",
-              "需要新关键词时联系团长或运营创建，再由团长分发。",
+              "也可以点击“创建关键词”，填写任务、渠道和内容链接；新词自动绑定本人及当前团队。",
             ]
           : [
               "进入关键词页，选择有“领取关键词”按钮的记录。",
               leader
                 ? "领取后点击“分发给达人”，选择团队达人或自己。"
                 : "新词前 30 分钟为团长优先期，之后独立达人可领取就绪的词。",
-              "没有合适的词时，联系运营创建；看不到项目时请管理员核对项目权限。",
+              leader ? "也可以自主创建关键词，创建后归本人保留，再分配给团队达人或自己。" : "也可以自主创建关键词，创建后自动绑定本人；看不到项目时请管理员核对项目权限。",
             ],
         action: {
           label: assigned ? "查看已分配关键词" : "去领取关键词",
@@ -144,13 +145,14 @@ export function zhihuOperationGuide(
           ? "邀请或创建团队达人，核对团队归属，管理本人团队的成员资料。"
           : "邀请或创建成员，按职责设置角色、状态和团队归属。",
         instructions: [
-          "在“团队与成员”中邀请或创建成员；邀请链接可设置有效期与使用人数。",
+          "在“邀请链接”中新增链接，可设置名称、有效期与使用人数，并可编辑、复制或删除。",
           leader
             ? "团长邀请注册的达人自动加入本人团队，项目权限仍需管理员分配。"
             : "管理角色邀请注册的成员默认为独立达人；需要加入团队时在成员编辑中选择团长。",
           "“详情”可核对注册来源和权限；“编辑”中只能调整自己有权管理的成员。",
         ],
         action: { label: "去管理成员", to: "/team" },
+        secondaryAction: { label: "管理邀请链接", to: "/invitations" },
       });
     management.push({
       id: "distribute",
@@ -170,7 +172,7 @@ export function zhihuOperationGuide(
   }
   return {
     storageKey:
-      "timo:operation-guide:v1:" +
+      "timo:operation-guide:v2:" +
       user.id +
       ":" +
       (user.role === "developer" ? "admin" : user.role),

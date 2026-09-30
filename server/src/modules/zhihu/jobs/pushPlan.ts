@@ -78,9 +78,9 @@ export async function pushPlan(data: Record<string, unknown>) {
       await db.query(
         `UPDATE plans p JOIN zh_keywords k ON k.plan_id=p.id
          SET p.sync_status='simulated',p.status='active',p.sync_error=NULL,
-             k.upstream_status='simulated',k.lifecycle_status='available',k.version=k.version+1
+             k.upstream_status='simulated',k.lifecycle_status=IF(k.current_binding_id IS NULL,'available',k.lifecycle_status),k.version=k.version+1
          WHERE p.id=? AND p.keyword=? AND p.sync_status='syncing'
-           AND p.zhihu_plan_id IS NULL AND k.current_binding_id IS NULL AND k.used_ever_at IS NULL
+           AND p.zhihu_plan_id IS NULL AND k.used_ever_at IS NULL AND k.lifecycle_status IN ('pending','reserved','assigned','available')
            AND NOT EXISTS(SELECT 1 FROM zh_engine_routes r WHERE r.account_id=k.account_id AND r.project_id=k.project_id AND r.mode='stopped')`,
         [id, plan.keyword],
       );

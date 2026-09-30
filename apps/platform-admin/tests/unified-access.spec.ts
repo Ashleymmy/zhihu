@@ -3,6 +3,14 @@ import { fakeUser } from '@zhihu-koc/test-support'
 import { canAccessPath, isValidAccount, safeRedirect } from '../src/access'
 
 describe('统一入口与权限', () => {
+  it('邀请链接页面仅开放给有成员邀请权限的管理角色和团长',()=>{
+    for(const role of ['developer','admin','operator','leader'] as const) {
+      expect(canAccessPath(fakeUser({role,permissions:['team.create_member']}),'/invitations')).toBe(true)
+      expect(canAccessPath(fakeUser({role,permissions:[]}),'/invitations')).toBe(false)
+    }
+    expect(canAccessPath(fakeUser({role:'creator',permissions:['team.create_member']}),'/invitations')).toBe(false)
+    expect(canAccessPath(fakeUser({role:'admin',adminDuty:'finance',permissions:['team.create_member']}),'/invitations')).toBe(false)
+  })
   it.each(['developer', 'admin', 'operator', 'leader', 'creator'] as const)(
     '同一入口接受 %s 角色',
     (role) => {

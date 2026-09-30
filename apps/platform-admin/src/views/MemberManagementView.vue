@@ -300,6 +300,7 @@ onMounted(() => run(load));
         <p>查看成员资料、角色权限、团队归属与邀请记录。</p>
       </div>
       <div class="member-actions">
+        <router-link to="/invitations">管理邀请链接</router-link>
         <button
           @click="
             open('invite');
@@ -843,7 +844,7 @@ onMounted(() => run(load));
               readonly
               @focus="($event.target as HTMLInputElement).select()"
           /></label>
-          <p>请复制保存；关闭后不再展示完整链接，可在“我的邀请”中停用。</p>
+          <p>可在“邀请链接”页面再次复制、编辑或删除此链接。</p>
           <button type="button" @click="copyLink">复制邀请链接</button>
         </div>
         <div class="dialog-actions">

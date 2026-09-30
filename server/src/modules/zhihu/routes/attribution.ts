@@ -126,6 +126,7 @@ attributionRouter.get(
 );
 attributionRouter.post(
   '/keywords',
+  requirePermission('keyword.create'),
   asyncHandler(async (req, res) => {
     const input = scopeSchema
       .extend({

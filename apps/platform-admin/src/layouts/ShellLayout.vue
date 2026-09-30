@@ -26,6 +26,7 @@ const navigation = computed<NavGroup[]>(() => {
       label: '组织',
       items: [
         { key: 'team', label: '团队与成员', path: '/team' },
+        { key: 'invitations', label: '邀请链接', path: '/invitations' },
         { key: 'mcn', label: '运营账户', path: '/mcn' },
       ],
     },

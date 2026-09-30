@@ -87,7 +87,7 @@ function publicPlan(plan: PlanRow, user: AuthUser): PlanRow {
 }
 
 function assertPlanWriter(user: AuthUser) {
-  if (user.role === 'creator') throw new AppError(403, 40301, '达人只能领取关键词和登记作品，计划维护请联系运营人员');
+  if (user.role === 'creator') throw new AppError(403, 40301, '请通过关键词页创建关键词，计划修改与维护请联系运营人员');
 }
 
 async function getPlanForUpdate(connection: PoolConnection, user: AuthUser, id: string): Promise<PlanRow> {
@@ -210,10 +210,9 @@ export async function getPlan(user: AuthUser, id: string) {
 }
 
 export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) {
-  assertPlanWriter(user);
   if (isDevDemoAuthUser(user)) return createDevDemoPlan(user, input as unknown as Record<string, unknown>);
 
-  if (isStaffRole(user.role) && (!input.ownerId || input.ownerId === user.sub)) {
+  if (!isStaffRole(user.role) || !input.ownerId || input.ownerId === user.sub) {
     const scope = await withTransaction(c => resolvePlanPool(c,input.taskId,input.channelId));
     const result = await createKeyword(user,scope,crypto.randomUUID(),{...input,taskId:scope.taskId,channelId:scope.channelId});
     return {id:result.planId,keywordId:result.id,...scope,syncStatus:'local'};

@@ -17,7 +17,7 @@ const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loadin
 const scope=reactive({projectId:'',accountId:''})
 const options=ref<EngineOptions>({tasks:[],channels:[],mappings:[],users:[]})
 const section=computed(()=>props.section||'operations'),admin=computed(()=>isStaffRole(props.role))
-const guide=computed(()=>section.value==='operations'?zhihuOperationGuide({id:props.userId,role:props.role,parentId:props.parentId,adminDuty:props.adminDuty,permissions:props.permissions},scope):null)
+const guide=computed(()=>section.value==='operations'?zhihuOperationGuide({id:props.userId,role:props.role,parentId:props.parentId,hasTeamLeader:options.value.hasTeamLeader,adminDuty:props.adminDuty,permissions:props.permissions},scope):null)
 const title=computed(()=>section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'运营管理':props.role==='leader'?'团队业务':'我的关键词')
 const intro=computed(()=>section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与审核待办。':props.role==='leader'?'分发关键词、管理团队单价和审核作品。':'选择关键词，提交作品，查看审核结果。')
 const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...scope},role:isStaffRole(props.role)?'admin':props.role,userId:props.userId,parentId:props.parentId??null,adminDuty:props.adminDuty??'all',options:options.value}))

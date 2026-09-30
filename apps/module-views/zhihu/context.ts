@@ -22,6 +22,7 @@ export interface Option {
   syncedAt?: string | null
 }
 export interface EngineOptions {
+  hasTeamLeader?: boolean
   integrationMode?: 'simulation' | 'upstream'
   tasks: Option[]
   channels: Option[]

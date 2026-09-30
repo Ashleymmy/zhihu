@@ -5,6 +5,7 @@ import {
   PublicFinance,
 } from '@zhihu-koc/shared-components'
 export const workspaceRoutes: RouteRecordRaw[] = [
+  { path: 'invitations', name: 'invitations', component: () => import('../../platform-admin/src/views/InvitationLinksView.vue'), meta: { title: '邀请链接' } },
   { path: '', redirect: '/dashboard' },
   {
     path: 'dashboard',

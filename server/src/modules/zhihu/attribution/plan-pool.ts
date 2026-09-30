@@ -4,6 +4,7 @@ import type { AuthUser } from '../../../types';
 import { audit, insert, scopeLock, select } from './store';
 import { fail } from './domain';
 import { assertEngineWritable } from './routing';
+import { independentCreatorSql } from './relationships';
 
 export function keywordVisibility(user: AuthUser) {
   if (isStaffRole(user.role)) return { clause: '1=1', bindings: [] as string[] };
@@ -13,7 +14,7 @@ export function keywordVisibility(user: AuthUser) {
   };
   return {
     clause: `(b.executor_id=? OR (k.current_binding_id IS NULL AND k.lifecycle_status='available' AND k.priority_until<=NOW(3)
-      AND EXISTS(SELECT 1 FROM users viewer WHERE viewer.id=? AND viewer.parent_id IS NULL)
+      AND EXISTS(SELECT 1 FROM users viewer WHERE viewer.id=? AND ${independentCreatorSql('viewer')})
       AND NOT EXISTS(SELECT 1 FROM zh_engine_routes route WHERE route.project_id=k.project_id AND route.account_id=k.account_id AND route.mode='stopped')
       AND EXISTS(SELECT 1 FROM plans ready WHERE ready.id=k.plan_id AND ready.status='active' AND (
         (ready.sync_status='synced' AND NULLIF(TRIM(ready.zhihu_plan_id),'') IS NOT NULL)

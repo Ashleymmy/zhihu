@@ -11,6 +11,7 @@ import { officialPlanReadCapability } from '../zhihu/planReadCapability';
 import { planAccountSql } from '../services/plan-account';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { synchronizeKeywords } from './keyword-readiness';
+import { teamLeader } from './relationships';
 export { synchronizeKeywords } from './keyword-readiness';
 
 async function simulationScope(c: PoolConnection, scope: Scope) {
@@ -110,12 +111,9 @@ export async function options(user: AuthUser, scope: Scope) {
     const tasks = await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_task_id,unit_price,settle_type,status,start_time,end_time,synced_at FROM tasks WHERE project_id=? ORDER BY id', [
       scope.projectId,
     ]);
-    const channels =
-      isStaffRole(user.role)
-        ? await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_channel_id,generation,synced_at FROM channels WHERE project_id=? AND is_enabled=1', [
+    const channels = await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_channel_id,generation,synced_at FROM channels WHERE project_id=? AND is_enabled=1', [
             scope.projectId,
-          ])
-        : [];
+          ]);
     const mappings = await select(
       c,
       'SELECT CAST(id AS CHAR) id,channel_name,CAST(channel_id AS CHAR) channel_id FROM zh_channel_mappings WHERE account_id=? AND project_id=? AND canonical_id IS NULL',
@@ -131,7 +129,9 @@ export async function options(user: AuthUser, scope: Scope) {
       AND (?=1 OR u.parent_id=? OR u.id=?) ORDER BY u.id`,
             [scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub],
           );
-    return { tasks, channels, mappings, users, integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
+    const [actor] = await select(c, 'SELECT parent_id FROM users WHERE id=?', [user.sub]);
+    const [parent] = actor?.parent_id ? await select(c, 'SELECT role FROM users WHERE id=?', [actor.parent_id]) : [];
+    return { tasks, channels, mappings, users, hasTeamLeader: parent?.role === 'leader', integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
   });
 }
 export async function createMapping(
@@ -190,7 +190,7 @@ export async function createKeyword(
   key: string,
   input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null },
 ) {
-  if (!isStaffRole(user.role)) fail('仅管理员可以创建词库关键词', 403);
+  if (!isStaffRole(user.role) && !['leader', 'creator'].includes(user.role)) fail('无权创建关键词', 403);
   const keyword = keywordText(input.keyword);
   const result = await mutate(user, scope, 'keyword.create', key, input, async (c) => {
     await assertKeywordFree(c, keyword);
@@ -224,7 +224,19 @@ export async function createKeyword(
       'INSERT INTO zh_keywords(account_id,project_id,task_id,channel_mapping_id,plan_id,keyword,created_by,priority_until) VALUES(?,?,?,?,?,?,?,TIMESTAMPADD(MINUTE,30,NOW(3)))',
       [scope.accountId, scope.projectId, input.taskId, mappingId, planId, keyword, user.sub],
     );
-    await audit(c, user, 'keyword.create', id, { ...scope, planId });
+    let bindingId: string | null = null;
+    if (!isStaffRole(user.role)) {
+      const [actor] = await select(c, 'SELECT id,role,parent_id FROM users WHERE id=? FOR SHARE', [user.sub]);
+      const reserved = user.role === 'leader';
+      const leaderId = reserved ? user.sub : await teamLeader(c, scope, actor);
+      bindingId = await insert(c,
+        'INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,relation_snapshot,assigned_at) VALUES(?,?,?,?,?,?)',
+        [id, reserved ? 'reserved' : leaderId ? 'team_creator' : 'direct_creator', leaderId, reserved ? null : user.sub,
+          JSON.stringify({ ...scope, actor, leaderId, source: 'self_create' }), reserved ? null : new Date()]);
+      await c.query('UPDATE zh_keywords SET current_binding_id=?,lifecycle_status=?,version=version+1 WHERE id=?',
+        [bindingId, reserved ? 'reserved' : 'assigned', id]);
+    }
+    await audit(c, user, 'keyword.create', id, { ...scope, planId, bindingId });
     return { id, planId };
   });
   // 计划已经持久化；投递失败仍可按 planId 重试，不重复创建资源。
@@ -316,7 +328,7 @@ export async function claim(user: AuthUser, scope: Scope, id: string, key: strin
     const [actor] = await select(c, 'SELECT id,role,parent_id,is_active FROM users WHERE id=? FOR SHARE', [user.sub]);
     if (!actor?.is_active || actor.role !== user.role) fail('账号权限已变化，请重新登录', 403);
     const [time] = await select(c, 'SELECT (priority_until<=NOW(3)) AS ended FROM zh_keywords WHERE id=?', [id]);
-    if (user.role === 'creator' && (actor.parent_id !== null || Number(time.ended) !== 1))
+    if (user.role === 'creator' && ((await teamLeader(c, scope, actor)) !== null || Number(time.ended) !== 1))
       fail('仅优先期结束后的直属达人可领取', 403);
     const leader = user.role === 'leader';
     const bindingId = await insert(
@@ -398,7 +410,7 @@ export async function changeBinding(
       const [executor] = await select(c, 'SELECT role,parent_id FROM users WHERE id=? FOR SHARE', [user.sub]);
       if (
         (binding.path_type === 'team_creator' && String(executor.parent_id) !== String(binding.leader_id)) ||
-        (binding.path_type === 'direct_creator' && executor.parent_id !== null) ||
+        (binding.path_type === 'direct_creator' && (await teamLeader(c, scope, executor)) !== null) ||
         (binding.path_type === 'leader_self' && executor.role !== 'leader')
       )
         fail('团队关系已变化，请使用新团队分配的关键词', 409);
@@ -451,7 +463,7 @@ export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,
   if(plan.status!=='active'||!(plan.sync_status==='synced'&&String(plan.zhihu_plan_id??'').trim()||plan.sync_status==='simulated'&&word.upstream_status==='simulated'&&await simulationScope(c,scope)))fail('关键词尚未创建成功');
   const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE',[targetId,scope.projectId]);
   if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择有效的团长或达人');
-  const leader=target.role==='leader'?targetId:target.parent_id===null?null:String(target.parent_id);
+  const leader=target.role==='leader'?targetId:await teamLeader(c,scope,target);
   if(leader&&target.role==='creator'){
    const parents=await select(c,"SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.role='leader' AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE",[leader,scope.projectId]);
    if(!parents.length)fail('请先将该达人的团长加入项目');

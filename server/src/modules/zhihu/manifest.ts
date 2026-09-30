@@ -1,5 +1,6 @@
 import type { ModuleManifest } from '../../core/contracts';
 const creator = [
+  'keyword.create',
   'keyword.read',
   'keyword.claim',
   'binding.use',
@@ -54,7 +55,6 @@ export const zhihuManifest: ModuleManifest = {
       'withdraw.approve',
       'finance.relay',
       'data.import',
-      'keyword.create',
       'binding.release',
       'channel.manage',
       'attribution.manage',

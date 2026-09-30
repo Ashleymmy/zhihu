@@ -47,6 +47,10 @@ watch(registering, () => {
 async function submit() {
   if (submitting.value) return
   errorMessage.value = ''
+  if (registering.value && invitationToken.value && !invitation.value) {
+    errorMessage.value = invitationError.value || '正在核验邀请链接，请稍候'
+    return
+  }
   if (registering.value && password.value !== confirmPassword.value) {
     errorMessage.value = '两次输入的密码不一致'
     return
