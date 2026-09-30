@@ -58,7 +58,7 @@ export function zhihuOperationGuide(
         instructions: assigned
           ? [
               "进入“我的关键词”，查看团长已分发给你的关键词。",
-              "没有记录时，联系团长确认关键词分发，并由管理员核对项目权限。",
+              "没有记录时，联系团长确认关键词分发，并由团长或运营核对项目权限。",
               "也可以点击“创建关键词”，填写任务、渠道和内容链接；新词自动绑定本人及当前团队。",
             ]
           : [
@@ -66,7 +66,7 @@ export function zhihuOperationGuide(
               leader
                 ? "领取后点击“分发给达人”，选择团队达人或自己。"
                 : "新词前 30 分钟为团长优先期，之后独立达人可领取就绪的词。",
-              leader ? "也可以自主创建关键词，创建后归本人保留，再分配给团队达人或自己。" : "也可以自主创建关键词，创建后自动绑定本人；看不到项目时请管理员核对项目权限。",
+              leader ? "也可以自主创建关键词，创建后归本人保留，再分配给团队达人或自己。" : "也可以自主创建关键词，创建后自动绑定本人；看不到项目时请团长或运营分配项目。",
             ],
         action: {
           label: assigned ? "查看已分配关键词" : "去领取关键词",
@@ -110,11 +110,11 @@ export function zhihuOperationGuide(
   const management: GuideCard[] = [];
   if (!creator) {
     management.push(
-      has("project.manage")
+      (has("project.manage") || has("team.create_member"))
         ? {
             id: "projects",
             title: "项目分配",
-            description: "在成员编辑中勾选可参与的项目，与成员资料一起保存。",
+            description: leader ? "为直属达人分配自己已加入的有效项目。" : "在成员编辑中勾选可参与的项目，与成员资料一起保存。",
             instructions: [
               "打开“团队与成员”，找到成员并点击“编辑”。",
               "在“分配项目”中搜索、多选项目，保存修改。",
@@ -122,7 +122,7 @@ export function zhihuOperationGuide(
               "管理员和运营账号按角色职责访问项目，无需逐个加入。",
             ],
             action: { label: "分配成员项目", to: "/team" },
-            secondaryAction: { label: "管理业务项目", to: "/projects" },
+            secondaryAction: has("project.manage") ? { label: "管理业务项目", to: "/projects" } : undefined,
           }
         : {
             id: "projects",
@@ -147,7 +147,7 @@ export function zhihuOperationGuide(
         instructions: [
           "在“邀请链接”中新增链接，可设置名称、有效期与使用人数，并可编辑、复制或删除。",
           leader
-            ? "团长邀请注册的达人自动加入本人团队，项目权限仍需管理员分配。"
+            ? "团长邀请注册的达人自动加入本人团队，项目可由团长在成员编辑中分配。"
             : "管理角色邀请注册的成员默认为独立达人；需要加入团队时在成员编辑中选择团长。",
           "“详情”可核对注册来源和权限；“编辑”中只能调整自己有权管理的成员。",
         ],

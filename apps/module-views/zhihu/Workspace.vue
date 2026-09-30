@@ -55,7 +55,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <header class="business-heading"><div><p class="business-eyebrow">知乎业务</p><h1>{{title}}</h1><p>{{intro}}</p></div><div class="project-picker"><label v-if="projects.length>1">业务项目<select v-model="scope.projectId"><option v-for="p in projects" :key="p.id" :value="p.id">{{p.name}}</option></select></label><span v-else>{{projects[0]?.name}}</span><label v-if="accounts.length>1">接入账号<select v-model="scope.accountId"><option v-for="a in accounts" :key="a.id" :value="a.id">{{a.name}}</option></select></label></div></header>
 <p v-if="error" role="alert" class="engine-error">{{error}}</p><p v-if="loading" role="status">正在加载业务资料…</p>
 <OperationGuide v-if="guide" :guide="guide" />
-<div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先关联知乎接入账号并添加项目成员。':'请联系运营人员，将你加入业务项目并分配关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">管理项目接入</button></div>
+<div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先关联知乎接入账号并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">管理项目接入</button></div>
 <template v-if="ready">
  <Finance v-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
  <template v-else><nav class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>

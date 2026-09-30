@@ -15,11 +15,17 @@ import { apis, http, useAuthStore } from "../stores/auth";
 const auth = useAuthStore();
 const projects = ref<Project[]>([]),
   projectSearch = ref("");
-const canManageProjects = computed(
+const canAssignProjects = computed(
   () =>
-    auth.user?.permissions?.includes("project.manage") &&
+    (isStaffRole(auth.user?.role) || auth.user?.role === "leader") &&
     auth.user?.adminDuty !== "finance",
 );
+function projectLocked(project: { id: string; isEnabled: boolean }) {
+  const existing = selected.value?.projects?.find(p => p.id === project.id);
+  if (existing?.memberRole === "owner") return true;
+  if (existing?.memberRole === "admin" && !auth.user?.permissions?.includes("project.manage")) return true;
+  return auth.user?.role === "leader" && (!project.isEnabled || !projects.value.some(p => p.id === project.id && p.isEnabled));
+}
 const projectOptions = computed(() => {
   const all = new Map(
     projects.value.map((p) => [
@@ -142,7 +148,7 @@ async function load() {
       apis.team.listMembers(),
       apis.team.invitations(),
       apis.team.listApplications(),
-      canManageProjects.value ? apis.projects.list() : Promise.resolve([]),
+      canAssignProjects.value ? apis.projects.list() : Promise.resolve([]),
     ]);
     members.value = m;
     invitations.value = i;
@@ -659,7 +665,8 @@ onMounted(() => run(load));
           <p v-if="isStaffRole(edit.role)">
             管理角色按角色和职责访问全部项目，无需单独加入。
           </p>
-          <template v-else-if="selected.canAssignProjects && canManageProjects">
+          <template v-else-if="selected.canAssignProjects && canAssignProjects">
+            <p v-if="auth.user?.role === 'leader'">可分配自己已加入且启用中的项目，仅对直属达人生效。超出范围的已有项目及管理权限会保留。</p>
             <label
               >搜索项目<input
                 v-model="projectSearch"
@@ -676,14 +683,14 @@ onMounted(() => run(load));
                   type="checkbox"
                   :value="project.id"
                   :disabled="
-                    busy ||
+                    busy || projectLocked(project) ||
                     (!project.isEnabled &&
                       !edit.projectIds.includes(project.id))
                   "
                 />
                 <span
                   >{{ project.name
-                  }}{{ project.isEnabled ? "" : "（已停用）" }}</span
+                  }}{{ project.isEnabled ? "" : "（已停用）" }}{{ projectLocked(project) ? "（只读）" : "" }}</span
                 ></label
               >
             </div>
@@ -700,7 +707,7 @@ onMounted(() => run(load));
             {{
               selected.projects?.map((p) => p.name).join("、") ||
               "尚未分配项目"
-            }}。修改需要项目管理权限。
+            }}。当前账号无权为此成员分配项目。
           </p>
         </fieldset>
         <p>

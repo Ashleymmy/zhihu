@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { LeaderOption, MyTeamResp, TeamApplication } from '@zhihu-koc/shared-contracts/core'
+import { ROLE_LABELS, type LeaderOption, type MyAffiliationResp, type TeamApplication } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
 
 const auth = useAuthStore()
 const applications = ref<TeamApplication[]>([])
 const leaders = ref<LeaderOption[]>([])
-const team = ref<MyTeamResp | null>(null)
+const affiliation = ref<MyAffiliationResp | null>(null)
+const team = computed(() => affiliation.value?.team ?? null)
 const loading = ref(true)
 const error = ref('')
 
@@ -45,11 +46,12 @@ const statusClass: Record<TeamApplication['status'], string> = { pending: 'pause
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
-    const [a, l, t] = await Promise.all([apis.team.myApplications(), apis.team.listLeaders(), apis.team.myTeam()])
+    const [a, l, t] = await Promise.all([apis.team.myApplications(), apis.team.listLeaders(), apis.team.myAffiliation()])
     applications.value = a
     leaders.value = l
-    team.value = t
+    affiliation.value = t
   }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
@@ -121,7 +123,11 @@ onMounted(load)
         <!-- 我的团队 -->
         <p class="section-index">02 / 我的团队</p>
         <h2 class="workspace-title">当前归属</h2>
-        <article v-if="team" class="panel team-card">
+        <div v-if="loading" class="empty-panel" style="min-height: 90px;">正在加载归属信息…</div>
+        <div v-else-if="!affiliation" class="empty-panel" style="min-height: 90px;">
+          <span>归属信息加载失败。</span><button class="row-action" @click="load">重新加载</button>
+        </div>
+        <article v-else-if="team" class="panel team-card">
           <span class="team-avatar">{{ team.leaderName.slice(0, 1) }}</span>
           <div class="team-meta">
             <strong>{{ team.leaderName }}</strong>
@@ -129,7 +135,17 @@ onMounted(load)
           </div>
           <span :class="['status-badge', team.leaderActive ? 'active' : 'ended']">{{ team.leaderActive ? '合作中' : '已停用' }}</span>
         </article>
-        <div v-else class="empty-panel" style="min-height: 90px;"><span>还没有加入任何团队。</span></div>
+        <article v-else class="panel team-card">
+          <span class="team-avatar">平</span>
+          <div class="team-meta">
+            <strong>平台管理 · 独立达人</strong>
+            <small>当前未加入团长团队，由平台运营管理。</small>
+          </div>
+        </article>
+        <div v-if="!loading && affiliation" class="affiliation-detail">
+          <p v-if="affiliation.inviter">邀请人：{{ affiliation.inviter.name }}{{ affiliation.inviter.role ? '（' + ROLE_LABELS[affiliation.inviter.role] + '）' : '' }} · 邀请注册已绑定</p>
+          <p>{{ team ? '需要开通项目时，请联系团长或运营，在成员编辑中分配项目。' : '需要开通项目时，请联系邀请人或平台运营分配项目；也可以申请加入团长团队。' }}</p>
+        </div>
 
         <!-- 申请记录 -->
         <p class="section-index" style="margin-top: 28px;">03 / 申请记录</p>
@@ -180,7 +196,7 @@ onMounted(load)
           </div>
           <label>申请留言（可选）</label>
           <textarea v-model="form.message" rows="3" maxlength="500" placeholder="简单介绍你的推广方向或经验"></textarea>
-          <button type="submit" class="primary-action" :disabled="submitting || !form.leaderUsername">{{ submitting ? '提交中...' : '提交申请' }}</button>
+          <button type="submit" class="primary-action" :disabled="loading || !affiliation || submitting || !form.leaderUsername">{{ submitting ? '提交中...' : '提交申请' }}</button>
         </form>
       </aside>
     </section>
@@ -223,6 +239,9 @@ onMounted(load)
 .team-meta { display: grid; flex: 1; min-width: 0; }
 .team-meta strong { font-size: 14px; }
 .team-meta small { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
+.affiliation-detail { color: var(--ink-soft); font-size: 13px; line-height: 1.8; }
+.affiliation-detail p { margin: 10px 0; }
+.team-meta small { overflow-wrap: anywhere; }
 
 .rail-form { display: grid; gap: 10px; }
 .rail-form label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }

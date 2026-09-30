@@ -157,7 +157,7 @@ onMounted(() => run(load));
               ? "通过你的链接注册的达人，自动加入你的团队。"
               : "通过你的链接注册的成员成为平台管理的独立达人。"
           }}
-          注册时无需填写邀请码，业务项目仍由管理员授权。
+          注册时无需填写邀请码，业务项目可由团长或运营在成员编辑中分配。
         </p>
       </div>
       <button class="primary-action" :disabled="busy" @click="open('create')">

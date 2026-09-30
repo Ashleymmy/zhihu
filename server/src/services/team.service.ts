@@ -279,7 +279,7 @@ export async function myTeam(user: AuthUser) {
   const [meRow] = await rows<MemberRow>('SELECT id, role, parent_id, is_active FROM users WHERE id = ? LIMIT 1', [user.sub]);
   if (!meRow?.parent_id) return null;
   const [leader] = await rows<RowDataPacket & { id: string; username: string; display_name: string; is_active: number }>(
-    'SELECT id, username, display_name, is_active FROM users WHERE id = ? LIMIT 1',
+    "SELECT id, username, display_name, is_active FROM users WHERE id = ? AND role='leader' LIMIT 1",
     [meRow.parent_id],
   );
   if (!leader) return null;
@@ -294,6 +294,19 @@ export async function myTeam(user: AuthUser) {
     leaderActive: Boolean(leader.is_active),
     memberCount: Number(count?.member_count ?? 0),
   };
+}
+
+/** Invitation provenance is separate from commission-bearing leader membership. */
+export async function myAffiliation(user: AuthUser) {
+  const team = await myTeam(user);
+  if (isDevDemoAuthUser(user)) return { team, inviter: null };
+  const [inviter] = await rows<RowDataPacket>(
+    `SELECT inviter.display_name name,inviter.role,iu.registered_at invited_at
+     FROM member_invitation_uses iu JOIN member_invitations i ON i.id=iu.invitation_id
+     JOIN users inviter ON inviter.id=i.owner_user_id WHERE iu.user_id=? LIMIT 1`,
+    [user.sub],
+  );
+  return { team, inviter: inviter ? { name: inviter.name, role: normalizeRole(inviter.role), invitedAt: inviter.invited_at } : null };
 }
 
 interface ApplicationRow extends RowDataPacket {

@@ -20,6 +20,7 @@ import type {
   ApplyTeamReq,
   LeaderOption,
   MyTeamResp,
+  MyAffiliationResp,
   AuditLogItem,
   AccountMonitorItem,
   Announcement,
@@ -101,6 +102,7 @@ export function createTeamApi(http: HttpClient) {
     applyToTeam: (data: ApplyTeamReq) => http.post<{ id: string }>('/team/applications', data),
     listLeaders: () => http.get<LeaderOption[]>('/team/leaders'),
     myTeam: () => http.get<MyTeamResp | null>('/team/my'),
+    myAffiliation: () => http.get<MyAffiliationResp>('/team/affiliation'),
     myApplications: () => http.get<TeamApplication[]>('/team/applications/mine'),
     listApplications: () => http.get<TeamApplication[]>('/team/applications'),
     reviewApplication: (id: string, action: 'approve' | 'reject') =>

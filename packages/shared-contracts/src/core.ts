@@ -161,6 +161,11 @@ export interface MyTeamResp {
   memberCount: number
 }
 
+export interface MyAffiliationResp {
+  team: MyTeamResp | null
+  inviter: { name: string; role: GlobalRole | null; invitedAt: string } | null
+}
+
 export interface AuditLogItem {
   id: string
   action: string

@@ -318,19 +318,21 @@ it('member editing assigns multiple projects atomically and revokes old sessions
   }
 });
 
-it('project assignment cannot be smuggled through profile or role edits by unauthorized actors', async () => {
+it('scoped project assignment never grants project configuration or role escalation', async () => {
   // Role changes clear team membership; explicitly attach the creator for this scope check.
   expect((await call('admin', 'patch', '/team/members/5/access').send({ parentId: '6' })).status).toBe(200);
   await login('creator');
   for (const actor of ['operator', 'other_leader']) {
     expect((await call(actor, 'get', '/team/members')).body.data.find((m: any) => m.id === '5').canAssignProjects).toBe(
-      false,
+      true,
     );
-    expect((await call(actor, 'patch', '/team/members/5/access').send({ projectIds: [] })).status).toBe(403);
+    expect((await call(actor, 'post', '/projects').send({ name: '越权项目', slug: 'unauthorized' })).status).toBe(403);
   }
   expect(
-    (await call('operator', 'patch', '/team/members/5/access').send({ role: 'leader', projectIds: ['901'] })).status,
+    (await call('other_leader', 'patch', '/team/members/5/access').send({ role: 'leader', projectIds: ['901'] })).status,
   ).toBe(403);
+  expect((await call('other_leader', 'patch', '/team/members/5/access').send({ projectIds: ['999999'] })).status).toBe(403);
+  expect((await call('operator', 'patch', '/team/members/5/access').send({ role: 'admin', projectIds: ['901'] })).status).toBe(403);
   const [[u]] = await c.query<RowDataPacket[]>('SELECT role,parent_id FROM users WHERE id=5');
   expect(u.role).toBe('creator');
   expect(String(u.parent_id)).toBe('6');
@@ -365,4 +367,93 @@ it('unchanged project roles are retained, new access is ordinary membership, and
     'SELECT COUNT(*) n FROM project_members WHERE user_id=5 AND left_at IS NULL',
   );
   expect(stillThere.n).toBe(2);
+});
+
+it('invited creators see the real team and invitation source; platform invitations remain free to join a team', async () => {
+  for (const owner of ['leader', 'operator']) {
+    const link = await invite(owner);
+    const name = 'affiliation_' + owner;
+    const registered = await register(link.token, name);
+    expect(registered.status).toBe(201);
+    await login(name);
+    const response = await call(name, 'get', '/team/affiliation');
+    expect(response.status).toBe(200);
+    expect(response.body.data.inviter).toMatchObject({ role: owner, name: owner === 'leader' ? '邀请团长' : 'operator' });
+    if (owner === 'leader') {
+      expect(response.body.data.team).toMatchObject({ leaderId: '4', leaderName: '邀请团长' });
+      expect((await call(name, 'post', '/team/applications').send({ leaderUsername: 'other_leader' })).status).toBe(422);
+    } else {
+      expect(response.body.data.team).toBeNull();
+      expect((await call(name, 'get', '/team/my')).body.data).toBeNull();
+      expect((await call(name, 'post', '/team/applications').send({ leaderUsername: 'other_leader' })).status).toBe(201);
+    }
+    expect((await call(owner, 'delete', '/team/invitations/' + link.id)).status).toBe(200);
+    expect((await call(name, 'get', '/team/affiliation')).body.data).toEqual(response.body.data);
+  }
+});
+
+it('leaders assign their active projects to invited creators, preserving inaccessible grants and revoking stale sessions', async () => {
+  const i = await invite();
+  const r = await register(i.token, 'scoped_creator');
+  expect(r.status).toBe(201);
+  const id = String(r.body.data.id);
+  await login('scoped_creator');
+  await c.query("INSERT INTO projects(id,name,slug,is_enabled) VALUES(910,'团长可分配项目','leader-scope',1),(911,'其他项目','outside-scope',1),(912,'已离开项目','left-scope',1),(913,'停用项目','disabled-scope',0)");
+  await c.query("INSERT INTO project_members(project_id,user_id,left_at) VALUES(910,4,NULL),(912,4,NOW()),(913,4,NULL)");
+  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(911,?)', [id]);
+  const member = (await call('leader', 'get', '/team/members')).body.data.find((m: any) => m.id === id);
+  expect(member.canAssignProjects).toBe(true);
+  expect((await call('leader', 'patch', `/team/members/${id}/access`).send({ projectIds: ['910'] })).status).toBe(200);
+  expect((await call('scoped_creator', 'get', '/auth/me')).status).toBe(401);
+  await login('scoped_creator');
+  expect((await call('scoped_creator', 'get', '/projects')).body.data.map((p: any) => p.id)).toEqual(['910','911']);
+  for (const outside of ['912','913','999999']) {
+    const response = await call('leader', 'patch', `/team/members/${id}/access`).send({ projectIds: ['910',outside], displayName: 'must rollback' });
+    expect(response.status, JSON.stringify(response.body)).toBe(403);
+    const [[member]] = await c.query<RowDataPacket[]>('SELECT display_name FROM users WHERE id=?', [id]);
+    expect(member.display_name).not.toBe('must rollback');
+  }
+  expect((await call('other_leader', 'patch', `/team/members/${id}/access`).send({ projectIds: ['910'] })).status).toBe(403);
+  expect((await call('leader', 'patch', '/team/members/4/access').send({ projectIds: ['910'] })).status).toBe(403);
+  expect((await call('leader', 'patch', `/team/members/${id}/access`).send({ projectIds: [] })).status).toBe(200);
+  await login('scoped_creator');
+  expect((await call('scoped_creator', 'get', '/projects')).body.data.map((p: any) => p.id)).toEqual(['911']);
+  // Revalidate scope at save time, even when the dialog opened before the leader left.
+  await c.query('UPDATE project_members SET left_at=NOW() WHERE user_id=4 AND project_id=910');
+  expect((await call('leader', 'patch', `/team/members/${id}/access`).send({ projectIds: ['910'] })).status).toBe(403);
+  await c.query('UPDATE project_members SET left_at=NULL WHERE user_id=4 AND project_id=910');
+  await c.query('UPDATE projects SET is_enabled=0 WHERE id=910');
+  expect((await call('leader', 'patch', `/team/members/${id}/access`).send({ projectIds: ['910'] })).status).toBe(403);
+  await c.query('UPDATE projects SET is_enabled=1 WHERE id=910');
+});
+
+it('operator can allocate business projects to platform-invited creators without changing attribution', async () => {
+  const link = await invite('operator');
+  const r = await register(link.token, 'platform_creator');
+  expect(r.status).toBe(201);
+  const id = String(r.body.data.id);
+  expect((await call('operator','get','/team/members')).body.data.find((m: any) => m.id === id).canAssignProjects).toBe(true);
+  const response = await call('operator','patch',`/team/members/${id}/access`).send({projectIds:['910','911']});
+  expect(response.status, JSON.stringify(response.body)).toBe(200);
+  await login('platform_creator');
+  expect((await call('platform_creator','get','/projects')).body.data.map((p: any) => p.id)).toEqual(['910','911']);
+  const [[member]] = await c.query<RowDataPacket[]>('SELECT parent_id,created_by FROM users WHERE id=?',[id]);
+  expect(member.parent_id).toBeNull();expect(String(member.created_by)).toBe('3');
+  expect((await call('leader','patch',`/team/members/${id}/access`).send({projectIds:['910']})).status).toBe(403);
+});
+
+it('scoped managers cannot strip project administration and legacy staff parents are not shown as leaders', async () => {
+  const [[u]] = await c.query<RowDataPacket[]>("SELECT id FROM users WHERE username='scoped_creator'");
+  for (const memberRole of ['owner','admin']) {
+    await c.query('INSERT INTO project_members(project_id,user_id,member_role) VALUES(910,?,?) ON DUPLICATE KEY UPDATE member_role=VALUES(member_role),left_at=NULL',[u.id,memberRole]);
+    for (const actor of ['leader','operator']) {
+      expect((await call(actor,'patch',`/team/members/${u.id}/access`).send({projectIds:['910']})).status).toBe(200);
+      expect((await call(actor,'patch',`/team/members/${u.id}/access`).send({projectIds:[]})).status).toBe(memberRole==='owner'?409:403);
+    }
+    const [[kept]] = await c.query<RowDataPacket[]>('SELECT member_role,left_at FROM project_members WHERE project_id=910 AND user_id=?',[u.id]);
+    expect(kept.member_role).toBe(memberRole);expect(kept.left_at).toBeNull();
+  }
+  await c.query("UPDATE users SET parent_id=3 WHERE username='platform_creator'");
+  expect((await call('platform_creator','get','/team/my')).body.data).toBeNull();
+  expect((await call('platform_creator','get','/team/affiliation')).body.data.team).toBeNull();
 });

@@ -8,6 +8,7 @@ import { createMember, deleteMember, disableMember, listMembers, resetPassword, 
 import { ok } from '../utils/response';
 import { createInvitation, listInvitations, revokeInvitation, invitationLink, updateInvitation, regenerateInvitation, deleteInvitation } from '../services/invitations.service';
 import { updateMemberAccess } from '../services/member-access.service';
+import { myAffiliation } from '../services/team.service';
 
 const id = z.string().regex(/^\d+$/);
 const create = z.object({
@@ -36,6 +37,7 @@ const review = z.object({
 });
 export const teamRouter = Router();
 teamRouter.use(requireAuth);
+teamRouter.get('/affiliation', requirePermission('team.apply'), asyncHandler(async (req, res) => ok(res, await myAffiliation(req.user))));
 teamRouter.get('/invitations',requirePermission('team.create_member'),asyncHandler(async(req,res)=>ok(res,await listInvitations(req.user))));
 teamRouter.get('/invitations/:id/link',requirePermission('team.create_member'),asyncHandler(async(req,res)=>{res.set('Cache-Control','no-store');ok(res,await invitationLink(req.user,id.parse(req.params.id)))}));
 teamRouter.patch('/invitations/:id',requirePermission('team.create_member'),validateBody(z.object({label:z.string().trim().min(1).max(100).optional(),maxUses:z.number().int().min(1).max(1000).optional(),expiresAt:z.string().datetime().optional(),enabled:z.boolean().optional()}).strict().refine(v=>Object.keys(v).length>0)),asyncHandler(async(req,res)=>{await updateInvitation(req.user,id.parse(req.params.id),req.body);ok(res,null)}));

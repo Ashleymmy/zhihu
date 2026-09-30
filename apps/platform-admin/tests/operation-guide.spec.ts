@@ -11,12 +11,13 @@ describe('operation guidance respects current responsibilities', () => {
     expect(JSON.stringify(guide)).toContain('自主创建关键词')
     expect(zhihuOperationGuide({ ...user, parentId: '2' })!.steps[0]!.title).toBe('创建或接收关键词')
   })
-  it('leaders and operators are directed to admins for project authorization', () => {
+  it('leaders and operators can assign member projects without managing project configuration', () => {
     for (const role of ['leader', 'operator']) {
-      const guide = zhihuOperationGuide({ ...user, role, permissions: ['team.view'] })!
+      const guide = zhihuOperationGuide({ ...user, role, permissions: ['team.view', 'team.create_member'] })!
       const project = guide.management.find(c => c.id === 'projects')!
-      expect(project.description).toContain('由管理员')
-      expect(project.action?.label).toBe('查看可参与项目')
+      expect(project.action).toEqual({ label: '分配成员项目', to: '/team' })
+      expect(project.secondaryAction).toBeUndefined()
+      if (role === 'leader') expect(project.description).toContain('自己已加入')
       expect(guide.management.map(c => c.id)).toEqual(['projects', 'members', 'distribute'])
     }
   })
