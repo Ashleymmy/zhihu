@@ -57,7 +57,7 @@ onMounted(load)
       <div class="page-actions">
         <input v-model="keyword" placeholder="搜索任务名称" style="width: 160px;" @keyup.enter="load" />
         <button class="row-action" @click="load">查询</button>
-        <button v-if="auth.user?.role === 'admin'" class="primary-action" :disabled="syncing" @click="syncNow">{{ syncing ? '同步中...' : '从知乎同步' }}</button>
+        <button v-if="['developer','admin','operator'].includes(auth.user?.role??'')" class="primary-action" :disabled="syncing" @click="syncNow">{{ syncing ? '同步中...' : '从知乎同步' }}</button>
       </div>
     </header>
 

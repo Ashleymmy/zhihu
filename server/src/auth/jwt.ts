@@ -6,6 +6,7 @@ import { normalizeRole } from './roles';
 import { revocationStore } from './revocation';
 
 export interface TokenUser {
+  sessionId?: string;
   adminDuty?: 'all' | 'operations' | 'finance';
   id: string;
   role: Role;
@@ -17,7 +18,7 @@ export interface TokenUser {
 export async function signToken(user: TokenUser) {
   const jti = crypto.randomUUID();
   const token = jwt.sign(
-    { role: user.role, adminDuty: user.adminDuty, parentId: user.parentId, username: user.username, displayName: user.displayName },
+    { role: user.role, adminDuty: user.adminDuty, parentId: user.parentId, username: user.username, displayName: user.displayName, sessionId: user.sessionId },
     config.jwt.secret,
     { algorithm: 'HS256', subject: user.id, jwtid: jti, expiresIn: config.jwt.expiresIn as SignOptions['expiresIn'] },
   );
@@ -36,6 +37,7 @@ export function verifyToken(token: string): AuthUser {
   return {
     sub: decoded.sub,
     jti: decoded.jti,
+    sessionId: typeof decoded.sessionId === 'string' ? decoded.sessionId : undefined,
     role,
     adminDuty: decoded.adminDuty === 'operations' || decoded.adminDuty === 'finance' ? decoded.adminDuty : 'all',
     parentId: (decoded.parentId as string | null) ?? null,

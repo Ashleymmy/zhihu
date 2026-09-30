@@ -6,6 +6,7 @@ import {
 } from '@zhihu-koc/shared-components'
 export const workspaceRoutes: RouteRecordRaw[] = [
   { path: '', redirect: '/dashboard' },
+  { path: 'system/roles', name: 'system-roles', component: () => import('./views/StaffView.vue'), meta: { title: '角色与账号' } },
   {
     path: 'dashboard',
     name: 'dashboard',

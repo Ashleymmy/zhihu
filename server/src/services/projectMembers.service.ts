@@ -1,3 +1,4 @@
+import { isStaffRole } from '../auth/roles';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
@@ -37,7 +38,7 @@ async function assertProjectExists(projectId: string) {
 export async function assertProjectMembership(user: AuthUser, projectId: string): Promise<void> {
   if (isDevDemoAuthUser(user)) return;
 
-  if (user.role === 'admin') return;
+  if (isStaffRole(user.role)) return;
   const found = await rows<RowDataPacket>(
     'SELECT id FROM project_members WHERE project_id = ? AND user_id = ? AND left_at IS NULL LIMIT 1',
     [projectId, user.sub],
@@ -64,13 +65,13 @@ export async function listProjects(user: AuthUser) {
         slug: 'opc-demo',
         isEnabled: true,
         createdAt: new Date(Date.now() - 14 * 86_400_000).toISOString(),
-        memberRole: user.role === 'admin' ? null : 'member',
+        memberRole: isStaffRole(user.role) ? null : 'member',
       },
     ];
   }
 
   const projects =
-    user.role === 'admin'
+    isStaffRole(user.role)
       ? await rows<ProjectRow>(
           'SELECT p.id, p.name, p.slug, p.is_enabled, p.created_at, NULL AS member_role FROM projects p ORDER BY p.id',
         )

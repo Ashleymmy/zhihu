@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed,onMounted,onUnmounted,reactive,ref,watch} from 'vue'
 import type {HttpClient} from '@zhihu-koc/shared-services/core'
+import { isStaffRole } from '@zhihu-koc/shared-contracts/core'
 import {StaffManager} from '@zhihu-koc/shared-components'
 import Keywords from './Keywords.vue'
 import Prices from './Prices.vue'
@@ -14,10 +15,10 @@ const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
 const options=ref<EngineOptions>({tasks:[],channels:[],mappings:[],users:[]})
-const section=computed(()=>props.section||'operations'),admin=computed(()=>props.role==='admin')
+const section=computed(()=>props.section||'operations'),admin=computed(()=>isStaffRole(props.role))
 const title=computed(()=>section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'运营管理':props.role==='leader'?'团队业务':'我的关键词')
 const intro=computed(()=>section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与审核待办。':props.role==='leader'?'分发关键词、管理团队单价和审核作品。':'选择关键词，提交作品，查看审核结果。')
-const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...scope},role:props.role,userId:props.userId,parentId:props.parentId??null,adminDuty:props.adminDuty??'all',options:options.value}))
+const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...scope},role:isStaffRole(props.role)?'admin':props.role,userId:props.userId,parentId:props.parentId??null,adminDuty:props.adminDuty??'all',options:options.value}))
 const tabs=computed(()=>[{key:'keywords',label:'关键词'}, {key:'works',label:props.role==='creator'?'审核进度':'作品审核'},...(props.role==='creator'?[]:[{key:'prices',label:'定价规则'},{key:'people',label:'人员与权限'}]),...(admin.value?[{key:'channels',label:'渠道与任务'},{key:'issues',label:'数据待办'}]:[])])
 watch([()=>props.activeTab,tabs],()=>{tab.value=tabs.value.some(t=>t.key===props.activeTab)?props.activeTab!:'keywords'},{immediate:true})
 let generation=0
@@ -60,7 +61,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
  <Prices v-if="tab==='prices'&&role!=='creator'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Channels v-if="tab==='channels'&&admin" :context="context" @refresh="refreshOptions" @projects="emit('navigate','/projects')" />
  <Issues v-if="tab==='issues'&&admin" :context="context" />
- <template v-if="tab==='people'&&role!=='creator'"><div class="work-card"><h2>{{admin?'团长与达人':'团队成员'}}</h2><p>按姓名管理成员，项目授权决定可以参与哪些业务。</p><div class="engine-actions"><button class="primary" @click="emit('navigate','/team')">管理{{admin?'团长与达人':'团队成员'}}</button><button v-if="admin" @click="emit('navigate','/projects')">项目成员与授权</button></div></div><StaffManager v-if="admin&&(adminDuty??'all')==='all'" :http="coreHttp" /></template>
+ <template v-if="tab==='people'&&role!=='creator'"><div class="work-card"><h2>{{admin?'团长与达人':'团队成员'}}</h2><p>按姓名管理成员，项目授权决定可以参与哪些业务。</p><div class="engine-actions"><button class="primary" @click="emit('navigate','/team')">管理{{admin?'团长与达人':'团队成员'}}</button><button v-if="admin" @click="emit('navigate','/projects')">项目成员与授权</button></div></div><StaffManager v-if="admin&&(adminDuty??'all')==='all'" :http="coreHttp" :actor-role="role" /></template>
  </template>
 </template></section></template>
 <style>

@@ -3,6 +3,8 @@ import { AuthUser } from '../types';
 export function scopeFilter(user: AuthUser, ownerCol = 'owner_id') {
   if (!/^[A-Za-z0-9_.]+$/.test(ownerCol)) throw new Error('非法 owner 列名');
   switch (user.role) {
+    case 'developer':
+    case 'operator':
     case 'admin':
       return { clause: '1=1', bindings: [] as string[] };
     case 'leader':

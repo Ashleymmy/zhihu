@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ROLE_LABELS, ROLE_LEVELS, isStaffRole } from '@zhihu-koc/shared-contracts/core'
 import { computed, onMounted, ref } from 'vue'
 import type { TeamMember, CreateMemberResp, TeamApplication } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
@@ -90,7 +91,7 @@ function toggleSelectAll() {
 }
 
 /** admin 账号与当前登录人不可删，不进勾选范围 */
-const deletableMembers = computed(() => members.value.filter((m) => m.role !== 'admin' && m.id !== auth.user?.id))
+const deletableMembers = computed(() => members.value.filter((m) => !isStaffRole(m.role) && m.id !== auth.user?.id && !!auth.user?.permissions?.includes('team.delete')))
 
 async function deleteMember(id: string, name: string) {
   if (!confirm(`确定永久删除成员「${name}」？此操作不可恢复。\n有业务数据的账号会被拒绝删除，建议改用禁用。`)) return
@@ -195,18 +196,18 @@ onMounted(load)
           <tbody>
             <tr v-for="m in members" :key="m.id">
               <td>
-                <input v-if="m.role !== 'admin' && m.id !== auth.user?.id" type="checkbox" :checked="selected.has(m.id)" @change="toggleSelect(m.id)" />
+                <input v-if="!isStaffRole(m.role) && m.id !== auth.user?.id && !!auth.user?.permissions?.includes('team.delete')" type="checkbox" :checked="selected.has(m.id)" @change="toggleSelect(m.id)" />
               </td>
               <td style="font-family: var(--font-mono); font-size: 12px;">{{ m.username }}</td>
               <td><strong>{{ m.displayName }}</strong></td>
-              <td><span class="status-badge draft">{{ m.role }}</span></td>
+              <td><span class="status-badge draft">{{ ROLE_LABELS[m.role] }}</span></td>
               <td style="font-size: 12px; color: var(--ink-soft);">{{ m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleDateString('zh-CN') : '—' }}</td>
               <td><span :class="['status-badge', m.isActive ? 'active' : 'ended']">{{ m.isActive ? '活跃' : '已禁用' }}</span></td>
               <td>
                 <div style="display: flex; gap: 6px;">
-                  <button class="row-action" @click="openReset(m)">重置密码</button>
-                  <button v-if="m.isActive" class="row-action" @click="disableMember(m.id)">禁用</button>
-                  <button v-if="m.role !== 'admin' && m.id !== auth.user?.id" class="row-action danger" :disabled="deleting" @click="deleteMember(m.id, m.username)">删除</button>
+                  <button v-if="auth.user && ROLE_LEVELS[auth.user.role]>ROLE_LEVELS[m.role]" class="row-action" @click="openReset(m)">重置密码</button>
+                  <button v-if="m.isActive && auth.user && ROLE_LEVELS[auth.user.role]>ROLE_LEVELS[m.role]" class="row-action" @click="disableMember(m.id)">禁用</button>
+                  <button v-if="!isStaffRole(m.role) && m.id !== auth.user?.id && !!auth.user?.permissions?.includes('team.delete')" class="row-action danger" :disabled="deleting" @click="deleteMember(m.id, m.username)">删除</button>
                 </div>
               </td>
             </tr>

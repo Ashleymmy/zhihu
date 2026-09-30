@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import { createHash } from 'node:crypto';
 import type { AuthUser } from '../../../types';
@@ -57,7 +58,7 @@ function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKind, row
   return { next, changed, conflict };
 }
 export async function previewImport(user: AuthUser, scope: Scope, file: AllianceUploadFile, kind: ReportKind) {
-  if (user.role !== 'admin') fail('仅管理员可导入来源报告', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可导入来源报告', 403);
   await authorize(user, scope);
   const name = normalizeUploadFilename(file.originalname);
   const parsed = await parseReport({ ...file, originalname: name }, kind);
@@ -99,7 +100,7 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
   });
 }
 export async function importDetail(user: AuthUser, scope: Scope, id: string, page: number, pageSize: number) {
-  if (user.role !== 'admin') fail('原始报告仅管理员可见', 403);
+  if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const [batch] = await select(
@@ -131,7 +132,7 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
   });
 }
 export async function listImports(user: AuthUser, scope: Scope, page: number, pageSize: number) {
-  if (user.role !== 'admin') fail('原始报告仅管理员可见', 403);
+  if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const list = await select(
@@ -148,7 +149,7 @@ export async function listImports(user: AuthUser, scope: Scope, page: number, pa
   });
 }
 export async function originalFile(user: AuthUser, scope: Scope, id: string) {
-  if (user.role !== 'admin') fail('原始报告仅管理员可见', 403);
+  if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const [file] = await select(
@@ -161,7 +162,7 @@ export async function originalFile(user: AuthUser, scope: Scope, id: string) {
   });
 }
 export async function requeueImport(user: AuthUser, scope: Scope, id: string, key: string) {
-  if (user.role !== 'admin') fail('仅管理员可补投任务', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可补投任务', 403);
   return mutate(user, scope, 'report.requeue', key, { id }, async (c) => {
     const [batch] = await select(
       c,
@@ -175,7 +176,7 @@ export async function requeueImport(user: AuthUser, scope: Scope, id: string, ke
   });
 }
 export async function commitImport(user: AuthUser, scope: Scope, id: string, key: string, previewHash: string) {
-  if (user.role !== 'admin') fail('仅管理员可确认导入', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可确认导入', 403);
   return mutate(user, scope, 'report.commit', key, { id, previewHash }, async (c) => {
     const [batch] = await select(
       c,
@@ -293,7 +294,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   return { id, snapshot, code, binding, source };
 }
 export async function processBatch(user: AuthUser, scope: Scope, id: string, limit = 200) {
-  if (user.role !== 'admin') fail('仅管理员可处理报告', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可处理报告', 403);
   await authorize(user, scope);
   const ids = await withTransaction(async (c) => {
     await scopeLock(c, scope, user);
@@ -413,7 +414,7 @@ export async function acceptRevision(
   reason: string,
   accept = true,
 ) {
-  if (user.role !== 'admin') fail('仅管理员可确认来源修订', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可确认来源修订', 403);
   return mutate(user, scope, 'revision.resolve', key, { id, expected, reason, accept }, async (c) => {
     const [ref] = await select(
       c,
@@ -461,7 +462,7 @@ export async function rebaseRevision(
   expected: string,
   reason: string,
 ) {
-  if (user.role !== 'admin') fail('仅管理员可重建修订候选', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可重建修订候选', 403);
   return mutate(user, scope, 'revision.rebase', key, { id, expected, reason }, async (c) => {
     const [ref] = await select(
       c,
@@ -507,7 +508,7 @@ export async function rebaseRevision(
   });
 }
 export async function listExceptions(user: AuthUser, scope: Scope, page: number, pageSize: number) {
-  if (user.role !== 'admin') fail('来源异常仅管理员可处理', 403);
+  if (!isStaffRole(user.role)) fail('来源异常仅管理员可处理', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const list = await select(
@@ -527,7 +528,7 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
   });
 }
 export async function retryException(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {
-  if (user.role !== 'admin') fail('仅管理员可重试异常', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可重试异常', 403);
   return mutate(user, scope, 'exception.retry', key, { id, reason }, async (c) => {
     const [e] = await select(
       c,
@@ -561,7 +562,7 @@ export async function trace(user: AuthUser, scope: Scope, id: string) {
     );
     if (
       !fact ||
-      (user.role !== 'admin' && String(fact.executor_id) !== user.sub && String(fact.leader_id) !== user.sub)
+      (!isStaffRole(user.role) && String(fact.executor_id) !== user.sub && String(fact.leader_id) !== user.sub)
     )
       fail('无权查看归因来源', 403);
     const results = await select(
@@ -570,7 +571,7 @@ export async function trace(user: AuthUser, scope: Scope, id: string) {
       [id],
     );
     const revisions =
-      user.role === 'admin'
+      isStaffRole(user.role)
         ? await select(
             c,
             `SELECT v.*,r.raw_json,r.normalized_json,r.line_number,b.file_name,b.file_sha256,b.template_version FROM zh_metric_revisions v JOIN zh_import_rows r ON r.id=v.source_row_id JOIN zh_import_batches b ON b.id=r.batch_id WHERE v.fact_id=? ORDER BY v.id DESC LIMIT 100`,
@@ -589,7 +590,7 @@ export async function trace(user: AuthUser, scope: Scope, id: string) {
   });
 }
 export async function recompute(user: AuthUser, scope: Scope, id: string) {
-  if (user.role !== 'admin') fail('仅管理员可重算', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可重算', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
@@ -606,7 +607,7 @@ export async function recompute(user: AuthUser, scope: Scope, id: string) {
 }
 export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
   const obligations = snapshot.obligations.filter(
-    (o) => user.role === 'admin' || o.payeeId === user.sub || (o.payerKind === 'user' && o.payerId === user.sub),
+    (o) => isStaffRole(user.role) || o.payeeId === user.sub || (o.payerKind === 'user' && o.payerId === user.sub),
   );
   const result: Record<string, unknown> = {
     date: snapshot.date,
@@ -615,7 +616,7 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
     search: snapshot.search,
     obligations,
   };
-  if (user.role === 'admin') {
+  if (isStaffRole(user.role)) {
     result.revenue = snapshot.revenue;
     result.agencyMargin =
       snapshot.revenue === null || !snapshot.obligations.length

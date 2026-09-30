@@ -1,17 +1,17 @@
 import bcrypt from 'bcryptjs';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-import { db, rows, withTransaction } from '../db';
+import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
 import { AuthUser, Role } from '../types';
 import { signToken, tokenTtl } from '../auth/jwt';
-import { normalizeRole } from '../auth/roles';
+import { normalizeRole, effectiveDuty } from '../auth/roles';
+import type { ClientIdentity } from '../auth/clientIdentity';
 import { permissionsFor } from '../auth/permissions';
 import { revocationStore } from '../auth/revocation';
 import {
   RefreshSession,
   issueRefreshSession,
-  revokeRefreshFamily,
-  revokeUserSessions,
+  revokeLoginSession,
   rotateRefreshSession,
 } from '../auth/tokenSessions';
 import { writeAudit } from './audit.service';
@@ -45,7 +45,7 @@ const publicUser = (user: UserRow, role: Role) => ({
   username: user.username,
   displayName: user.display_name,
   role,
-  adminDuty: user.admin_duty ?? 'all',
+  adminDuty: effectiveDuty({role,adminDuty:user.admin_duty}),
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
   permissions: permissionsFor(role),
@@ -68,9 +68,10 @@ async function requireKnownRole(user: UserRow, ip?: string): Promise<Role> {
   return role;
 }
 
-async function issueAccessToken(user: UserRow, role: Role) {
+async function issueAccessToken(user: UserRow, role: Role, sessionId: string) {
   return signToken({
     id: String(user.id),
+    sessionId,
     role,
     adminDuty: user.admin_duty ?? 'all',
     parentId: user.parent_id ? String(user.parent_id) : null,
@@ -108,7 +109,7 @@ export async function register(
   }
 }
 
-export async function login(username: string, password: string, ip?: string) {
+export async function login(username: string, password: string, ip?: string, client?: ClientIdentity) {
   const demoUser = devDemoLoginUser(username, password);
   if (demoUser) {
     const token = await signToken(devDemoTokenUser(demoUser));
@@ -133,8 +134,9 @@ export async function login(username: string, password: string, ip?: string) {
   const userKey = `login:user:${username}`;
   await deleteRateLimit(userKey);
 
-  const token = await issueAccessToken(user, role);
-  const refresh = await issueRefreshSession(String(user.id));
+  if (!client) throw new AppError(401,40106,'客户端标识缺失，请刷新页面后重新登录');
+  const refresh = await issueRefreshSession(String(user.id), client, user.password_hash);
+  const token = await issueAccessToken(user, role, refresh.familyId);
   await withTransaction(async (connection) => {
     await connection.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
     await writeAudit(
@@ -146,7 +148,7 @@ export async function login(username: string, password: string, ip?: string) {
 }
 
 /** Refresh Cookie 轮换：换发新 Access Token 与新 Refresh Token。 */
-export async function refresh(plainToken: string, ip?: string) {
+export async function refresh(plainToken: string, ip?: string, client?: ClientIdentity) {
   const demoUser = devDemoUserFromRefreshToken(plainToken);
   if (demoUser) {
     const token = await signToken(devDemoTokenUser(demoUser));
@@ -154,11 +156,11 @@ export async function refresh(plainToken: string, ip?: string) {
     return { token, user: devDemoPublicUser(demoUser), mustChangePwd: false, refresh };
   }
 
-  const session = await rotateRefreshSession(plainToken);
+  const session = await rotateRefreshSession(plainToken, client);
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [session.userId]);
   if (!user || !user.is_active) throw new AppError(401, 40101, '登录已过期，请重新登录');
   const role = await requireKnownRole(user, ip);
-  const token = await issueAccessToken(user, role);
+  const token = await issueAccessToken(user, role, session.familyId);
   return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh: session };
 }
 
@@ -184,7 +186,7 @@ export async function logout(auth: AuthUser, refreshToken: string | null, ip?: s
   }
 
   await revocationStore.revoke(auth.jti, tokenTtl(auth));
-  if (refreshToken) await revokeRefreshFamily(refreshToken, 'logout');
+  if (auth.sessionId) await revokeLoginSession(auth.sub, auth.sessionId, 'logout');
   await writeAudit({ userId: auth.sub, action: 'auth.logout', resourceType: 'user', resourceId: auth.sub, ip });
 }
 
@@ -196,18 +198,31 @@ export async function changePassword(auth: AuthUser, oldPassword: string, newPas
   if (await bcrypt.compare(newPassword, user.password_hash)) throw new AppError(422, 42203, '新密码不能与原密码相同');
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await withTransaction(async (connection) => {
+    const [[current]] = await connection.query<UserRow[]>(
+      'SELECT password_hash,is_active FROM users WHERE id=? FOR UPDATE',
+      [auth.sub],
+    );
+    if (!current?.is_active || current.password_hash !== user.password_hash)
+      throw new AppError(409, 40900, '账号或密码已变化，请重新登录后再修改');
     const [result] = await connection.query<ResultSetHeader>(
       'UPDATE users SET password_hash = ?, must_change_pwd = 0 WHERE id = ?',
       [passwordHash, auth.sub],
     );
     if (result.affectedRows !== 1) throw new AppError(404, 40401, '用户不存在');
+    await connection.query(
+      "UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='password_changed' WHERE user_id=? AND revoked_at IS NULL",
+      [auth.sub],
+    );
+    await connection.query(
+      "UPDATE token_sessions SET revoked_at=NOW(3),revoke_reason='password_changed' WHERE user_id=? AND revoked_at IS NULL",
+      [auth.sub],
+    );
     await writeAudit(
       { userId: auth.sub, action: 'auth.change_password', resourceType: 'user', resourceId: auth.sub, ip },
       connection,
     );
   });
   await revocationStore.revokeUser(auth.sub);
-  await revokeUserSessions(auth.sub, 'password_changed');
 }
 
 export type { RefreshSession };

@@ -6,6 +6,7 @@ import type { Express } from 'express';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
 let container: StartedMySqlContainer, conn: mysql.Connection, app: Express, pool: typeof import('../../src/db').db;
 const password = 'isolated_password';
+const clientHeaders = { 'X-Client-Id': 'unified-auth-integration-client' };
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
     .withDatabase('unified_auth_test')
@@ -63,17 +64,17 @@ it('registers a creator and rejects escalation, duplicates, stale roles and disa
   expect(users[0].password_hash).not.toBe(password);
   expect(users[0].role_id).toBeTruthy();
   expect((await request(app).post(endpoint).send({ username: 'new_creator', password })).status).toBe(409);
-  const agent = request.agent(app);
+  const agent = request.agent(app).set(clientHeaders);
   const logged = await agent.post('/api/v1/core/auth/login').send({ username: 'new_creator', password });
   expect(logged.status).toBe(200);
   const auth = 'Bearer ' + logged.body.data.token;
   expect(logged.body.data.user.role).toBe('creator');
   expect((await agent.post('/api/v1/core/auth/refresh')).status).toBe(200);
-  expect((await request(app).get('/api/v1/core/team/members').set('Authorization', auth)).status).toBe(403);
+  expect((await request(app).get('/api/v1/core/team/members').set(clientHeaders).set('Authorization', auth)).status).toBe(403);
   await conn.query("UPDATE users SET role='leader' WHERE username='new_creator'");
-  expect((await request(app).get('/api/v1/core/auth/me').set('Authorization', auth)).body.data.role).toBe('leader');
+  expect((await request(app).get('/api/v1/core/auth/me').set(clientHeaders).set('Authorization', auth)).body.data.role).toBe('leader');
   await conn.query("UPDATE users SET is_active=0 WHERE username='new_creator'");
-  expect((await request(app).get('/api/v1/core/projects').set('Authorization', auth)).status).toBe(401);
+  expect((await request(app).get('/api/v1/core/projects').set(clientHeaders).set('Authorization', auth)).status).toBe(401);
 });
 it('preserves deep links through the unified entry', async () => {
   for (const role of ['admin', 'leader', 'creator'])
@@ -156,7 +157,7 @@ it.skipIf(!process.env.OPC_PLAYWRIGHT_MODULE)(
           role === 'creator' ? 0 : 1,
         );
         expect(await page.locator('.studio-nav').getByText('数据库状态', { exact: true }).count()).toBe(
-          role === 'admin' ? 1 : 0,
+          0,
         );
         await page
           .locator('.studio-nav')

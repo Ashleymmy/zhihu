@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import crypto from 'node:crypto';
 import { assertDuty } from '../../../core/duties';
 import { keywordVisibility, resolvePlanPool } from '../attribution/plan-pool';
@@ -133,7 +134,7 @@ export async function checkKeyword(user: AuthUser, channelId: string, keyword: s
 
 function readablePlans(user: AuthUser) {
   const owned = scopeFilter(user, 'p.owner_id');
-  if (user.role === 'admin') return owned;
+  if (isStaffRole(user.role)) return owned;
   const visible = keywordVisibility(user);
   return { clause: `((NOT EXISTS(SELECT 1 FROM zh_keywords legacy_word WHERE legacy_word.plan_id=p.id) AND ${owned.clause}) OR EXISTS(
     SELECT 1 FROM zh_keywords k LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
@@ -190,12 +191,12 @@ export async function getPlan(user: AuthUser, id: string) {
 export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) {
   if (isDevDemoAuthUser(user)) return createDevDemoPlan(user, input as unknown as Record<string, unknown>);
 
-  if (user.role === 'admin' && (!input.ownerId || input.ownerId === user.sub)) {
+  if (isStaffRole(user.role) && (!input.ownerId || input.ownerId === user.sub)) {
     const scope = await withTransaction(c => resolvePlanPool(c,input.taskId,input.channelId));
     const result = await createKeyword(user,scope,crypto.randomUUID(),{...input,taskId:scope.taskId,channelId:scope.channelId});
     return {id:result.planId,keywordId:result.id,...scope,syncStatus:'local'};
   }
-  const ownerId = user.role === 'admin' && input.ownerId ? input.ownerId : user.sub;
+  const ownerId = isStaffRole(user.role) && input.ownerId ? input.ownerId : user.sub;
   const id = await withTransaction(async (connection) => {
     await assertKeywordFree(connection, input.keyword);
     const [existing] = await connection.query<RowDataPacket[]>(

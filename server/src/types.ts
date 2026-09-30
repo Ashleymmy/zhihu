@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'leader' | 'creator';
+export type Role = 'developer' | 'admin' | 'operator' | 'leader' | 'creator';
 
 export interface AuthUser {
   adminDuty?: 'all' | 'operations' | 'finance';
@@ -9,6 +9,7 @@ export interface AuthUser {
   displayName: string;
   jti: string;
   exp?: number;
+  sessionId?: string;
 }
 
 export interface ProjectCourse {

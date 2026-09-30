@@ -1,4 +1,4 @@
-import { isGlobalRole, type AuthUser } from '@zhihu-koc/shared-contracts/core'
+import { isGlobalRole, isStaffRole, type AuthUser } from '@zhihu-koc/shared-contracts/core'
 export type WorkspaceAccess = 'ok' | 'invalid-role' | 'unauthenticated'
 /** All known account roles share the same application entry. */
 export function checkWorkspaceAccess(
@@ -15,7 +15,8 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
   path = path.toLowerCase().replace(/\/+$/, '') || '/'
   const has = (permission: string) =>
     user.permissions?.includes(permission) ?? false
-  const duty = user.role === 'admin' ? (user.adminDuty ?? 'all') : 'all'
+  const duty = user.role === 'operator' ? 'operations' : user.role === 'admin' ? (user.adminDuty ?? 'all') : 'all'
+  if (path === '/account/security') return true
   if (
     duty === 'finance' &&
     !['/dashboard', '/finance', '/modules'].includes(path) &&
@@ -33,10 +34,11 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
   if (path === '/mcn') return has('project.manage')
   if (path === '/join-team') return user.role === 'creator' && has('team.apply')
   if (path === '/profile') return user.role === 'creator'
+  if (path === '/system/db') return has('system.develop')
   if (path.startsWith('/system/'))
-    return user.role === 'admin' && duty === 'all'
+    return isStaffRole(user.role) && duty === 'all'
   if (path === '/audit-log')
-    return user.role === 'admin' && duty === 'all' && has('audit.view')
+    return isStaffRole(user.role) && duty === 'all' && has('audit.view')
   return true
 }
 export function safeRedirect(value: unknown): string {

@@ -1,3 +1,4 @@
+import { isStaffRole } from '../auth/roles';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import type { AuthUser } from '../types';
 import { rows, withTransaction } from '../db';
@@ -29,15 +30,15 @@ const publicAccount = (r: AccountRow): IntegrationAccount => ({
 const demoAccounts: IntegrationAccount[] = [];
 const demoLinks = new Set<string>();
 export async function listAccounts(user: AuthUser) {
-  if (isDevDemoAuthUser(user)) return user.role === 'admin' ? demoAccounts : [];
+  if (isDevDemoAuthUser(user)) return isStaffRole(user.role) ? demoAccounts : [];
   const filter =
-    user.role === 'admin'
+    isStaffRole(user.role)
       ? '1=1'
       : 'EXISTS (SELECT 1 FROM project_integrations pi JOIN project_members pm ON pm.project_id=pi.project_id WHERE pi.account_id=a.id AND pm.user_id=? AND pm.left_at IS NULL)';
   return (
     await rows<AccountRow>(
       'SELECT a.id,a.module_id,a.account_key,a.name,a.status FROM integration_accounts a WHERE ' + filter,
-      user.role === 'admin' ? [] : [user.sub],
+      isStaffRole(user.role) ? [] : [user.sub],
     )
   ).map(publicAccount);
 }

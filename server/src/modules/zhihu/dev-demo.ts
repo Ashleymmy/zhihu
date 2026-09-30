@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../auth/roles';
 import crypto from 'node:crypto';
 import { permissionsFor } from './permissions';
 import { RefreshSession } from '../../auth/tokenSessions';
@@ -247,7 +248,7 @@ function demoUserProfile(userId: string) {
 }
 
 function canViewOwner(viewer: AuthUser, ownerId: string) {
-  if (viewer.role === 'admin') return true;
+  if (isStaffRole(viewer.role)) return true;
   if (viewer.role === 'creator') return ownerId === viewer.sub;
   const owner = demoUserProfile(ownerId);
   return ownerId === viewer.sub || owner.parentId === viewer.sub;
@@ -415,7 +416,7 @@ export function checkDevDemoKeyword(user: AuthUser, channelId: string, keyword: 
 
 export function createDevDemoPlan(user: AuthUser, input: Record<string, unknown>) {
   const now = new Date().toISOString();
-  const ownerId = user.role === 'admin' && input.ownerId ? String(input.ownerId) : user.sub;
+  const ownerId = isStaffRole(user.role) && input.ownerId ? String(input.ownerId) : user.sub;
   const owner = demoUserProfile(ownerId);
   const plan: DemoPlan = {
     id: nextDemoId(),

@@ -1,11 +1,12 @@
+import { isStaffRole } from '../auth/roles';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { ResultSetHeader, RowDataPacket, PoolConnection } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import { revocationStore } from '../auth/revocation';
 import { AppError } from '../middleware/errors';
 import { AuthUser, Role } from '../types';
-import { normalizeRole } from '../auth/roles';
+import { normalizeRole, canManageRole } from '../auth/roles';
 import { writeAudit } from './audit.service';
 import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser, isDevDemoEnabled } from '../core/demo';
 
@@ -15,6 +16,7 @@ interface MemberRow extends RowDataPacket {
   parent_id: string | null;
   is_active: number;
   username?: string;
+  admin_duty?: 'all' | 'operations' | 'finance';
 }
 
 const demoCreatedAt = () => new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -52,22 +54,30 @@ async function resolveParentId(user: AuthUser, role: Role, requestedParentId?: s
   if (role === 'leader') return user.sub;
 
   // admin 创建达人且未显式指定归属时，达人保持“未入团”，由达人通过入团申请选择团长
-  if (user.role === 'admin' && role === 'creator' && !requestedParentId) return null;
+  if (isStaffRole(user.role) && role === 'creator' && !requestedParentId) return null;
 
   const parentId = requestedParentId ?? user.sub;
   const [parent] = await rows<MemberRow>('SELECT id, role, parent_id, is_active FROM users WHERE id = ? LIMIT 1', [
     parentId,
   ]);
-  if (!parent || !parent.is_active || !['admin', 'leader'].includes(normalizeRole(parent.role) ?? '')) {
+  if (!parent || !parent.is_active || !['developer','admin','operator', 'leader'].includes(normalizeRole(parent.role) ?? '')) {
     throw new AppError(422, 42205, '成员必须归属于有效的管理员或团长账号');
   }
   return String(parent.id);
 }
 
-const target = async (user: AuthUser, id: string) => {
-  const [member] = await rows<MemberRow>('SELECT id, role, parent_id, is_active, username FROM users WHERE id = ? LIMIT 1', [id]);
+const target = async (user: AuthUser, id: string, connection?: PoolConnection) => {
+  let member: MemberRow | undefined;
+  if(connection){
+    const [locked]=await connection.query<MemberRow[]>('SELECT id,role,parent_id,is_active,username,admin_duty FROM users WHERE id IN (?,?) ORDER BY id FOR UPDATE',[user.sub,id]);
+    const actor=locked.find(row=>String(row.id)===user.sub);
+    if(!actor?.is_active || normalizeRole(actor.role)!==user.role)throw new AppError(403,40301,'当前账号权限已变化，请重新登录');
+    user={...user,adminDuty:actor.admin_duty};
+    member=locked.find(row=>String(row.id)===id);
+  }else [member] = await rows<MemberRow>('SELECT id, role, parent_id, is_active, username FROM users WHERE id = ? LIMIT 1', [id]);
   if (!member) throw new AppError(404, 40401, '成员不存在');
-  if (member.role === 'admin' && user.role === 'admin' && (user.adminDuty ?? 'all') !== 'all') throw new AppError(403,40301,'运营人员不能修改管理员账号');
+  const memberRole=normalizeRole(member.role);
+  if (!memberRole || (isStaffRole(memberRole) && (!canManageRole(user.role,memberRole) || (user.role==='admin' && (user.adminDuty??'all')!=='all')))) throw new AppError(403,40301,'不能修改同级或更高权限的管理账号');
   if (user.role === 'leader' && String(member.parent_id) !== user.sub) throw new AppError(403, 40301, '无权访问该成员');
   return member;
 };
@@ -75,11 +85,11 @@ const target = async (user: AuthUser, id: string) => {
 export async function listMembers(user: AuthUser) {
   if (isDevDemoAuthUser(user)) {
     const members = demoMemberRows();
-    if (user.role === 'admin') return members;
+    if (isStaffRole(user.role)) return members;
     return members.filter((item) => item.id === user.sub || item.parentId === user.sub);
   }
 
-  if (user.role === 'admin')
+  if (isStaffRole(user.role))
     return rows(
       'SELECT id, username, role, parent_id, display_name, phone, is_active, must_change_pwd, last_login_at, created_at FROM users ORDER BY created_at DESC',
     );
@@ -98,7 +108,8 @@ export async function createMember(
     return { id: `demo-member-${Date.now()}`, username: input.username, temporaryPassword: 'demo123456', mustChangePwd: true };
   }
 
-  const role: Role = user.role === 'admin' ? (input.role ?? 'creator') : 'creator';
+  const role: Role = isStaffRole(user.role) ? (input.role ?? 'creator') : 'creator';
+  if (!['leader','creator'].includes(role)) throw new AppError(403,40301,'管理账号请通过角色管理创建');
   const parentId = await resolveParentId(user, role, input.parentId);
   const temporaryPassword = crypto.randomBytes(9).toString('base64url');
   const hash = await bcrypt.hash(temporaryPassword, 12);
@@ -146,6 +157,7 @@ export async function updateMember(
   }
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
   await withTransaction(async (connection) => {
+    await target(user,id,connection);
     await connection.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, [...bindings, id]);
     await writeAudit(
       { userId: user.sub, action: 'user.update', resourceType: 'user', resourceId: id, detail: patch, ip },
@@ -163,7 +175,10 @@ export async function resetPassword(user: AuthUser, id: string, ip?: string, cus
   const hash = await bcrypt.hash(temporaryPassword, 12);
   const mustChangePwd = customPassword ? 0 : 1;
   await withTransaction(async (connection) => {
+    await target(user,id,connection);
     await connection.query('UPDATE users SET password_hash = ?, must_change_pwd = ? WHERE id = ?', [hash, mustChangePwd, id]);
+    await connection.query("UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='password_reset' WHERE user_id=? AND revoked_at IS NULL",[id]);
+    await connection.query("UPDATE token_sessions SET revoked_at=NOW(3),revoke_reason='password_reset' WHERE user_id=? AND revoked_at IS NULL",[id]);
     await writeAudit(
       { userId: user.sub, action: 'user.reset_pwd', resourceType: 'user', resourceId: id, detail: { custom: Boolean(customPassword) }, ip },
       connection,
@@ -179,7 +194,7 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
 
   if (id === user.sub) throw new AppError(422, 42204, '不能删除当前登录账号');
   const member = await target(user, id);
-  if (normalizeRole(member.role) === 'admin') throw new AppError(422, 42212, '管理员账号不可删除');
+  if (isStaffRole(normalizeRole(member.role))) throw new AppError(422, 42212, '管理账号不可删除');
 
   // 依赖检查：任何业务数据存在都拒绝删除，避免外键断裂与审计链丢失
   const checks: Array<{ label: string; sql: string }> = [
@@ -196,6 +211,8 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
   }
 
   await withTransaction(async (connection) => {
+    const current=await target(user,id,connection);
+    if(isStaffRole(current.role))throw new AppError(422,42212,'管理账号不可删除');
     // 入团申请是低价值流程记录，随账号一并清除（其他业务数据已在上方拦截）
     await connection.query('DELETE FROM team_applications WHERE creator_id = ? OR leader_id = ?', [id, id]);
     await connection.query('DELETE FROM users WHERE id = ?', [id]);
@@ -213,7 +230,10 @@ export async function disableMember(user: AuthUser, id: string, ip?: string) {
   if (id === user.sub) throw new AppError(422, 42204, '不能停用当前账号');
   await target(user, id);
   await withTransaction(async (connection) => {
+    await target(user,id,connection);
     await connection.query('UPDATE users SET is_active = 0 WHERE id = ?', [id]);
+    await connection.query("UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='disabled' WHERE user_id=? AND revoked_at IS NULL",[id]);
+    await connection.query("UPDATE token_sessions SET revoked_at=NOW(3),revoke_reason='disabled' WHERE user_id=? AND revoked_at IS NULL",[id]);
     await writeAudit(
       { userId: user.sub, action: 'user.disable', resourceType: 'user', resourceId: id, ip },
       connection,
@@ -354,7 +374,7 @@ export async function listApplications(user: AuthUser) {
     return demoApplications();
   }
 
-  if (user.role === 'admin') return rows<ApplicationRow>(`${applicationSelect} ORDER BY a.created_at DESC`);
+  if (isStaffRole(user.role)) return rows<ApplicationRow>(`${applicationSelect} ORDER BY a.created_at DESC`);
   return rows<ApplicationRow>(`${applicationSelect} WHERE a.leader_id = ? ORDER BY a.created_at DESC`, [user.sub]);
 }
 
@@ -388,7 +408,7 @@ export async function reviewApplication(user: AuthUser, applicationId: string, a
 
   const [application] = await rows<ApplicationRow>(`${applicationSelect} WHERE a.id = ? LIMIT 1`, [applicationId]);
   if (!application) throw new AppError(404, 40401, '申请不存在');
-  if (user.role !== 'admin' && String(application.leader_id) !== user.sub) {
+  if (!isStaffRole(user.role) && String(application.leader_id) !== user.sub) {
     throw new AppError(403, 40301, '无权审批该申请');
   }
   if (application.status !== 'pending') throw new AppError(422, 42210, '该申请已处理过');

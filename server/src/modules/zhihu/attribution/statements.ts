@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../../../types';
 import { withTransaction } from '../../../db';
@@ -43,7 +44,7 @@ export async function reviewEvidence(
     if (!ref) fail('作品不存在', 404);
     const { binding } = await bindingLock(c, scope, String(ref.binding_id));
     if (
-      user.role !== 'admin' &&
+      !isStaffRole(user.role) &&
       (user.role !== 'leader' || String(binding.leader_id) !== user.sub || String(binding.executor_id) === user.sub)
     )
       fail('仅管理员或非本人作品的所属团长可核验', 403);
@@ -74,7 +75,7 @@ export async function disputeBinding(
   return mutate(user, scope, 'evidence.dispute', key, { id, resolve, reason }, async (c) => {
     const { binding } = await bindingLock(c, scope, id);
     ownBinding(user, binding);
-    if (resolve && user.role !== 'admin') fail('争议须由管理员解除', 403);
+    if (resolve && !isStaffRole(user.role)) fail('争议须由管理员解除', 403);
     const passed = await select(c, "SELECT id FROM zh_evidence WHERE binding_id=? AND status='passed' LIMIT 1", [id]);
     await c.query('UPDATE zh_keyword_bindings SET verification_status=?,version=version+1 WHERE id=?', [
       resolve ? (passed.length ? 'passed' : 'pending') : 'disputed',
@@ -101,7 +102,7 @@ export async function listEvidence(user: AuthUser, scope: Scope, page: number, p
   });
 }
 function ownsPayer(user: AuthUser, o: { payerKind: string; payerId: string }) {
-  return o.payerKind === 'agency' ? user.role === 'admin' : user.role === 'leader' && o.payerId === user.sub;
+  return o.payerKind === 'agency' ? isStaffRole(user.role) : user.role === 'leader' && o.payerId === user.sub;
 }
 async function lastConfirmed(c: PoolConnection, factId: unknown, relation: string) {
   return (
@@ -208,7 +209,7 @@ async function confirmEntry(c: PoolConnection, user: AuthUser, scope: Scope, id:
     'SELECT *,CAST(amount AS CHAR) amount_text,CAST(target_amount AS CHAR) target_text FROM zh_statement_entries WHERE id=? FOR UPDATE',
     [id],
   );
-  if (!(central && user.role === 'admin') && !ownsPayer(user, { payerKind: String(entry.payer_kind), payerId: String(entry.payer_id) }))
+  if (!(central && isStaffRole(user.role)) && !ownsPayer(user, { payerKind: String(entry.payer_kind), payerId: String(entry.payer_id) }))
     fail('只有付款主体可确认自己的应付', 403);
   if (entry.input_hash !== expectedHash) fail('草稿摘要不一致', 409);
   if (entry.status === 'confirmed') return { id };

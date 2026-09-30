@@ -47,9 +47,10 @@ auditLogsRouter.get('/actions', asyncHandler(async (_req, res) => ok(res, await 
 export const adminToolsRouter = Router();
 adminToolsRouter.use(requireAuth, requirePermission('project.manage'));
 adminToolsRouter.get('/monitor', asyncHandler(async (_req, res) => ok(res, await accountMonitor())));
-adminToolsRouter.get('/db-stats', asyncHandler(async (_req, res) => ok(res, await dbStats())));
+adminToolsRouter.get('/db-stats', requirePermission('system.develop'), asyncHandler(async (_req, res) => ok(res, await dbStats())));
 adminToolsRouter.post(
   '/audit-cleanup',
+  requirePermission('system.develop'),
   validateBody(cleanupInput),
   asyncHandler(async (req, res) => ok(res, await cleanupAuditLogs(req.user, req.body.days, req.ip))),
 );

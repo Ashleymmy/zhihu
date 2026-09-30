@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { ROLE_TONES, roleTone } from '../src/role-tone'
 
 describe('roleTone', () => {
-  it('三个角色各有稳定色调', () => {
-    expect(new Set(Object.values(ROLE_TONES)).size).toBe(3)
+  it('五个角色各有稳定色调', () => {
+    expect(new Set(Object.values(ROLE_TONES)).size).toBe(5)
     expect(roleTone('admin')).toBe(ROLE_TONES.admin)
   })
 

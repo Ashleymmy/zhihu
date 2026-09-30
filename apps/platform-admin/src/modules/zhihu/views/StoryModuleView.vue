@@ -100,8 +100,8 @@ onMounted(load)
           </div>
           <a v-if="item.url" :href="item.url" target="_blank" class="row-action" style="text-decoration: none;">查看链接</a>
           <small style="color: var(--ink-soft); font-size: 12px;">{{ item.ownerName ?? '' }} · {{ new Date(item.createdAt).toLocaleDateString('zh-CN') }}</small>
-          <button v-if="item.ownerId === auth.user?.id || auth.user?.role === 'admin'" class="row-action" @click="archive(item)">归档</button>
-          <button v-if="item.ownerId === auth.user?.id || auth.user?.role === 'admin'" class="row-action danger" @click="remove(item)">删除</button>
+          <button v-if="item.ownerId === auth.user?.id || ['developer','admin','operator'].includes(auth.user?.role??'')" class="row-action" @click="archive(item)">归档</button>
+          <button v-if="item.ownerId === auth.user?.id || ['developer','admin','operator'].includes(auth.user?.role??'')" class="row-action danger" @click="remove(item)">删除</button>
         </div>
       </div>
     </article>

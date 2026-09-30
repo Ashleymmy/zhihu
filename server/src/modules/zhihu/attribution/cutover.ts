@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { AuthUser } from '../../../types';
 import { withTransaction } from '../../../db';
 import { day, fail, type Scope } from './domain';
@@ -8,7 +9,7 @@ export async function configureRoute(
   scope: Scope,
   input: { from: string; mode: 'trial' | 'enabled' | 'stopped'; reason: string; sampleVerified: boolean },
 ) {
-  if (user.role !== 'admin') fail('仅管理员可配置引擎边界', 403);
+  if (!['developer','admin'].includes(user.role)) fail('仅管理员可配置引擎边界', 403);
   await authorize(user, scope);
   day(input.from);
   return withTransaction(async (c) => {
@@ -69,7 +70,7 @@ export async function getRoute(user: AuthUser, scope: Scope) {
   });
 }
 export async function legacyInventory(user: AuthUser, scope: Scope, page: number, pageSize: number) {
-  if (user.role !== 'admin') fail('历史盘点仅管理员可见', 403);
+  if (!isStaffRole(user.role)) fail('历史盘点仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const list = await select(

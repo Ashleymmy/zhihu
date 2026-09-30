@@ -1,6 +1,7 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import type { RefreshResp } from '@zhihu-koc/shared-contracts/core'
 import { createSessionTokenStore, type TokenStore } from './token-store'
+import { browserClientId } from './client-identity'
 
 export interface ApiError {
   code: string | number
@@ -59,6 +60,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
   })
 
   instance.interceptors.request.use((config) => {
+    config.headers['X-Client-Id'] = browserClientId()
     const token = tokens.get()
     if (token && config.headers) config.headers.Authorization = `Bearer ${token}`
     return config

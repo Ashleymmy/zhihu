@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../../../types';
 import { withTransaction } from '../../../db';
@@ -32,13 +33,13 @@ export async function draftPrice(user: AuthUser, scope: Scope, key: string, inpu
     );
     if (!target) fail('收款人不是有效项目成员', 403);
     let relation = '';
-    if (user.role === 'admin') {
+    if (isStaffRole(user.role)) {
       if (target.role === 'leader') relation = 'agency_leader';
       else if (target.role === 'creator' && target.parent_id === null) relation = 'agency_creator';
     } else if (target.role === 'creator' && String(target.parent_id) === user.sub) relation = 'leader_creator';
     if (!relation) fail('当前付款关系不允许向此成员报价', 403);
-    const payerKind = user.role === 'admin' ? 'agency' : 'user',
-      payerId = user.role === 'admin' ? '1' : user.sub;
+    const payerKind = isStaffRole(user.role) ? 'agency' : 'user',
+      payerId = isStaffRole(user.role) ? '1' : user.sub;
     const agreementId = await insert(
       c,
       `INSERT INTO zh_price_agreements(account_id,project_id,task_id,payer_kind,payer_id,payee_id,relation_type)
@@ -89,7 +90,7 @@ export async function publishPrice(user: AuthUser, scope: Scope, id: string, key
     await select(c, 'SELECT id FROM tasks WHERE id=? FOR UPDATE', [ref.task_id]);
     const [p] = await select(c, `${pricesSql} WHERE v.id=? FOR UPDATE`, [id]);
     if (
-      (p.payer_kind === 'agency' && user.role !== 'admin') ||
+      (p.payer_kind === 'agency' && !isStaffRole(user.role)) ||
       (p.payer_kind === 'user' && String(p.payer_id) !== user.sub)
     )
       fail('仅付款主体可发布报价', 403);

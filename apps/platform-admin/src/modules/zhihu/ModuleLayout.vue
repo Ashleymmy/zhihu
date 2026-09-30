@@ -4,7 +4,7 @@ import {useAuthStore} from '../../stores/auth'
 import {modulePages} from './routes'
 const auth=useAuthStore()
 const available=computed(()=>modulePages.filter(p=>{
- if(auth.user?.role!=='admin')return true
+ if(!auth.user||!['developer','admin','operator'].includes(auth.user.role))return true
  if((auth.user.adminDuty??'all')==='all')return p.path!=='wallet'
  const duty=auth.user.adminDuty
  return p.path==='dashboard'||(duty==='finance'?['finance','data-import','settlements','earnings','withdrawals','appeals','orders'].includes(p.path):!['finance','wallet','settlements','earnings','withdrawals','appeals','data-import'].includes(p.path))

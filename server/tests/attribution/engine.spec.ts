@@ -591,8 +591,13 @@ describe('队列恢复、公共摘要和切换保护', () => {
     app.use(errorHandler);
     app.post('/api/v1/modules/zhihu/existing-signed-callback', (_req, res) => res.sendStatus(204));
     expect((await request(app).post('/api/v1/modules/zhihu/existing-signed-callback')).status).toBe(204);
+    const client = { id: crypto.randomUUID(), type: 'web' as const };
+    const { issueRefreshSession } = await import('../../src/auth/tokenSessions');
+    const creatorSession = await issueRefreshSession('3', client);
+    const adminSession = await issueRefreshSession('1', client);
     const token = await signToken({
         id: '3',
+        sessionId: creatorSession.familyId,
         role: 'creator',
         username: 'creator',
         displayName: '达人',
@@ -600,6 +605,7 @@ describe('队列恢复、公共摘要和切换保护', () => {
       }),
       adminToken = await signToken({
         id: '1',
+        sessionId: adminSession.familyId,
         role: 'admin',
         username: 'admin',
         displayName: '管理员',
@@ -607,6 +613,7 @@ describe('队列恢复、公共摘要和切换保护', () => {
       });
     const options = await request(app)
       .get('/api/v1/modules/zhihu/attribution-options')
+      .set('X-Client-Id', client.id)
       .query(scope)
       .set('Authorization', 'Bearer ' + adminToken);
     expect(options.status).toBe(200);
@@ -614,6 +621,7 @@ describe('队列恢复、公共摘要和切换保护', () => {
     expect(options.body.data.users[0]).toHaveProperty('displayName');
     const result = await request(app)
       .get('/api/v1/modules/zhihu/attributions')
+      .set('X-Client-Id', client.id)
       .query(scope)
       .set('Authorization', 'Bearer ' + token);
     expect(result.status).toBe(200);
@@ -622,6 +630,7 @@ describe('队列恢复、公共摘要和切换保护', () => {
     expect(result.body.data.list[0].obligations).toHaveLength(1);
     const denied = await request(app)
       .get('/api/v1/modules/zhihu/attributions')
+      .set('X-Client-Id', client.id)
       .query({ ...scope, projectId: '999' })
       .set('Authorization', 'Bearer ' + token);
     expect(denied.status).toBe(403);

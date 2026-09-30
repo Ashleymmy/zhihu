@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../../../db';
 import { AppError } from '../../../middleware/errors';
@@ -63,9 +64,9 @@ export async function listStoryItems(user: AuthUser, type: StoryItemType, includ
     return { list: items.slice((page - 1) * pageSize, page * pageSize), total: items.length, page, pageSize };
   }
 
-  const scope = user.role === 'admin' ? '' : 'AND (i.owner_id = ? OR i.owner_id IN (SELECT id FROM users WHERE parent_id = ?))';
+  const scope = isStaffRole(user.role) ? '' : 'AND (i.owner_id = ? OR i.owner_id IN (SELECT id FROM users WHERE parent_id = ?))';
   const bindings: unknown[] = [type];
-  if (user.role !== 'admin') bindings.push(user.sub, user.sub);
+  if (!isStaffRole(user.role)) bindings.push(user.sub, user.sub);
   const where = `i.type = ? ${includeArchived ? '' : "AND i.status = 'active'"} ${scope}`;
   const [count] = await rows<RowDataPacket & { total: number }>(`SELECT COUNT(*) total FROM story_items i WHERE ${where}`, bindings);
   const list = await rows<StoryItemRow>(
@@ -144,5 +145,5 @@ export async function deleteStoryItem(user: AuthUser, id: string, ip?: string) {
 async function mustOwn(user: AuthUser, id: string) {
   const [item] = await rows<StoryItemRow>('SELECT id, owner_id FROM story_items WHERE id = ? LIMIT 1', [id]);
   if (!item) throw new AppError(404, 40401, '内容不存在');
-  if (user.role !== 'admin' && String(item.owner_id) !== user.sub) throw new AppError(403, 40301, '无权操作该内容');
+  if (!isStaffRole(user.role) && String(item.owner_id) !== user.sub) throw new AppError(403, 40301, '无权操作该内容');
 }

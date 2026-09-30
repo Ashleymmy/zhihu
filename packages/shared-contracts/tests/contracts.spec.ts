@@ -94,8 +94,12 @@ describe('财务门禁 50310', () => {
 })
 
 describe('角色与权限', () => {
-  it('admin 拥有全部权限', () => {
-    expect(ROLE_PERMISSIONS.admin).toHaveLength(ALL_PERMISSIONS.length)
+  it('developer 继承管理权限，admin 与 operator 按层级受限', () => {
+    expect(ROLE_PERMISSIONS.developer).toHaveLength(ALL_PERMISSIONS.length)
+    expect(ROLE_PERMISSIONS.admin).not.toContain('system.develop')
+    expect(ROLE_PERMISSIONS.operator).not.toContain('staff.manage')
+    for(const permission of ROLE_PERMISSIONS.operator)expect(ROLE_PERMISSIONS.admin).toContain(permission)
+    for(const permission of ROLE_PERMISSIONS.admin)expect(ROLE_PERMISSIONS.developer).toContain(permission)
   })
 
   it('leader 与 creator 均无 project.manage', () => {

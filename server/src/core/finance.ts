@@ -1,3 +1,4 @@
+import { isStaffRole } from '../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../types';
 import { withTransaction } from '../db';
@@ -15,7 +16,7 @@ export async function lockFinance(c:PoolConnection,s:FinanceScope){
 }
 async function authorize(u:AuthUser,s:FinanceScope){
  await assertDataScope(u,s.projectId,s.accountId,s.moduleId);
- if(u.role==='admin')assertDuty(u,'finance');
+ if(isStaffRole(u.role))assertDuty(u,'finance');
 }
 export async function syncIncome(c:PoolConnection,u:AuthUser,s:FinanceScope,input:{sourceKey:string;version:string;date:string;description:string;allocations:{userId:string;amount:string}[];total:string}){
  assertDuty(u,'finance');await lockFinance(c,s);
@@ -65,11 +66,11 @@ async function fundingRows(c:PoolConnection,s:FinanceScope){
 export async function financeOverview(u:AuthUser,s:FinanceScope,page=1){
  await authorize(u,s);
  return withTransaction(async c=>{
-  const own=u.role==='admin'?'':' AND w.user_id=?',args=[s.moduleId,s.projectId,s.accountId,...(u.role==='admin'?[]:[u.sub])];
+  const own=isStaffRole(u.role)?'':' AND w.user_id=?',args=[s.moduleId,s.projectId,s.accountId,...(isStaffRole(u.role)?[]:[u.sub])];
   const [count]=await q(c,'SELECT COUNT(*) total FROM opc_withdrawals w WHERE w.module_id=? AND w.project_id=? AND w.account_id=?'+own,args);
   const withdrawals=await q(c,`SELECT CAST(w.id AS CHAR) id,CAST(w.user_id AS CHAR) user_id,u.display_name,CAST(w.amount AS CHAR) amount,w.status,w.receiver_name,w.bank_name,w.bank_account,w.remark,w.created_at,w.payment_reference,DATE_FORMAT(w.paid_on,'%Y-%m-%d') paid_on,w.proof_name FROM opc_withdrawals w JOIN users u ON u.id=w.user_id WHERE w.module_id=? AND w.project_id=? AND w.account_id=?`+own+' ORDER BY w.id DESC LIMIT 25 OFFSET ?',[...args,(page-1)*25]);
-  const rows=u.role==='admin'?await fundingRows(c,s):[];
-  return {balance:u.role==='admin'?null:await balance(c,u,s),withdrawals,total:Number(count.total),page,funding:{amount:cashText(rows.reduce((n,r)=>n+cash(String(r.amount),true),0n)),hash:checksum(rows)},canManage:u.role==='admin'};
+  const rows=isStaffRole(u.role)?await fundingRows(c,s):[];
+  return {balance:isStaffRole(u.role)?null:await balance(c,u,s),withdrawals,total:Number(count.total),page,funding:{amount:cashText(rows.reduce((n,r)=>n+cash(String(r.amount),true),0n)),hash:checksum(rows)},canManage:isStaffRole(u.role)};
  });
 }
 export async function releaseFunding(u:AuthUser,s:FinanceScope,hash:string,reference:string){
@@ -142,7 +143,7 @@ export async function recordPayment(u:AuthUser,s:FinanceScope,id:string,input:{r
  });
 }
 export async function paymentProof(u:AuthUser,s:FinanceScope,id:string){
- await authorize(u,s);return withTransaction(async c=>{const w=await withdrawal(c,s,id);if(u.role!=='admin'&&String(w.user_id)!==u.sub)fail('无权查看此付款凭证',403);if(!w.proof_bytes)fail('尚未登记付款凭证',404);return{name:String(w.proof_name),type:String(w.proof_type),buffer:w.proof_bytes as Buffer};});
+ await authorize(u,s);return withTransaction(async c=>{const w=await withdrawal(c,s,id);if(!isStaffRole(u.role)&&String(w.user_id)!==u.sub)fail('无权查看此付款凭证',403);if(!w.proof_bytes)fail('尚未登记付款凭证',404);return{name:String(w.proof_name),type:String(w.proof_type),buffer:w.proof_bytes as Buffer};});
 }
 
 

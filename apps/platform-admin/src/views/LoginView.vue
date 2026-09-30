@@ -117,6 +117,7 @@ async function submit() {
         >
           注册成功，请使用新账号登录。
         </p>
+        <p v-if="!registering && route.query.passwordChanged === '1'" class="auth-success" role="status">密码已修改，请使用新密码登录。</p>
         <form @submit.prevent="submit">
           <div
             class="form-grid"

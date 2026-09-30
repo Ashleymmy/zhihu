@@ -3,6 +3,7 @@ import { useAuthStore } from './stores/auth'
 import { workspace } from './stores/platform'
 import { installBusinessRoutes } from './composition/modules'
 import { canAccessPath } from './access'
+import { businessRole } from '@zhihu-koc/shared-contracts/core'
 
 const workspaceLoaders = {
   admin: () => import('./workspace-routes'),
@@ -32,7 +33,7 @@ export function createAppRouter(
         name: 'shell',
         component: () => import('./layouts/ShellLayout.vue'),
         meta: { requiresAuth: true },
-        children: [],
+        children: [{path:'account/security',name:'account-security',component:()=>import('./views/AccountSecurityView.vue'),meta:{title:'账号安全'}}],
       },
       {
         path: '/:pathMatch(.*)*',
@@ -69,7 +70,7 @@ export function createAppRouter(
     ])
     if (installedFor !== identity) {
       resetRoutes()
-      const { workspaceRoutes } = await workspaceLoaders[auth.user.role]()
+      const { workspaceRoutes } = await workspaceLoaders[businessRole(auth.user.role)]()
       removeRoutes = workspaceRoutes.map((record) =>
         router.addRoute('shell', record),
       )
@@ -91,6 +92,7 @@ export function createAppRouter(
       // Resolve again against this account's route table, including after a role change.
       return to.fullPath
     }
+    if(auth.user.mustChangePwd && to.path !== '/account/security')return '/account/security'
     if (
       to.meta.requiresAuth === false ||
       to.name === 'not-found' ||

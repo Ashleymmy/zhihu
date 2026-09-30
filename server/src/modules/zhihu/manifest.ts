@@ -31,7 +31,7 @@ export const zhihuManifest: ModuleManifest = {
   name: '知乎',
   version: '1.0.0',
   contractVersion: 1,
-  roles: ['admin', 'leader', 'creator'],
+  roles: ['developer', 'admin', 'operator', 'leader', 'creator'],
   entryPath: '/modules/zhihu',
   accountCreation: 'managed',
   accountMessage: '当前使用迁移生成的历史接入账号；新增知乎凭证接入尚未开放。',

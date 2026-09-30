@@ -112,7 +112,7 @@ onMounted(load)
         <p class="eyebrow">PROJECTS / MANAGEMENT</p>
         <h1>项目管理</h1>
       </div>
-      <button v-if="useAuthStore().user?.role === 'admin'" class="primary-action" @click="showCreate = true">
+      <button v-if="useAuthStore().user?.permissions?.includes('project.manage')" class="primary-action" @click="showCreate = true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
@@ -184,7 +184,7 @@ onMounted(load)
               >
             </h2>
             <button
-              v-if="useAuthStore().user?.role === 'admin'"
+              v-if="useAuthStore().user?.permissions?.includes('project.manage')"
               class="row-action danger"
               @click="deleteProject(selected.id)"
             >
@@ -202,7 +202,7 @@ onMounted(load)
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px">
             <h2 style="margin: 0; font-size: 16px">成员（{{ members.length }}）</h2>
           </div>
-          <form v-if="useAuthStore().user?.role === 'admin'" @submit.prevent="addProjectMember" style="display: flex; gap: 8px; margin-bottom: 14px">
+          <form v-if="useAuthStore().user?.permissions?.includes('project.manage')" @submit.prevent="addProjectMember" style="display: flex; gap: 8px; margin-bottom: 14px">
             <select v-model="memberUserId" required :disabled="addingMember" style="flex: 1">
               <option value="">选择团长或达人</option>
               <option v-for="m in availableMembers" :key="m.id" :value="m.id">
@@ -213,7 +213,7 @@ onMounted(load)
               {{ addingMember ? '加入中...' : '加入项目' }}
             </button>
           </form>
-          <p v-if="useAuthStore().user?.role === 'admin' && !availableMembers.length" style="color: var(--ink-soft); font-size: 12px; margin: 0 0 10px">
+          <p v-if="useAuthStore().user?.permissions?.includes('project.manage') && !availableMembers.length" style="color: var(--ink-soft); font-size: 12px; margin: 0 0 10px">
             暂无可加入的活跃团长或达人；已加入项目的成员不会重复显示。
           </p>
           <div v-if="!members.length" style="color: var(--ink-soft); font-size: 12px">暂无成员</div>
@@ -233,7 +233,7 @@ onMounted(load)
             <span>{{ m.displayName ?? m.username ?? m.userId }}</span>
             <span style="display: flex; align-items: center; gap: 8px">
               <span class="status-badge draft">{{ m.memberRole }}</span>
-              <button v-if="useAuthStore().user?.role === 'admin'" class="row-action danger" @click="removeProjectMember(m.userId, m.displayName ?? m.username ?? m.userId)">移出</button>
+              <button v-if="useAuthStore().user?.permissions?.includes('project.manage')" class="row-action danger" @click="removeProjectMember(m.userId, m.displayName ?? m.username ?? m.userId)">移出</button>
             </span>
           </div>
         </article>

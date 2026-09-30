@@ -1,12 +1,12 @@
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
-import { config } from '../config';
 import { requireAuth } from '../auth/middleware';
 import { RefreshSession } from '../auth/tokenSessions';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { changePassword, login, logout, me, refresh, register } from '../services/auth.service';
 import { ok } from '../utils/response';
+import { clientIdentity } from '../auth/clientIdentity';
 
 const loginSchema = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(128) });
 const registerSchema = z.object({
@@ -15,7 +15,7 @@ const registerSchema = z.object({
   displayName: z.string().trim().min(1).max(64).optional(),
   phone: z.string().trim().regex(/^\+?[0-9 -]{6,20}$/).optional(),
 }).strict();
-const passwordSchema = z.object({ oldPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128) });
+const passwordSchema = z.object({ oldPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(72).refine(value=>Buffer.byteLength(value,'utf8')<=72) });
 
 export const REFRESH_COOKIE_NAME = 'zk_refresh';
 const REFRESH_COOKIE_PATH = '/api/v1';
@@ -38,11 +38,11 @@ export function readRefreshCookie(req: Request): string | null {
   return null;
 }
 
-const setRefreshCookie = (res: Response, session: RefreshSession) => {
+const setRefreshCookie = (req: Request, res: Response, session: RefreshSession) => {
   res.cookie(REFRESH_COOKIE_NAME, session.refreshToken, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.nodeEnv === 'production',
+    secure: req.secure,
     path: REFRESH_COOKIE_PATH,
     expires: session.expiresAt,
   });
@@ -66,8 +66,8 @@ authRouter.post(
   '/login',
   validateBody(loginSchema),
   asyncHandler(async (req, res) => {
-    const { refresh: session, ...result } = await login(req.body.username, req.body.password, req.ip);
-    setRefreshCookie(res, session);
+    const { refresh: session, ...result } = await login(req.body.username, req.body.password, req.ip, clientIdentity(req));
+    setRefreshCookie(req, res, session);
     ok(res, result);
   }),
 );
@@ -81,8 +81,8 @@ authRouter.post(
       return;
     }
     try {
-      const { refresh: session, ...result } = await refresh(plainToken, req.ip);
-      setRefreshCookie(res, session);
+      const { refresh: session, ...result } = await refresh(plainToken, req.ip, clientIdentity(req));
+      setRefreshCookie(req, res, session);
       ok(res, result);
     } catch (error) {
       clearRefreshCookie(res);

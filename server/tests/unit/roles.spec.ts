@@ -11,6 +11,9 @@ describe('角色归一化（03 §5.3）', () => {
   it('目标值保持不变', () => {
     expect(normalizeRole('admin')).toBe('admin');
     expect(normalizeRole('creator')).toBe('creator');
+    expect(normalizeRole('developer')).toBe('developer');
+    expect(normalizeRole('operator')).toBe('operator');
+    expect(normalizeRole('opreater')).toBe('operator');
   });
 
   it('未知值返回 null，不得默认提升权限', () => {

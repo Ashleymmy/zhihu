@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import fs from 'node:fs';
 import { assertLegacyRoute } from '../attribution/routing';
 import path from 'node:path';
@@ -476,7 +477,7 @@ export async function getInvoice(user: AuthUser, id: string) {
   if (!item || !item.invoice_path) throw new AppError(404, 40401, '该申请没有上传发票');
   const allowed =
     String(item.user_id) === user.sub ||
-    user.role === 'admin' ||
+    isStaffRole(user.role) ||
     (user.role === 'leader' && String(item.applicant_parent) === user.sub);
   if (!allowed) throw new AppError(403, 40301, '无权查看该发票');
 
@@ -508,7 +509,7 @@ export async function getStatement(user: AuthUser, id: string) {
   ) as unknown as [{ applicant_parent: string | null } | undefined];
   const allowed =
     String(item.user_id) === user.sub ||
-    user.role === 'admin' ||
+    isStaffRole(user.role) ||
     (user.role === 'leader' && String(parent?.applicant_parent) === user.sub);
   if (!allowed) throw new AppError(403, 40301, '无权查看该结算单');
 

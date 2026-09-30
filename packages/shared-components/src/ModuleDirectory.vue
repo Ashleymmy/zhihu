@@ -68,13 +68,13 @@ onMounted(load)
       >
         <span>{{ a.name }}</span
         ><span>{{ a.moduleId }} · {{ a.status === 'active' ? '启用' : '停用' }}</span
-        ><button v-if="w.role.value === 'admin'" class="row-action" @click="toggle(a)">
+        ><button v-if="['developer','admin'].includes(w.role.value)" class="row-action" @click="toggle(a)">
           {{ a.status === 'active' ? '停用' : '启用' }}
         </button>
       </div>
       <form
         v-if="
-          w.role.value === 'admin' &&
+          ['developer','admin'].includes(w.role.value) &&
           w.modules.value.some((x) => x.status === 'enabled' && x.accountCreation !== 'managed')
         "
         class="form-grid"

@@ -8,6 +8,7 @@
     "./*": "./zhihu/*"
   },
   "dependencies": {
+    "@zhihu-koc/shared-contracts": "workspace:*",
     "vue": "^3.4.21",
     "@zhihu-koc/shared-services": "workspace:*",
     "@zhihu-koc/shared-utils": "workspace:*",

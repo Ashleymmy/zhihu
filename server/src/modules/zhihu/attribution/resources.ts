@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import { withTransaction } from '../../../db';
 import type { AuthUser } from '../../../types';
@@ -44,7 +45,7 @@ export async function assertLegacyPlan(c: PoolConnection, id: string) {
   if (managed.length) fail('此计划由独占词库管理，请使用归因与对账入口', 409);
 }
 export async function confirmUpstream(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {
-  if (user.role !== 'admin') fail('仅管理员可核实上游状态', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可核实上游状态', 403);
   return mutate(user, scope, 'keyword.confirm-upstream', key, { id, reason }, async (c) => {
     const word = await keywordLock(c, scope, id);
     const [plan] = await select(c, 'SELECT sync_status,zhihu_plan_id,status FROM plans WHERE id=? FOR UPDATE', [
@@ -77,7 +78,7 @@ export async function confirmUpstream(user: AuthUser, scope: Scope, id: string, 
   });
 }
 export async function retryKeyword(user: AuthUser, scope: Scope, id: string, key: string) {
-  if (user.role !== 'admin') fail('仅管理员可重试上游创建', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可重试上游创建', 403);
   const result = await mutate(user, scope, 'keyword.retry-upstream', key, { id }, async (c) => {
     const word = await keywordLock(c, scope, id);
     const [plan] = await select(c, 'SELECT sync_status,zhihu_plan_id,sync_error FROM plans WHERE id=? FOR UPDATE', [
@@ -110,7 +111,7 @@ export async function options(user: AuthUser, scope: Scope) {
       scope.projectId,
     ]);
     const channels =
-      user.role === 'admin'
+      isStaffRole(user.role)
         ? await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_channel_id,generation,synced_at FROM channels WHERE project_id=? AND is_enabled=1', [
             scope.projectId,
           ])
@@ -139,7 +140,7 @@ export async function createMapping(
   key: string,
   input: { channelId: string; name: string; from: string; to?: string; canonicalId?: string },
 ) {
-  if (user.role !== 'admin') fail('仅管理员可以维护渠道映射', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可以维护渠道映射', 403);
   day(input.from);
   if (input.to) day(input.to);
   if (!input.name.trim() || (input.to && input.to <= input.from)) fail('渠道名称或有效区间不合法');
@@ -189,7 +190,7 @@ export async function createKeyword(
   key: string,
   input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null },
 ) {
-  if (user.role !== 'admin') fail('仅管理员可以创建词库关键词', 403);
+  if (!isStaffRole(user.role)) fail('仅管理员可以创建词库关键词', 403);
   const keyword = keywordText(input.keyword);
   const result = await mutate(user, scope, 'keyword.create', key, input, async (c) => {
     await assertKeywordFree(c, keyword);
@@ -269,7 +270,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       CAST(k.task_id AS CHAR) task_id,CAST(p.id AS CHAR) plan_id,
       (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name,
       COALESCE(k.lifecycle_status,'historical') lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,
-      (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,${user.role === 'admin' ? 'p.sync_error' : 'NULL'} AS sync_error,
+      (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,${isStaffRole(user.role) ? 'p.sync_error' : 'NULL'} AS sync_error,
       (k.id IS NULL OR NOT (${visibility.clause})) read_only,
       ${compositionCount} composition_count,
       (SELECT u.display_name FROM users u WHERE u.id=p.owner_id) owner_name,
@@ -357,7 +358,7 @@ export async function changeBinding(
       if (binding.stop_new_use_at) fail('已停止新增使用，不可重新分配', 409);
       if (
         binding.used_at ||
-        (user.role !== 'admin' && (user.role !== 'leader' || String(binding.leader_id) !== user.sub))
+        (!isStaffRole(user.role) && (user.role !== 'leader' || String(binding.leader_id) !== user.sub))
       )
         fail('无权重新分配此绑定', 403);
       if (!binding.leader_id) fail('直属达人绑定不可由团长分配');
@@ -418,7 +419,7 @@ export async function changeBinding(
       if (sourceUse.length) fail('该词已有来源事实，不能证明未使用；请先核实来源异常', 409);
       if (!input.reason?.trim()) fail('请填写未使用核实依据');
       if (input.action === 'release') {
-        if (user.role !== 'admin' || binding.release_status !== 'requested') fail('仅管理员可审核释放申请', 403);
+        if (!isStaffRole(user.role) || binding.release_status !== 'requested') fail('仅管理员可审核释放申请', 403);
         await c.query(
           "UPDATE zh_keyword_bindings SET released_at=NOW(3),release_status='approved',release_reason=?,version=version+1 WHERE id=?",
           [input.reason, id],
@@ -439,7 +440,7 @@ export async function changeBinding(
 }
 
 export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,targetId:string){
- if(user.role!=='admin')fail('只有运营人员可以直接分发关键词',403);
+ if(!isStaffRole(user.role))fail('只有运营人员可以直接分发关键词',403);
  await authorize(user,scope);
  await synchronizeKeywords(scope);
  return mutate(user,scope,'keyword.distribute',key,{id,targetId},async c=>{

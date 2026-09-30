@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -41,7 +42,7 @@ attributionRouter.use((req, res, next) =>
 );
 attributionRouter.use(requirePermission('attribution.read'));
 attributionRouter.use((req,_res,next)=>{
- if(req.user.role!=='admin'||['GET','HEAD'].includes(req.method))return next();
+ if(!isStaffRole(req.user.role)||['GET','HEAD'].includes(req.method))return next();
  try {
   const group=req.path.split('/')[1];
   assertDuty(req.user,['imports','metric-revisions','statements'].includes(group)||group==='workbench'&&['import','confirm'].includes(req.path.split('/')[2])?'finance':'operations');
@@ -54,6 +55,7 @@ attributionRouter.get(
 );
 attributionRouter.post(
   '/engine-route',
+  requirePermission('engine.configure'),
   asyncHandler(async (req, res) => {
     const q = scopeSchema
       .extend({

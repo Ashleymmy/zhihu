@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { withTransaction } from '../../../db';
 import { assertDataScope } from '../../../core/accounts';
@@ -34,7 +35,7 @@ export async function scopeLock(c: PoolConnection, scope: Scope, user?: AuthUser
   if (user) {
     const [actor] = await select(c, 'SELECT id,role,is_active FROM users WHERE id=? FOR SHARE', [user.sub]);
     if (!actor || !actor.is_active || actor.role !== user.role) fail('用户状态已变化，请重新登录', 403);
-    if (user.role !== 'admin') {
+    if (!isStaffRole(user.role)) {
       const members = await select(
         c,
         'SELECT user_id FROM project_members WHERE project_id=? AND user_id=? AND left_at IS NULL FOR SHARE',
@@ -111,6 +112,6 @@ export async function bindingLock(c: PoolConnection, scope: Scope, id: string) {
   return { word, binding };
 }
 export function ownBinding(user: AuthUser, binding: RecordRow) {
-  if (user.role !== 'admin' && String(binding.leader_id) !== user.sub && String(binding.executor_id) !== user.sub)
+  if (!isStaffRole(user.role) && String(binding.leader_id) !== user.sub && String(binding.executor_id) !== user.sub)
     fail('无权操作此绑定', 403);
 }

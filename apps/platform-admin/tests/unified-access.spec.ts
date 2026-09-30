@@ -3,7 +3,7 @@ import { fakeUser } from '@zhihu-koc/test-support'
 import { canAccessPath, isValidAccount, safeRedirect } from '../src/access'
 
 describe('统一入口与权限', () => {
-  it.each(['admin', 'leader', 'creator'] as const)(
+  it.each(['developer', 'admin', 'operator', 'leader', 'creator'] as const)(
     '同一入口接受 %s 角色',
     (role) => {
       expect(isValidAccount(fakeUser({ role }))).toBe(true)
@@ -54,6 +54,18 @@ describe('统一入口与权限', () => {
     const operations = fakeUser({ role: 'admin', adminDuty: 'operations' })
     expect(canAccessPath(operations, '/FINANCE/')).toBe(false)
     expect(canAccessPath(operations, '/system/db')).toBe(false)
+  })
+  it('开发者拥有开发工具，运营不能进入账号权限或财务，所有账号都可改密',()=>{
+    const developer=fakeUser({role:'developer',permissions:['system.develop','staff.manage']})
+    const admin=fakeUser({role:'admin',permissions:['staff.manage']})
+    const operator=fakeUser({role:'operator',adminDuty:'all',permissions:['team.view']})
+    expect(canAccessPath(developer,'/system/db')).toBe(true)
+    expect(canAccessPath(admin,'/system/db')).toBe(false)
+    expect(canAccessPath(admin,'/system/roles')).toBe(true)
+    expect(canAccessPath(operator,'/system/roles')).toBe(false)
+    expect(canAccessPath(operator,'/finance')).toBe(false)
+    expect(canAccessPath(operator,'/team')).toBe(true)
+    for(const role of ['developer','admin','operator','leader','creator'] as const)expect(canAccessPath(fakeUser({role}),'/account/security')).toBe(true)
   })
 })
 describe('登录跳转校验', () => {

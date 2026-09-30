@@ -2,7 +2,9 @@ import { RequestHandler } from 'express';
 import { AppError } from '../middleware/errors';
 import { Role } from '../types';
 import { rows } from '../db';
-import { normalizeRole } from './roles';
+import { normalizeRole, effectiveDuty, isStaffRole, canManageRole } from './roles';
+import { clientIdentity } from './clientIdentity';
+import { assertLoginSession } from './tokenSessions';
 import { isDevDemoAuthUser } from '../core/demo';
 import { verifyToken } from './jwt';
 import { revocationStore } from './revocation';
@@ -27,8 +29,9 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
         if (!current || !current.is_active || !role) throw new Error('inactive');
         // 每次请求以数据库当前身份为准，停用、降权、转团立即生效。
         user.role = role;
-        user.adminDuty = current.admin_duty ?? 'all';
+        user.adminDuty = effectiveDuty({ role, adminDuty: current.admin_duty }) as 'all' | 'operations' | 'finance';
         user.parentId = current.parent_id == null ? null : String(current.parent_id);
+        await assertLoginSession(user.sub, user.sessionId, clientIdentity(req));
       }
       req.user = user;
       req.token = token;
@@ -42,7 +45,12 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
 export const requireRole =
   (...roles: Role[]): RequestHandler =>
   (req, _res, next) => {
-    if (!roles.includes(req.user.role) || (req.user.role === 'admin' && (req.user.adminDuty ?? 'all') !== 'all'))
-      return next(new AppError(403, 40301, '无权执行此操作'));
+    const allowed =
+      roles.includes(req.user.role) || roles.some((role) => isStaffRole(role) && canManageRole(req.user.role, role));
+    const limited =
+      isStaffRole(req.user.role) &&
+      effectiveDuty(req.user) !== 'all' &&
+      !(roles.includes('operator') && effectiveDuty(req.user) === 'operations');
+    if (!allowed || limited) return next(new AppError(403, 40301, '无权执行此操作'));
     next();
   };

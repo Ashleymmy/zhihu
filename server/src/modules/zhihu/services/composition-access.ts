@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { AuthUser } from '../../../types';
 import { scopeFilter } from '../../../utils/scopeFilter';
 
@@ -16,12 +17,12 @@ export function compositionPlanScope(user: AuthUser, currentRead = false) {
         }
       : scopeFilter(user, 'p.owner_id');
   const actor =
-    user.role === 'admin'
+    isStaffRole(user.role)
       ? '1=1'
       : user.role === 'leader'
         ? '(cb.executor_id=? OR cb.leader_id=?)'
         : 'cb.executor_id=?';
-  const actorBindings = user.role === 'admin' ? [] : user.role === 'leader' ? [user.sub, user.sub] : [user.sub];
+  const actorBindings = isStaffRole(user.role) ? [] : user.role === 'leader' ? [user.sub, user.sub] : [user.sub];
   return {
     clause: `(p.status<>'ended' AND (
       (NOT EXISTS(SELECT 1 FROM zh_keywords legacy WHERE legacy.plan_id=p.id${lock}) AND ${legacy.clause})
@@ -34,9 +35,9 @@ export function compositionPlanScope(user: AuthUser, currentRead = false) {
         LEFT JOIN users executor ON executor.id=cb.executor_id AND executor.is_active=1
         WHERE ck.plan_id=p.id AND ck.project_id=p.project_id
         AND NOT EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.project_id=ck.project_id AND er.account_id=ck.account_id AND er.mode='stopped'${lock})
-        AND (${user.role === 'admin' ? '1=1' : `EXISTS(SELECT 1 FROM project_members viewer WHERE viewer.project_id=ck.project_id AND viewer.user_id=? AND viewer.left_at IS NULL${lock})`})
+        AND (${isStaffRole(user.role) ? '1=1' : `EXISTS(SELECT 1 FROM project_members viewer WHERE viewer.project_id=ck.project_id AND viewer.user_id=? AND viewer.left_at IS NULL${lock})`})
         AND (
-          (${user.role === 'admin' ? '1=1' : '1=0'} AND ck.current_binding_id IS NULL AND ck.lifecycle_status IN ('pending','available'))
+          (${isStaffRole(user.role) ? '1=1' : '1=0'} AND ck.current_binding_id IS NULL AND ck.lifecycle_status IN ('pending','available'))
           OR (ck.lifecycle_status IN ('assigned','active') AND cb.released_at IS NULL
             AND cb.stop_new_use_at IS NULL AND cb.release_status<>'requested'
             AND executor.id IS NOT NULL AND ${actor}
@@ -47,6 +48,6 @@ export function compositionPlanScope(user: AuthUser, currentRead = false) {
         )${lock}
       )
     ))`,
-    bindings: [...legacy.bindings, ...(user.role === 'admin' ? [] : [user.sub]), ...actorBindings],
+    bindings: [...legacy.bindings, ...(isStaffRole(user.role) ? [] : [user.sub]), ...actorBindings],
   };
 }

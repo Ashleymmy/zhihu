@@ -1,3 +1,4 @@
+import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../../../types';
 import { audit, insert, scopeLock, select } from './store';
@@ -5,7 +6,7 @@ import { fail } from './domain';
 import { assertEngineWritable } from './routing';
 
 export function keywordVisibility(user: AuthUser) {
-  if (user.role === 'admin') return { clause: '1=1', bindings: [] as string[] };
+  if (isStaffRole(user.role)) return { clause: '1=1', bindings: [] as string[] };
   if (user.role === 'leader') return {
     clause: "(b.leader_id=? OR b.executor_id=? OR (k.current_binding_id IS NULL AND k.lifecycle_status<>'retired'))",
     bindings: [user.sub, user.sub],
@@ -50,8 +51,8 @@ export async function ensurePoolMapping(c: PoolConnection, user: AuthUser, scope
 
 // Explicit repair only: never turn used historical plans into unclaimed resources.
 export async function registerUnusedAdminPlan(c: PoolConnection, user: AuthUser, planId: string) {
-  if(user.role!=='admin') fail('仅管理员可以修复关键词库',403);
-  const [plan] = await select(c,"SELECT p.* FROM plans p JOIN users u ON u.id=p.created_by WHERE p.id=? AND u.role='admin' AND p.owner_id=p.created_by AND p.status<>'ended' FOR UPDATE",[planId]);
+  if(!isStaffRole(user.role)) fail('仅管理员可以修复关键词库',403);
+  const [plan] = await select(c,"SELECT p.* FROM plans p JOIN users u ON u.id=p.created_by WHERE p.id=? AND u.role IN ('developer','admin','operator') AND p.owner_id=p.created_by AND p.status<>'ended' FOR UPDATE",[planId]);
   if(!plan) fail('只能接入管理员创建且尚未分配的计划');
   const existing=await select(c,'SELECT id FROM zh_keywords WHERE plan_id=?',[planId]);
   if(existing.length)return {id:String(existing[0].id)};

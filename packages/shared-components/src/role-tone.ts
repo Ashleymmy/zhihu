@@ -2,6 +2,8 @@ import type { GlobalRole } from '@zhihu-koc/shared-contracts'
 
 /** 角色 → 主题色调（展示层约定，供徽章/标签统一取色）。 */
 export const ROLE_TONES: Record<GlobalRole, string> = {
+  developer: '#4338ca',
+  operator: '#b45309',
   admin: '#722ed1',
   leader: '#1677ff',
   creator: '#13c2c2',

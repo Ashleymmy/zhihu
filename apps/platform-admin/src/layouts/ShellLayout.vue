@@ -5,6 +5,7 @@ import { AppShell, type NavGroup, type ShellAnnouncement } from '@zhihu-koc/shar
 import { useAuthStore, apis } from '../stores/auth'
 import { workspace } from '../stores/platform'
 import { canAccessPath } from '../access'
+import { ROLE_LABELS } from '@zhihu-koc/shared-contracts/core'
 const auth = useAuthStore(),
   route = useRoute(),
   router = useRouter(),
@@ -18,6 +19,7 @@ const navigation = computed<NavGroup[]>(() => {
         { key: 'projects', label: '业务项目', path: '/projects' },
         { key: 'modules', label: '业务模块', path: '/modules' },
         { key: 'finance', label: '财务中心', path: '/finance' },
+        { key: 'security', label: '账号安全', path: '/account/security' },
       ],
     },
     {
@@ -30,6 +32,7 @@ const navigation = computed<NavGroup[]>(() => {
     {
       label: '系统',
       items: [
+        { key: 'roles', label: '角色与账号', path: '/system/roles' },
         { key: 'monitor', label: '账号监控', path: '/system/monitor' },
         { key: 'announcements', label: '系统公告', path: '/system/announcements' },
         { key: 'audit', label: '审计日志', path: '/audit-log' },
@@ -66,7 +69,7 @@ async function logout() {
   <AppShell
     :groups="navigation"
     :user-name="auth.user?.displayName ?? ''"
-    :role-label="auth.user?.role === 'admin' ? (auth.user.adminDuty==='finance'?'财务':auth.user.adminDuty==='operations'?'运营':'管理员') : auth.user?.role === 'leader' ? '团长' : '达人'"
+    :role-label="auth.user ? (auth.user.role==='admin' && auth.user.adminDuty==='finance'?'财务管理员':ROLE_LABELS[auth.user.role]) : ''"
     :current-path="route.path"
     :announcements="announcements"
     @navigate="router.push"

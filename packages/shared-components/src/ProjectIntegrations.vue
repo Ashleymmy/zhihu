@@ -45,9 +45,9 @@ watch(() => props.projectId, load, { immediate: true })
     <p v-if="!linked.length">此项目尚未关联接入账号。</p>
     <div v-for="a in linked" :key="a.id" style="display: flex; gap: 16px; margin: 12px 0; align-items: center">
       <span>{{ a.name }} · {{ a.moduleId }} · {{ a.accountKey }} <small style="color: var(--ink-soft)">{{ a.status === 'active' ? '启用' : '已停用' }}</small></span
-      ><button v-if="w.role.value === 'admin'" class="row-action" @click="unlink(a.id)">解除关联</button>
+      ><button v-if="['developer','admin'].includes(w.role.value)" class="row-action" @click="unlink(a.id)">解除关联</button>
     </div>
-    <form v-if="w.role.value === 'admin'" @submit.prevent="link">
+    <form v-if="['developer','admin'].includes(w.role.value)" @submit.prevent="link">
       <select v-model="selected" required>
         <option value="">选择接入账号</option>
         <option v-for="a in available" :key="a.id" :value="a.id">
@@ -55,7 +55,7 @@ watch(() => props.projectId, load, { immediate: true })
         </option></select
       ><button class="row-action" :disabled="!available.length">关联账号</button>
     </form>
-    <p v-if="w.role.value === 'admin' && !error && !available.length" style="color: var(--ink-soft); font-size: 12px; margin: 10px 0 0">
+    <p v-if="['developer','admin'].includes(w.role.value) && !error && !available.length" style="color: var(--ink-soft); font-size: 12px; margin: 10px 0 0">
       暂无可关联的接入账号；当前项目已关联全部可用账号，或该模块的账号由部署配置管理。
     </p>
   </article>

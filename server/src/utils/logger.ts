@@ -16,7 +16,7 @@ export const logger = pino({
 /** HTTP 请求日志中间件用（pino-http） */
 export const httpLoggerOptions = {
   logger,
-  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-client-id"]', 'res.headers["set-cookie"]'],
   // 不记录健康检查与静态资源，避免噪音
   autoLogging: { ignore: (req: { url?: string }) => /^\/(healthz|metrics|portal|landing|admin|leader|creator|manus-storage)/.test(req.url ?? '') },
   customLogLevel: (_req: unknown, res: { statusCode: number }, err: unknown) =>
