@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { rows } from '../db';
 import { requireAuth } from '../auth/middleware';
 import { requirePermission } from '../modules/zhihu/permissions';
 import { asyncHandler, AppError } from '../middleware/errors';
@@ -15,8 +14,7 @@ import { overview } from '../modules/zhihu/attribution/workbench';
 import { listKeywords } from '../modules/zhihu/attribution/resources';
 import { insertEvidence } from '../modules/zhihu/attribution/statements';
 import { listWorks } from '../modules/zhihu/attribution/works';
-import { listProjects } from '../services/projectMembers.service';
-import { listProjectCourses } from '../services/project-courses.service';
+import { listCollegeCourses, getCollegeCourse } from '../services/college.service';
 import { miniFile } from './files';
 import { analyzeCompositionImport } from '../modules/zhihu/services/composition-import.service';
 import { importOptionsSchema } from '../modules/zhihu/services/composition-import-parser';
@@ -112,41 +110,17 @@ miniBusinessRouter.get(
 miniBusinessRouter.get(
   '/courses',
   asyncHandler(async (req, res) => {
-    const projects = await listProjects(req.user),
-      tiers = [];
-    for (const project of projects) {
-      if (!project.isEnabled) continue;
-      const courses = (await listProjectCourses(req.user, String(project.id)))
-        .filter((c) => c.isActive)
-        .map((c) => ({
-          id: c.id,
-          projectId: c.projectId,
-          title: c.courseName,
-          intro: '项目课程',
-          cover: '',
-          tier: 'silver',
-          url: c.courseUrl,
-          views: null,
-          duration: '',
-        }));
-      if (courses.length) tiers.push({ key: String(project.id), title: project.name, subtitle: '项目课程', courses });
-    }
-    ok(res, { tiers, total: tiers.reduce((n, t) => n + t.courses.length, 0) });
+    ok(res, await listCollegeCourses(req.user));
   }),
 );
 miniBusinessRouter.get(
   '/courses/:id',
   asyncHandler(async (req, res) => {
-    const id = z.string().regex(/^\d+$/).parse(req.params.id);
-    const [ref] = await rows('SELECT project_id FROM project_courses WHERE id=?', [id]);
-    if (!ref) throw new AppError(404, 40400, '课程不存在');
-    const course = (await listProjectCourses(req.user, String(ref.project_id))).find((c) => c.id === id && c.isActive);
-    if (!course) throw new AppError(404, 40400, '课程不存在或已下架');
-    ok(res, {
-      id,
-      title: course.courseName,
-      url: course.courseUrl,
-      sections: [{ title: '课程链接', content: course.courseUrl || '课程内容尚未发布' }],
-    });
+    const id = z
+      .string()
+      .max(64)
+      .regex(/^[\w-]+$/)
+      .parse(req.params.id);
+    ok(res, await getCollegeCourse(req.user, id));
   }),
 );

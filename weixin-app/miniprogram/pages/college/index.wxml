@@ -12,6 +12,7 @@
     data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
   />
   <skeleton wx:if="{{allowed && loading && !tiers.length}}" rows="{{3}}" />
+  <state-view wx:if="{{allowed && !loading && !error && !tiers.length}}" text="课程筹备中，敬请期待。" />
   <block wx:if="{{allowed}}">
     <view
       class="card rise"
@@ -42,7 +43,7 @@
         <view class="course-main">
           <view class="item-title">{{course.title}}</view>
           <view class="muted clamp2">{{course.intro}}</view>
-          <view class="muted course-meta">{{course.duration}} · {{course.views}} 人学过</view>
+          <view wx:if="{{course.meta}}" class="muted course-meta">{{course.meta}}</view>
         </view>
       </view>
       <state-view wx:if="{{!tier.courses.length}}" text="课程筹备中，敬请期待。" />
@@ -56,14 +57,15 @@
         <view class="section-title">{{detail.title}}</view>
         <button size="mini" bindtap="closeDetail">关闭</button>
       </view>
-      <image class="detail-cover" src="{{detail.cover || covers[detail.tier]}}" mode="aspectFill" />
-      <view class="muted detail-meta">{{detail.duration}} · {{detail.views}} 人学过</view>
+      <image class="detail-cover" src="{{detail.coverSrc}}" mode="aspectFill" />
+      <view wx:if="{{detail.meta}}" class="muted detail-meta">{{detail.meta}}</view>
       <view class="detail-intro">{{detail.intro}}</view>
       <view class="detail-section" wx:for="{{detail.sections}}" wx:key="title">
         <view class="detail-section-title">{{index + 1}}. {{item.title}}</view>
         <view class="detail-section-body">{{item.content}}</view>
       </view>
       <view wx:if="{{!detail.sections.length}}" class="muted">课程详情整理中。</view>
+      <button wx:if="{{detail.url}}" bindtap="copyCourseUrl">复制课程链接</button>
     </scroll-view>
   </view>
 </view>

@@ -6,6 +6,8 @@ import crypto from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
+import { runMigrations } from '../../scripts/migrationRunner';
+import path from 'node:path';
 vi.mock('../../src/modules/zhihu/queue', () => ({ enqueue: vi.fn(async () => ({ id: 'isolated' })) }));
 let container: StartedMySqlContainer, c: Connection, app: express.Express, pool: typeof import('../../src/db').db;
 const secret = 'isolated_wechat_bridge_signing_secret_32_chars',
@@ -345,4 +347,72 @@ it('disabled shared users cannot silently sign back in with WeChat', async () =>
   await c.query('UPDATE users SET is_active=0 WHERE id=3');
   expect((await call('creator', '/core/auth/me')).status).toBe(401);
   expect((await call('creator', '/core/auth/wechat-login', 'POST')).status).toBe(403);
+});
+
+it('college starter lessons and details are readable by a new creator without a project', async () => {
+  const hash = await bcrypt.hash(password, 4);
+  await c.query(
+    "INSERT INTO users(id,username,display_name,password_hash,role,must_change_pwd) VALUES(910,'college','学院测试达人',?,'creator',0)",
+    [hash],
+  );
+  await login('college');
+  expect((await call('college', '/core/projects')).body.data).toHaveLength(0);
+  const list = await call('college', '/modules/zhihu/courses');
+  expect(list.status).toBe(200);
+  expect(list.body.data.total).toBe(7);
+  expect(list.body.data.tiers.map((t: any) => t.courses.length)).toEqual([3, 2, 2]);
+  for (const tier of list.body.data.tiers)
+    for (const card of tier.courses) {
+      expect(card.views).toBe(null);
+      const detail = await call('college', '/modules/zhihu/courses/' + card.id);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.title).toBe(card.title);
+      expect(detail.body.data.sections).toHaveLength(2);
+    }
+  expect((await call('college', '/modules/zhihu/courses/missing')).status).toBe(404);
+  expect((await call('anonymous-college', '/modules/zhihu/courses')).status).toBe(401);
+});
+
+it('college retains project course membership, publication and enabled-project boundaries', async () => {
+  await c.query("INSERT INTO projects(id,name,slug,is_enabled) VALUES(920,'隔离课程项目','college-test',1)");
+  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(920,2)');
+  await c.query(
+    "INSERT INTO project_courses(id,project_id,course_name,course_url,is_active) VALUES(921,920,'项目私有课','https://example.com/lesson',1),(922,920,'未上架',NULL,0)",
+  );
+  expect((await call('college', '/modules/zhihu/courses')).body.data.total).toBe(7);
+  expect((await call('college', '/modules/zhihu/courses/921')).status).toBe(403);
+  const list = await call('leader', '/modules/zhihu/courses');
+  expect(list.body.data.total).toBe(8);
+  expect(list.body.data.tiers.find((t: any) => t.key === '920').courses).toHaveLength(1);
+  expect((await call('leader', '/modules/zhihu/courses/921')).body.data.url).toBe('https://example.com/lesson');
+  expect((await call('leader', '/modules/zhihu/courses/922')).status).toBe(404);
+  await c.query('UPDATE projects SET is_enabled=0 WHERE id=920');
+  expect((await call('leader', '/modules/zhihu/courses')).body.data.total).toBe(7);
+  expect((await call('leader', '/modules/zhihu/courses/921')).status).toBe(404);
+  await c.query('UPDATE projects SET is_enabled=1 WHERE id=920');
+  await c.query('UPDATE project_members SET left_at=NOW() WHERE project_id=920 AND user_id=2');
+  expect((await call('leader', '/modules/zhihu/courses')).body.data.total).toBe(7);
+  expect((await call('leader', '/modules/zhihu/courses/921')).status).toBe(403);
+});
+
+it('unpublished or deleted college lessons stay hidden across reads and migration reruns', async () => {
+  await c.query("UPDATE college_courses SET published=0 WHERE id='seed-silver-1'");
+  expect((await call('college', '/modules/zhihu/courses')).body.data.total).toBe(6);
+  expect((await call('college', '/modules/zhihu/courses/seed-silver-1')).status).toBe(404);
+  await c.query('UPDATE college_courses SET published=0');
+  await c.query("DELETE FROM college_courses WHERE id='seed-elite-2'");
+  await runMigrations(
+    {
+      host: container.getHost(),
+      port: container.getPort(),
+      user: container.getUsername(),
+      password: container.getUserPassword(),
+      database: container.getDatabase(),
+    },
+    path.resolve('schema/extensions'),
+  );
+  expect((await call('college', '/modules/zhihu/courses')).body.data).toEqual({ tiers: [], total: 0 });
+  expect((await call('college', '/modules/zhihu/courses/seed-elite-2')).status).toBe(404);
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM college_courses');
+  expect(count.n).toBe(6);
 });
