@@ -1,0 +1,64 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="card avatar-card">
+    <image class="profile-avatar" src="/images/avatar.png" mode="aspectFill" />
+    <text class="muted avatar-hint">头像</text>
+  </view>
+  <template is="status" data="{{error, loading}}" />
+  <block wx:if="{{!loading && user}}">
+    <view class="card cell-card">
+      <view class="cell" bindtap="openDisplayNameModal">
+        <text class="cell-label">昵称</text>
+        <text class="cell-value muted">{{user.displayName || user.username}}</text>
+        <text class="cell-arrow">›</text>
+      </view>
+      <view class="cell">
+        <text class="cell-label">手机号码</text>
+        <text class="cell-value muted">{{user.phone || '未绑定'}}</text>
+      </view>
+      <view class="cell" bindtap="openContactModal">
+        <text class="cell-label">备用联系方式</text>
+        <text class="cell-value muted">{{user.contact || '未填写'}}</text>
+        <text class="cell-arrow">›</text>
+      </view>
+      <view class="cell">
+        <text class="cell-label">实名认证</text>
+        <text class="cell-value muted">未认证</text>
+      </view>
+    </view>
+    <view class="card cell-card">
+      <view class="cell"><text class="cell-label">邀请归属</text><text class="cell-value">{{inviteUsed ? '已绑定' : '自主注册'}}</text></view>
+      <view class="cell" wx:if="{{affiliation}}"><text class="cell-label">团队</text><text class="cell-value">{{affiliation.team ? affiliation.team.leaderName : '平台管理 · 独立达人'}}</text></view>
+      <view class="cell" data-path="/pages/password/index" bindtap="open">
+        <text class="cell-label">登录密码</text>
+        <text class="cell-arrow">›</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 编辑弹层：iOS 底部半屏 -->
+  <view class="modal-mask" wx:if="{{showEditModal}}" bindtap="closeEditModal">
+    <view class="modal profile-modal" catchtap="noop">
+      <view class="section-head">
+        <text class="section-title">{{editModalTitle}}</text>
+        <button size="mini" bindtap="closeEditModal">取消</button>
+      </view>
+      <view class="muted profile-modal-sub" wx:if="{{editField === 'contact'}}">微信号、QQ 等，供财务核对或紧急联系使用</view>
+      <input class="modal-input" value="{{editInput}}" placeholder="{{editField === 'contact' ? '如：微信号 abc123' : '请输入内容'}}" bindinput="onEditInput" maxlength="128" focus="{{showEditModal}}" />
+      <view wx:if="{{editError}}" class="error">{{editError}}</view>
+      <button class="primary" loading="{{editBusy}}" disabled="{{editBusy}}" bindtap="submitEdit">保存</button>
+    </view>
+  </view>
+
+  <view class="modal-mask" wx:if="{{showInviteModal}}" bindtap="closeInviteModal">
+    <view class="modal profile-modal" catchtap="noop">
+      <view class="section-head">
+        <text class="section-title">填写邀请码</text>
+        <button size="mini" bindtap="closeInviteModal">取消</button>
+      </view>
+      <input class="modal-input" value="{{inviteInput}}" placeholder="请输入邀请码" bindinput="onInviteInput" maxlength="20" focus="{{showInviteModal}}" />
+      <view wx:if="{{inviteError}}" class="error">{{inviteError}}</view>
+      <button class="primary" loading="{{inviteBusy}}" disabled="{{inviteBusy}}" bindtap="submitInvite">确认</button>
+    </view>
+  </view>
+</view>

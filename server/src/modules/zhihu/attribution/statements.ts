@@ -16,21 +16,30 @@ export async function submitEvidence(
   key: string,
   input: { bindingId: string; url: string; description: string },
 ) {
+  return mutate(user, scope, 'evidence.submit', key, input, (c) => insertEvidence(c, user, scope, input));
+}
+/** Shared transaction helper: mini work registration also submits platform evidence. */
+export async function insertEvidence(
+  c: PoolConnection,
+  user: AuthUser,
+  scope: Scope,
+  input: { bindingId: string; url: string; description: string },
+) {
   const url = new URL(input.url);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('作品地址必须是公开 HTTP 链接');
-  return mutate(user, scope, 'evidence.submit', key, input, async (c) => {
-    const { binding } = await bindingLock(c, scope, input.bindingId);
-    ownBinding(user, binding);
-    if (!binding.used_at || binding.released_at) fail('请先声明实际使用关键词');
-    const id = await insert(
-      c,
-      'INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by) VALUES(?,?,?,?)',
-      [binding.id, input.url, input.description, user.sub],
-    );
-    await audit(c, user, 'evidence.submit', id, { bindingId: input.bindingId });
-    return { id };
-  });
+  const { binding } = await bindingLock(c, scope, input.bindingId);
+  ownBinding(user, binding);
+  if (!binding.used_at || binding.released_at) fail('请先声明实际使用关键词');
+  const id = await insert(c, 'INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by) VALUES(?,?,?,?)', [
+    binding.id,
+    input.url,
+    input.description,
+    user.sub,
+  ]);
+  await audit(c, user, 'evidence.submit', id, { bindingId: input.bindingId });
+  return { id };
 }
+
 export async function reviewEvidence(
   user: AuthUser,
   scope: Scope,
@@ -81,8 +90,14 @@ export async function disputeBinding(
       resolve ? (passed.length ? 'passed' : 'pending') : 'disputed',
       id,
     ]);
-    const affected = await select(c,'SELECT id FROM zh_metric_facts WHERE keyword_id=?',[binding.keyword_id]);
-    for(const f of affected) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+f.id,resolve?'争议已解除，待财务重新核对':'作品存在争议');
+    const affected = await select(c, 'SELECT id FROM zh_metric_facts WHERE keyword_id=?', [binding.keyword_id]);
+    for (const f of affected)
+      await blockIncome(
+        c,
+        { ...scope, moduleId: 'zhihu' },
+        'fact:' + f.id,
+        resolve ? '争议已解除，待财务重新核对' : '作品存在争议',
+      );
     await audit(c, user, resolve ? 'evidence.resolve-dispute' : 'evidence.dispute', id, { reason });
     return { id };
   });
@@ -195,7 +210,14 @@ export async function confirmStatement(user: AuthUser, scope: Scope, id: string,
     confirmEntry(c, user, scope, id, expectedHash),
   );
 }
-async function confirmEntry(c: PoolConnection, user: AuthUser, scope: Scope, id: string, expectedHash: string, central = false) {
+async function confirmEntry(
+  c: PoolConnection,
+  user: AuthUser,
+  scope: Scope,
+  id: string,
+  expectedHash: string,
+  central = false,
+) {
   const [ref] = await select(
     c,
     'SELECT fact_id FROM zh_statement_entries WHERE id=? AND account_id=? AND project_id=?',
@@ -209,7 +231,10 @@ async function confirmEntry(c: PoolConnection, user: AuthUser, scope: Scope, id:
     'SELECT *,CAST(amount AS CHAR) amount_text,CAST(target_amount AS CHAR) target_text FROM zh_statement_entries WHERE id=? FOR UPDATE',
     [id],
   );
-  if (!(central && isStaffRole(user.role)) && !ownsPayer(user, { payerKind: String(entry.payer_kind), payerId: String(entry.payer_id) }))
+  if (
+    !(central && isStaffRole(user.role)) &&
+    !ownsPayer(user, { payerKind: String(entry.payer_kind), payerId: String(entry.payer_id) })
+  )
     fail('只有付款主体可确认自己的应付', 403);
   if (entry.input_hash !== expectedHash) fail('草稿摘要不一致', 409);
   if (entry.status === 'confirmed') return { id };
@@ -309,16 +334,31 @@ export async function listStatements(user: AuthUser, scope: Scope, page: number,
   });
 }
 
-export async function confirmFinancialFact(c:PoolConnection,user:AuthUser,scope:Scope,factId:string,resultId:string,revisionId:string){
- assertDuty(user,'finance');
- const [fact]=await select(c,'SELECT * FROM zh_metric_facts WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',[factId,scope.accountId,scope.projectId]);
- if(!fact||String(fact.current_result_id)!==resultId||String(fact.current_revision_id)!==revisionId)fail('报表已更新，请重新核对',409);
- const [r]=await select(c,'SELECT * FROM zh_attribution_results WHERE id=?',[resultId]);
- if(!r||r.reason_code)fail('请先处理报表待办',409);
- const snapshot=json<AttributionSnapshot>(r.snapshot_json);
- for(const o of snapshot.obligations){
-  const entry=await buildEntry(c,scope,fact,resultId,snapshot,o,false);
-  if(entry){const [e]=await select(c,'SELECT input_hash FROM zh_statement_entries WHERE id=?',[entry.id]);await confirmEntry(c,user,scope,entry.id,String(e.input_hash),true);}
- }
- return snapshot;
+export async function confirmFinancialFact(
+  c: PoolConnection,
+  user: AuthUser,
+  scope: Scope,
+  factId: string,
+  resultId: string,
+  revisionId: string,
+) {
+  assertDuty(user, 'finance');
+  const [fact] = await select(
+    c,
+    'SELECT * FROM zh_metric_facts WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',
+    [factId, scope.accountId, scope.projectId],
+  );
+  if (!fact || String(fact.current_result_id) !== resultId || String(fact.current_revision_id) !== revisionId)
+    fail('报表已更新，请重新核对', 409);
+  const [r] = await select(c, 'SELECT * FROM zh_attribution_results WHERE id=?', [resultId]);
+  if (!r || r.reason_code) fail('请先处理报表待办', 409);
+  const snapshot = json<AttributionSnapshot>(r.snapshot_json);
+  for (const o of snapshot.obligations) {
+    const entry = await buildEntry(c, scope, fact, resultId, snapshot, o, false);
+    if (entry) {
+      const [e] = await select(c, 'SELECT input_hash FROM zh_statement_entries WHERE id=?', [entry.id]);
+      await confirmEntry(c, user, scope, entry.id, String(e.input_hash), true);
+    }
+  }
+  return snapshot;
 }

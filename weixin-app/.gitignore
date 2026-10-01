@@ -1,0 +1,9 @@
+node_modules/
+project.private.config.json
+.DS_Store
+cloudfunctions/opc-worker/lib/
+cloudfunctions/opc-worker/vendor/
+cloudfunctions/opc-admin/lib/
+cloudfunctions/opc-admin/vendor/
+cloudbase/export/
+cloudbase/*secret*

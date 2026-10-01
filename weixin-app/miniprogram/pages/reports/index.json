@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "报表与异常",
+  "usingComponents": {
+    "role-nav": "/components/role-nav/index",
+    "state-view": "/components/state/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

@@ -1,0 +1,52 @@
+/* Shared layout is defined in app.wxss. */
+
+.kw-page { background: var(--paper); }
+
+.kw-header { background: #fff; padding: 24rpx 32rpx 0; border-bottom: 1rpx solid #e8e8e8; }
+.kw-header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20rpx; }
+.kw-header-actions { display: flex; gap: 16rpx; align-items: center; }
+.btn-primary-mini { background: var(--forest, #214239) !important; color: #fff !important; border-radius: var(--radius-sm, 14rpx) !important; }
+
+.kw-search-bar { margin-bottom: 20rpx; }
+.kw-search-input { background: #f5f5f5; border-radius: var(--radius-sm, 14rpx); padding: 14rpx 24rpx; font-size: 28rpx; width: 100%; box-sizing: border-box; }
+
+.kw-tabs { display: flex; white-space: nowrap; padding-bottom: 0; }
+.kw-tab { display: inline-block; padding: 16rpx 32rpx; font-size: 28rpx; color: #888; border-bottom: 4rpx solid transparent; white-space: nowrap; }
+.kw-tab-active { color: var(--forest, #214239); border-bottom-color: var(--forest, #214239); font-weight: 600; }
+
+.kw-card { background: #fff; border-radius: var(--radius, 20rpx); margin: 20rpx 24rpx 0; padding: 28rpx 28rpx 20rpx; box-shadow: 0 1rpx 0 #e8e8e8; }
+.kw-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12rpx; gap: 16rpx; }
+.kw-keyword { font-size: 32rpx; font-weight: 600; color: #1a1a1a; flex: 1; line-height: 1.4; }
+.kw-card-meta { font-size: 24rpx; color: #888; margin-top: 6rpx; display: flex; gap: 8rpx; flex-wrap: wrap; }
+.kw-dot { color: #ccc; }
+.kw-card-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
+.btn-action { display: inline-block !important; width: auto !important; margin: 0 !important; font-size: 24rpx !important; border-radius: var(--radius-sm, 14rpx) !important; background: #f5f5f5 !important; color: #444 !important; }
+.btn-action-primary { display: inline-block !important; width: auto !important; margin: 0 !important; font-size: 24rpx !important; border-radius: var(--radius-sm, 14rpx) !important; background: var(--forest, #214239) !important; color: #fff !important; }
+
+.kw-modal { padding: 32rpx; }
+.kw-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
+.kw-modal-title { flex: 1; font-size: 32rpx; font-weight: 600; color: #1a1a1a; }
+.kw-modal-head button { display: inline-block !important; width: auto !important; margin: 0 !important; }
+.btn-close { display: inline-block !important; width: auto !important; margin: 0 !important; flex-shrink: 0; }
+.kw-modal-keyword { font-size: 36rpx; font-weight: 700; color: #1a1a1a; margin-bottom: 32rpx; padding-bottom: 24rpx; border-bottom: 1rpx solid #f0f0f0; }
+
+.kw-field { margin-bottom: 28rpx; }
+.kw-label { display: block; font-size: 26rpx; color: #888; margin-bottom: 12rpx; }
+.kw-input { background: #f5f6f5; border-radius: var(--radius-sm, 14rpx); padding: 20rpx 24rpx; font-size: 28rpx; width: 100%; box-sizing: border-box; }
+.kw-textarea { background: #f5f6f5; border-radius: var(--radius-sm, 14rpx); padding: 20rpx 24rpx; font-size: 28rpx; width: 100%; box-sizing: border-box; min-height: 140rpx; }
+.kw-picker-row { background: #f5f6f5; border-radius: var(--radius-sm, 14rpx); padding: 20rpx 24rpx; font-size: 28rpx; display: flex; justify-content: space-between; align-items: center; }
+.kw-arrow { color: #aaa; }
+
+.kw-radio-group { display: flex; gap: 16rpx; flex-wrap: wrap; }
+.kw-radio { padding: 14rpx 32rpx; border-radius: 100rpx; font-size: 26rpx; background: #f5f6f5; color: #444; border: 2rpx solid transparent; }
+.kw-radio-active { background: var(--forest, #214239); color: #fff; border-color: var(--forest, #214239); }
+
+.kw-batch-card { background: #f0f4f0; border-radius: var(--radius, 20rpx); padding: 24rpx 28rpx; margin-bottom: 28rpx; }
+.kw-batch-card-head { display: flex; justify-content: space-between; align-items: center; }
+.kw-batch-card-title { font-size: 28rpx; font-weight: 600; color: #1a1a1a; margin-bottom: 4rpx; }
+.kw-batch-actions { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
+.kw-batch-actions button { display: inline-block !important; width: auto !important; margin: 0 !important; }
+.kw-batch-item { background: #f9f9f9; border-radius: var(--radius, 20rpx); padding: 24rpx 24rpx 16rpx; margin-bottom: 20rpx; border: 1rpx solid #e8e8e8; }
+.kw-batch-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
+.kw-batch-item-no { font-size: 26rpx; font-weight: 600; color: #888; }
+.kw-batch-item-head button { display: inline-block !important; width: auto !important; margin: 0 !important; }

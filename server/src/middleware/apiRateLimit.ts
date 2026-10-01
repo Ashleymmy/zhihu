@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import { incrRateLimit } from '../utils/rateLimit';
 import { AppError } from './errors';
+import { wechatContext, wechatClientId } from '../wechat/context';
 
 /**
  * API 级限流（在 IP 登录限流之上叠加）：
@@ -19,7 +20,8 @@ export function apiRateLimit(options: { windowSec?: number; userLimit?: number; 
         const r = await incrRateLimit(`api:user:${uid}`, userLimit, windowSec);
         if (!r.allowed) throw new AppError(429, 42901, '请求过于频繁，请稍后再试');
       } else {
-        const ip = req.ip ?? 'unknown';
+        const identity = wechatContext(req);
+        const ip = identity ? `wechat:${wechatClientId(identity)}` : req.ip ?? 'unknown';
         const r = await incrRateLimit(`api:anon:${ip}`, anonLimit, windowSec);
         if (!r.allowed) throw new AppError(429, 42901, '请求过于频繁，请稍后再试');
       }

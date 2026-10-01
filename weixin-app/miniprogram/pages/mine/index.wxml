@@ -1,0 +1,50 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="profile-head" wx:if="{{guest}}" bindtap="toLogin">
+    <image class="avatar" src="/images/avatar.png" mode="aspectFill" />
+    <view class="profile-info">
+      <view class="profile-name-row">
+        <text class="profile-name">点击登录</text>
+      </view>
+      <text class="muted">登录后使用关键词、作品、收益等全部功能</text>
+    </view>
+    <text class="cell-arrow">›</text>
+  </view>
+  <view class="profile-head" wx:elif="{{user}}" bindtap="openProfile">
+    <image class="avatar" src="/images/avatar.png" mode="aspectFill" />
+    <view class="profile-info">
+      <view class="profile-name-row">
+        <text class="profile-name">{{user.displayName || user.username}}</text>
+        <text class="badge">{{roleLabel}}</text>
+      </view>
+      <text class="muted">@{{user.username}}</text>
+    </view>
+  </view>
+  <!-- 我的页游客态由资料头承担，不再重复展示登录引导卡 -->
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy}}"
+  />
+  <block wx:if="{{allowed}}">
+    <view class="card cell-card">
+      <view
+        class="cell"
+        wx:for="{{menus}}"
+        wx:key="key"
+        data-path="{{item.path}}"
+        bindtap="open"
+      >
+        <view
+          class="cell-icon"
+          style="background: {{item.tint}};"
+          ><image wx:if="{{item.iconImg}}" class="icon-img" src="{{item.iconImg}}" mode="aspectFit" /><text wx:else style="color: {{item.fg}};">{{item.icon}}</text></view
+        >
+        <text class="cell-label">{{item.label}}</text>
+        <text class="cell-arrow">›</text>
+      </view>
+    </view>
+    <button class="logout-btn" disabled="{{busy}}" bindtap="logout"
+      >退出登录</button
+    >
+  </block>
+</view>

@@ -12,6 +12,10 @@ import { adminToolsRouter, announcementsRouter, auditLogsRouter } from '../route
 import { createPlatformRouter } from './routes';
 import { ModuleRuntime } from './module-runtime';
 import { setModulePermissions } from '../auth/permissions';
+import { mountWechatBridge } from '../wechat/bridge';
+import { wechatAuthRouter } from '../wechat/auth';
+import { miniInvitationsRouter } from '../wechat/invitations';
+import { miniFilesRouter, attachMiniFile } from '../wechat/files';
 
 export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app: Express) => void) {
   const app = express();
@@ -28,6 +32,7 @@ export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app:
     module.beforeJson?.(before);
     app.use((req, res, next) => (runtime.get(module.manifest.id) ? before(req, res, next) : next()));
   }
+  mountWechatBridge(app);
   app.use(express.json({ limit: '1mb' }));
   const publicRoutes: Array<[string, express.Router]> = [
     ['auth', authRouter],
@@ -40,6 +45,10 @@ export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app:
   ];
   // Login/refresh also retain their own dedicated limiter.
   app.use('/api/v1', apiRateLimit());
+  app.use(attachMiniFile);
+  app.use('/api/v1/core/mini-auth', wechatAuthRouter);
+  app.use('/api/v1/core/files', miniFilesRouter);
+  app.use('/api/v1/modules/zhihu/invite', miniInvitationsRouter);
   for (const [name, router] of publicRoutes) app.use('/api/v1/core/' + name, router);
   app.use('/api/v1/core', createPlatformRouter(runtime));
   for (const module of runtime.all()) {

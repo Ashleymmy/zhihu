@@ -1,0 +1,79 @@
+/* 骨架屏：灰块 + shimmer 呼吸扫光（iOS 式柔和脉动） */
+.sk {
+  padding-top: 8rpx;
+}
+.sk-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 30rpx 28rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 6rpx 20rpx rgba(29, 39, 35, 0.05);
+}
+.sk-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+.sk-block {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper-deep);
+  border-radius: 10rpx;
+}
+.sk-block::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+.sk-title {
+  width: 40%;
+  height: 48rpx;
+  margin: 12rpx 0 26rpx;
+}
+.sk-line {
+  height: 26rpx;
+  margin: 18rpx 0;
+}
+.sk-pill {
+  width: 96rpx;
+  height: 34rpx;
+  border-radius: 999rpx;
+}
+.sk-stats {
+  display: flex;
+  gap: 18rpx;
+  margin-bottom: 22rpx;
+}
+.sk-stat {
+  flex: 1;
+  height: 120rpx;
+  border-radius: var(--radius-sm);
+}
+.w90 {
+  width: 90%;
+}
+.w60 {
+  width: 60%;
+}
+.w45 {
+  width: 45%;
+}
+@keyframes sk-shimmer {
+  from {
+    left: -40%;
+  }
+  to {
+    left: 100%;
+  }
+}

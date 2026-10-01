@@ -9,37 +9,55 @@ import { openInvitationToken, sealInvitationToken } from '../utils/invitationTok
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 const unavailable = () => new AppError(422, 42220, '邀请链接已失效、已用完或已停用，请联系邀请人');
-function canInvite(user: RowDataPacket) {
+function canInvite(user: RowDataPacket, source = 'web') {
   const role = normalizeRole(user.role);
   return (
     user.is_active &&
     role &&
-    (role === 'leader' || (isStaffRole(role) && effectiveDuty({ role, adminDuty: user.admin_duty }) !== 'finance'))
+    (role === 'leader' ||
+      (source === 'mini' && role === 'creator') ||
+      (isStaffRole(role) && effectiveDuty({ role, adminDuty: user.admin_duty }) !== 'finance'))
   );
+}
+function currentTeamMatches(owner: RowDataPacket, invite: RowDataPacket, parentRole?: string) {
+  if (invite.source !== 'mini') return true;
+  const expected =
+    owner.role === 'leader'
+      ? String(owner.id)
+      : owner.role === 'creator' && parentRole === 'leader'
+        ? String(owner.parent_id)
+        : null;
+  return expected === (invite.team_leader_id == null ? null : String(invite.team_leader_id));
 }
 export async function invitationPreview(token: string) {
   const [r] = await rows<RowDataPacket>(
-    `SELECT i.*,u.display_name,u.role,u.admin_duty,u.is_active,l.display_name team_name,l.is_active leader_active,l.role leader_role
-     FROM member_invitations i JOIN users u ON u.id=i.owner_user_id LEFT JOIN users l ON l.id=i.team_leader_id
+    `SELECT i.*,u.id owner_id,u.parent_id,u.display_name,pu.role owner_parent_role,u.role,u.admin_duty,u.is_active,l.display_name team_name,l.is_active leader_active,l.role leader_role
+     FROM member_invitations i JOIN users u ON u.id=i.owner_user_id LEFT JOIN users l ON l.id=i.team_leader_id LEFT JOIN users pu ON pu.id=u.parent_id
      WHERE i.token_hash=? AND i.deleted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>NOW(3) AND i.used_count<i.max_uses`,
     [hash(token)],
   );
-  if (!r || !canInvite(r) || (r.team_leader_id && (!r.leader_active || r.leader_role !== 'leader')))
+  if (
+    !r ||
+    !canInvite(r, r.source) ||
+    !currentTeamMatches({ ...r, id: r.owner_id }, r, r.owner_parent_role) ||
+    (r.team_leader_id && (!r.leader_active || r.leader_role !== 'leader'))
+  )
     throw unavailable();
   return { inviterName: r.display_name, teamName: r.team_name ?? null, role: 'creator', expiresAt: r.expires_at };
 }
 /** Actor rows are locked before the invitation row, matching create/revoke/member changes. */
 export async function lockInvitation(c: PoolConnection, token: string) {
   const [[lookup]] = await c.query<RowDataPacket[]>(
-    'SELECT owner_user_id,team_leader_id FROM member_invitations WHERE token_hash=?',
+    'SELECT i.owner_user_id,i.team_leader_id,u.parent_id FROM member_invitations i JOIN users u ON u.id=i.owner_user_id WHERE i.token_hash=?',
     [hash(token)],
   );
   if (!lookup) throw unavailable();
   const [users] = await c.query<RowDataPacket[]>(
-    'SELECT id,role,is_active,admin_duty FROM users WHERE id IN (?,?) ORDER BY id FOR UPDATE',
-    [lookup.owner_user_id, lookup.team_leader_id],
+    'SELECT id,role,is_active,admin_duty,parent_id FROM users WHERE id IN (?,?,?) ORDER BY id FOR UPDATE',
+    [lookup.owner_user_id, lookup.team_leader_id, lookup.parent_id],
   );
   const owner = users.find((u) => String(u.id) === String(lookup.owner_user_id));
+  const parent = users.find((u) => String(u.id) === String(lookup.parent_id));
   const leader = users.find((u) => String(u.id) === String(lookup.team_leader_id));
   const [[invite]] = await c.query<RowDataPacket[]>(
     'SELECT *,expires_at>NOW(3) unexpired FROM member_invitations WHERE token_hash=? FOR UPDATE',
@@ -47,8 +65,10 @@ export async function lockInvitation(c: PoolConnection, token: string) {
   );
   if (
     !owner ||
-    !canInvite(owner) ||
+    !canInvite(owner, invite?.source) ||
     !invite ||
+    String(owner.parent_id) !== String(lookup.parent_id) ||
+    !currentTeamMatches(owner, invite, parent?.role) ||
     invite.deleted_at ||
     invite.revoked_at ||
     Number(invite.unexpired) !== 1 ||
@@ -75,24 +95,36 @@ export async function consumeInvitation(c: PoolConnection, invite: RowDataPacket
     c,
   );
 }
-export async function createInvitation(auth: AuthUser, input: { label: string; validDays: number; maxUses: number }) {
+export async function createInvitation(
+  auth: AuthUser,
+  input: { label: string; validDays: number; maxUses: number },
+  source: 'web' | 'mini' = 'web',
+) {
   const token = randomBytes(32).toString('base64url');
   const id = await withTransaction(async (c) => {
     const [[owner]] = await c.query<RowDataPacket[]>(
-      'SELECT role,admin_duty,is_active FROM users WHERE id=? FOR UPDATE',
+      'SELECT role,admin_duty,is_active,parent_id FROM users WHERE id=? FOR UPDATE',
       [auth.sub],
     );
-    if (!owner || !canInvite(owner)) throw new AppError(403, 40301, '当前账号不能邀请成员');
+    if (!owner || !canInvite(owner, source)) throw new AppError(403, 40301, '当前账号不能邀请成员');
+    let leaderId = owner.role === 'leader' ? auth.sub : null;
+    if (source === 'mini' && owner.role === 'creator' && owner.parent_id) {
+      const [[parent]] = await c.query<RowDataPacket[]>('SELECT id,role,is_active FROM users WHERE id=?', [
+        owner.parent_id,
+      ]);
+      if (parent?.role === 'leader' && parent.is_active) leaderId = String(parent.id);
+    }
     const [r] = await c.query<ResultSetHeader>(
-      'INSERT INTO member_invitations(owner_user_id,team_leader_id,token_hash,token_cipher,label,max_uses,expires_at) VALUES(?,?,?,?,?,?,TIMESTAMPADD(DAY,?,NOW(3)))',
+      'INSERT INTO member_invitations(owner_user_id,team_leader_id,token_hash,token_cipher,label,max_uses,expires_at,source) VALUES(?,?,?,?,?,?,TIMESTAMPADD(DAY,?,NOW(3)),?)',
       [
         auth.sub,
-        owner.role === 'leader' ? auth.sub : null,
+        leaderId,
         hash(token),
         sealInvitationToken(token),
         input.label,
         input.maxUses,
         input.validDays,
+        source,
       ],
     );
     await writeAudit(
@@ -113,7 +145,7 @@ export async function listInvitations(auth: AuthUser) {
   return rows(
     `SELECT CAST(i.id AS CHAR) id,i.label,CAST(i.owner_user_id AS CHAR) owner_id,u.display_name owner_name,l.display_name team_name,i.max_uses,i.used_count,i.expires_at,i.revoked_at,i.created_at,(i.token_cipher IS NOT NULL) can_copy,
     CASE WHEN i.revoked_at IS NOT NULL THEN 'revoked' WHEN i.expires_at<=NOW(3) THEN 'expired' WHEN i.used_count>=i.max_uses THEN 'used' ELSE 'active' END status
-    FROM member_invitations i JOIN users u ON u.id=i.owner_user_id LEFT JOIN users l ON l.id=i.team_leader_id
+    FROM member_invitations i JOIN users u ON u.id=i.owner_user_id LEFT JOIN users l ON l.id=i.team_leader_id LEFT JOIN users pu ON pu.id=u.parent_id
     WHERE i.owner_user_id=? AND i.deleted_at IS NULL ORDER BY i.id DESC`,
     [auth.sub],
   );

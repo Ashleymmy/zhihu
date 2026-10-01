@@ -1,0 +1,85 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="row page-heading">
+    <view>
+      <view class="title">收益</view>
+    </view>
+    <button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button>
+  </view>
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
+  />
+  <skeleton wx:if="{{allowed && scopeReady && loading && !summary && !restricted}}" type="stats" rows="{{2}}" />
+  <!-- 运营管理员等无个人收益口径的账号：引导态而非报错 -->
+  <view class="card rise" wx:if="{{allowed && scopeReady && restricted && !loading}}">
+    <state-view
+      text="当前账号类型不展示收益明细，请从钱包或报表页查看财务数据。"
+      guide-text="前往钱包"
+      guide-path="/pages/wallet/index"
+    />
+  </view>
+  <block wx:if="{{allowed && scopeReady && summary}}">
+    <!-- 本期收益 hero：主数字 + 已确认/待确认副指标 -->
+    <view class="balance-card rise">
+      <view class="balance-label">本期推广收益（元）</view>
+      <view class="balance-value">¥{{summary.receivable}}</view>
+      <view class="balance-sub">已确认 ¥{{summary.confirmedReceivable}} · 待确认 ¥{{summary.pendingReceivable}}</view>
+      <view class="balance-sub">{{from}} 至 {{to}}</view>
+    </view>
+
+    <!-- 期间筛选：快捷月份 + 自定义起止 -->
+    <view class="card rise rise-d1">
+      <view class="income-quick">
+        <view
+          class="income-quick-item {{quick === 'this' ? 'income-quick-active' : ''}}"
+          data-q="this"
+          hover-class="press"
+          bindtap="quickRange"
+        >本月</view>
+        <view
+          class="income-quick-item {{quick === 'prev' ? 'income-quick-active' : ''}}"
+          data-q="prev"
+          hover-class="press"
+          bindtap="quickRange"
+        >上月</view>
+      </view>
+      <view class="row">
+        <view class="date-field">
+          <text class="field-label">开始日期</text>
+          <picker mode="date" value="{{from}}" data-name="from" disabled="{{busy}}" bindchange="dateChange">{{from}}</picker>
+        </view>
+        <view class="date-field">
+          <text class="field-label">结束日期</text>
+          <picker mode="date" value="{{to}}" data-name="to" disabled="{{busy}}" bindchange="dateChange">{{to}}</picker>
+        </view>
+      </view>
+    </view>
+
+    <!-- 推广任务奖励：真实结算记录，带确认状态 -->
+    <view class="card rise rise-d2">
+      <view class="row">
+        <view class="section-title">推广任务奖励</view>
+        <text class="amount-income">¥{{summary.receivable}}</text>
+      </view>
+      <view class="list-item" wx:for="{{records}}" wx:key="key">
+        <view class="row">
+          <view class="item-title">{{item.keyword}}</view>
+          <text class="amount-income">¥{{item.amount}}</text>
+        </view>
+        <view class="row entry-sub">
+          <text class="muted">{{item.date}}</text>
+          <text class="tag {{item.status === 'confirmed' ? '' : 'tag-sun'}}">{{item.statusText}}</text>
+        </view>
+        <view wx:if="{{item.blocked}}" class="text-sun income-blocked">{{item.blocked}}</view>
+      </view>
+      <state-view
+        wx:if="{{!records.length}}"
+        text="本期暂无推广收益，提交作品并通过审核后即可结算。"
+        guide-text="去看关键词"
+        guide-path="/pages/keywords/index"
+      />
+    </view>
+
+  </block>
+</view>

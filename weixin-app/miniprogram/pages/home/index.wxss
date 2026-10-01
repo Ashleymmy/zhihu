@@ -1,0 +1,92 @@
+/* 首页：搜索入口、banner 轮播、工作台摘要、公告弹层 */
+
+/* 搜索入口（仿搜索框，点击跳关键词页） */
+.home-search {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  height: 80rpx;
+  padding: 0 28rpx;
+  margin-bottom: 22rpx;
+  background: var(--white);
+  border-radius: 999rpx;
+  box-shadow: 0 4rpx 14rpx rgba(29, 39, 35, 0.05);
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+.home-search-icon {
+  color: var(--moss);
+  font-size: 34rpx;
+  font-weight: 600;
+}
+.home-search-ph {
+  color: var(--ink-soft);
+  font-size: 26rpx;
+}
+
+/* banner 轮播：图片垫底 + 左下渐变文字 */
+.banner-swiper {
+  height: 300rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+  margin-bottom: 22rpx;
+  box-shadow: 0 8rpx 24rpx rgba(29, 39, 35, 0.1);
+}
+.banner-slide {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.banner-img {
+  width: 100%;
+  height: 100%;
+}
+.banner-copy {
+  position: absolute;
+  left: 36rpx;
+  bottom: 32rpx;
+  right: 36rpx;
+}
+.banner-title {
+  color: #fff;
+  font-size: 38rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  text-shadow: 0 2rpx 12rpx rgba(23, 32, 28, 0.35);
+}
+.banner-sub {
+  margin-top: 8rpx;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 24rpx;
+  text-shadow: 0 2rpx 8rpx rgba(23, 32, 28, 0.35);
+}
+
+/* 工作台摘要三列 */
+.stats-card {
+  padding: 30rpx 12rpx;
+}
+.stats-card .stat {
+  padding: 6rpx 8rpx;
+  border-radius: 14rpx;
+}
+
+/* 公告弹层条目 */
+.announce-item {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--line);
+}
+.announce-item:last-child {
+  border-bottom: 0;
+}
+.announce-body {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.announce-time {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+}

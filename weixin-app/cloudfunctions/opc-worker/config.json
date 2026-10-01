@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "triggers": [
+    {
+      "name": "opc-jobs-every-minute",
+      "type": "timer",
+      "config": "0 * * * * * *"
+    }
+  ]
+}
+

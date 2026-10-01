@@ -1,0 +1,20 @@
+/* Shared layout is defined in app.wxss. */
+
+/* 关键词放通：角色选择胶囊 */
+.auto-role {
+  padding: 12rpx 36rpx;
+  border-radius: 999rpx;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-size: 26rpx;
+  font-weight: 500;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.15s ease;
+}
+.auto-role-on {
+  background: var(--forest);
+  color: #fff;
+  font-weight: 600;
+}

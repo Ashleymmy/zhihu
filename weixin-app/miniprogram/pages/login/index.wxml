@@ -1,0 +1,47 @@
+<view class="login-page">
+  <view class="login-logo">T</view>
+  <view class="login-title">欢迎来到 TIMO</view>
+  <view class="login-sub">多渠道 OPC 业务平台</view>
+  <view class="login-form">
+    <view class="input-row"
+      ><input
+        data-name="username"
+        value="{{username}}"
+        placeholder="请输入账号或手机号"
+        placeholder-class="ph"
+        bindinput="input"
+    /></view>
+    <view class="input-row"
+      ><input
+        data-name="password"
+        value="{{password}}"
+        password
+        placeholder="请输入登录密码"
+        placeholder-class="ph"
+        bindinput="input"
+        bindconfirm="submit"
+    /></view>
+  </view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <button
+    class="primary login-btn"
+    loading="{{busy}}"
+    disabled="{{busy}}"
+    bindtap="submit"
+    >登 录</button
+  >
+  <view class="login-links"
+    ><text class="login-link-strong" bindtap="toRegister">注册账号</text
+    ><text bindtap="forgotPassword">忘记密码</text
+    ><text class="muted" bindtap="backHome">返回首页</text></view
+  >
+  <view class="login-divider"
+    ><view class="login-divider-line"></view
+    ><text>其他登录方式</text
+    ><view class="login-divider-line"></view
+  ></view>
+  <view class="wx-entry" hover-class="press" bindtap="wechatLogin">
+    <image class="wx-icon" src="/images/channels/wechat.png" mode="aspectFit" />
+  </view>
+  <view class="login-agreement">登录即代表您知晓并同意<text class="agreement-link" data-type="user" bindtap="openAgreement">《用户协议》</text>与<text class="agreement-link" data-type="privacy" bindtap="openAgreement">《隐私协议》</text></view>
+</view>

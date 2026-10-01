@@ -1,0 +1,15 @@
+<scroll-view class="nav-wrap" scroll-x enhanced show-scrollbar="{{false}}">
+  <view class="nav-track">
+    <button class="nav-pill {{active==='home'?'active':''}}" bindtap="home"
+      >工作台</button
+    >
+    <button
+      wx:for="{{items}}"
+      wx:key="key"
+      class="nav-pill {{active===item.key?'active':''}}"
+      data-path="{{item.path}}"
+      bindtap="open"
+      >{{item.label}}</button
+    >
+  </view>
+</scroll-view>

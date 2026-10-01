@@ -1,0 +1,125 @@
+<import src="../../templates/shared.wxml" />
+<view class="page"
+  ><role-nav user="{{user}}" active="admin" />
+  <view class="row page-heading"
+    ><view
+      ><view class="title">项目管理</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
+  /><block wx:if="{{allowed && scopeReady}}">
+    <view class="card"
+      ><view class="row"
+        ><view class="section-title">业务项目</view
+        ><button size="mini" disabled="{{busy}}" bindtap="toggleForm"
+          >{{formOpen ? '收起' : '新增项目'}}</button
+        ></view
+      >
+      <view class="form-box" wx:if="{{formOpen}}"
+        ><view class="field"
+          ><text class="field-label">项目名称</text
+          ><input
+            data-name="form.name"
+            value="{{form.name}}"
+            maxlength="128"
+            bindinput="input" /></view
+        ><view class="field"
+          ><text class="field-label">项目标识（小写字母、数字、短横线）</text
+          ><input
+            data-name="form.slug"
+            value="{{form.slug}}"
+            maxlength="64"
+            bindinput="input" /></view
+        ><button
+          class="primary"
+          disabled="{{busy}}"
+          loading="{{busy}}"
+          bindtap="create"
+          >创建项目</button
+        ></view
+      >
+      <picker
+        wx:if="{{projects.length}}"
+        range="{{projects}}"
+        range-key="name"
+        value="{{projectIndex}}"
+        disabled="{{busy || loading}}"
+        bindchange="chooseProject"
+        >{{projects[projectIndex].name}} ▾</picker
+      ><state-view wx:elif="{{!loading}}" text="暂无项目，请先创建。" />
+    </view>
+    <block wx:if="{{selectedProject}}">
+      <view class="card"
+        ><view class="section-title">项目成员</view
+        ><text class="muted"
+          >团长和团队达人均需加入项目，才能分发和使用关键词。</text
+        ><view wx:for="{{members}}" wx:key="userId" class="list-item"
+          ><view class="row"
+            ><text>{{item.displayName || item.username}}</text
+            ><text class="tag">{{item.roleText}}</text></view
+          ></view
+        >
+        <view class="field"
+          ><text class="field-label">选择尚未加入项目的账号</text
+          ><picker
+            range="{{users}}"
+            range-key="displayName"
+            value="{{userIndex}}"
+            bindchange="chooseUser"
+            >{{userIndex >= 0 ? users[userIndex].displayName : '请选择账号'}}
+            ▾</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">项目角色</text
+          ><picker
+            range="{{roles}}"
+            value="{{roleIndex}}"
+            bindchange="chooseRole"
+            >{{roles[roleIndex]}} ▾</picker
+          ></view
+        ><button
+          disabled="{{busy || loading}}"
+          loading="{{busy}}"
+          bindtap="grant"
+          >添加项目成员</button
+        >
+      </view>
+      <view class="card"
+        ><view class="section-title">知乎接入账号</view
+        ><view wx:for="{{integrations}}" wx:key="id" class="list-item"
+          ><view>{{item.name}}</view
+          ><text class="muted"
+            >{{item.moduleId}} · {{item.status === 'active' ? '启用' :
+            '停用'}}</text
+          ></view
+        ><state-view
+          wx:if="{{!integrations.length}}"
+          text="此项目尚未关联接入账号。"
+        />
+        <view class="field"
+          ><text class="field-label">关联已有知乎账号</text
+          ><picker
+            range="{{accounts}}"
+            range-key="name"
+            value="{{accountIndex}}"
+            bindchange="chooseAccount"
+            >{{accountIndex >= 0 ? accounts[accountIndex].name :
+            '请选择接入账号'}} ▾</picker
+          ></view
+        ><button
+          disabled="{{busy || loading || !accounts.length}}"
+          loading="{{busy}}"
+          bindtap="linkAccount"
+          >关联账号</button
+        ><view class="muted"
+          >新的知乎接入账号由部署流程配置，已有账号可在这里关联。</view
+        >
+      </view>
+    </block>
+  </block></view
+>

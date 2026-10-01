@@ -1,0 +1,25 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <role-nav user="{{user}}" active="reports" />
+  <view class="row page-heading"><view><view class="title">报表与异常</view></view><button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button></view>
+  <template is="status" data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}" />
+  <block wx:if="{{allowed && scopeReady}}">
+    <view class="wrap actions"><button size="mini" disabled="{{busy || loading}}" data-section="imports" bindtap="section">导入记录</button><button size="mini" disabled="{{busy || loading}}" data-section="exceptions" bindtap="section">归因异常</button></view>
+    <view class="card" wx:if="{{section === 'imports'}}"><view class="section-title">上传知乎报表</view><view class="muted">从微信聊天选择 XLSX 文件，最大 10 MB。核对预览后再提交，收入需另行确认和开放提现。</view><button class="primary" disabled="{{busy || loading}}" loading="{{busy}}" bindtap="uploadReport">选择报表并预览</button></view>
+    <view class="card" wx:for="{{list}}" wx:key="id">
+      <block wx:if="{{section === 'imports'}}"><view class="row"><text class="item-title">{{item.fileName}}</text><text class="tag">{{item.statusText}}</text></view><view class="muted">{{item.createdAt}}</view><button size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="inspect">查看预览</button></block>
+      <block wx:elif="{{section === 'exceptions'}}"><view class="item-title">{{item.reason}}</view><view class="muted">修复渠道映射、关键词归属或有效单价后再重试。</view><button size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="choose">重试归因</button></block>
+      <block wx:else><view class="item-title">{{item.value.keyword}} · {{item.value.date}}</view><view class="muted">更正后订单 {{item.value.orders}} · 搜索 {{item.value.search}}</view><view class="wrap actions"><button size="mini" data-index="{{index}}" data-accept="{{true}}" disabled="{{busy}}" bindtap="choose">接受更正</button><button size="mini" data-index="{{index}}" data-accept="{{false}}" disabled="{{busy}}" bindtap="choose">拒绝更正</button></view></block>
+    </view>
+    <state-view wx:if="{{!loading && !error && !list.length}}" text="暂无记录。" />
+    <template is="pager" data="{{total, page, loading, busy, pageSize:20}}" />
+  </block>
+  <view wx:if="{{detail && allowed && scopeReady}}" class="modal-mask"><scroll-view scroll-y class="modal">
+    <view class="row"><text class="section-title">报表预览 · {{detail.rowCount}} 行</text><button size="mini" disabled="{{busy}}" bindtap="close">关闭</button></view>
+    <view wx:for="{{detail.rows}}" wx:key="id" class="report-row"><view>{{item.value.date}} · {{item.value.channel}}</view><view>{{item.value.keyword}}</view><text class="muted">订单 {{item.value.orders}} · 搜索 {{item.value.search}} · 金额 {{item.value.revenue}}</text><view wx:if="{{item.error}}" class="error">{{item.error}}</view></view>
+    <view class="row"><button size="mini" disabled="{{busy || detailPage <= 1}}" bindtap="detailPrev">上一页</button><text>{{detailPage}}</text><button size="mini" disabled="{{busy || detailPage * 20 >= detail.rowCount}}" bindtap="detailNext">下一页</button></view>
+    <block wx:if="{{detail.status === 'preview'}}"><checkbox-group bindchange="acknowledge"><label><checkbox value="yes" checked="{{acknowledged}}" />已核对报表来源、日期和数据</label></checkbox-group><button class="primary" disabled="{{busy || !acknowledged}}" loading="{{busy}}" bindtap="commit">确认导入</button></block>
+    <view wx:if="{{error}}" class="error">{{error}}</view>
+  </scroll-view></view>
+  <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask"><scroll-view scroll-y class="modal"><view class="section-title">{{section === 'exceptions' ? '重试归因' : accept ? '接受报表更正' : '拒绝报表更正'}}</view><view class="notice">更正将影响后续账单；更正后的金额仍须财务重新核对。</view><view class="field"><text class="field-label">核对说明</text><textarea maxlength="500" data-name="reason" value="{{reason}}" bindinput="input" /></view><view wx:if="{{error}}" class="error">{{error}}</view><button class="primary" disabled="{{busy}}" loading="{{busy}}" bindtap="resolve">确认处理</button><button disabled="{{busy}}" bindtap="close">取消</button></scroll-view></view>
+</view>

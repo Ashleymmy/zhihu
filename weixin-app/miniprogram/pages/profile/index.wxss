@@ -1,0 +1,34 @@
+.avatar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48rpx 0 32rpx;
+}
+.profile-avatar {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 80rpx;
+  background: var(--paper-deep);
+}
+.avatar-hint {
+  font-size: 24rpx;
+  margin-top: 16rpx;
+}
+
+/* 编辑弹层：内容自适应高度（不走全局 82vh 高弹层） */
+.profile-modal {
+  height: auto;
+  padding-bottom: 30rpx;
+}
+.profile-modal-sub {
+  margin: -8rpx 0 18rpx;
+  font-size: 24rpx;
+}
+.modal-input {
+  background: var(--paper-deep);
+  border-radius: var(--radius-sm);
+  padding: 24rpx 28rpx;
+  font-size: 28rpx;
+  width: 100%;
+  letter-spacing: 4rpx;
+}

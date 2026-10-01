@@ -1,0 +1,43 @@
+<view class="login-page">
+  <view class="login-title">绑定网站账号</view>
+  <view class="login-sub">当前微信尚未绑定账号，绑定后下次可微信一键登录</view>
+  <view class="login-form">
+    <view class="input-row"
+      ><input
+        type="text"
+        data-name="phone"
+        value="{{phone}}"
+        maxlength="64"
+        placeholder="请输入网站登录账号"
+        placeholder-class="ph"
+        bindinput="input"
+    /></view>
+    <view class="input-row"
+      ><input
+        data-name="password"
+        value="{{password}}"
+        password
+        placeholder="请输入网站账号密码"
+        placeholder-class="ph"
+        bindinput="input"
+    /></view>
+  </view>
+  <view class="form-hint">已有网站账号验证密码后绑定微信。新用户请返回登录页，使用邀请码注册。</view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view class="agree-row">
+    <view class="agree-check {{agreed ? 'agree-on' : ''}}" bindtap="toggleAgree">{{agreed ? '✓' : ''}}</view>
+    <text class="agree-text">已阅读并同意<text class="agreement-link" data-type="user" bindtap="openAgreement">《用户协议》</text>与<text class="agreement-link" data-type="privacy" bindtap="openAgreement">《隐私协议》</text></text>
+  </view>
+  <button
+    class="primary login-btn"
+    loading="{{busy}}"
+    disabled="{{busy}}"
+    bindtap="submit"
+    >完成绑定</button
+  >
+  <view class="login-links"
+    ><text class="login-link-strong" bindtap="toLogin">返回登录</text
+    ><text class="muted" bindtap="backHome">返回首页</text></view
+  >
+  <confirm-sheet id="confirmSheet" />
+</view>

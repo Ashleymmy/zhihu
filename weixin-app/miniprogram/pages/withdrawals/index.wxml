@@ -1,0 +1,170 @@
+<import src="../../templates/shared.wxml" />
+<view class="page"
+  ><role-nav user="{{user}}" active="wallet" />
+  <view class="row page-heading"
+    ><view
+      ><view class="title">提现记录</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
+  /><skeleton wx:if="{{allowed && scopeReady && loading && !view}}" rows="{{3}}" /><block wx:if="{{allowed && scopeReady}}">
+    <block wx:if="{{view}}">
+      <view class="card" wx:if="{{view.balance}}"
+        ><text class="muted">可提现余额</text
+        ><view class="title">¥{{view.balance.available}}</view
+        ><button
+          class="primary"
+          disabled="{{busy || loading}}"
+          bindtap="openApply"
+          >申请提现</button
+        ></view
+      >
+      <view class="notice" wx:if="{{view.canManage}}"
+        >审批通过后，请先在银行或支付渠道实际付款，再上传凭证登记。登记不会自动转账。</view
+      >
+      <view class="card" wx:for="{{view.withdrawals}}" wx:key="id"
+        ><view class="row"
+          ><view class="item-title">¥{{item.amount}}</view
+          ><text class="tag">{{item.statusText}}</text></view
+        ><view class="muted"
+          >{{item.displayName}} · {{item.receiverName}} ·
+          {{item.bankName}}</view
+        ><view class="muted">{{item.createdAt}}</view
+        ><view class="notice" wx:if="{{item.remark}}">{{item.remark}}</view
+        ><view class="muted" wx:if="{{item.paidOn}}"
+          >付款日期 {{item.paidOn}} · 凭据 {{item.paymentReference}}</view
+        ><view class="wrap actions">
+          <button wx:if="{{view.canManage && item.status === 'approved'}}" size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="pay">登记实际付款</button>
+          <button wx:if="{{item.status === 'paid'}}" size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="proof">查看凭证</button>
+          <button
+            wx:if="{{!view.canManage && item.status === 'pending'}}"
+            size="mini"
+            data-index="{{index}}"
+            data-action="cancel"
+            disabled="{{busy}}"
+            bindtap="choose"
+            >撤回申请</button
+          >
+          <button
+            wx:if="{{view.canManage && item.status === 'pending'}}"
+            size="mini"
+            data-index="{{index}}"
+            data-action="approve"
+            disabled="{{busy}}"
+            bindtap="choose"
+            >批准</button
+          >
+          <button
+            wx:if="{{view.canManage && item.status === 'pending'}}"
+            size="mini"
+            data-index="{{index}}"
+            data-action="reject"
+            disabled="{{busy}}"
+            bindtap="choose"
+            >退回</button
+          >
+        </view></view
+      ><state-view
+        wx:if="{{!loading && !error && !view.withdrawals.length}}"
+        text="暂无提现记录。"
+      /><template
+        is="loadmore"
+        data="{{total, page, loadingMore, pageSize: 25}}"
+      />
+    </block> </block
+  ><view wx:if="{{applyOpen && allowed && scopeReady}}" class="modal-mask"
+    ><scroll-view scroll-y class="modal"
+      ><view class="row"
+        ><view class="section-title">申请提现</view
+        ><button size="mini" disabled="{{busy}}" bindtap="close"
+          >关闭</button
+        ></view
+      ><text class="muted">可提现 ¥{{view.balance.available}}</text>
+      <view class="field"
+        ><view class="row"
+          ><text class="field-label">金额（最多两位小数）</text
+          ><text class="link-btn" bindtap="fillAll">全部提现</text></view
+        ><input
+          type="digit"
+          data-name="form.amount"
+          value="{{form.amount}}"
+          maxlength="16"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">收款人</text
+        ><input
+          data-name="form.receiverName"
+          value="{{form.receiverName}}"
+          maxlength="128"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">银行或支付渠道</text
+        ><input
+          data-name="form.bankName"
+          value="{{form.bankName}}"
+          maxlength="128"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">收款账号</text
+        ><input
+          data-name="form.bankAccount"
+          value="{{form.bankAccount}}"
+          maxlength="128"
+          bindinput="input"
+      /></view>
+      <view wx:if="{{error}}" class="error">{{error}}</view
+      ><button
+        class="primary"
+        disabled="{{busy}}"
+        loading="{{busy}}"
+        bindtap="apply"
+        >提交申请</button
+      >
+    </scroll-view></view
+  >
+  <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask"
+    ><scroll-view scroll-y class="modal"
+      ><view class="section-title"
+        >{{reviewAction === 'cancel' ? '撤回' : reviewAction === 'approve' ?
+        '批准' : '退回'}}提现申请</view
+      ><view class="item-title"
+        >¥{{selected.amount}} · {{selected.receiverName}}</view
+      ><view class="muted"
+        >{{selected.bankName}} · {{selected.bankAccount}}</view
+      ><view class="field"
+        ><text class="field-label">说明（退回必填）</text
+        ><textarea
+          data-name="reason"
+          value="{{reason}}"
+          maxlength="500"
+          bindinput="input"
+        /></view
+      ><view class="error" wx:if="{{error}}">{{error}}</view
+      ><button
+        class="primary"
+        disabled="{{busy}}"
+        loading="{{busy}}"
+        bindtap="review"
+        >确认</button
+      ><button disabled="{{busy}}" bindtap="close">取消</button></scroll-view
+    ></view
+  >
+  <view wx:if="{{payment && allowed && scopeReady}}" class="modal-mask"><scroll-view scroll-y class="modal">
+    <view class="section-title">登记实际付款</view><view class="item-title">¥{{payment.amount}} · {{payment.receiverName}}</view><view class="muted">{{payment.bankName}} · {{payment.bankAccount}}</view>
+    <view class="field"><text class="field-label">银行或支付渠道流水号</text><input maxlength="128" data-name="paymentForm.reference" value="{{paymentForm.reference}}" bindinput="input" /></view>
+    <view class="field"><text class="field-label">实际付款日期</text><picker mode="date" data-name="paymentForm.paidOn" value="{{paymentForm.paidOn}}" bindchange="input">{{paymentForm.paidOn}}</picker></view>
+    <button disabled="{{busy}}" bindtap="uploadProof">{{proofFileId ? '重新上传付款凭证' : '上传付款凭证（PNG / JPG / PDF）'}}</button><view wx:if="{{proofFileId}}" class="muted">凭证已上传</view>
+    <checkbox-group bindchange="acknowledgePayment"><label><checkbox value="yes" checked="{{paymentForm.acknowledged}}" />已核对收款账户、金额和流水，款项已实际支付</label></checkbox-group>
+    <view wx:if="{{error}}" class="error">{{error}}</view><button class="primary" disabled="{{busy || !proofFileId || !paymentForm.acknowledged}}" loading="{{busy}}" bindtap="recordPayment">确认登记</button><button disabled="{{busy}}" bindtap="close">取消</button>
+  </scroll-view></view>
+  <confirm-sheet id="confirmSheet" />
+  </view
+>

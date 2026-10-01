@@ -1,0 +1,173 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="row page-heading"
+    ><view
+      ><view class="title">收入与财务账单</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
+  /><skeleton wx:if="{{allowed && scopeReady && loading && !report}}" type="stats" rows="{{2}}" /><block wx:if="{{allowed && scopeReady}}">
+    <view class="balance-card" wx:if="{{view && view.balance}}"
+      ><view class="balance-head"
+        ><view
+          ><view class="balance-label">可提现金额（元）</view
+          ><view class="balance-value">¥{{view.balance.available}}</view></view
+        ><button
+          size="mini"
+          data-path="/pages/withdrawals/index"
+          bindtap="open"
+          >去提现</button
+        ></view
+      ><view class="balance-sub"
+        >待开放 ¥{{view.balance.held}} · 处理中 ¥{{view.balance.processing}} ·
+        已到账 ¥{{view.balance.paid}} · 待抵扣 ¥{{view.balance.offset}}</view
+      ></view
+    >
+    <view class="card"
+      ><view class="row"
+        ><view class="date-field"
+          ><text class="field-label">开始日期</text
+          ><picker
+            mode="date"
+            value="{{from}}"
+            data-name="from"
+            disabled="{{busy}}"
+            bindchange="dateChange"
+            >{{from}}</picker
+          ></view
+        ><view class="date-field"
+          ><text class="field-label">结束日期</text
+          ><picker
+            mode="date"
+            value="{{to}}"
+            data-name="to"
+            disabled="{{busy}}"
+            bindchange="dateChange"
+            >{{to}}</picker
+          ></view
+        ></view
+      ></view
+    >
+    <block wx:if="{{report}}">
+      <view class="card"
+        ><view class="section-title"
+          >{{isStaff ? '平台应付账单' : '个人收入'}}</view
+        ><view class="stats-row">
+          <view class="stat"
+            ><text class="stat-num"
+              >¥{{isStaff ? report.summary.confirmedPayable :
+              report.summary.confirmedReceivable}}</text
+            ><text class="stat-label">已确认金额</text></view
+          >
+          <view class="stat"
+            ><text class="stat-num"
+              >¥{{isStaff ? report.summary.pendingPayable :
+              report.summary.pendingReceivable}}</text
+            ><text class="stat-label">待确认金额</text></view
+          >
+        </view>
+        <view class="muted stats-note"
+          >{{report.summary.records}} 条来源记录 · {{report.summary.orders}}
+          笔订单</view
+        >
+        <view class="error" wx:if="{{report.summary.issues}}"
+          >{{report.summary.issues}} 条异常待处理，请在 Web
+          财务端核对原始报表。</view
+        ></view
+      >
+      <view
+        class="card"
+        wx:if="{{user.role !== 'creator' && report.groups.length}}"
+        ><view class="section-head"
+          ><view class="section-title">成员金额</view
+          ><button size="mini" bindtap="group">全部明细</button></view
+        >
+        <button
+          wx:for="{{report.groups}}"
+          wx:key="payeeId"
+          class="group-row"
+          data-id="{{item.payeeId}}"
+          bindtap="group"
+          ><view class="row"
+            ><text>{{item.name}}</text
+            ><text class="amount">¥{{item.total}}</text></view
+          ><view class="muted"
+            >已确认 ¥{{item.confirmed}} · 待确认 ¥{{item.pending}}</view
+          ><view
+            class="muted"
+            wx:for="{{item.blockers}}"
+            wx:for-item="blocker"
+            wx:for-index="blockerIndex"
+            wx:key="*this"
+            >{{blocker}}</view
+          ></button
+        >
+      </view>
+      <view class="card"
+        ><view class="section-title"
+          >账单明细{{groupId ? ' · 已筛选成员' : ''}}</view
+        >
+        <view wx:for="{{visibleEntries}}" wx:key="id" class="list-item"
+          ><view class="row"
+            ><view class="item-title">{{item.keyword}}</view
+            ><text class="amount-income">¥{{item.amount}}</text></view
+          ><view class="row entry-sub"
+            ><text class="muted">{{item.date}} · {{item.payeeName}}</text
+            ><text
+              class="tag {{item.status === 'confirmed' ? '' : 'tag-sun'}}"
+              >{{item.status === 'confirmed' ? '已确认' : '待确认'}}</text
+            ></view
+          ><view wx:if="{{item.blocked}}" class="error"
+            >{{item.blocked}}</view
+          ></view
+        >
+        <state-view
+          wx:if="{{!visibleEntries.length}}"
+          text="当前日期范围暂无账单。"
+        />
+      </view>
+      <view class="card" wx:if="{{isStaff}}"
+        ><view class="section-title">确认账单</view
+        ><text class="muted"
+          >可确认 {{readyCount}}
+          条；存在阻断原因的记录继续等待处理。{{report.needsReview ?
+          '当前项目处于试运行，确认后将启用正式归因结算。' : ''}}</text
+        ><checkbox-group bindchange="acknowledge"
+          ><label class="check"
+            ><checkbox
+              value="yes"
+              checked="{{acknowledged}}"
+              disabled="{{busy || loading}}"
+            />我已核对本期收款人、金额和作品审核结果</label
+          ></checkbox-group
+        ><button
+          class="primary"
+          disabled="{{busy || loading || !acknowledged || !readyCount}}"
+          loading="{{busy}}"
+          bindtap="confirmBills"
+          >确认可结算账单</button
+        ></view
+      >
+    </block>
+    <view class="card" wx:if="{{view && view.canManage}}">
+      <view class="section-title">开放提现款项</view>
+      <view class="item-title">本次开放 ¥{{view.funding.amount}}</view>
+      <view class="muted">核对当前项目全部待开放款项。数据变化后须刷新重新核对。</view>
+      <input data-name="reference" value="{{reference}}" placeholder="到账凭据或核对说明" maxlength="255" bindinput="input" />
+      <checkbox-group bindchange="acknowledgeFunding"><label><checkbox value="yes" checked="{{fundingAcknowledged}}" />我已核实上述款项到账</label></checkbox-group>
+      <button class="primary" disabled="{{busy || loading || !fundingAcknowledged || !reference}}" bindtap="releaseFunding">开放上述全部款项</button>
+    </view>
+    <button
+      class="primary"
+      wx:if="{{!(view && view.balance)}}"
+      data-path="/pages/withdrawals/index"
+      bindtap="open"
+      >查看提现与审批</button
+    >
+  </block></view
+>

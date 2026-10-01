@@ -1,4 +1,5 @@
 import { projectsRouter } from './routes/projects';
+import { miniBusinessRouter } from '../../wechat/business';
 import { attributionRouter } from './routes/attribution';
 import { Router } from 'express';
 import type { BusinessModule } from '../../core/contracts';
@@ -25,6 +26,7 @@ import { attributionDataProvider } from './attribution/provider';
 import { registerAttributionJobs, startAttributionWorker, stopAttributionWorker } from './attribution/worker';
 export function createZhihuModule(): BusinessModule {
   const router = Router();
+  router.use(miniBusinessRouter);
   router.use(attributionRouter);
   const routes: Array<[string, Router]> = [
     ['projects', projectsRouter],

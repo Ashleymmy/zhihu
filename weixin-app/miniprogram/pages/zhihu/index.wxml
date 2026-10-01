@@ -1,0 +1,25 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="title">知乎工作台</view>
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
+  />
+  <view class="card cell-card" wx:if="{{allowed}}">
+    <view
+      class="cell"
+      wx:for="{{items}}"
+      wx:key="key"
+      data-path="{{item.path}}"
+      bindtap="open"
+    >
+      <view
+        class="cell-icon"
+        style="background: {{item.tint}};"
+        ><image wx:if="{{item.iconImg}}" class="icon-img" src="{{item.iconImg}}" mode="aspectFit" /><text wx:else style="color: {{item.fg}};">{{item.icon}}</text></view
+      >
+      <text class="cell-label">{{item.label}}</text>
+      <text class="cell-arrow">›</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,91 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="row page-heading"
+    ><view
+      ><view class="title">作品与审核</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
+  />
+  <skeleton wx:if="{{allowed && scopeReady && loading && !list.length}}" rows="{{3}}" />
+  <block wx:if="{{allowed && scopeReady}}">
+    <view class="card" wx:for="{{list}}" wx:key="id"
+      ><view class="row"
+        ><view class="item-title">{{item.keyword}}</view
+        ><text class="tag {{item.status === 'rejected' ? 'tag-clay' : ''}}"
+          >{{item.statusText}}</text
+        ></view
+      >
+      <view class="muted">{{item.upstreamText}} · {{item.syncText}}</view><view class="notice" wx:if="{{item.upstreamReason}}">{{item.upstreamReason}}</view>
+      <view class="link-text" user-select>{{item.workUrl}}</view
+      ><view class="muted">{{item.description}}</view>
+      <view class="notice" wx:if="{{item.reason}}"
+        >审核说明：{{item.reason}}</view
+      >
+      <view class="wrap actions"
+        ><button size="mini" data-text="{{item.workUrl}}" bindtap="copy"
+          >复制作品链接</button
+        ><button
+          wx:if="{{item.canReview}}"
+          size="mini"
+          class="primary"
+          disabled="{{busy}}"
+          data-index="{{index}}"
+          bindtap="choose"
+          >审核作品</button
+        ></view
+      >
+      <view class="muted" wx:if="{{item.status === 'rejected'}}"
+        >请在关键词页修改作品后重新提交。</view
+      >
+    </view>
+    <state-view
+      wx:if="{{!loading && !error && !list.length}}"
+      text="暂无作品，提交后可在这里查看审核进度。"
+      guide-text="去提交作品"
+      guide-path="/pages/keywords/index"
+    /><template
+      is="loadmore"
+      data="{{total, page, loadingMore, pageSize: 20}}"
+    />
+  </block>
+  <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask"
+    ><scroll-view scroll-y class="modal"
+      ><view class="row"
+        ><view class="section-title">审核 {{selected.keyword}}</view
+        ><button size="mini" disabled="{{busy}}" bindtap="close"
+          >关闭</button
+        ></view
+      ><view class="link-text">{{selected.workUrl}}</view
+      ><button size="mini" data-text="{{selected.workUrl}}" bindtap="copy"
+        >复制链接核对</button
+      ><view class="field"
+        ><text class="field-label">审核说明（退回必填）</text
+        ><textarea
+          data-name="reason"
+          value="{{reason}}"
+          maxlength="500"
+          bindinput="input"
+        /></view
+      ><view class="error" wx:if="{{error}}">{{error}}</view
+      ><view class="row"
+        ><button disabled="{{busy}}" data-accept="false" bindtap="review"
+          >退回修改</button
+        ><button
+          class="primary"
+          disabled="{{busy}}"
+          loading="{{busy}}"
+          data-accept="true"
+          bindtap="review"
+          >通过审核</button
+        ></view
+      ></scroll-view
+    ></view
+  >
+  <confirm-sheet id="confirmSheet" />
+</view>

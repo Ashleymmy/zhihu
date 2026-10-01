@@ -1,0 +1,76 @@
+const test=require('node:test'),assert=require('node:assert/strict'),{fixture,scope}=require('./cloud-fixture.cjs'),d=require('../cloudfunctions/opc-api/lib/domain')
+const {run}=require('../cloudfunctions/opc-api/lib/worker')
+test('native keyword job matches the real strict Zhihu request contract',async()=>{
+ const f=await fixture(),admin=await f.login('admin')
+ const result=await f.call(admin,'POST','/modules/zhihu/keywords',{...scope,keyword:'contract-word',taskId:'20',mappingId:'40',landingUrl:'https://www.zhihu.com/a',popularizeType:0,requestKey:'native-contract-001'})
+ assert.equal(result.code,0)
+ const {resolveClientEndpoint}=require('../cloudfunctions/opc-api/vendor/zhihu/allianceEndpointRegistry'),{parseAllianceUpstreamRequest}=require('../cloudfunctions/opc-api/vendor/zhihu/allianceContracts')
+ await run(f.store,{request:async(method,path,payload)=>{parseAllianceUpstreamRequest(resolveClientEndpoint(method,'/alliance/api'+path),payload);return {plan_id:'600'}}})
+ const word=await f.store.get('keywords',result.data.id)
+ assert.equal(word.syncStatus,'synced')
+ // 旧 bug 就是漏掉这几行写入：拿到 plan_id 却只写 syncStatus，planStatus 留在 pending，
+ // 关键词于是显示成「已同步但计划还没过审」。这条断言是防它再溜回去的锁。
+ assert.equal(word.planStatus,'active')
+ assert.equal(word.lifecycleStatus,'available')
+ assert.ok(word.priorityUntil)
+})
+test('legacy plan requests are durable, use approved schema and do not replay uncertain writes',async()=>{
+ const f=await fixture(),creator=await f.login('creator');await f.store.remove('routes',d.hash(scope))
+ const body={...scope,taskId:'200',channelId:'300',keyword:'legacy-new-word',landingUrl:'https://www.zhihu.com/a',popularizeType:0,requestKey:'legacy-plan-create-001'}
+ const created=await f.call(creator,'POST','/modules/zhihu/plans',body);assert.equal(created.code,0,created.message)
+ assert.equal((await f.call(creator,'POST','/modules/zhihu/plans',body)).data.id,created.data.id)
+ let calls=0;await run(f.store,{request:async()=>{calls++;throw Error('timeout')}});await run(f.store,{request:async()=>{calls++;return {plan_id:'1'}}})
+ assert.equal(calls,1);assert.equal(f.dump('jobs')[0].status,'uncertain')
+ assert.equal((await f.call(creator,'POST','/modules/zhihu/plans/'+created.data.id+'/retry-sync',{...scope,requestKey:'legacy-plan-retry-001'})).statusCode,409)
+})
+test('upstream quota coordinates concurrent calls and charges failed attempts',async()=>{
+ const f=await fixture(),{acquire}=require('../cloudfunctions/opc-api/lib/quota')
+ const all=await Promise.allSettled(Array.from({length:5},()=>acquire(f.store)))
+ assert.equal(all.filter(r=>r.status==='fulfilled').length,4);assert.equal(all.filter(r=>r.status==='rejected').length,1)
+ for(const result of all)if(result.status==='fulfilled')await result.value()
+ const release=await acquire(f.store);await release()
+ const state=await f.store.get('limits','zhihu-'+d.today());assert.equal(state.count,5);assert.equal(Object.keys(state.leases).length,0)
+})
+test('direct alliance writes cannot bypass role checks and use durable requests',async()=>{
+ const f=await fixture(),admin=await f.login('admin'),creator=await f.login('creator')
+ const data={...scope,payload:{taskId:'200',channelId:'300',contentUrl:'https://www.zhihu.com/a',keyword:'direct-keyword',popularizeType:0},requestKey:'alliance-direct-001'}
+ assert.equal((await f.call(creator,'POST','/modules/zhihu/alliance/api/popularize_plan',data)).statusCode,403)
+ const first=await f.call(admin,'POST','/modules/zhihu/alliance/api/popularize_plan',data)
+ assert.equal(first.code,0,first.message);assert.equal((await f.call(admin,'POST','/modules/zhihu/alliance/api/popularize_plan',data)).data.jobId,first.data.jobId)
+ let requests=0;await run(f.store,{request:async()=>{requests++;return {plan_id:'9'}}});await run(f.store,{request:async()=>{requests++;return {plan_id:'9'}}})
+ assert.equal(requests,1);assert.equal((await f.store.get('jobs',first.data.jobId)).result.plan_id,'9')
+})
+
+test('legacy plans retain budget and dates without resubmitting synced metadata',async()=>{
+ const f=await fixture(),creator=await f.login('creator');await f.store.remove('routes',d.hash(scope))
+ const body={...scope,taskId:'200',channelId:'300',keyword:'metadata-word',landingUrl:'https://www.zhihu.com/a',popularizeType:0,dailyBudget:125.5,startDate:'2026-09-01',endDate:'2026-10-01',requestKey:'legacy-metadata-001'}
+ assert.equal((await f.call(creator,'POST','/modules/zhihu/plans',{...body,endDate:'2026-08-01'})).statusCode,422)
+ assert.equal((await f.call(creator,'POST','/modules/zhihu/plans',{...body,dailyBudget:-1})).statusCode,422)
+ const created=await f.call(creator,'POST','/modules/zhihu/plans',body);assert.equal(created.code,0,created.message)
+ const id=created.data.id,row=await f.store.get('legacy_plans',id)
+ assert.equal(row.dailyBudget,'125.5000');assert.equal(row.startDate,body.startDate);assert.equal(row.endDate,body.endDate)
+ await run(f.store,{request:async()=>({plan_id:'900'})})
+ const patch=await f.call(creator,'PATCH','/modules/zhihu/plans/'+id,{...scope,name:'Renamed',dailyBudget:null,requestKey:'legacy-metadata-002'})
+ assert.equal(patch.code,0,patch.message);assert.equal(patch.data.syncStatus,'synced');assert.equal(patch.data.dailyBudget,null)
+ assert.equal(f.dump('jobs')[0].status,'completed')
+ assert.equal((await f.call(creator,'PATCH','/modules/zhihu/plans/'+id,{...scope,landingUrl:'https://www.zhihu.com/b',requestKey:'legacy-metadata-003'})).statusCode,409)
+})
+
+test('legacy scoped reads, writes and workers cannot cross integration accounts',async()=>{
+ const f=await fixture(),creator=await f.login('creator'),admin=await f.login('admin'),other={projectId:'1',accountId:'11'}
+ await f.store.put('accounts','11',{id:'11',moduleId:'zhihu',status:'active'})
+ await f.store.put('links',d.hash(other),other)
+ await f.store.put('legacy_plans','80',{id:'80',...other,ownerId:'3',keyword:'other-account',status:'active',syncStatus:'failed',channelId:'300'})
+ assert.equal((await f.call(creator,'GET','/modules/zhihu/plans/80',scope)).statusCode,404)
+ assert.equal((await f.call(creator,'GET','/modules/zhihu/plans',scope)).data.total,0)
+ assert.equal((await f.call(creator,'PATCH','/modules/zhihu/plans/80',{...scope,name:'forged',requestKey:'legacy-scope-edit-001'})).statusCode,404)
+ assert.equal((await f.call(admin,'POST','/modules/zhihu/callbacks/rules',{...scope,planId:'80',callbackUrl:'https://example.com/callback',events:['approved'],requestKey:'legacy-scope-rule-001'})).statusCode,404)
+ const check=await f.call(creator,'POST','/modules/zhihu/plans/check-keyword',{...scope,channelId:'300',keyword:'other-account'})
+ assert.equal(check.data.available,false);assert.equal(check.data.planId,null);assert.equal(check.data.occupiedByMe,false)
+ await f.store.put('jobs','legacy-push-plan-80',{id:'legacy-push-plan-80',scope,type:'legacy-push-plan',resourceId:'80',status:'pending',nextAt:Date.now(),attempts:0})
+ let calls=0;await run(f.store,{request:async()=>{calls++;return {plan_id:'900'}}});assert.equal(calls,0)
+ await f.store.put('legacy_plans','81',{id:'81',projectId:'1',ownerId:'3',keyword:'source-era',status:'active'})
+ assert.equal((await f.call(creator,'GET','/modules/zhihu/plans/81',scope)).statusCode,409)
+ await f.store.remove('links',d.hash(other))
+ assert.equal((await f.call(creator,'GET','/modules/zhihu/plans/81',scope)).code,0)
+})

@@ -1,0 +1,4 @@
+/* Shared layout is defined in app.wxss. */
+
+.row button { display: inline-block !important; width: auto !important; margin: 0 !important; flex-shrink: 0; }
+.modal .row button { display: inline-block !important; width: auto !important; margin: 0 !important; flex-shrink: 0; }

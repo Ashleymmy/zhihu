@@ -1,0 +1,12 @@
+/* 我的页：资料头 + 单元格列表（基础样式在 app.wxss） */
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 8rpx;
+  flex-wrap: wrap;
+}

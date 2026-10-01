@@ -1,0 +1,157 @@
+<import src="../../templates/shared.wxml" />
+<view class="page"
+  ><role-nav user="{{user}}" active="team" />
+  <view class="row page-heading"
+    ><view
+      ><view class="title">团队成员</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
+  /><block wx:if="{{allowed && scopeReady}}">
+    <view class="card" wx:if="{{credentials}}"
+      ><view class="section-title">新账号已创建</view
+      ><view selectable>账号：{{credentials.username}}</view
+      ><view selectable>临时密码：{{credentials.password}}</view
+      ><text class="muted"
+        >请妥善交付给成员，首次登录需修改密码。离开本页后不再显示。</text
+      ><button size="mini" bindtap="dismissCredentials"
+        >已记录，隐藏密码</button
+      ></view
+    >
+    <view class="card"
+      ><view class="section-head"
+        ><view class="section-title">成员列表</view
+        ><button size="mini" disabled="{{busy}}" bindtap="toggleForm"
+          >{{formOpen ? '收起' : '新增成员'}}</button
+        ></view
+      >
+      <view wx:if="{{formOpen}}" class="form-box">
+        <view class="field"
+          ><text class="field-label">登录账号</text
+          ><input
+            data-name="form.username"
+            value="{{form.username}}"
+            maxlength="64"
+            bindinput="input"
+        /></view>
+        <view class="field"
+          ><text class="field-label">成员姓名</text
+          ><input
+            data-name="form.displayName"
+            value="{{form.displayName}}"
+            maxlength="64"
+            bindinput="input"
+        /></view>
+        <view class="field"
+          ><text class="field-label">联系电话（选填）</text
+          ><input
+            data-name="form.phone"
+            value="{{form.phone}}"
+            maxlength="20"
+            bindinput="input"
+        /></view>
+        <view class="field" wx:if="{{isAdmin}}"
+          ><text class="field-label">角色</text
+          ><picker
+            range="{{roles}}"
+            value="{{roleIndex}}"
+            bindchange="chooseRole"
+            >{{roles[roleIndex]}} ▾</picker
+          ></view
+        >
+        <view class="field" wx:if="{{isAdmin && roleIndex === 0}}"
+          ><text class="field-label">所属团长（选填）</text
+          ><picker
+            range="{{leaders}}"
+            range-key="displayName"
+            value="{{leaderIndex}}"
+            bindchange="chooseLeader"
+            >{{leaderIndex >= 0 ? leaders[leaderIndex].displayName :
+            '直属达人，暂不入团'}} ▾</picker
+          ><button size="mini" bindtap="clearLeader">设为直属达人</button></view
+        >
+        <text class="muted"
+          >新账号创建后，可在成员编辑中分配可用项目。团长创建的达人自动加入自己的团队。</text
+        ><button
+          class="primary"
+          disabled="{{busy}}"
+          loading="{{busy}}"
+          bindtap="create"
+          >创建账号</button
+        >
+      </view>
+      <view wx:for="{{members}}" wx:key="id" class="list-item"
+        ><view class="row"
+          ><view class="item-title">{{item.displayName}}</view
+          ><button
+            size="mini"
+            data-index="{{index}}"
+            disabled="{{busy || loading}}"
+            wx:if="{{item.canManage}}" bindtap="manage"
+            >管理</button
+          ></view
+        ><view class="row entry-sub"
+          ><text class="muted"
+            >{{item.username}} · {{item.phone || '未填写电话'}}</text
+          ><text class="tag {{item.active ? '' : 'tag-clay'}}"
+            >{{item.roleText}} · {{item.active ? '启用' : '停用'}}</text
+          ></view
+        ></view
+      ><state-view
+        wx:if="{{!loading && !members.length}}"
+        text="暂无团队成员。"
+      />
+    </view>
+    <view class="card"
+      ><view class="section-title">待处理入团申请</view
+      ><view wx:for="{{applications}}" wx:key="id" class="list-item"
+        ><view class="item-title"
+          >{{item.creatorName || item.creatorUsername}} →
+          {{item.leaderName}}</view
+        ><view class="muted">{{item.message || '未填写申请说明'}}</view
+        ><view class="wrap actions"
+          ><button
+            size="mini"
+            data-index="{{index}}"
+            data-action="approve"
+            disabled="{{busy}}"
+            bindtap="reviewApplication"
+            >同意</button
+          ><button
+            size="mini"
+            data-index="{{index}}"
+            data-action="reject"
+            disabled="{{busy}}"
+            bindtap="reviewApplication"
+            >拒绝</button
+          ></view
+        ></view
+      ><state-view
+        wx:if="{{!loading && !applications.length}}"
+        text="暂无待处理申请。"
+    /></view>
+    <view wx:if="{{selected}}" class="modal-mask"><scroll-view scroll-y class="modal">
+      <view class="row"><text class="section-title">{{selected.displayName}}</text><button size="mini" disabled="{{busy}}" bindtap="closeManage">关闭</button></view>
+      <view class="muted">{{selected.username}} · {{selected.roleText}} · {{selected.active ? '启用中' : '已停用'}}</view>
+      <view class="field"><text class="field-label">成员姓名</text><input data-name="editName" value="{{editName}}" maxlength="64" bindinput="input" /></view>
+      <view class="field"><text class="field-label">联系电话</text><input data-name="editPhone" value="{{editPhone}}" maxlength="20" bindinput="input" /></view>
+      <view wx:if="{{selected.canAssignProjects}}" class="field"><text class="field-label">分配项目</text><checkbox-group bindchange="projectChange"><label wx:for="{{projectSelection}}" wx:key="id"><checkbox value="{{item.id}}" checked="{{item.checked}}" disabled="{{busy}}" />{{item.name}}</label></checkbox-group></view>
+      <button disabled="{{busy}}" bindtap="saveMember">保存资料</button>
+      <view class="field"><text class="field-label">新密码（留空则由服务端生成一次性临时密码）</text><input data-name="resetPassword" value="{{resetPassword}}" maxlength="128" bindinput="input" /></view>
+      <button disabled="{{busy}}" bindtap="resetMemberPassword">重置密码</button>
+      <button wx:if="{{selected.active && !selected.self}}" class="danger" disabled="{{busy}}" bindtap="disableMember">停用账号</button>
+      <button wx:if="{{!selected.self}}" class="danger" disabled="{{busy}}" bindtap="deleteMember">删除成员</button>
+      <view wx:if="{{error}}" class="error">{{error}}</view>
+    </scroll-view></view>
+    <button wx:if="{{canManageProjects}}" data-path="/pages/projects/index" bindtap="open"
+      >前往项目管理授权成员</button
+    >
+  </block>
+  <confirm-sheet id="confirmSheet" />
+</view
+>

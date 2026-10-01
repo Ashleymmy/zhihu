@@ -1,0 +1,75 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/register/index",
+    "pages/bind/index",
+    "pages/invite/index",
+    "pages/agreement/index",
+    "pages/home/index",
+    "pages/college/index",
+    "pages/income/index",
+    "pages/tools/index",
+    "pages/zhihu/index",
+    "pages/keywords/index",
+    "pages/keywords/create/index",
+    "pages/works/index",
+    "pages/wallet/index",
+    "pages/mine/index",
+    "pages/withdrawals/index",
+    "pages/admin/index",
+    "pages/team/index",
+    "pages/projects/index",
+    "pages/prices/index",
+    "pages/password/index",
+    "pages/profile/index",
+    "pages/reports/index"
+  ],
+  "window": {
+    "backgroundColor": "#f5f6f5",
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "TIMO",
+    "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "color": "#9aa8a2",
+    "selectedColor": "#214239",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "images/tabs/home.png",
+        "selectedIconPath": "images/tabs/home-active.png"
+      },
+      {
+        "pagePath": "pages/college/index",
+        "text": "学院",
+        "iconPath": "images/tabs/college.png",
+        "selectedIconPath": "images/tabs/college-active.png"
+      },
+      {
+        "pagePath": "pages/income/index",
+        "text": "收益",
+        "iconPath": "images/tabs/income.png",
+        "selectedIconPath": "images/tabs/income-active.png"
+      },
+      {
+        "pagePath": "pages/tools/index",
+        "text": "工具",
+        "iconPath": "images/tabs/tools.png",
+        "selectedIconPath": "images/tabs/tools-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "images/tabs/mine.png",
+        "selectedIconPath": "images/tabs/mine-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

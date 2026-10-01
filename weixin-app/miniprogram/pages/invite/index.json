@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "邀请好友",
+  "usingComponents": {
+    "state-view": "/components/state/index",
+    "skeleton": "/components/skeleton/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

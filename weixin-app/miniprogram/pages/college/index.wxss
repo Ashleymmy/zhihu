@@ -1,0 +1,60 @@
+/* 学院页：左封面右信息的课程卡 + 详情弹层 */
+.tier-sub {
+  margin: -12rpx 0 8rpx;
+}
+.course {
+  display: flex;
+  gap: 22rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--line);
+}
+.course:last-of-type {
+  border-bottom: 0;
+}
+.course-cover {
+  width: 220rpx;
+  height: 124rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: var(--paper-deep);
+}
+.course-main {
+  flex: 1;
+  min-width: 0;
+}
+.course-main .item-title {
+  margin: 0 0 6rpx;
+}
+.course-meta {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+.detail-cover {
+  width: 100%;
+  height: 320rpx;
+  border-radius: 16rpx;
+  background: var(--paper-deep);
+}
+.detail-meta {
+  margin: 18rpx 0 8rpx;
+}
+.detail-intro {
+  margin: 10rpx 0 6rpx;
+  font-size: 27rpx;
+  line-height: 1.7;
+}
+.detail-section {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid var(--line);
+}
+.detail-section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 10rpx;
+}
+.detail-section-body {
+  color: var(--ink-soft);
+  font-size: 26rpx;
+  line-height: 1.8;
+}

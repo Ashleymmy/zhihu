@@ -1,0 +1,44 @@
+/* 协议页：正式阅读版式（通栏正文，非卡片） */
+.agreement-page {
+  background: var(--white);
+  min-height: 100vh;
+  padding: 40rpx 40rpx 80rpx;
+}
+.agreement-doc-title {
+  text-align: center;
+  font-size: 44rpx;
+  font-weight: 700;
+  margin: 24rpx 0 28rpx;
+  color: var(--ink);
+}
+.agreement-date {
+  font-size: 24rpx;
+  color: var(--ink-soft);
+  line-height: 1.8;
+}
+.agreement-notice {
+  margin: 32rpx 0;
+  font-size: 26rpx;
+  line-height: 1.9;
+  color: var(--ink);
+}
+.agreement-section {
+  margin-top: 36rpx;
+}
+.agreement-h {
+  font-size: 28rpx;
+  font-weight: 700;
+  margin-bottom: 14rpx;
+  color: var(--ink);
+}
+.agreement-p {
+  font-size: 27rpx;
+  line-height: 1.9;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.agreement-end {
+  margin-top: 48rpx;
+  font-size: 24rpx;
+  color: var(--ink-soft);
+}

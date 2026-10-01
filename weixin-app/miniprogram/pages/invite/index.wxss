@@ -1,0 +1,75 @@
+/* 邀请好友页：品牌绿主卡 + 大邀请码 */
+.invite-card {
+  background: linear-gradient(135deg, #17352e 0%, #214239 55%, #2f6b52 100%);
+  border-radius: var(--radius);
+  padding: 40rpx 30rpx;
+  margin-bottom: 22rpx;
+  color: #fff;
+  text-align: center;
+}
+.invite-label {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.75);
+}
+.invite-code {
+  margin: 16rpx 0;
+  font-size: 64rpx;
+  font-weight: 700;
+  letter-spacing: 12rpx;
+  padding-left: 12rpx;
+}
+.invite-sub {
+  font-size: 23rpx;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.6;
+}
+.invite-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 30rpx;
+}
+.invite-btn {
+  flex: 1;
+  min-width: 0;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0 8rpx;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.invite-btn::after {
+  border: 0;
+}
+.invite-btn-primary {
+  background: #fff;
+  color: var(--forest);
+}
+/* 海报：离屏画布 + 预览弹层 */
+.poster-canvas {
+  position: fixed;
+  left: -2000rpx;
+  top: 0;
+  width: 375px;
+  height: 590px;
+}
+.poster-modal {
+  height: auto;
+  max-height: 86vh;
+}
+.poster-preview {
+  width: 100%;
+  max-height: 56vh;
+  object-fit: contain;
+  border-radius: 16rpx;
+  background: var(--paper-deep);
+}
+.poster-tip {
+  margin: 16rpx 0 8rpx;
+  text-align: center;
+}

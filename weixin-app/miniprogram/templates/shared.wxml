@@ -1,0 +1,51 @@
+<template name="status">
+  <view wx:if="{{guest}}" class="card empty"
+    >登录后使用此页面的全部功能。<button
+      class="primary"
+      size="mini"
+      bindtap="toLogin"
+      >立即登录</button
+    ></view
+  >
+  <view wx:if="{{denied}}" class="card empty"
+    >当前账号没有此页面权限。<button bindtap="home">返回工作台</button></view
+  >
+  <view wx:if="{{error}}" class="error"
+    >{{error}}<button size="mini" bindtap="load" disabled="{{busy}}"
+      >重新加载</button
+    ></view
+  >
+  <view wx:if="{{notice}}" class="notice">{{notice}}</view>
+  <view wx:if="{{loading && !skeleton}}" class="loading">正在加载…</view>
+  <view wx:if="{{allowed && !loading && !scopeReady}}" class="card empty"
+    >{{scopeNotice || '请先选择业务项目和知乎接入账号'}}<button bindtap="home"
+      >前往工作台</button
+    ></view
+  >
+</template>
+<template name="pager">
+  <view class="row pager" wx:if="{{total > pageSize}}">
+    <button
+      size="mini"
+      disabled="{{page <= 1 || loading || busy}}"
+      bindtap="prev"
+      >上一页</button
+    >
+    <text class="muted">第 {{page}} 页 · 共 {{total}} 条</text>
+    <button
+      size="mini"
+      disabled="{{page * pageSize >= total || loading || busy}}"
+      bindtap="next"
+      >下一页</button
+    >
+  </view>
+</template>
+<!-- 无限滚动页的收尾条：加载中提示 / 到底提示 -->
+<template name="loadmore">
+  <view class="loadmore" wx:if="{{loadingMore || total > 0}}">
+    <text class="loadmore-text" wx:if="{{loadingMore}}">正在加载…</text>
+    <text class="loadmore-text" wx:elif="{{page * pageSize >= total}}"
+      >没有更多了</text
+    >
+  </view>
+</template>

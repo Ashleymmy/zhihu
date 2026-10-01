@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "state-view": "/components/state/index",
+    "project-picker": "/components/project-picker/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

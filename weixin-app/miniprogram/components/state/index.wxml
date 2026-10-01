@@ -1,0 +1,12 @@
+<view class="state state-{{type}} state-in">
+  <view class="state-icon {{type === 'error' ? 'state-icon-error' : ''}}">
+    <text>{{type === 'error' ? '!' : '空'}}</text>
+  </view>
+  <text class="state-text">{{text || (type === 'error' ? '暂时无法加载，请稍后重试' : '暂无数据')}}</text>
+  <button
+    wx:if="{{guideText && guidePath}}"
+    class="primary state-guide"
+    size="mini"
+    bindtap="goGuide"
+  >{{guideText}}</button>
+</view>

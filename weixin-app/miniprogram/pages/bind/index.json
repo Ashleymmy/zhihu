@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "绑定手机号",
+  "usingComponents": {
+    "confirm-sheet": "/components/confirm-sheet/index"
+  }
+}

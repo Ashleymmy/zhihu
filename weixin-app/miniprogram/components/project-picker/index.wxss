@@ -1,0 +1,19 @@
+:host {
+  display: block;
+}
+.field {
+  margin: 22rpx 0;
+}
+.label {
+  display: block;
+  color: var(--ink-soft, #7c8883);
+  font-size: 24rpx;
+  margin-bottom: 12rpx;
+}
+.choice {
+  padding: 20rpx 22rpx;
+  border-radius: 14rpx;
+  background: var(--paper, #f5f6f5);
+  color: var(--ink, #1d2723);
+  font-size: 28rpx;
+}

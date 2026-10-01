@@ -1,0 +1,146 @@
+<import src="../../templates/shared.wxml" />
+<view class="page"
+  ><role-nav user="{{user}}" active="prices" />
+  <view class="row page-heading"
+    ><view
+      ><view class="title">定价规则</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}" /><block
+    wx:if="{{allowed && scopeReady}}"
+  >
+    <!-- 设置单价 -->
+    <view class="card rise rise-d1"
+      ><text class="muted"
+        >按有效订单设置单价。为具体成员设置有效单价；先保存草稿，核对后发布。</text
+      >
+      <view class="wrap" style="margin-top: 20rpx;"
+        ><button size="mini" bindtap="toggleForm"
+          >{{formOpen ? '收起' : '设置单价'}}</button
+        ></view
+      >
+      <view wx:if="{{formOpen}}" class="form-box"
+        ><view class="field"
+          ><text class="field-label">推广任务</text
+          ><picker
+            range="{{tasks}}"
+            range-key="name"
+            value="{{taskIndex}}"
+            bindchange="chooseTask"
+            >{{taskIndex >= 0 ? tasks[taskIndex].name : '请选择任务'}} ▾</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">收款对象（全局价按角色统一，个人价选具体成员）</text
+          ><picker
+            range="{{payees}}"
+            range-key="displayName"
+            value="{{payeeIndex}}"
+            bindchange="choosePayee"
+            >{{payeeIndex >= 0 ? payees[payeeIndex].displayName : '请选择收款对象'}}
+            ▾</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">每单金额（最多四位小数）</text
+          ><input
+            type="digit"
+            data-name="form.unitPrice"
+            value="{{form.unitPrice}}"
+            maxlength="16"
+            bindinput="input" /></view
+        ><view class="field"
+          ><text class="field-label">生效日期</text
+          ><picker
+            mode="date"
+            data-name="form.from"
+            value="{{form.from}}"
+            bindchange="input"
+            >{{form.from}}</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">截止日期（不含，选填）</text
+          ><picker
+            mode="date"
+            data-name="form.to"
+            value="{{form.to}}"
+            bindchange="input"
+            >{{form.to || '长期有效'}}</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">定价或调价原因</text
+          ><textarea
+            data-name="form.reason"
+            value="{{form.reason}}"
+            maxlength="500"
+            bindinput="input"
+          /></view
+        ><button
+          class="primary"
+          disabled="{{busy}}"
+          loading="{{busy}}"
+          bindtap="create"
+          >保存草稿</button
+        ></view
+      >
+    </view>
+
+    <!-- 角色全局价 -->
+    <block wx:if="{{roleList.length}}">
+      <view class="section-title block-title">角色全局价</view>
+      <view class="card rise" wx:for="{{roleList}}" wx:key="versionId"
+        ><view class="row"
+          ><view class="item-title">{{item.taskName}}</view
+          ><text class="tag {{item.priceStatus === 'published' ? '' : 'tag-sun'}}"
+            >{{item.priceStatus === 'published' ? '已发布' : '草稿'}}</text
+          ></view
+        ><view
+          ><text class="tag tag-moss">{{item.payeeName}}</text> ¥{{item.price}} /
+          单</view
+        ><view class="muted"
+          >{{item.startDay}} 至 {{item.endDay || '长期有效'}}</view
+        ><button
+          wx:if="{{item.canPublish}}"
+          size="mini"
+          disabled="{{busy}}"
+          data-id="{{item.versionId}}"
+          bindtap="publish"
+          >核对并发布</button
+        ></view
+      >
+    </block>
+
+    <!-- 个人定价 -->
+    <block wx:if="{{memberList.length}}">
+      <view class="section-title block-title">个人定价（优先于全局价）</view>
+      <view class="card" wx:for="{{memberList}}" wx:key="versionId"
+        ><view class="row"
+          ><view class="item-title">{{item.taskName}}</view
+          ><text class="tag {{item.priceStatus === 'published' ? '' : 'tag-sun'}}"
+            >{{item.priceStatus === 'published' ? '已发布' : '草稿'}}</text
+          ></view
+        ><view>{{item.payeeName}} · ¥{{item.price}} / 单</view
+        ><view class="muted"
+          >{{item.startDay}} 至 {{item.endDay || '长期有效'}}</view
+        ><button
+          wx:if="{{item.canPublish}}"
+          size="mini"
+          disabled="{{busy}}"
+          data-id="{{item.versionId}}"
+          bindtap="publish"
+          >核对并发布</button
+        ></view
+      >
+    </block>
+    <state-view
+      wx:if="{{!loading && !error && !list.length}}"
+      text="暂无定价，点上方「达人全局价」先设置角色统一单价。"
+    /><template
+      is="pager"
+      data="{{total, page, loading, busy, pageSize: 20}}"
+    /> </block
+  ><confirm-sheet id="confirmSheet" /></view
+>

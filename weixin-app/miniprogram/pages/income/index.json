@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "收益",
+  "usingComponents": {
+    "state-view": "/components/state/index",
+    "skeleton": "/components/skeleton/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

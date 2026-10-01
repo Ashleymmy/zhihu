@@ -1,0 +1,5 @@
+{
+  "ready": true,
+  "blockers": [],
+  "note": "2026-09-18 用户决定：正式生产环境暂缓建立，先用独立测试环境 test-opc-app-d3gki762bfb61da92 预演上线流程，并明确要求破例放行 ready 门禁（赶工）。ready=true 在此的语义是「接口迁移与云端验收完成、接受剩余风险」，不是「可以对外发布」。本轮 seal 前的独立回读证据：数据导入 verified=true（27 批 203 条，missing/mismatched/invalidCounts 全空）、历史发票已迁入云存储并核对哈希（sealed-invoices/legacy-3/353f95f4….pdf）、44 条查询索引回读 desired=44 present=44 missing=0、隔离业务验收 passed（seed/roles/operations/finance/cleanup 全 true）、事务原语七项全通过、三函数凭据与回传加密配置核实（check-runtime）。仍未完成、上线前必须补齐：1) 正式生产环境尚未建立，env.js 的 production 仍指向开发环境，release 版继续被守卫拒绝启动；2) 五角色真机端到端验收与小程序后台 downloadFile 合法域名配置；3) 大账户容量与生产恢复演练。"
+}

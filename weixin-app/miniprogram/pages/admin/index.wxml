@@ -1,0 +1,98 @@
+<import src="../../templates/shared.wxml" />
+<view class="page"
+  ><role-nav user="{{user}}" active="admin" />
+  <view class="row page-heading"
+    ><view
+      ><view class="title">运营管理</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}" /><block
+    wx:if="{{allowed && scopeReady}}"
+  >
+    <view class="card" wx:if="{{mappingScope.accountId}}">
+      <view class="section-title">知乎渠道与任务</view>
+      <button disabled="{{busy}}" bindtap="syncChannels">同步渠道</button>
+      <view class="field"><text class="field-label">知乎渠道</text><picker range="{{channels}}" range-key="name" value="{{syncChannelIndex}}" bindchange="chooseSyncChannel">{{channels[syncChannelIndex].name || '暂无渠道，请先同步'}} ▾</picker></view>
+      <button disabled="{{busy}}" bindtap="syncTasks">{{hasMoreTasks ? '继续同步下一批任务' : '同步渠道任务'}}</button>
+    </view>
+    <view class="card"
+      ><view class="section-title">业务管理</view
+      ><view class="menu-grid">
+        <button wx:if="{{canManageProjects}}" data-path="/pages/projects/index" bindtap="open"
+          >项目与授权</button
+        ><button data-path="/pages/team/index" bindtap="open">团队成员</button>
+        <button data-path="/pages/keywords/index" bindtap="open"
+          >关键词分发</button
+        ><button data-path="/pages/works/index" bindtap="open">作品审核</button
+        ><button data-path="/pages/prices/index" bindtap="open"
+          >定价规则</button
+        >
+      </view></view
+    >
+    <view class="card"
+      ><view class="section-head"
+        ><view class="section-title">渠道映射</view
+        ><button
+          size="mini"
+          disabled="{{busy || !channels.length}}"
+          bindtap="toggleForm"
+          >{{formOpen ? '收起' : '新增映射'}}</button
+        ></view
+      ><view class="muted">{{scopeNotice}}</view>
+      <view wx:if="{{formOpen}}" class="form-box"
+        ><view class="field"
+          ><text class="field-label">项目渠道</text
+          ><picker
+            range="{{channels}}"
+            range-key="name"
+            value="{{channelIndex}}"
+            bindchange="chooseChannel"
+            >{{channels[channelIndex].name}} ▾</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">知乎报表渠道名称</text
+          ><input
+            data-name="form.name"
+            value="{{form.name}}"
+            maxlength="255"
+            bindinput="input" /></view
+        ><view class="field"
+          ><text class="field-label">生效日期</text
+          ><picker
+            mode="date"
+            value="{{form.from}}"
+            data-name="form.from"
+            bindchange="input"
+            >{{form.from}}</picker
+          ></view
+        ><view class="field"
+          ><text class="field-label">截止日期（不含，选填）</text
+          ><picker
+            mode="date"
+            value="{{form.to}}"
+            data-name="form.to"
+            bindchange="input"
+            >{{form.to || '长期有效'}}</picker
+          ></view
+        ><button
+          class="primary"
+          disabled="{{busy}}"
+          loading="{{busy}}"
+          bindtap="createMapping"
+          >创建映射</button
+        ></view
+      >
+      <view wx:for="{{mappings}}" wx:key="id" class="list-item"
+        ><text>{{item.channelName}}</text
+        ><view class="muted">项目渠道编号 {{item.channelId}}</view></view
+      ><state-view
+        wx:if="{{!loading && !mappings.length}}"
+        text="暂无映射，请先选择项目和接入账号。"
+      />
+    </view> </block
+></view>

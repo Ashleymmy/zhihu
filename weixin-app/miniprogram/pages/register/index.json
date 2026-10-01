@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "注册账号",
+  "usingComponents": {
+    "confirm-sheet": "/components/confirm-sheet/index"
+  }
+}

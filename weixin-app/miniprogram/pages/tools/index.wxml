@@ -1,0 +1,30 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <view class="title">工具</view>
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
+  />
+  <view class="channel-grid" wx:if="{{allowed}}">
+    <view
+      class="channel-card"
+      wx:for="{{tools}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="openTool"
+    >
+      <view class="row channel-head">
+        <view
+          class="channel-logo"
+          style="background: {{item.tint}};"
+          ><image wx:if="{{item.iconImg}}" class="icon-img" src="{{item.iconImg}}" mode="aspectFit" /><text wx:else style="color: {{item.fg}};">{{item.icon}}</text></view
+        >
+        <text class="tag {{item.enabled ? '' : 'tag-sun'}}"
+          >{{item.enabled ? '已开通' : '未开通'}}</text
+        >
+      </view>
+      <view class="channel-name">{{item.name}}</view>
+      <view class="channel-desc">{{item.desc}}</view>
+    </view>
+  </view>
+</view>

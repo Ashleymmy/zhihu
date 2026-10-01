@@ -1,0 +1,172 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <!-- 品牌行 -->
+  <view class="brand-row">
+    <view class="brand-logo">T</view>
+    <view class="brand-main">
+      <view class="brand-name">TIMO</view>
+      <text class="muted">多渠道 OPC 业务平台</text>
+    </view>
+    <text class="hero-tag" wx:if="{{roleLabel}}">{{roleLabel}}</text>
+  </view>
+
+  <!-- 搜索入口：跳关键词页 -->
+  <view class="home-search rise" hover-class="press" bindtap="toSearch">
+    <text class="home-search-icon">⌕</text>
+    <text class="home-search-ph">搜索关键词 / 查看我的任务</text>
+  </view>
+
+  <!-- banner 轮播（占位海报，运营图就绪后替换） -->
+  <swiper
+    class="banner-swiper rise rise-d1"
+    autoplay
+    circular
+    interval="4500"
+    duration="400"
+    indicator-dots
+    indicator-color="rgba(255,255,255,.4)"
+    indicator-active-color="#ffffff"
+  >
+    <swiper-item wx:for="{{banners}}" wx:key="key">
+      <view
+        class="banner-slide"
+        data-path="{{item.path}}"
+        bindtap="openBanner"
+      >
+        <image class="banner-img" src="{{item.image}}" mode="aspectFill" />
+        <view class="banner-copy">
+          <view class="banner-title">{{item.title}}</view>
+          <view class="banner-sub">{{item.subtitle}}</view>
+        </view>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <!-- 运营公告（真实数据，点开看全文） -->
+  <view
+    class="notice-bar rise rise-d2"
+    wx:if="{{announcements.length}}"
+    hover-class="press"
+    bindtap="openAnnouncements"
+  >
+    <view class="notice-icon">告</view>
+    <text class="notice-text">{{announcements[0].title}}</text>
+    <text class="notice-arrow">›</text>
+  </view>
+
+  <!-- 工作台摘要：今日预估 / 进行中 / 待审核 -->
+  <view class="card stats-card stats-row rise rise-d2" wx:if="{{summary}}">
+    <view class="stat" data-path="/pages/income/index" hover-class="press" bindtap="open">
+      <text class="stat-num">¥{{summary.todayAmount}}</text>
+      <text class="stat-label">{{isStaff ? '今日应付' : '今日预估'}}</text>
+    </view>
+    <view class="stat" data-path="/pages/keywords/index" hover-class="press" bindtap="open">
+      <text class="stat-num">{{summary.keywordCount}}</text>
+      <text class="stat-label">可见关键词</text>
+    </view>
+    <view class="stat" data-path="/pages/works/index" hover-class="press" bindtap="open">
+      <text class="stat-num {{summary.workCount > 0 ? 'text-sun' : ''}}">{{summary.workCount}}</text>
+      <text class="stat-label">作品登记</text>
+    </view>
+  </view>
+
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
+  />
+  <block wx:if="{{allowed}}">
+    <view class="card rise" wx:if="{{user && user.role !== 'creator'}}">
+      <view class="section-title">当前业务范围</view>
+      <project-picker
+        projects="{{projects}}"
+        accounts="{{accounts}}"
+        project-index="{{projectIndex}}"
+        account-index="{{accountIndex}}"
+        disabled="{{loading || busy}}"
+        bind:projectchange="onProjectChange"
+        bind:accountchange="onAccountChange"
+      />
+      <view class="empty" wx:if="{{scopeNotice}}">{{scopeNotice}}</view>
+    </view>
+    <view class="balance-card rise" wx:if="{{balance}}"
+      ><view class="balance-head"
+        ><view
+          ><view class="balance-label">可提现金额（元）</view
+          ><view class="balance-value">¥{{balance.available}}</view></view
+        ><button size="mini" data-path="/pages/wallet/index" bindtap="open"
+          >去提现</button
+        ></view
+      ><view class="balance-sub"
+        >待开放 ¥{{balance.held}} · 处理中 ¥{{balance.processing}} · 已到账
+        ¥{{balance.paid}}</view
+      ></view
+    >
+  </block>
+
+  <!-- 渠道矩阵：游客也可浏览 -->
+  <view class="section-title block-title rise">业务渠道</view>
+  <view class="channel-grid rise rise-d1">
+    <view
+      class="channel-card"
+      wx:for="{{channels}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      hover-class="press"
+      bindtap="openChannel"
+    >
+      <view class="row channel-head">
+        <view
+          wx:if="{{item.logo}}"
+          class="channel-logo channel-logo-frame"
+        ><image class="channel-logo-img" src="{{item.logo}}" mode="aspectFit" /></view>
+        <view
+          wx:else
+          class="channel-logo"
+          style="background: {{item.tint}}; color: {{item.fg}};"
+          >{{item.icon}}</view
+        >
+        <text class="tag {{item.open ? '' : 'tag-sun'}}"
+          >{{item.open ? '已开通' : '敬请期待'}}</text
+        >
+      </view>
+      <view class="channel-name">{{item.name}}</view>
+      <view class="channel-desc">{{item.desc}}</view>
+    </view>
+  </view>
+
+  <block wx:if="{{allowed}}">
+    <view class="card rise" wx:if="{{menus.length}}">
+      <view class="section-title">快捷入口</view>
+      <view class="func-grid"
+        ><view
+          class="func-item"
+          wx:for="{{menus}}"
+          wx:key="key"
+          data-path="{{item.path}}"
+          hover-class="press"
+          bindtap="open"
+          ><view
+            class="func-icon"
+            style="background: {{item.tint}};"
+            ><image wx:if="{{item.iconImg}}" class="icon-img" src="{{item.iconImg}}" mode="aspectFit" /><text wx:else style="color: {{item.fg}};">{{item.icon}}</text></view
+          ><text class="func-label">{{item.label}}</text></view
+        ></view
+      >
+    </view>
+  </block>
+
+  <!-- 公告详情弹层 -->
+  <view wx:if="{{showAnnouncements}}" class="modal-mask">
+    <scroll-view scroll-y class="modal">
+      <view class="row">
+        <view class="section-title">平台公告</view>
+        <button size="mini" bindtap="closeAnnouncements">关闭</button>
+      </view>
+      <view class="announce-item" wx:for="{{announcements}}" wx:key="id">
+        <view class="item-title">{{item.title}}</view>
+        <view class="announce-body">{{item.content}}</view>
+        <view class="muted announce-time">{{item.createdAt}}</view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

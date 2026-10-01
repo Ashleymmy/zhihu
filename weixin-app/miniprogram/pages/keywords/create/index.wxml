@@ -1,0 +1,56 @@
+<import src="../../../templates/shared.wxml" />
+<view class="page">
+  <template is="status" data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}" />
+  <block wx:if="{{allowed && scopeReady}}">
+    <view wx:if="{{options.tasks.length > 1 || options.mappings.length > 1}}" class="picker-bar">
+      <view class="picker-item" wx:if="{{options.tasks.length > 1}}">
+        <text class="picker-label">任务</text>
+        <picker range="{{options.tasks}}" range-key="name" value="{{taskIndex}}" bindchange="chooseTask">
+          <text class="picker-val">{{options.tasks[taskIndex].name}} ▾</text>
+        </picker>
+      </view>
+      <view class="picker-item" wx:if="{{options.mappings.length > 1}}">
+        <text class="picker-label">渠道</text>
+        <picker range="{{options.mappings}}" range-key="channelName" value="{{mappingIndex}}" bindchange="chooseMapping">
+          <text class="picker-val">{{options.mappings[mappingIndex].channelName}} ▾</text>
+        </picker>
+      </view>
+    </view>
+
+    <view class="kw-list">
+      <view class="kw-card" wx:for="{{items}}" wx:key="index">
+        <view class="kw-seq">序号{{index + 1}}</view>
+        <view wx:if="{{items.length > 1}}" class="kw-remove" data-index="{{index}}" bindtap="removeItem">×</view>
+        <view class="field-row">
+          <text class="field-req">*</text>
+          <text class="field-label">关键词</text>
+        </view>
+        <input
+          class="kw-input"
+          placeholder="请输入关键词"
+          value="{{item.keyword}}"
+          data-index="{{index}}"
+          bindinput="inputKeyword"
+          disabled="{{busy}}"
+        />
+        <view class="field-row" style="margin-top:24rpx">
+          <text class="field-req">*</text>
+          <text class="field-label">文章链接</text>
+        </view>
+        <input
+          class="kw-input"
+          placeholder="请输入文章链接"
+          value="{{item.landingUrl}}"
+          data-index="{{index}}"
+          bindinput="inputUrl"
+          disabled="{{busy}}"
+        />
+      </view>
+    </view>
+  </block>
+
+  <view class="bottom-bar">
+    <button class="btn-add" bindtap="addItem" disabled="{{busy || !allowed}}">+ 新增</button>
+    <button class="btn-confirm primary" bindtap="confirm" loading="{{busy}}" disabled="{{busy || !allowed}}">确认</button>
+  </view>
+</view>

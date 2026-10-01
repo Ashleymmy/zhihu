@@ -1,0 +1,16 @@
+<view class="sk" aria-hidden="true">
+  <view wx:if="{{type === 'page'}}" class="sk-block sk-title"></view>
+  <view wx:if="{{type === 'stats'}}" class="sk-stats">
+    <view class="sk-block sk-stat"></view>
+    <view class="sk-block sk-stat"></view>
+    <view class="sk-block sk-stat"></view>
+  </view>
+  <view wx:for="{{rows}}" wx:key="*this" class="sk-card">
+    <view class="sk-row">
+      <view class="sk-block sk-line w60"></view>
+      <view class="sk-block sk-pill"></view>
+    </view>
+    <view class="sk-block sk-line w90"></view>
+    <view class="sk-block sk-line w45"></view>
+  </view>
+</view>

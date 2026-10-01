@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { ResultSetHeader, RowDataPacket, type PoolConnection } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
 import { AuthUser, Role } from '../types';
@@ -85,8 +85,10 @@ async function issueAccessToken(user: UserRow, role: Role, sessionId: string) {
 export async function register(
   input: { username: string; password: string; displayName?: string; phone?: string; invitationToken?: string },
   ip?: string,
+  onCreated?: (connection: PoolConnection, id: string) => Promise<void>,
+  rateLimitIdentity?: string,
 ) {
-  const limit = await incrRateLimit(`register:ip:${ip ?? 'unknown'}`, 5, 3600);
+  const limit = await incrRateLimit(`register:ip:${rateLimitIdentity ?? ip ?? 'unknown'}`, 5, 3600);
   if (!limit.allowed) throw new AppError(429, 42903, '注册请求过于频繁，请 1 小时后再试');
   const [existing] = await rows<UserRow>('SELECT id FROM users WHERE username = ? LIMIT 1', [input.username]);
   if (existing) throw new AppError(409, 40901, '用户名已被使用');
@@ -101,6 +103,7 @@ export async function register(
       );
       const id = String(result.insertId);
       if (invitation) await consumeInvitation(connection, invitation, id);
+      if (onCreated) await onCreated(connection, id);
       await writeAudit({ userId: id, action: 'auth.register', resourceType: 'user', resourceId: id, ip }, connection);
       return id;
     });
@@ -229,3 +232,18 @@ export async function changePassword(auth: AuthUser, oldPassword: string, newPas
 }
 
 export type { RefreshSession };
+
+/** Internal entry used only after trusted WeChat identity/password verification. */
+export async function loginVerifiedUser(userId: string, client: ClientIdentity, ip?: string, expectedPasswordHash?: string) {
+  const [user] = await rows<UserRow>('SELECT * FROM users WHERE id=?', [userId]);
+  if (!user?.is_active) throw new AppError(403, 40302, '账号已停用');
+  const role = await requireKnownRole(user, ip);
+  const session = await issueRefreshSession(String(user.id), client, expectedPasswordHash);
+  const token = await issueAccessToken(user, role, session.familyId);
+  await withTransaction(async c => {
+    await c.query('UPDATE users SET last_login_at=NOW() WHERE id=?', [userId]);
+    await writeAudit({userId,action:'auth.wechat_login',resourceType:'user',resourceId:userId,ip},c);
+  });
+  // A cloud invocation has no refresh cookie; re-enter via the verified WeChat identity after expiry.
+  return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd) };
+}

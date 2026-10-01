@@ -35,7 +35,7 @@ const releaseTime = z
   .string()
   .refine(isZonedIsoDateTime, '作品发布时间必须是带时区的 ISO 8601')
   .transform(normalizeZonedIsoDateTime);
-const input = z
+export const compositionInputSchema = z
   .object({
     planId: id,
     mediaType,
@@ -103,13 +103,13 @@ compositionsRouter.get(
 compositionsRouter.post(
   '/',
   requirePermission('composition.create'),
-  validateBody(input),
+  validateBody(compositionInputSchema),
   asyncHandler(async (req, res) => ok(res, await createComposition(req.user, req.body, req.ip), 201)),
 );
 compositionsRouter.post(
   '/batch',
   requirePermission('composition.create'),
-  validateBody(z.object({ items: z.array(input).min(1).max(100) })),
+  validateBody(z.object({ items: z.array(compositionInputSchema).min(1).max(100) })),
   asyncHandler(async (req, res) => ok(res, await createCompositionBatch(req.user, req.body.items, req.ip), 201)),
 );
 compositionsRouter.patch(

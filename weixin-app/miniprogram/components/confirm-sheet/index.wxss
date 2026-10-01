@@ -1,0 +1,112 @@
+/* iOS 风格半屏确认弹层：圆角分组面板 + 分离取消键 + 上滑入场/下滑退场 */
+.sheet-mask {
+  position: fixed;
+  z-index: 200;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(23, 32, 28, 0.45);
+  animation: sheet-fade-in 0.22s ease-out;
+}
+.sheet-mask-out {
+  animation: sheet-fade-out 0.2s ease-in forwards;
+}
+.sheet-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 16rpx calc(16rpx + env(safe-area-inset-bottom));
+}
+.sheet-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.sheet-up {
+  animation: sheet-slide-up 0.28s cubic-bezier(0.32, 0.72, 0.35, 1);
+}
+.sheet-down {
+  animation: sheet-slide-down 0.2s ease-in forwards;
+}
+.sheet-body {
+  background: var(--white);
+  border-radius: 28rpx;
+  overflow: hidden;
+}
+.sheet-title {
+  padding: 32rpx 32rpx 6rpx;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--ink);
+}
+.sheet-message {
+  padding: 8rpx 32rpx 26rpx;
+  text-align: center;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.sheet-action,
+.sheet-cancel {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--white);
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--forest);
+  line-height: 1.4;
+  padding: 28rpx 0;
+}
+.sheet-action::after,
+.sheet-cancel::after {
+  border: 0;
+}
+.sheet-action {
+  border-top: 1rpx solid var(--line);
+}
+.sheet-danger {
+  color: var(--clay);
+}
+.sheet-cancel {
+  border-radius: 28rpx;
+  font-weight: 500;
+}
+.sheet-action-hover {
+  background: var(--paper-deep);
+}
+@keyframes sheet-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes sheet-slide-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(110%);
+  }
+}
+@keyframes sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

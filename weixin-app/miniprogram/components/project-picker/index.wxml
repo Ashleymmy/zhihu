@@ -1,0 +1,22 @@
+<view class="field" wx:if="{{projects.length}}"
+  ><text class="label">业务项目</text
+  ><picker
+    disabled="{{disabled}}"
+    range="{{projects}}"
+    range-key="name"
+    value="{{projectIndex}}"
+    bindchange="project"
+    ><view class="choice">{{projects[projectIndex].name}} ▾</view></picker
+  ></view
+>
+<view class="field" wx:if="{{accounts.length}}"
+  ><text class="label">知乎接入账号</text
+  ><picker
+    disabled="{{disabled}}"
+    range="{{accounts}}"
+    range-key="name"
+    value="{{accountIndex}}"
+    bindchange="account"
+    ><view class="choice">{{accounts[accountIndex].name}} ▾</view></picker
+  ></view
+>

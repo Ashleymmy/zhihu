@@ -1,0 +1,275 @@
+<import src="../../templates/shared.wxml" />
+<view class="page kw-page">
+  <view class="kw-header">
+    <view class="kw-header-top">
+      <view>
+        <view class="title">关键词</view>
+      </view>
+      <view class="kw-header-actions">
+        <button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button>
+        <button size="mini" class="btn-primary-mini" bindtap="openCreate" disabled="{{busy}}">+ 新建</button>
+      </view>
+    </view>
+    <view class="kw-search-bar">
+      <input
+        data-name="search"
+        value="{{search}}"
+        placeholder="搜索关键词"
+        maxlength="128"
+        bindinput="input"
+        bindconfirm="search"
+        class="kw-search-input"
+      />
+    </view>
+    <scroll-view scroll-x class="kw-tabs">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="key"
+        class="kw-tab {{tabIndex === index ? 'kw-tab-active' : ''}}"
+        data-index="{{index}}"
+        bindtap="switchTab"
+      >{{item.label}}</view>
+    </scroll-view>
+  </view>
+
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
+  />
+  <skeleton wx:if="{{allowed && scopeReady && loading && !list.length}}" rows="{{4}}" />
+
+  <block wx:if="{{allowed && scopeReady}}">
+    <view
+      class="kw-card"
+      wx:for="{{filteredList}}"
+      wx:key="id"
+    >
+      <view class="kw-card-top">
+        <view class="kw-keyword">{{item.keyword}}</view>
+        <text class="tag {{item.lifecycleStatus === 'retired' ? 'tag-clay' : item.lifecycleStatus === 'pending' ? 'tag-sun' : item.lifecycleStatus === 'available' ? 'tag-moss' : ''}}">{{item.statusText}}</text>
+      </view>
+      <view class="kw-card-meta">
+        <text>{{item.taskName}}</text>
+        <text class="kw-dot">·</text>
+        <text>{{item.executorName}}</text>
+      </view>
+      <view class="kw-card-meta text-sun" wx:if="{{item.releaseStatus === 'requested'}}">已申请释放，等待运营审核</view>
+      <view class="kw-card-meta text-clay" wx:if="{{item.syncError}}">{{item.syncError}}</view>
+      <view class="kw-card-actions" wx:if="{{item.actions.length}}">
+        <button
+          wx:for="{{item.actions}}"
+          wx:for-item="op"
+          wx:for-index="oi"
+          wx:key="key"
+          size="mini"
+          class="{{op.key === 'work' ? 'btn-action-primary' : 'btn-action'}}"
+          disabled="{{busy || loading}}"
+          data-index="{{index}}"
+          data-action="{{op.key}}"
+          bindtap="choose"
+        >{{op.label}}</button>
+      </view>
+    </view>
+
+    <state-view
+      wx:if="{{!loading && !error && !filteredList.length}}"
+      text="暂无关键词；可尝试修改搜索条件，或联系团长分配。"
+    />
+    <template is="loadmore" data="{{total, page, loadingMore, pageSize: 20}}" />
+  </block>
+
+  <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask">
+    <scroll-view scroll-y class="modal kw-modal">
+      <view class="kw-modal-head">
+        <view class="kw-modal-title section-title">{{actionLabel}}</view>
+        <button size="mini" class="btn-close" disabled="{{busy}}" bindtap="close">关闭</button>
+      </view>
+      <view class="kw-modal-keyword">{{selected.keyword}}</view>
+
+      <block wx:if="{{actionName === 'work'}}">
+        <view class="kw-batch-card">
+          <view class="kw-batch-card-head">
+            <view>
+              <view class="kw-batch-card-title">批量回填</view>
+              <text class="muted">上传 xlsx 文件快速导入多条作品</text>
+            </view>
+            <switch checked="{{batchMode}}" bindchange="toggleBatchMode" disabled="{{busy}}" />
+          </view>
+        </view>
+
+        <block wx:if="{{batchMode}}">
+          <view class="kw-batch-actions">
+            <button size="mini" bindtap="chooseBatchFile" disabled="{{busy}}">上传 xlsx</button>
+            <button size="mini" bindtap="addBatchItem" disabled="{{busy}}">+ 新增</button>
+          </view>
+          <view wx:if="{{!batchItems.length}}" class="muted" style="margin-bottom:24rpx;">暂无条目，上传文件或手动新增</view>
+          <view
+            wx:for="{{batchItems}}"
+            wx:key="index"
+            class="kw-batch-item"
+          >
+            <view class="kw-batch-item-head">
+              <text class="kw-batch-item-no">{{index + 1}}</text>
+              <button size="mini" data-index="{{index}}" bindtap="removeBatchItem" disabled="{{busy}}">删除</button>
+            </view>
+            <view class="kw-field">
+              <text class="kw-label">发布平台</text>
+              <picker range="{{platforms}}" value="{{item.platformIndex}}" data-index="{{index}}" bindchange="batchChoosePlatform">
+                <view class="kw-picker-row">
+                  <text>{{item.platformIndex >= 0 ? platforms[item.platformIndex] : '请选择平台'}}</text>
+                  <text class="kw-arrow">▾</text>
+                </view>
+              </picker>
+            </view>
+            <view class="kw-field"><text class="kw-label">平台账号</text><input value="{{item.mediaAccount}}" data-index="{{index}}" data-field="mediaAccount" bindinput="updateBatchItem" maxlength="128" placeholder="发布作品的账号名称" /></view>
+            <view class="kw-field"><text class="kw-label">作品子分类</text><picker range="{{item.categories}}" range-key="label" value="{{item.contentTypeIndex}}" data-index="{{index}}" bindchange="batchChooseContentType">{{item.contentTypeIndex >= 0 ? item.categories[item.contentTypeIndex].label : '请选择子分类'}} ▾</picker></view>
+            <view class="kw-field">
+              <text class="kw-label">作品链接</text>
+              <input value="{{item.url}}" placeholder="https://" maxlength="2048" data-index="{{index}}" data-field="url" bindinput="updateBatchItem" class="kw-input" />
+            </view>
+            <view class="kw-field">
+              <text class="kw-label">发布日期</text>
+              <picker mode="date" value="{{item.publishDate}}" data-index="{{index}}" bindchange="batchChooseDate">
+                <view class="kw-picker-row">
+                  <text>{{item.publishDate || '请选择日期'}}</text>
+                  <text class="kw-arrow">▾</text>
+                </view>
+              </picker>
+            </view>
+            <view class="kw-field">
+              <text class="kw-label">作品类型</text>
+              <view class="kw-radio-group">
+                <view
+                  wx:for="{{workTypes}}"
+                  wx:for-item="wt"
+                  wx:for-index="wi"
+                  wx:key="*this"
+                  class="kw-radio {{item.workTypeIndex === wi ? 'kw-radio-active' : ''}}"
+                  data-index="{{index}}"
+                  data-wi="{{wi}}"
+                  bindtap="batchChooseWorkType"
+                >{{wt}}</view>
+              </view>
+            </view>
+          </view>
+          <text class="muted">每条作品会独立提交并标记该关键词已使用。</text>
+        </block>
+
+        <block wx:else>
+          <view class="kw-field">
+            <text class="kw-label">发布平台</text>
+            <picker range="{{platforms}}" value="{{platformIndex}}" bindchange="choosePlatform">
+              <view class="kw-picker-row">
+                <text>{{platformIndex >= 0 ? platforms[platformIndex] : '请选择平台'}}</text>
+                <text class="kw-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="kw-field"><text class="kw-label">平台账号</text><input data-name="mediaAccount" value="{{mediaAccount}}" bindinput="input" maxlength="128" placeholder="发布作品的账号名称" /></view>
+          <view class="kw-field">
+            <text class="kw-label">作品链接</text>
+            <input
+              data-name="workUrl"
+              value="{{workUrl}}"
+              placeholder="https://"
+              maxlength="2048"
+              bindinput="input"
+              class="kw-input"
+            />
+          </view>
+          <view class="kw-field">
+            <text class="kw-label">发布日期</text>
+            <picker mode="date" value="{{publishDate}}" bindchange="chooseDate">
+              <view class="kw-picker-row">
+                <text>{{publishDate || '请选择日期'}}</text>
+                <text class="kw-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="kw-field">
+            <text class="kw-label">作品类型</text>
+            <view class="kw-radio-group">
+              <view
+                wx:for="{{workTypes}}"
+                wx:key="*this"
+                wx:for-index="wi"
+                class="kw-radio {{workTypeIndex === wi ? 'kw-radio-active' : ''}}"
+                data-index="{{wi}}"
+                bindtap="chooseWorkType"
+              >{{item}}</view>
+            </view>
+          </view>
+          <view class="kw-field">
+            <text class="kw-label">作品子分类</text>
+            <picker range="{{contentTypes}}" value="{{contentTypeIndex}}" bindchange="chooseContentType">
+              <view class="kw-picker-row">
+                <text>{{contentTypeIndex >= 0 ? contentTypes[contentTypeIndex] : '请选择类型'}}</text>
+                <text class="kw-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <text class="muted">登记后将自动提交知乎，可在作品页面查看同步与审核状态。</text>
+        </block>
+      </block>
+
+      <view
+        wx:elif="{{actionName === 'assign' || actionName === 'distribute'}}"
+        class="kw-field"
+      >
+        <text class="kw-label">接收成员</text>
+        <picker range="{{targets}}" range-key="displayName" value="{{targetIndex}}" bindchange="chooseTarget">
+          <view class="kw-picker-row">
+            <text>{{targetIndex >= 0 ? targets[targetIndex].displayName : '请选择成员'}}</text>
+            <text class="kw-arrow">▾</text>
+          </view>
+        </picker>
+        <text class="muted" wx:if="{{!targets.length}}">暂无符合条件的项目成员，请先完成成员授权。</text>
+      </view>
+
+      <view
+        wx:elif="{{actionName === 'request-release' || actionName === 'release' || actionName === 'stop'}}"
+        class="kw-field"
+      >
+        <text class="kw-label">操作原因 / 未使用核实依据</text>
+        <textarea
+          data-name="reason"
+          value="{{reason}}"
+          maxlength="500"
+          bindinput="input"
+          class="kw-textarea"
+        />
+        <text class="muted" wx:if="{{actionName === 'stop'}}">停止后不可新增使用，已有作品和归属记录保留。</text>
+      </view>
+
+      <view wx:elif="{{actionName === 'edit-retry'}}">
+        <view class="kw-field">
+          <text class="kw-label">关键词</text>
+          <input data-name="editKeyword" value="{{editKeyword}}" maxlength="128" bindinput="input" class="kw-input" />
+        </view>
+        <view class="kw-field">
+          <text class="kw-label">落地链接</text>
+          <input data-name="editLandingUrl" value="{{editLandingUrl}}" placeholder="https://" maxlength="2048" bindinput="input" class="kw-input" />
+        </view>
+        <view class="kw-field">
+          <text class="kw-label">渠道映射</text>
+          <picker range="{{options.mappings}}" range-key="channelName" value="{{editMappingIndex}}" bindchange="chooseEditMapping">
+            <view class="kw-picker-row">
+              <text>{{editMappingIndex >= 0 ? options.mappings[editMappingIndex].channelName : '请选择渠道映射'}}</text>
+              <text class="kw-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <text class="muted">保存后重置同步状态并重新提交知乎，通常 10-30 秒内出结果。</text>
+      </view>
+
+      <view wx:elif="{{actionName === 'delete'}}">
+        <text class="text-clay">删除后不可恢复：该关键词及其归属记录、上游推送任务将一并移除。仅从未使用的同步异常记录可删除。</text>
+      </view>
+
+      <view wx:else class="muted">确认{{actionLabel}}该关键词？</view>
+
+      <view class="error" wx:if="{{error}}">{{error}}</view>
+      <button class="primary" disabled="{{busy}}" loading="{{busy}}" bindtap="runAction">确认{{actionLabel}}</button>
+    </scroll-view>
+  </view>
+</view>

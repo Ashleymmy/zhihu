@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "工具",
+  "usingComponents": {
+    "state-view": "/components/state/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

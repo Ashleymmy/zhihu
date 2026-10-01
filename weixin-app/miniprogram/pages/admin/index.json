@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "role-nav": "/components/role-nav/index",
+    "state-view": "/components/state/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

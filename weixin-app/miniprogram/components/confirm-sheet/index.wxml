@@ -1,0 +1,16 @@
+<view wx:if="{{visible}}" class="sheet-mask {{closing ? 'sheet-mask-out' : ''}}" bindtap="onMask">
+  <view class="sheet-wrap" catchtap="noop">
+    <view class="sheet-panel {{closing ? 'sheet-down' : 'sheet-up'}}">
+      <view class="sheet-body">
+        <view wx:if="{{title}}" class="sheet-title">{{title}}</view>
+        <view wx:if="{{message}}" class="sheet-message">{{message}}</view>
+        <button
+          class="sheet-action {{danger ? 'sheet-danger' : ''}}"
+          hover-class="sheet-action-hover"
+          bindtap="onConfirm"
+        >{{confirmText}}</button>
+      </view>
+      <button class="sheet-cancel" hover-class="sheet-action-hover" bindtap="onCancel">{{cancelText}}</button>
+    </view>
+  </view>
+</view>

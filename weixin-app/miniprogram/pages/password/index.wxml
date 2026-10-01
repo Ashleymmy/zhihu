@@ -1,0 +1,61 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+  <role-nav user="{{user}}" active="password" />
+  <view class="row page-heading"
+    ><view
+      ><view class="title">修改密码</view
+      ></view
+    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
+      >刷新</button
+    ></view
+  >
+  <template
+    is="status"
+    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
+  />
+  <block wx:if="{{allowed && scopeReady}}">
+    <view class="card"
+      ><text class="muted"
+        >{{user.mustChangePwd ? '首次使用临时密码，请先设置新密码。' :
+        '修改密码后需重新登录。'}}</text
+      >
+      <view class="field"
+        ><text class="field-label">原密码</text
+        ><input
+          password
+          maxlength="128"
+          data-name="oldPassword"
+          value="{{oldPassword}}"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">新密码（8–128 位）</text
+        ><input
+          password
+          maxlength="128"
+          data-name="newPassword"
+          value="{{newPassword}}"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">再次输入新密码</text
+        ><input
+          password
+          maxlength="128"
+          data-name="confirmPassword"
+          value="{{confirmPassword}}"
+          bindinput="input"
+      /></view>
+      <button
+        class="primary"
+        loading="{{busy}}"
+        disabled="{{busy}}"
+        bindtap="submit"
+        >保存密码</button
+      >
+      <button class="text-button" disabled="{{busy}}" bindtap="logout"
+        >退出登录</button
+      ></view
+    >
+  </block>
+</view>

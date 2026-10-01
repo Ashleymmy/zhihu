@@ -1,0 +1,130 @@
+const permissions = require("./permissions");
+const same = (a, b) => a != null && b != null && String(a) === String(b);
+const labels = {
+  claim: "领取",
+  distribute: "分发",
+  assign: "分配执行人",
+  work: "登记作品",
+  "request-release": "申请释放",
+  release: "批准释放",
+  stop: "停止新增使用",
+  "retry-upstream": "重试上游",
+  "edit-retry": "编辑重试",
+  delete: "删除",
+};
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso), p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function flags(user, item) {
+  if (!permissions.canOperate(user) || Number(item.readOnly) === 1) return [];
+  const admin = permissions.isAdmin(user);
+  const owner =
+    admin || same(item.leaderId, user.id) || same(item.executorId, user.id);
+  const available =
+    !item.bindingId &&
+    item.lifecycleStatus === "available" &&
+    item.syncStatus === "synced" &&
+    item.planStatus === "active";
+  const live = item.bindingId && item.lifecycleStatus !== "retired";
+  const result = [];
+  if (
+    available &&
+    (user.role === "leader" ||
+      (user.role === "creator" &&
+        !item.hasTeamLeader &&
+        Number(item.priorityEnded) === 1))
+  )
+    result.push("claim");
+  if (available && admin) result.push("distribute");
+  if (
+    live &&
+    !item.usedEverAt &&
+    item.leaderId &&
+    (admin || (user.role === "leader" && same(item.leaderId, user.id)))
+  )
+    result.push("assign");
+  if (
+    live && item.executorId &&
+    (admin || same(item.executorId, user.id)) &&
+    item.releaseStatus !== "requested"
+  )
+    result.push("work");
+  if (
+    item.bindingId &&
+    owner &&
+    !item.usedEverAt &&
+    item.releaseStatus !== "requested"
+  )
+    result.push("request-release");
+  if (
+    item.bindingId &&
+    admin &&
+    !item.usedEverAt &&
+    item.releaseStatus === "requested"
+  )
+    result.push("release");
+  if (live && owner) result.push("stop");
+  if (admin && item.syncStatus === "failed" && !item.usedEverAt)
+    result.push("retry-upstream");
+  return result;
+}
+function targets(user, item, action, users) {
+  if (action === "assign")
+    return users.filter(
+      (u) =>
+        (same(u.id, item.leaderId) && u.role === "leader") ||
+        (u.role === "creator" && same(u.parentId, item.leaderId)),
+    );
+  if (action === "distribute")
+    return users.filter(
+      (u) =>
+        u.role === "leader" ||
+        (u.role === "creator" &&
+          (!u.parentId ||
+            users.some((p) => same(p.id, u.parentId) && p.role === "leader"))),
+    );
+  return [];
+}
+function decorate(user, item, options) {
+  item = Object.assign({},item,{hasTeamLeader:options.hasTeamLeader});
+  const states = {
+    available: "可领取",
+    reserved: "团长已领取",
+    assigned: "已分配",
+    active: "已使用",
+    retired: "已停止新增使用",
+  };
+  // pending 时"是否已提交知乎"和"知乎有没有审核"是两件独立的事，
+  // 统一叫"等待同步"会让人误以为是数据没传过去，按 syncStatus 拆开说清楚。
+  const pendingStates = {
+    local: "待提交知乎（通常 10-30 秒）",
+    failed: "提交异常，待处理",
+    synced: "已提交知乎，等待审核通过",
+  };
+  const member = options.users.find((u) => same(u.id, item.executorId));
+  const task = options.tasks.find((t) => same(t.id, item.taskId));
+  return Object.assign({}, item, {
+    statusText:
+      item.lifecycleStatus === "pending"
+        ? pendingStates[item.syncStatus] || "等待处理"
+        : item.lifecycleStatus === "available" && user.role === "creator"
+          ? options.hasTeamLeader
+            ? "等待团长分配"
+            : Number(item.priorityEnded) !== 1
+              ? "优先期内，暂不可领取"
+              : "可领取"
+          : states[item.lifecycleStatus] || item.lifecycleStatus,
+    taskName: task ? task.name : "任务 " + item.taskId,
+    executorName: member
+      ? member.displayName
+      : same(item.executorId, user.id)
+        ? "本人"
+        : item.executorId
+          ? "成员 " + item.executorId
+          : "待分配",
+    actions: flags(user, item).map((key) => ({ key, label: labels[key] })),
+  });
+}
+module.exports = { flags, targets, decorate, labels };

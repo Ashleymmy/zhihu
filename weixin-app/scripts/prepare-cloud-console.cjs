@@ -1,0 +1,10 @@
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto')
+const directory=path.resolve(__dirname,'../../.runtime/cloud-migration'),file=path.join(directory,'private-console-config.json')
+fs.mkdirSync(directory,{recursive:true})
+const config=fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{OPC_MIGRATION_SECRET:crypto.randomBytes(32).toString('hex'),OPC_CALLBACK_KEY:crypto.randomBytes(32).toString('hex')}
+fs.writeFileSync(file,JSON.stringify(config,null,2))
+fs.writeFileSync(path.join(directory,'console-bootstrap.json'),JSON.stringify({action:'bootstrap',secret:config.OPC_MIGRATION_SECRET},null,2))
+fs.writeFileSync(path.join(directory,'console-verify.json'),JSON.stringify({action:'verify',secret:config.OPC_MIGRATION_SECRET},null,2))
+fs.writeFileSync(path.join(directory,'console-runtime-check.json'),JSON.stringify({action:'check-runtime',secret:config.OPC_MIGRATION_SECRET},null,2))
+fs.writeFileSync(path.join(directory,'console-business-check.json'),JSON.stringify({action:'check-business',secret:config.OPC_MIGRATION_SECRET},null,2))
+console.log('Prepared private console configuration and bootstrap/verify test events in '+directory+'; values are not printed. Existing secrets were preserved.')

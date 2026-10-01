@@ -1,0 +1,60 @@
+/* 空态/异常态：插画圆标 + 说明 + 引导按钮，入场轻微上浮渐现（iOS 式） */
+.state {
+  padding: 56rpx 24rpx;
+  text-align: center;
+  color: var(--ink-soft, #7c8883);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.state-in {
+  animation: state-rise 0.32s cubic-bezier(0.32, 0.72, 0.35, 1);
+}
+.state-icon {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: var(--forest-tint, #e9f0ed);
+  color: var(--forest, #214239);
+  font-size: 40rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+  animation: state-breathe 2.6s ease-in-out infinite;
+}
+.state-icon-error {
+  background: var(--clay-tint, #fbeeea);
+  color: var(--clay, #d05a43);
+  animation: none;
+}
+.state-text {
+  font-size: 26rpx;
+  line-height: 1.7;
+}
+.state-guide {
+  margin-top: 28rpx;
+}
+.state.error {
+  color: var(--clay, #d05a43);
+}
+@keyframes state-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes state-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
