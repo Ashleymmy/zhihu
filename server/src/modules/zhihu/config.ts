@@ -1,6 +1,7 @@
 import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import { unsafeProductionJwtSecret } from '../../utils/productionSecrets';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config();
@@ -41,7 +42,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv) {
   parsed.ZHIHU_API_BASE = validateZhihuApiBase(parsed.ZHIHU_API_BASE);
   if (parsed.NODE_ENV === 'production') {
     const unsafe = [
-      parsed.JWT_SECRET.startsWith('test_only_'),
+      unsafeProductionJwtSecret(parsed.JWT_SECRET),
       parsed.ZHIHU_ACCESS_TOKEN === 'mock_access_token',
       parsed.ZHIHU_SECRET_KEY === 'mock_secret_key',
       /^0+$/.test(parsed.CALLBACK_SECRET_ENCRYPTION_KEY),

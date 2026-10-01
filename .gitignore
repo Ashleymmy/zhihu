@@ -22,6 +22,12 @@
 !/.env.docker.example
 **/*.local
 **/project.private.config.json
+**/.dsh-debug/
+**/cloudbaserc.json
+**/*.key
+**/*.p12
+**/*.pfx
+**/*_nginx/
 
 # 日志与临时文件
 **/*.log

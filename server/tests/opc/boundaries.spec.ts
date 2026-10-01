@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { randomBytes } from 'node:crypto';
 import { ModuleRuntime } from '../../src/core/module-runtime';
 import { sampleManifest, createSampleModule } from '../../examples/sample-api/module';
 import { parseEnvironment } from '../../src/config';
@@ -44,7 +45,7 @@ describe('core boundaries', () => {
   });
   it('production core does not need optional provider keys', () => {
     expect(() =>
-      parseEnvironment({ NODE_ENV: 'production', JWT_SECRET: 'production_core_test_secret_long_enough' }),
+      parseEnvironment({ NODE_ENV: 'production', JWT_SECRET: randomBytes(32).toString('hex') }),
     ).not.toThrow();
     expect(() => parseEnvironment({ NODE_ENV: 'production' })).toThrow();
     expect(() => parseEnvironment({ OPC_MODULES: 'sample-api,sample-api' })).toThrow();

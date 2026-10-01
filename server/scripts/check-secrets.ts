@@ -3,6 +3,8 @@
  * 用法：npx tsx scripts/check-secrets.ts（或部署流水线中作为 preflight）
  * 任一失败以非零退出码结束。
  */
+import { unsafeProductionJwtSecret } from '../src/utils/productionSecrets';
+
 const required: Array<{ key: string; minLen?: number; hint: string }> = [
   { key: 'JWT_SECRET', minLen: 32, hint: '至少 32 位随机字符串（openssl rand -hex 32）' },
   { key: 'CALLBACK_SECRET_ENCRYPTION_KEY', minLen: 64, hint: '64 位 hex（openssl rand -hex 32）' },
@@ -30,6 +32,10 @@ for (const { key, minLen, hint } of required) {
 }
 
 if (process.env.NODE_ENV === 'production') {
+  if (unsafeProductionJwtSecret(process.env.JWT_SECRET ?? '')) {
+    console.error('✗ JWT_SECRET 不能使用示例、测试或重复字符；请生成至少 32 字节的随机密钥');
+    failed++;
+  }
   if (!process.env.ALLIANCE_QUOTA_POLICY) {
     console.error('✗ ALLIANCE_QUOTA_POLICY 未设置（生产模式启动会崩溃）');
     failed++;

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import { unsafeProductionJwtSecret } from './utils/productionSecrets';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config();
 const schema = z.object({
@@ -21,7 +22,7 @@ const schema = z.object({
 });
 export function parseEnvironment(input: NodeJS.ProcessEnv) {
   const parsed = schema.parse(input);
-  if (parsed.NODE_ENV === 'production' && parsed.JWT_SECRET.startsWith('test_only_'))
+  if (parsed.NODE_ENV === 'production' && unsafeProductionJwtSecret(parsed.JWT_SECRET))
     throw new Error('生产环境缺少安全配置');
   const modules = parsed.OPC_MODULES.split(',')
     .map((s) => s.trim())
