@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const tools = [
   { path: '/system/data', code: '01', title: '数据处理与授权', desc: '渠道/任务/指标同步状态与手动触发，知乎接口授权状态，收益数据导出。' },
-  { path: '/system/monitor', code: '02', title: '子账号监控', desc: '各账号的登录时间、近 7 日操作量与最近动作。' },
+  { path: '/system/monitor', code: '02', title: '运维监控', desc: '小程序接入、账号绑定、业务数据与账号近期操作。' },
   { path: '/system/db', code: '03', title: '数据库维护', desc: '表行数与体积概览，历史操作日志清理。' },
   { path: '/system/announcements', code: '04', title: '系统公告', desc: '发布与下线面向三端的系统公告。' },
   { path: '/system/site', code: '05', title: '站点维护', desc: '运行时信息、知乎接口模式与项目结算参数。' },

@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import MemberClientDetails from './MemberClientDetails.vue';
+import { bindingLabel, miniFilters, matchesMiniFilter } from '../mini-status';
 import { ActionDialog } from "@zhihu-koc/shared-components";
 import {
   ROLE_LABELS,
@@ -13,6 +16,8 @@ import {
 } from "@zhihu-koc/shared-contracts/core";
 import { apis, http, useAuthStore } from "../stores/auth";
 const auth = useAuthStore();
+const route=useRoute();
+const miniFilter=ref(''),memberIdFilter=ref('');
 const projects = ref<Project[]>([]),
   projectSearch = ref("");
 const canAssignProjects = computed(
@@ -53,6 +58,11 @@ const search = ref(""),
   page = ref(1),
   tab = ref("members");
 const pageSize = 20;
+watch(()=>[route.query.mini,route.query.member],()=>{
+  miniFilter.value=miniFilters.some(f=>f.value===route.query.mini)?String(route.query.mini):'';
+  memberIdFilter.value=typeof route.query.member==='string'&&/^\d+$/.test(route.query.member)?route.query.member:'';
+  page.value=1;
+},{immediate:true});
 const dialog = ref<
     | "create"
     | "edit"
@@ -86,6 +96,8 @@ const invite = reactive({ label: "成员邀请", validDays: 7, maxUses: 20 }),
 const filtered = computed(() =>
   members.value.filter(
     (m) =>
+      (!memberIdFilter.value || m.id===memberIdFilter.value) &&
+      matchesMiniFilter(m,miniFilter.value) &&
       (!roleFilter.value || m.role === roleFilter.value) &&
       (!statusFilter.value ||
         String(Number(m.isActive)) === statusFilter.value) &&
@@ -365,8 +377,10 @@ onMounted(() => run(load));
             <option value="1">启用</option>
             <option value="0">停用</option>
           </select></label
-        ><button type="button" :disabled="busy" @click="run(load)">刷新</button>
+        ><label>小程序状态<select v-model="miniFilter" @change="page=1"><option value="">全部绑定与登录状态</option><option v-for="f in miniFilters" :key="f.value" :value="f.value">{{ f.label }}</option></select></label>
+        <button type="button" :disabled="busy" @click="run(load)">刷新</button>
       </form>
+      <p v-if="memberIdFilter">正在定位成员 ID {{ memberIdFilter }} <button @click="memberIdFilter='';page=1">查看全部成员</button></p>
       <p v-if="loading" class="member-empty" role="status">正在加载成员…</p>
       <div v-else class="member-table">
         <table>
@@ -377,6 +391,7 @@ onMounted(() => run(load));
               <th>所属团队</th>
               <th>注册 / 邀请来源</th>
               <th>注册 / 最后登录</th>
+              <th>微信小程序</th>
               <th class="actions-column">操作</th>
             </tr>
           </thead>
@@ -423,6 +438,12 @@ onMounted(() => run(load));
               <td>
                 <small>{{ format(m.createdAt) }}</small
                 ><small>登录：{{ format(m.lastLoginAt) }}</small>
+              </td>
+              <td>
+                {{ bindingLabel(m.miniProgram) }}
+                <small>登录：{{ format(m.miniProgram?.lastLoginAt) }}</small>
+                <small v-if="matchesMiniFilter(m,'no-project')">待分配项目</small>
+                <small v-if="m.miniProgram?.recentBindingConflict">近期有绑定冲突</small>
               </td>
               <td class="actions-column">
                 <div class="member-actions">
@@ -772,6 +793,7 @@ onMounted(() => run(load));
             {{ selected.invitedCount ?? 0 }} 人
           </dd>
         </dl>
+        <MemberClientDetails :member="selected" />
         <h3>角色权限</h3>
         <p>
           {{

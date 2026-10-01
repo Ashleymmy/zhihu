@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db';
 import { asyncHandler, AppError } from '../middleware/errors';
 import { setWechatContext } from './context';
+import { observeMiniRequest } from './observability';
 
 const envelopeSchema = z
   .object({
@@ -16,6 +17,27 @@ const envelopeSchema = z
     method: z.enum(['GET', 'POST', 'PATCH', 'PUT', 'DELETE']),
     data: z.record(z.unknown()).default({}),
     token: z.string().max(4096).optional(),
+    observation: z
+      .object({
+        environment: z
+          .string()
+          .max(80)
+          .regex(/^[\w-]*$/)
+          .optional(),
+        version: z
+          .string()
+          .max(32)
+          .regex(/^[\w.-]*$/)
+          .optional(),
+        clientVersion: z
+          .string()
+          .max(32)
+          .regex(/^[\w.-]*$/)
+          .optional(),
+        clientEnv: z.enum(['develop', 'trial', 'release']).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -82,6 +104,7 @@ export function mountWechatBridge(app: Express) {
       const specialAuth = /^\/core\/auth\/(login|register|bind|wechat-login|profile)$/.test(body.path);
       const path = specialAuth ? body.path.replace('/auth/', '/mini-auth/') : body.path;
       req.method = body.method;
+      observeMiniRequest(req, res, body.path, body.observation);
       req.url = '/api/v1' + path;
       req.query = body.method === 'GET' ? (body.data as RequestQuery) : {};
       if (path === '/modules/zhihu/tasks/sync' && body.method === 'POST' && typeof body.data.channelId === 'string')

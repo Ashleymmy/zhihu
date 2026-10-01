@@ -16,6 +16,7 @@ import { mountWechatBridge } from '../wechat/bridge';
 import { wechatAuthRouter } from '../wechat/auth';
 import { miniInvitationsRouter } from '../wechat/invitations';
 import { miniFilesRouter, attachMiniFile } from '../wechat/files';
+import { miniMonitorRouter } from '../routes/mini-monitor';
 
 export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app: Express) => void) {
   const app = express();
@@ -40,6 +41,7 @@ export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app:
     ['projects', projectsRouter],
     ['mcn-accounts', mcnRouter],
     ['admin-tools', adminToolsRouter],
+    ['mini-monitor', miniMonitorRouter],
     ['announcements', announcementsRouter],
     ['audit-logs', auditLogsRouter],
   ];

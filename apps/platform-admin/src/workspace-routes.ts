@@ -48,7 +48,7 @@ export const workspaceRoutes: RouteRecordRaw[] = [
     path: 'system/monitor',
     name: 'system-monitor',
     component: () => import('./views/SysMonitorView.vue'),
-    meta: { title: '子账号监控' },
+    meta: { title: '运维监控' },
   },
   {
     path: 'system/db',

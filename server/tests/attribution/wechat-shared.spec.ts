@@ -39,6 +39,17 @@ async function login(name: string) {
   tokens[name] = r.body.data.token;
   return r;
 }
+const webSessions = new Map<string,{token:string;client:string}>();
+async function webMonitor(name: string) {
+  let session=webSessions.get(name);
+  if(!session) {
+    const client=crypto.randomUUID();
+    const response=await request(app).post('/api/v1/core/auth/login').set('X-Client-Id',client).send({username:name,password});
+    expect(response.status,JSON.stringify(response.body)).toBe(200);
+    session={token:response.body.data.token,client};webSessions.set(name,session);
+  }
+  return request(app).get('/api/v1/core/mini-monitor').set('X-Client-Id',session.client).auth(session.token,{type:'bearer'});
+}
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
     .withDatabase('wechat')
@@ -93,6 +104,7 @@ beforeAll(async () => {
   app = createCoreApp(runtime);
 }, 180000);
 afterAll(async () => {
+  await (await import('../../src/wechat/observability')).flushMiniObservations();
   if (pool) await pool.end();
   if (c) await c.end();
   if (container) await container.stop({ remove: true, removeVolumes: true });
@@ -415,4 +427,82 @@ it('unpublished or deleted college lessons stay hidden across reads and migratio
   expect((await call('college', '/modules/zhihu/courses/seed-elite-2')).status).toBe(404);
   const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM college_courses');
   expect(count.n).toBe(6);
+});
+
+it('mini monitoring separates technical access, operations summaries and denied roles', async () => {
+  await (await import('../../src/wechat/observability')).flushMiniObservations();
+  for (const name of ['admin','developer']) {
+    const result=await webMonitor(name);
+    expect(result.status,JSON.stringify(result.body)).toBe(200);
+    expect(result.body.data.technical.configured).toBe(true);
+    expect(result.body.data.technical.requests).toBeGreaterThan(0);
+    expect(result.body.data.business.publishedCourses).toBe(0);
+  }
+  const ops=await webMonitor('operator');
+  expect(ops.status).toBe(200);expect(ops.body.data.technical).toBe(null);
+  expect(JSON.stringify(ops.body)).not.toMatch(/appId|routeKey|writer|cloudEnv/);
+  expect((await webMonitor('leader')).status).toBe(403);
+  expect((await webMonitor('college')).status).toBe(403);
+  const hash=await bcrypt.hash(password,4);
+  await c.query("INSERT INTO users(id,username,display_name,password_hash,role,admin_duty,must_change_pwd) VALUES(930,'finance','财务',?,'admin','finance',0)",[hash]);
+  await login('finance');
+  expect((await webMonitor('finance')).status).toBe(403);
+});
+
+it('member bindings and separate client sessions respect the leader member scope and redact identity', async () => {
+  const hash=await bcrypt.hash(password,4);
+  await c.query("INSERT INTO users(id,username,display_name,password_hash,role,parent_id,must_change_pwd) VALUES(941,'membermini','本团达人',?,'creator',2,0)",[hash]);
+  await c.query('INSERT INTO wechat_identities(app_id,open_id,user_id) VALUES(?,?,941)',[appId,'private_member_openid_1234']);
+  for(const [type,until,revoked] of [['web',1,false],['mobile',-1,false],['mini',1,true]] as const) {
+    await c.query('INSERT INTO login_sessions(id,user_id,client_type,client_id_hash,expires_at,revoked_at) VALUES(?,941,?,?,TIMESTAMPADD(DAY,?,NOW(3)),IF(?,NOW(3),NULL))',[crypto.randomUUID(),type,'x'.repeat(64),until,revoked]);
+  }
+  const list=await call('leader','/core/team/members');expect(list.status).toBe(200);
+  expect(list.body.data.some((m:any)=>m.id==='910')).toBe(false);
+  const member=list.body.data.find((m:any)=>m.id==='941');
+  expect(member.miniProgram).toMatchObject({bindingStatus:'bound',maskedIdentity:'***1234'});
+  expect(member.miniProgram.sessions.map((s:any)=>s.state)).toEqual(['valid','expired','revoked']);
+  expect(JSON.stringify(list.body)).not.toContain('private_member_openid');
+  expect(JSON.stringify(list.body)).not.toMatch(/clientIdHash|passwordHash|refreshTokenHash/);
+  const monitor=await webMonitor('operator');expect(monitor.body.data.business.boundNoProject).toBeGreaterThan(0);
+  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,941)');
+  const after=await webMonitor('operator');expect(after.body.data.business.boundNoProject).toBe(monitor.body.data.business.boundNoProject-1);
+  await c.query('UPDATE project_members SET left_at=NOW() WHERE user_id=941');
+});
+
+it('records verified-account binding conflicts without trusting caller identity and clears attention after login', async () => {
+  const failed=await call('conflicting','/core/auth/login','POST',{username:'leader',password,userId:'1'});
+  expect(failed.status).toBe(409);
+  await (await import('../../src/wechat/observability')).flushMiniObservations();
+  const [[event]]=await c.query<RowDataPacket[]>('SELECT user_id,result_code FROM mini_request_events WHERE result_code=40908 ORDER BY id DESC LIMIT 1');
+  expect(String(event.user_id)).toBe('2');
+  const list=await call('admin','/core/team/members');
+  expect(list.body.data.find((m:any)=>m.id==='2').miniProgram.recentBindingConflict).toBe(true);
+  await login('leader');
+  await (await import('../../src/wechat/observability')).flushMiniObservations();
+  expect((await call('admin','/core/team/members')).body.data.find((m:any)=>m.id==='2').miniProgram.recentBindingConflict).toBe(false);
+});
+
+it('observes deployment metadata while supporting older envelopes and never persists secrets', async () => {
+  const signedBody=signed({appId,openId:openId('observe'),path:'/core/auth/wechat-login',method:'POST',data:{password:'never_record_me'},observation:{environment:'isolated-cloud',version:'2026.10.01.2',clientVersion:'1.1.2',clientEnv:'trial'}});
+  expect((await request(app).post('/api/v1/mini/bridge').set(signedBody.headers).send(signedBody.raw)).status).toBe(200);
+  await (await import('../../src/wechat/observability')).flushMiniObservations();
+  const [[event]]=await c.query<RowDataPacket[]>('SELECT * FROM mini_request_events WHERE cloud_env=? ORDER BY id DESC LIMIT 1',['isolated-cloud']);
+  expect(event.bridge_version).toBe('2026.10.01.2');expect(event.client_version).toBe('1.1.2');
+  expect(JSON.stringify(event)).not.toMatch(/never_record_me|wechat_test_identity|isolated_wechat_bridge_signing/);
+  expect((await call('observe','/core/auth/wechat-login','POST')).status).toBe(200);
+});
+
+it('telemetry write failures do not change successful business responses and are visible after recovery',async()=>{
+  const observations=await import('../../src/wechat/observability');
+  await observations.flushMiniObservations();
+  const before=observations.observationWriterState();
+  await c.query('RENAME TABLE mini_request_events TO isolated_events_unavailable');
+  try {
+    expect((await call('telemetry-down','/core/auth/wechat-login','POST')).status).toBe(200);
+    await observations.flushMiniObservations();
+    expect(observations.observationWriterState().failures).toBeGreaterThan(before.failures);
+    expect(observations.observationWriterState().dropped).toBeGreaterThan(before.dropped);
+  } finally { await c.query('RENAME TABLE isolated_events_unavailable TO mini_request_events'); }
+  const read=await webMonitor('admin');
+  expect(read.status).toBe(200);expect(read.body.data.technical.writer.failures).toBeGreaterThan(0);
 });

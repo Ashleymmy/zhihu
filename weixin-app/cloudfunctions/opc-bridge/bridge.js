@@ -3,7 +3,7 @@ const https=require('node:https');
 const crypto=require('node:crypto');
 const ENDPOINT='https://timo.clouddo.cc/api/v1/mini/bridge';
 const APP_ID='wx22b91776ccf37354';
-function createBridge({context,secret,send=sendHttps}) {
+function createBridge({context,secret,environment,version,send=sendHttps}) {
   return async event=>{
     try {
       const wx=context();
@@ -12,7 +12,13 @@ function createBridge({context,secret,send=sendHttps}) {
       if (!event || !/^\/(core|modules\/zhihu)\/[a-zA-Z0-9_/-]+$/.test(event.path||'') || !['GET','POST','PATCH','PUT','DELETE'].includes(event.method||'GET'))
         return {statusCode:422,code:42200,data:null,message:'请求参数不正确'};
       // Identity always comes from the WeChat invocation, never event.openId or event.appId.
-      const payload=JSON.stringify({appId:wx.APPID,openId:wx.OPENID,path:event.path,method:event.method||'GET',data:event.data||{},token:event.token||undefined});
+      const observation={};
+      if (/^[\w-]{1,80}$/.test(environment||'')) observation.environment=environment;
+      if (/^[\w.-]{1,32}$/.test(version||'')) observation.version=version;
+      const info=event.clientInfo||{};
+      if(typeof info.version==='string' && /^[\w.-]{1,32}$/.test(info.version)) observation.clientVersion=info.version;
+      if(['develop','trial','release'].includes(info.envVersion)) observation.clientEnv=info.envVersion;
+      const payload=JSON.stringify({appId:wx.APPID,openId:wx.OPENID,path:event.path,method:event.method||'GET',data:event.data||{},token:event.token||undefined,observation});
       if(Buffer.byteLength(payload)>1024*1024) return {statusCode:413,code:41300,data:null,message:'请求过大，请分块上传文件'};
       const timestamp=String(Date.now()),nonce=crypto.randomBytes(16).toString('hex');
       const signature=crypto.createHmac('sha256',secret).update(timestamp+'\n'+nonce+'\n'+payload).digest('hex');

@@ -34,7 +34,7 @@ const navigation = computed<NavGroup[]>(() => {
       label: '系统',
       items: [
         { key: 'roles', label: '角色与账号', path: '/system/roles' },
-        { key: 'monitor', label: '账号监控', path: '/system/monitor' },
+        { key: 'monitor', label: '运维监控', path: '/system/monitor' },
         { key: 'announcements', label: '系统公告', path: '/system/announcements' },
         { key: 'audit', label: '审计日志', path: '/audit-log' },
         { key: 'database', label: '数据库状态', path: '/system/db' },

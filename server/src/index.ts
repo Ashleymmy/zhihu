@@ -5,6 +5,7 @@ import { db } from './db';
 import { closeQueue } from './queue';
 import { revocationStore } from './auth/revocation';
 import { closeRateLimiter } from './utils/rateLimit';
+import { flushMiniObservations } from './wechat/observability';
 
 const app = createApp();
 const server = app.listen(config.port, () => {
@@ -14,7 +15,8 @@ const server = app.listen(config.port, () => {
 
 async function shutdown() {
   app.locals.moduleRuntime.stop();
-  server.close();
+  await new Promise<void>(resolve => server.close(() => resolve()));
+  await flushMiniObservations();
   await Promise.all([closeQueue(), revocationStore.close(), closeRateLimiter(), db.end()]);
 }
 

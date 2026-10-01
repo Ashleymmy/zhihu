@@ -15,6 +15,14 @@ test('relay rejects foreign apps and never retries an uncertain write',async()=>
  const denied=createBridge({context:()=>({APPID:'other',OPENID:'id'}),secret,send});assert.equal((await denied({path:'/core/projects'})).statusCode,403);assert.equal(writes,0);
  const bridge=createBridge({context:()=>({APPID:'wx22b91776ccf37354',OPENID:'trusted'}),secret,send});const result=await bridge({path:'/modules/zhihu/mini-works',method:'POST'});assert.equal(result.statusCode,502);assert.equal(writes,1);assert.ok(!result.message.includes('secret'));
 });
+
+test('cloud deployment metadata cannot be overridden by client claims',async()=>{
+ let raw;const bridge=createBridge({context:()=>({APPID:'wx22b91776ccf37354',OPENID:'trusted'}),secret,environment:'trusted-cloud',version:'2',send:async(_url,payload)=>{raw=JSON.parse(payload);return {code:0}}});
+ await bridge({path:'/core/auth/wechat-login',observation:{environment:'forged'},clientInfo:{version:'1.1.2',envVersion:'trial'}});
+ assert.deepEqual(raw.observation,{environment:'trusted-cloud',version:'2',clientVersion:'1.1.2',clientEnv:'trial'});
+ await bridge({path:'/core/projects',clientInfo:{version:'token\nsecret',envVersion:'forged'}});
+ assert.deepEqual(raw.observation,{environment:'trusted-cloud',version:'2'});
+});
 test('role matrix preserves operator business access, developer access and finance isolation',()=>{
  const h=harness(),p=h.load('utils/permissions');assert.equal(p.allowed({role:'operator'},'team'),true);assert.equal(p.allowed({role:'operator'},'projects'),false);assert.equal(p.allowed({role:'operator'},'wallet'),false);assert.equal(p.allowed({role:'developer'},'projects'),true);assert.equal(p.allowed({role:'admin',adminDuty:'finance'},'invite'),false);assert.equal(p.allowed({role:'creator'},'invite'),true);assert.equal(h.load('config/env').functionName,'opc-bridge');
 });

@@ -52,6 +52,7 @@ for (const route of ['/login', '/bind'])
       if (!user || !(await bcrypt.compare(input.password, user.password_hash)))
         throw new AppError(401, 40102, '网站账号或密码错误');
       if (!user.is_active) throw new AppError(403, 40302, '账号已停用');
+      res.locals.miniVerifiedUserId = String(user.id);
       await withTransaction(async (c) => {
         const [[current]] = await c.query<RowDataPacket[]>(
           'SELECT id,password_hash,is_active FROM users WHERE id=? FOR UPDATE',
@@ -78,6 +79,7 @@ wechatAuthRouter.post(
       identity.openId,
     ]);
     if (!link) return ok(res, { needsBind: true });
+    res.locals.miniVerifiedUserId = String(link.user_id);
     ok(res, await loginVerifiedUser(String(link.user_id), clientIdentity(req), req.ip));
   }),
 );
@@ -115,6 +117,7 @@ wechatAuthRouter.post(
       (c, id) => attachWechat(c, identity, id),
       address,
     );
+    res.locals.miniVerifiedUserId = result.id;
     ok(res, await loginVerifiedUser(result.id, clientIdentity(req), req.ip), 201);
   }),
 );

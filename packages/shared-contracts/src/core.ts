@@ -97,6 +97,7 @@ export interface Project {
 }
 
 export interface TeamMember {
+  miniProgram?: MemberMiniProgram
   projects?: {id:string;name:string;isEnabled:boolean;memberRole:string}[]
   canAssignProjects?: boolean
   adminDuty?: 'all' | 'operations' | 'finance'
@@ -122,6 +123,29 @@ export interface TeamMember {
   mustChangePwd: boolean
   lastLoginAt: string | null
   createdAt: string
+}
+
+export interface MemberMiniProgram {
+  bindingStatus: 'bound' | 'unbound' | 'not_configured'
+  boundAt: string | null
+  maskedIdentity: string | null
+  lastLoginAt: string | null
+  lastActivityAt: string | null
+  lastConflictAt: string | null
+  recentBindingConflict: boolean
+  sessions: {type:'web'|'mobile'|'mini';state:'none'|'valid'|'expired'|'revoked';activeCount:number;lastLoginAt:string|null;expiresAt:string|null}[]
+}
+export interface MiniMonitor {
+  readAt: string
+  business: {boundAccounts:number;unboundAccounts:number;validMiniSessions:number;boundNoProject:number;bindingConflicts:number;publishedCourses:number;totalCourses:number;enabledProjects:number;zhihuEnabled:boolean}
+  technical: null | {
+    configured:boolean;appId:string|null;database:'readable';requests:number;serverErrors:number;rejected:number;failureRate:number|null;averageMs:number|null
+    lastRequestAt:string|null;lastSuccessAt:string|null
+    deployment:null|{cloudEnv:string|null;bridgeVersion:string|null;occurredAt:string}
+    clientVersions:{clientEnv:string|null;clientVersion:string;requests:number;lastSeenAt:string}[]
+    failures:{id:string;occurredAt:string;routeKey:string;method:string;httpStatus:number;resultCode:number;durationMs:number;userId:string|null;displayName:string|null}[]
+    writer:{startedAt:string;dropped:number;failures:number;lastWriteAt:string|null;lastFailureAt:string|null;pending:number}
+  }
 }
 
 export type TeamApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'

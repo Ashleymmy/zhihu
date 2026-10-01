@@ -3,11 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import type { AccountMonitorItem } from '@zhihu-koc/shared-contracts/core'
 import { BarChart } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
+import MiniMonitorPanel from './MiniMonitorPanel.vue'
 
 const auth = useAuthStore()
 const rows = ref<AccountMonitorItem[]>([])
 const loading = ref(true)
 const error = ref('')
+const fullAccess=computed(()=>['admin','developer'].includes(auth.user?.role||'') && (auth.user?.adminDuty??'all')==='all')
 
 /** 近 7 日操作量条形图 */
 const chartItems = computed(() =>
@@ -30,30 +32,30 @@ async function load() {
   finally { loading.value = false }
 }
 
-onMounted(load)
+onMounted(()=>{if(fullAccess.value)void load();else loading.value=false})
 </script>
 
 <template>
   <div class="page-stack">
-    <router-link to="/system" class="back-link">← 返回系统工具</router-link>
     <header class="page-header">
       <div>
-        <p class="section-index">02 / 子账号监控</p>
-        <h1>子账号监控</h1>
-        <p>各账号的登录与操作行为概览（近 7 日）。</p>
+        <p class="section-index">系统 / 监控</p>
+        <h1>运维监控</h1>
+        <p>查看小程序接入、业务数据和账号使用情况。</p>
       </div>
-      <button class="row-action" @click="load">刷新</button>
+      <button v-if="fullAccess" class="row-action" :disabled="loading" @click="load">刷新账号行为</button>
     </header>
+    <MiniMonitorPanel />
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <article class="panel" style="padding: 22px; margin-bottom: 18px;">
+    <article v-if="fullAccess" class="panel" style="padding: 22px; margin-bottom: 18px;">
       <p class="section-index quiet">活跃度分布</p>
       <h2 class="workspace-title" style="font-size: 20px; margin: 4px 0 14px;">近 7 日操作量</h2>
       <BarChart :items="chartItems" color="#e66b3a" :max-items="8" />
     </article>
 
-    <article class="panel data-panel" style="min-height: 300px;">
+    <article v-if="fullAccess" class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
         <span class="toolbar-title">账号行为</span>
         <span class="toolbar-count">{{ rows.length }}</span>
@@ -66,7 +68,7 @@ onMounted(load)
             <tr v-for="r in rows" :key="r.id">
               <td><strong>{{ r.displayName }}</strong> <small style="color: var(--ink-soft); font-family: var(--font-mono); font-size: 12px;">{{ r.username }}</small></td>
               <td><span class="status-badge draft">{{ r.role }}</span></td>
-              <td><span :class="['status-badge', r.isActive ? 'active' : 'ended']">{{ r.isActive ? '活跃' : '已禁用' }}</span></td>
+              <td><span :class="['status-badge', r.isActive ? 'active' : 'ended']">{{ r.isActive ? '启用' : '已禁用' }}</span></td>
               <td style="font-size: 12px; color: var(--ink-soft);">{{ fmt(r.lastLoginAt) }}</td>
               <td style="font-family: var(--font-mono); font-size: 13px;">{{ r.actionCount7d ?? 0 }}</td>
               <td style="font-size: 12px; color: var(--ink-soft);">{{ r.lastAction ? `${r.lastAction} · ${fmt(r.lastActionAt)}` : '—' }}</td>

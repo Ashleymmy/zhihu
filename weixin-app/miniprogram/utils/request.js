@@ -13,6 +13,8 @@ function errorOf(response) {
 }
 function request(path,options={}) {
   const token=options.auth===false?'':wx.getStorageSync('zk_access_token')
+  let clientInfo={}
+  try { const info=wx.getAccountInfoSync().miniProgram; clientInfo={version:info.version||'',envVersion:info.envVersion} } catch (_) {}
   return new Promise((resolve,reject)=>{
     const success=response=>{
       if(token&&token!==wx.getStorageSync('zk_access_token')){const e=new Error('会话已更新，请重新加载');e.code='SESSION_CHANGED';reject(e);return}
@@ -29,7 +31,7 @@ function request(path,options={}) {
       const e=new Error(message);e.code='NETWORK_ERROR';e.detail=detail;reject(e)
     }
     try{initializeCloud()}catch(error){reject(error);return}
-    wx.cloud.callFunction({name:env.functionName,config:{env:env.cloudEnv},data:{path,method:options.method||'GET',data:options.data||{},token:token||undefined},
+    wx.cloud.callFunction({name:env.functionName,config:{env:env.cloudEnv},data:{path,method:options.method||'GET',data:options.data||{},token:token||undefined,clientInfo},
       success(result){const value=result.result;if(!value||typeof value.code!=='number'){reject(new Error('云函数返回格式不正确'));return}success({statusCode:value.statusCode|| (value.code===0?200:500),data:value})},fail})
   })
 }

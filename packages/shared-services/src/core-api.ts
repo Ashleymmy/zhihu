@@ -23,6 +23,7 @@ import type {
   MyAffiliationResp,
   AuditLogItem,
   AccountMonitorItem,
+  MiniMonitor,
   Announcement,
   DbTableStat,
   SiteInfo,
@@ -127,6 +128,7 @@ export function createAdminToolsApi(http: HttpClient) {
     auditActions: () => http.get<Array<{ action: string }>>('/audit-logs/actions'),
     /** 子账号行为监控 */
     monitor: () => http.get<AccountMonitorItem[]>('/admin-tools/monitor'),
+    miniMonitor: () => http.get<MiniMonitor>('/mini-monitor'),
     /** 数据库表统计 */
     dbStats: () => http.get<DbTableStat[]>('/admin-tools/db-stats'),
     auditCleanup: (days: number) => http.post<{ deleted: number }>('/admin-tools/audit-cleanup', { days }),
