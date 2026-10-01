@@ -47,12 +47,12 @@ async function loginWithWeChat() {
   wx.setStorageSync(TOKEN_KEY, result.token);
   return ensure();
 }
-async function register(phone, password, inviteCode, displayName) {
+async function register(phone, password, inviteCode, displayName, smsCode) {
   clear();
   const version = revision;
   const result = await request.send("/core/auth/register", {
     method: "POST",
-    data: { phone, password, inviteCode, displayName: displayName || "" },
+    data: { phone, password, inviteCode, displayName: displayName || "", ...(smsCode ? {smsCode} : {}) },
     auth: false,
   });
   if (version !== revision) throw new Error("注册已取消，请重试");
@@ -105,6 +105,8 @@ function entryPath(user) {
     : "/pages/home/index";
 }
 module.exports = {
+  registrationPolicy: () => request.send('/core/auth/registration-policy', {auth:false}),
+  sendRegistrationCode: (phone,inviteCode) => request.send('/core/auth/registration-code', {method:'POST',auth:false,data:{phone,inviteCode}}),
   TOKEN_KEY,
   USER_KEY,
   login,

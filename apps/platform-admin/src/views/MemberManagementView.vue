@@ -400,7 +400,7 @@ onMounted(() => run(load));
               <td>
                 <strong>{{ m.displayName }}</strong
                 ><small>{{ m.username }} · ID {{ m.id }}</small
-                ><small>{{ m.phone || "未填写手机号" }}</small>
+                ><small>{{ m.phone || "未填写手机号" }}{{ m.phone ? (m.phoneVerifiedAt ? ' · 手机号已验证' : ' · 手机号未验证') : '' }}</small>
               </td>
               <td>
                 {{ ROLE_LABELS[m.role]

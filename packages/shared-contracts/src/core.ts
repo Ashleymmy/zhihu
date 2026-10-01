@@ -27,6 +27,7 @@ export interface RegisterReq extends LoginReq {
 export interface RegisterResp { id: string; username: string }
 
 export interface AuthUser {
+  phoneVerifiedAt?: string | null
   adminDuty?: 'all' | 'operations' | 'finance';
   id: string
   username: string
@@ -97,6 +98,7 @@ export interface Project {
 }
 
 export interface TeamMember {
+  phoneVerifiedAt?: string | null
   miniProgram?: MemberMiniProgram
   projects?: {id:string;name:string;isEnabled:boolean;memberRole:string}[]
   canAssignProjects?: boolean

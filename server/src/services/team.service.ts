@@ -146,6 +146,8 @@ export async function updateMember(
     bindings.push(patch.displayName);
   }
   if (patch.phone !== undefined) {
+    fields.push('phone_verified_at = IF(phone <=> ?,phone_verified_at,NULL)');
+    bindings.push(patch.phone);
     fields.push('phone = ?');
     bindings.push(patch.phone);
   }

@@ -9,13 +9,67 @@ Page({
     agreed: false,
     busy: false,
     error: "",
+    smsRequired: false,
+    policyReady: false,
+    policyLoading: false,
+    smsCode: "",
+    sendingCode: false,
+    cooldown: 0,
+    codeNotice: "",
   },
   // 分享链接携带邀请码（pages/invite 的转发）：自动预填
-  onLoad(options) {
+  async onLoad(options) {
     if (options && options.code)
       this.setData({ inviteCode: String(options.code).toUpperCase() });
+    await this.loadPolicy();
+  },
+  async loadPolicy() {
+    if (this.data.policyLoading) return;
+    this.setData({ policyLoading: true, policyReady: false, error: "" });
+    try {
+      const policy = await auth.registrationPolicy();
+      if (!policy || typeof policy.smsRequired !== 'boolean') throw new Error('无法读取注册规则，请刷新后重试');
+      if (!this._disposed) this.setData({ smsRequired: policy.smsRequired, policyReady: true });
+    } catch (e) {
+      if (!this._disposed) this.setData({ error: e.message || '无法读取注册规则，请重试' });
+    } finally {
+      if (!this._disposed) this.setData({ policyLoading: false });
+    }
+  },
+  onShow() { this.startCountdown(); },
+  onHide() { clearInterval(this._timer); },
+  onUnload() { this._disposed = true; clearInterval(this._timer); },
+  startCountdown() {
+    clearInterval(this._timer);
+    const tick = () => {
+      const cooldown = Math.max(0, Math.ceil(((this._retryAt || 0) - Date.now()) / 1000));
+      this.setData({ cooldown });
+      if (!cooldown) clearInterval(this._timer);
+    };
+    tick();
+    if (this.data.cooldown) this._timer = setInterval(tick, 1000);
+  },
+  async sendCode() {
+    if (!this.data.policyReady || !this.data.smsRequired || this.data.sendingCode || this.data.busy || this.data.cooldown) return;
+    const phone = this.data.phone.trim(), inviteCode = this.data.inviteCode.trim().toUpperCase();
+    if (!/^1\d{10}$/.test(phone)) return this.setData({error:'请输入正确的 11 位手机号'});
+    if (!/^[A-Z2-9]{8}$/.test(inviteCode)) return this.setData({error:'请先填写有效的 8 位邀请码'});
+    if (!this.data.agreed) return this.setData({error:'请先阅读并同意用户协议和隐私协议'});
+    this.setData({sendingCode:true,error:'',codeNotice:'',smsCode:''});
+    try {
+      const result = await auth.sendRegistrationCode(phone, inviteCode);
+      if (this._disposed) return;
+      this._retryAt = Date.now() + Math.max(60,Number(result.retryAfterSeconds)||60)*1000;
+      this.startCountdown();
+      if (phone === this.data.phone.trim()) this.setData({codeNotice:'验证码已发送，5 分钟内有效，请查看手机短信。'});
+    } catch(e) {
+      if (!this._disposed) this.setData({error:e.message||'发送失败，请稍后重试'});
+    } finally {
+      if (!this._disposed) this.setData({sendingCode:false});
+    }
   },
   input(e) {
+    if (e.currentTarget.dataset.name === 'phone') this.setData({smsCode:'',codeNotice:''});
     this.setData({ [e.currentTarget.dataset.name]: e.detail.value });
   },
   backHome() {
@@ -33,7 +87,7 @@ Page({
     wx.redirectTo({ url: "/pages/login/index" });
   },
   async submit() {
-    if (this.data.busy) return;
+    if (this.data.busy || this.data.sendingCode) return;
     const phone = this.data.phone.trim();
     const password = this.data.password;
     const inviteCode = this.data.inviteCode.trim().toUpperCase();
@@ -49,6 +103,9 @@ Page({
       this.setData({ error: "请填写邀请码，请向邀请人获取" });
       return;
     }
+    if (!this.data.policyReady) return this.setData({error:'注册规则尚未加载，请重试'});
+    if (this.data.smsRequired && !/^\d{6}$/.test(this.data.smsCode.trim()))
+      return this.setData({error:'请输入 6 位短信验证码'});
     // 协议必须主动勾选；未勾选弹窗确认，点「同意」自动勾选并继续
     if (!this.data.agreed) {
       const ok = await feedback.confirm(this, {
@@ -68,9 +125,11 @@ Page({
         password,
         inviteCode,
         this.data.displayName.trim(),
+        this.data.smsRequired ? this.data.smsCode.trim() : undefined,
       );
       if (user) wx.reLaunch({ url: auth.entryPath(user) });
     } catch (error) {
+      if (error.code === 42220) await this.loadPolicy();
       this.setData({ error: error.message || "注册失败，请重试" });
     } finally {
       this.setData({ busy: false });

@@ -37,6 +37,7 @@ interface UserRow extends RowDataPacket {
   parent_id: string | null;
   display_name: string;
   phone: string | null;
+  phone_verified_at?: Date | null;
   is_active: number;
   must_change_pwd: number;
 }
@@ -49,6 +50,7 @@ const publicUser = (user: UserRow, role: Role) => ({
   adminDuty: effectiveDuty({role,adminDuty:user.admin_duty}),
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
+  phoneVerifiedAt: user.phone_verified_at ?? null,
   permissions: permissionsFor(role),
 });
 

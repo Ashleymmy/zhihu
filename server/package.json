@@ -38,6 +38,10 @@
     "test:opc:ui": "node tests/opc-ui/smoke.cjs"
   },
   "dependencies": {
+    "@alicloud/credentials": "2.4.7",
+    "@alicloud/dysmsapi20170525": "4.6.0",
+    "@alicloud/openapi-client": "0.4.15",
+    "@alicloud/tea-util": "1.4.11",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",

@@ -12,6 +12,8 @@ import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 import { ok } from '../utils/response';
 import { requireWechatContext, wechatClientId, type WechatIdentity } from './context';
 import { resolveInvitationCode } from './invitations';
+import { smsSettings, requireSmsEnabled } from '../sms/config';
+import { sendRegistrationCode, verifyRegistrationCode, consumeRegistrationCode } from '../sms/registration';
 
 export async function attachWechat(c: PoolConnection, id: WechatIdentity, userId: string) {
   const [links] = await c.query<RowDataPacket[]>(
@@ -86,6 +88,10 @@ wechatAuthRouter.post(
 const signup = z
   .object({
     phone: z.string().regex(/^1\d{10}$/),
+    smsCode: z
+      .string()
+      .regex(/^\d{6}$/)
+      .optional(),
     password: z
       .string()
       .min(8)
@@ -98,6 +104,36 @@ const signup = z
       .regex(/^[A-Z2-9]{8}$/),
   })
   .strict();
+wechatAuthRouter.get(
+  '/registration-policy',
+  asyncHandler(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    ok(res, { smsRequired: smsSettings().enabled });
+  }),
+);
+wechatAuthRouter.post(
+  '/registration-code',
+  asyncHandler(async (req, res) => {
+    requireSmsEnabled();
+    const input = z
+      .object({ phone: z.string().regex(/^1\d{10}$/), inviteCode: z.string().regex(/^[A-Z2-9]{8}$/) })
+      .strict()
+      .parse(req.body);
+    const identity = requireWechatContext(req);
+    // Validate invitation and existing accounts before spending an SMS. Never consume an invitation here.
+    await resolveInvitationCode(input.inviteCode);
+    const [existing] = await rows<RowDataPacket>('SELECT id FROM users WHERE username=? OR phone=? LIMIT 1', [
+      input.phone,
+      input.phone,
+    ]);
+    const [bound] = await rows<RowDataPacket>('SELECT user_id FROM wechat_identities WHERE app_id=? AND open_id=?', [
+      identity.appId,
+      identity.openId,
+    ]);
+    if (existing || bound) throw new AppError(409, 40920, '该手机号或微信已有账号，请使用原账号密码登录');
+    ok(res, await sendRegistrationCode(input.phone, wechatClientId(identity)));
+  }),
+);
 wechatAuthRouter.post(
   '/register',
   asyncHandler(async (req, res) => {
@@ -105,6 +141,9 @@ wechatAuthRouter.post(
       identity = requireWechatContext(req),
       address = `wechat:${wechatClientId(identity)}`;
     const invitationToken = await resolveInvitationCode(input.inviteCode);
+    const required = smsSettings().enabled;
+    if (required && !input.smsCode) throw new AppError(422, 42220, '请填写短信验证码；旧版小程序请更新后重试');
+    const proof = required ? await verifyRegistrationCode(input.phone, wechatClientId(identity), input.smsCode!) : null;
     const result = await register(
       {
         username: input.phone,
@@ -114,7 +153,10 @@ wechatAuthRouter.post(
         invitationToken,
       },
       req.ip,
-      (c, id) => attachWechat(c, identity, id),
+      async (c, id) => {
+        await attachWechat(c, identity, id);
+        if (proof) await consumeRegistrationCode(c, proof, id);
+      },
       address,
     );
     res.locals.miniVerifiedUserId = result.id;

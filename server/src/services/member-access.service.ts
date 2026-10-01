@@ -32,7 +32,7 @@ export function editableMemberRoles(actor: AuthUser) {
 }
 export async function listManagedMembers(actor: AuthUser) {
   const list = await rows<MemberRecord>(
-    `SELECT CAST(u.id AS CHAR) id,u.username,u.role,u.parent_id,u.display_name,u.phone,u.admin_duty,u.is_active,u.must_change_pwd,u.last_login_at,u.created_at,
+    `SELECT CAST(u.id AS CHAR) id,u.username,u.role,u.parent_id,u.display_name,u.phone,u.phone_verified_at,u.admin_duty,u.is_active,u.must_change_pwd,u.last_login_at,u.created_at,
     creator.display_name created_by_name,leader.display_name parent_name,inviter.display_name inviter_name,invitation.label invitation_label,iu.registered_at invited_at,
     (SELECT COUNT(*) FROM users child WHERE child.parent_id=u.id) member_count,
     (SELECT COUNT(*) FROM project_members pm WHERE pm.user_id=u.id AND pm.left_at IS NULL) project_count,
@@ -130,9 +130,10 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
             ? (patch.adminDuty ?? (member.role === 'admin' ? member.admin_duty : 'all'))
             : 'all';
     await c.query(
-      'UPDATE users SET display_name=?,phone=?,role=?,role_id=(SELECT id FROM roles WHERE role_key=?),admin_duty=?,is_active=?,parent_id=? WHERE id=?',
+      'UPDATE users SET display_name=?,phone_verified_at=IF(phone <=> ?,phone_verified_at,NULL),phone=?,role=?,role_id=(SELECT id FROM roles WHERE role_key=?),admin_duty=?,is_active=?,parent_id=? WHERE id=?',
       [
         patch.displayName ?? member.display_name,
+        patch.phone === undefined ? member.phone : patch.phone,
         patch.phone === undefined ? member.phone : patch.phone,
         role,
         role,

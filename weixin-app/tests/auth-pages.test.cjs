@@ -48,6 +48,7 @@ test('login page lands on entryPath when wechat-login succeeds', async () => {
 test('register page validates locally before any request', async () => {
   const h = setup(() => ({ token: 'tk', user: NEW_USER }))
   const page = h.page('register')
+  page.setData({policyReady:true,smsRequired:false})
   page.setData({ phone: '123', password: 'Passw0rd!', inviteCode: 'TEAM2026' })
   await page.submit()
   assert.equal(page.data.error, '请输入正确的 11 位手机号')
@@ -70,6 +71,7 @@ test('register submits phone, password and invite code then lands on entryPath',
     return {}
   })
   const page = h.page('register')
+  page.setData({policyReady:true,smsRequired:false})
   page.setData({ phone: '13800000001', password: 'Passw0rd!', inviteCode: 'team2026', displayName: '小明', agreed: true })
 
   await page.submit()
@@ -91,6 +93,7 @@ test('register without agreement shows the confirm dialog and does not submit wh
     return Promise.resolve({ confirm: false })
   }
   const page = h.page('register')
+  page.setData({policyReady:true,smsRequired:false})
   page.setData({ phone: '13800000001', password: 'Passw0rd!', inviteCode: 'TEAM2026' })
 
   await page.submit()
@@ -106,6 +109,7 @@ test('register auto-checks the agreement and proceeds when accepted in the dialo
   })
   // harness 默认 showModal confirm:true = 用户点了「同意」
   const page = h.page('register')
+  page.setData({policyReady:true,smsRequired:false})
   page.setData({ phone: '13800000001', password: 'Passw0rd!', inviteCode: 'TEAM2026' })
 
   await page.submit()

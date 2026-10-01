@@ -101,7 +101,7 @@ export function mountWechatBridge(app: Express) {
       delete req.headers['idempotency-key'];
       if (body.token) req.headers.authorization = `Bearer ${body.token}`;
       req.headers['content-type'] = 'application/json';
-      const specialAuth = /^\/core\/auth\/(login|register|bind|wechat-login|profile)$/.test(body.path);
+      const specialAuth = /^\/core\/auth\/(login|register|bind|wechat-login|profile|registration-policy|registration-code)$/.test(body.path);
       const path = specialAuth ? body.path.replace('/auth/', '/mini-auth/') : body.path;
       req.method = body.method;
       observeMiniRequest(req, res, body.path, body.observation);
