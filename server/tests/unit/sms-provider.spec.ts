@@ -35,10 +35,11 @@ vi.mock('@alicloud/credentials', () => ({
     constructor(_v: unknown) {}
   },
 }));
-import { sendRegistrationSms } from '../../src/sms/aliyun';
+import { sendRegistrationSms, sendAccountSms } from '../../src/sms/aliyun';
 import { smsSettings } from '../../src/sms/config';
 beforeEach(() => {
   vi.stubEnv('SMS_REGISTRATION_ENABLED', '1');
+  vi.stubEnv('SMS_LOGIN_ENABLED', '0');
   vi.stubEnv('SMS_REGISTRATION_PILOT_INVITATIONS', '');
   vi.stubEnv('SMS_SIGN_NAME', '测试签名');
   vi.stubEnv('SMS_TEMPLATE_CODE', 'SMS_123456');
@@ -49,6 +50,20 @@ beforeEach(() => {
   runtimes.length = 0;
 });
 afterEach(() => vi.unstubAllEnvs());
+it('account SMS has a separate switch and uses only the configured template', async () => {
+  await expect(sendAccountSms('13900001234', '123456')).rejects.toMatchObject({ code: 50320 });
+  expect(send).not.toHaveBeenCalled();
+  vi.stubEnv('SMS_LOGIN_ENABLED', '1');
+  vi.stubEnv('SMS_REGISTRATION_ENABLED', '0');
+  send.mockResolvedValue({ body: { code: 'OK' } });
+  await sendAccountSms('13900001234', '012345');
+  expect(requests[0]).toMatchObject({
+    phoneNumbers: '13900001234',
+    templateCode: 'SMS_123456',
+    templateParam: '{"code":"012345"}',
+  });
+  await expect(sendRegistrationSms('13900001234', '012345')).rejects.toMatchObject({ code: 50320 });
+});
 it('sends exactly configured registration template with no SDK automatic retries', async () => {
   send.mockResolvedValue({ body: { code: 'OK' } });
   await sendRegistrationSms('13900001234', '012345');

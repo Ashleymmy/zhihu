@@ -8,12 +8,7 @@ import { normalizeRole, effectiveDuty } from '../auth/roles';
 import type { ClientIdentity } from '../auth/clientIdentity';
 import { permissionsFor } from '../auth/permissions';
 import { revocationStore } from '../auth/revocation';
-import {
-  RefreshSession,
-  issueRefreshSession,
-  revokeLoginSession,
-  rotateRefreshSession,
-} from '../auth/tokenSessions';
+import { RefreshSession, issueRefreshSession, revokeLoginSession, rotateRefreshSession } from '../auth/tokenSessions';
 import { writeAudit } from './audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 import { lockInvitation, consumeInvitation } from './invitations.service';
@@ -47,7 +42,7 @@ const publicUser = (user: UserRow, role: Role) => ({
   username: user.username,
   displayName: user.display_name,
   role,
-  adminDuty: effectiveDuty({role,adminDuty:user.admin_duty}),
+  adminDuty: effectiveDuty({ role, adminDuty: user.admin_duty }),
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
   phoneVerifiedAt: user.phone_verified_at ?? null,
@@ -96,12 +91,19 @@ export async function register(
   if (existing) throw new AppError(409, 40901, '用户名已被使用');
   const hash = await bcrypt.hash(input.password, 12);
   try {
-    const id = await withTransaction(async connection => {
+    const id = await withTransaction(async (connection) => {
       const invitation = input.invitationToken ? await lockInvitation(connection, input.invitationToken) : null;
       const [result] = await connection.query<ResultSetHeader>(
         `INSERT INTO users (username, password_hash, role, role_id, parent_id, display_name, phone, is_active, must_change_pwd,created_by)
          VALUES (?, ?, 'creator', (SELECT id FROM roles WHERE role_key = 'creator'), ?, ?, ?, 1, 0,?)`,
-        [input.username, hash, invitation?.team_leader_id ?? null, input.displayName?.trim() || input.username, input.phone ?? null, invitation?.owner_user_id ?? null],
+        [
+          input.username,
+          hash,
+          invitation?.team_leader_id ?? null,
+          input.displayName?.trim() || input.username,
+          input.phone ?? null,
+          invitation?.owner_user_id ?? null,
+        ],
       );
       const id = String(result.insertId);
       if (invitation) await consumeInvitation(connection, invitation, id);
@@ -142,7 +144,7 @@ export async function login(username: string, password: string, ip?: string, cli
   const userKey = `login:user:${username}`;
   await deleteRateLimit(userKey);
 
-  if (!client) throw new AppError(401,40106,'客户端标识缺失，请刷新页面后重新登录');
+  if (!client) throw new AppError(401, 40106, '客户端标识缺失，请刷新页面后重新登录');
   const refresh = await issueRefreshSession(String(user.id), client, user.password_hash);
   const token = await issueAccessToken(user, role, refresh.familyId);
   await withTransaction(async (connection) => {
@@ -236,15 +238,21 @@ export async function changePassword(auth: AuthUser, oldPassword: string, newPas
 export type { RefreshSession };
 
 /** Internal entry used only after trusted WeChat identity/password verification. */
-export async function loginVerifiedUser(userId: string, client: ClientIdentity, ip?: string, expectedPasswordHash?: string) {
+export async function loginVerifiedUser(
+  userId: string,
+  client: ClientIdentity,
+  ip?: string,
+  expectedPasswordHash?: string,
+  beforeIssue?: (connection: PoolConnection) => Promise<void>,
+) {
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id=?', [userId]);
   if (!user?.is_active) throw new AppError(403, 40302, '账号已停用');
   const role = await requireKnownRole(user, ip);
-  const session = await issueRefreshSession(String(user.id), client, expectedPasswordHash);
+  const session = await issueRefreshSession(String(user.id), client, expectedPasswordHash, beforeIssue);
   const token = await issueAccessToken(user, role, session.familyId);
-  await withTransaction(async c => {
+  await withTransaction(async (c) => {
     await c.query('UPDATE users SET last_login_at=NOW() WHERE id=?', [userId]);
-    await writeAudit({userId,action:'auth.wechat_login',resourceType:'user',resourceId:userId,ip},c);
+    await writeAudit({ userId, action: 'auth.wechat_login', resourceType: 'user', resourceId: userId, ip }, c);
   });
   // A cloud invocation has no refresh cookie; re-enter via the verified WeChat identity after expiry.
   return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd) };

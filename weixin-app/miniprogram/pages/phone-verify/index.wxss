@@ -1,0 +1,7 @@
+.verify-note {font-size:25rpx; line-height:1.7; margin:22rpx 0;}
+.verify-input {background:var(--paper-deep); border-radius:var(--radius-sm); padding:24rpx; margin-top:20rpx; height:92rpx; font-size:28rpx;}
+.verify-code-row {display:flex; align-items:center; gap:14rpx;}
+.verify-code-row input {flex:1; min-width:0;}
+.verify-code-row button {font-size:24rpx; color:var(--forest); background:var(--forest-tint); margin-top:20rpx; padding:24rpx 18rpx;}
+.verify-consent {font-size:24rpx; color:var(--ink-soft); line-height:1.8; margin:24rpx 0;}
+.verify-consent checkbox {transform:scale(.7); width:40rpx; transform-origin:left center;}

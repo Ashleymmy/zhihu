@@ -199,7 +199,8 @@ describe('管理角色层级', () => {
       const s = await login(role);
       const get = (path: string) => request(app).get(path).set(headers(s.device)).auth(s.token, { type: 'bearer' });
       expect((await get('/developer-tool')).status).toBe(role === 'developer' ? 204 : 403);
-      expect((await get('/operations')).status).toBe(['developer', 'admin', 'operator'].includes(role) ? 204 : 403);
+      // Creators and leaders can also create keywords under the current business rules.
+      expect((await get('/operations')).status).toBe(204);
       expect((await get('/callback-secret')).status).toBe(['developer', 'admin'].includes(role) ? 204 : 403);
     }
   });

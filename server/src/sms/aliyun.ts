@@ -2,12 +2,21 @@ import Dysmsapi, { SendSmsRequest } from '@alicloud/dysmsapi20170525';
 import { Config } from '@alicloud/openapi-client';
 import Credential, { Config as CredentialConfig } from '@alicloud/credentials';
 import { RuntimeOptions } from '@alicloud/tea-util';
-import { requireSmsEnabled } from './config';
+import { requireSmsEnabled, requireAccountSmsEnabled } from './config';
 import { AppError } from '../middleware/errors';
 
 let client: Dysmsapi | undefined;
 export async function sendRegistrationSms(phone: string, code: string, invitationToken?: string): Promise<void> {
-  const { signName, templateCode } = requireSmsEnabled(invitationToken);
+  await sendSms(phone, code, requireSmsEnabled(invitationToken));
+}
+export async function sendAccountSms(phone: string, code: string): Promise<void> {
+  await sendSms(phone, code, requireAccountSmsEnabled());
+}
+async function sendSms(
+  phone: string,
+  code: string,
+  { signName, templateCode }: { signName: string; templateCode: string },
+): Promise<void> {
   try {
     // ECS role is the default; explicit server-only RAM credentials support isolated deployments.
     if (!client) {

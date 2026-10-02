@@ -42,10 +42,10 @@ for (const page of app.pages) {
       );
   const name = page.replace(/^pages\//, "").replace(/\/index$/, ""),
     instance = harness().page(name);
+  const source = fs.readFileSync(path.join(root, page + ".wxml"), "utf8");
+  // Only validate shared handlers for pages that actually import that template.
   const wxml =
-    fs.readFileSync(path.join(root, page + ".wxml"), "utf8") +
-    // 登录/注册/绑定/协议是公开页，不走 screen() 也不引共享模板
-    (["login", "register", "bind", "agreement"].includes(name) ? "" : shared);
+    source + (source.includes("templates/shared.wxml") ? shared : "");
   for (const event of wxml.matchAll(/(?:bind|catch):?[\w-]+="([A-Za-z]\w*)"/g))
     assert.equal(
       typeof instance[event[1]],
@@ -83,9 +83,15 @@ console.log(
 if (process.argv.includes("--wechat")) {
   const bin =
     process.env.WECHAT_COMPILER_DIR ||
-    ["resources/app.asar.unpacked/node_modules/wcc-exec", "code/package.nw/node_modules/wcc-exec"]
-      .map(folder=>path.join("C:/Program Files (x86)/Tencent/微信web开发者工具",folder))
-      .find(folder=>fs.existsSync(path.join(folder,"wcc.exe"))) || "";
+    [
+      "resources/app.asar.unpacked/node_modules/wcc-exec",
+      "code/package.nw/node_modules/wcc-exec",
+    ]
+      .map((folder) =>
+        path.join("C:/Program Files (x86)/Tencent/微信web开发者工具", folder),
+      )
+      .find((folder) => fs.existsSync(path.join(folder, "wcc.exe"))) ||
+    "";
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "timo-opc-compile-"));
   for (const [name, extension] of [
     ["wcc", "wxml"],

@@ -14,6 +14,7 @@ import { requireWechatContext, wechatClientId, type WechatIdentity } from './con
 import { resolveInvitationCode } from './invitations';
 import { smsSettings, requireSmsEnabled } from '../sms/config';
 import { sendRegistrationCode, verifyRegistrationCode, consumeRegistrationCode } from '../sms/registration';
+import { smsAuthRouter } from './sms-auth';
 
 export async function attachWechat(c: PoolConnection, id: WechatIdentity, userId: string) {
   const [links] = await c.query<RowDataPacket[]>(
@@ -36,6 +37,7 @@ wechatAuthRouter.use((req, _res, next) => {
   }
 });
 const credentials = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(128) });
+wechatAuthRouter.use(smsAuthRouter);
 for (const route of ['/login', '/bind'])
   wechatAuthRouter.post(
     route,

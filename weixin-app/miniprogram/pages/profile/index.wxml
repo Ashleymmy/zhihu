@@ -16,9 +16,10 @@
         <text class="cell-label">手机号码</text>
         <text class="cell-value muted">{{user.phone || '未绑定'}}</text>
       </view>
-      <view class="cell">
+      <view class="cell" bindtap="openPhoneVerification">
         <text class="cell-label">手机号验证</text>
-        <text class="cell-value muted">{{user.phoneVerifiedAt ? '已通过短信验证' : '未验证'}}</text>
+        <text class="cell-value muted">{{user.phoneVerifiedAt ? '已通过短信验证' : '去验证'}}</text>
+        <text class="cell-arrow" wx:if="{{!user.phoneVerifiedAt}}">›</text>
       </view>
       <view class="cell" bindtap="openContactModal">
         <text class="cell-label">备用联系方式</text>

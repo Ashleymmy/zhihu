@@ -1,1 +1,10 @@
 /* 登录页版式已收敛到 app.wxss（登录/注册/绑定页共用） */
+.login-modes {display:flex; gap:16rpx; width:100%; margin-bottom:28rpx;}
+.mode-option {flex:1; min-height:80rpx; line-height:80rpx; font-size:26rpx; color:var(--ink-soft); background:var(--paper-deep); border-radius:16rpx;}
+.mode-option.selected {color:var(--forest); background:var(--forest-tint); font-weight:600;}
+.sms-input-row {display:flex; align-items:center; gap:12rpx;}
+.sms-input-row input {min-width:0; flex:1;}
+.sms-send {font-size:24rpx; flex-shrink:0; min-height:80rpx; line-height:80rpx; color:var(--forest); background:var(--forest-tint); padding:0 20rpx;}
+.sms-help {font-size:23rpx; line-height:1.65; margin-top:18rpx;}
+.sms-consent {font-size:23rpx; line-height:1.8; margin-top:20rpx; color:var(--ink-soft);}
+.sms-consent checkbox {transform:scale(.7); transform-origin:left center; width:40rpx;}

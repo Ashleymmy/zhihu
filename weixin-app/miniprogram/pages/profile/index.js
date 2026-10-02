@@ -17,11 +17,14 @@ Page(
       editBusy: false,
       editField: "",
     },
-    async fetch({user}) {
+    async fetch({ user }) {
       const res = await request.get("/modules/zhihu/invite/status");
-      const affiliation = user.role === "creator" ? await request.get("/core/team/affiliation") : null;
-      const profile=await request.get("/core/auth/profile");
-      return { inviteUsed: res.used, affiliation, user:profile };
+      const affiliation =
+        user.role === "creator"
+          ? await request.get("/core/team/affiliation")
+          : null;
+      const profile = await request.get("/core/auth/profile");
+      return { inviteUsed: res.used, affiliation, user: profile };
     },
     openInviteModal() {
       this.setData({ showInviteModal: true, inviteInput: "", inviteError: "" });
@@ -51,10 +54,26 @@ Page(
       }
     },
     openDisplayNameModal() {
-      this.setData({ showEditModal: true, editModalTitle: "修改昵称", editField: "displayName", editInput: this.data.user?.displayName || "", editError: "" });
+      this.setData({
+        showEditModal: true,
+        editModalTitle: "修改昵称",
+        editField: "displayName",
+        editInput: this.data.user?.displayName || "",
+        editError: "",
+      });
     },
     openContactModal() {
-      this.setData({ showEditModal: true, editModalTitle: "备用联系方式", editField: "contact", editInput: this.data.user?.contact || "", editError: "" });
+      this.setData({
+        showEditModal: true,
+        editModalTitle: "备用联系方式",
+        editField: "contact",
+        editInput: this.data.user?.contact || "",
+        editError: "",
+      });
+    },
+    openPhoneVerification() {
+      if (!this.data.user || this.data.user.phoneVerifiedAt) return;
+      wx.navigateTo({ url: "/pages/phone-verify/index" });
     },
     closeEditModal() {
       if (this.data.editBusy) return;
@@ -75,7 +94,9 @@ Page(
       try {
         const body = { [this.data.editField]: value };
         const updated = await request.post("/core/auth/profile", body);
-        const userPatch = { [`user.${this.data.editField}`]: updated[this.data.editField] };
+        const userPatch = {
+          [`user.${this.data.editField}`]: updated[this.data.editField],
+        };
         this.setData({ showEditModal: false, ...userPatch });
       } catch (err) {
         this.setData({ editError: err.message || "保存失败" });

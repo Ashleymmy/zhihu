@@ -47,6 +47,7 @@ export async function issueRefreshSession(
   userId: string,
   client: ClientIdentity = { type: 'web', id: crypto.randomUUID() },
   expectedPasswordHash?: string,
+  beforeIssue?: (connection: PoolConnection) => Promise<void>,
 ): Promise<RefreshSession> {
   return withTransaction(async (c) => {
     const [[user]] = await c.query<RowDataPacket[]>(
@@ -54,6 +55,7 @@ export async function issueRefreshSession(
       [userId],
     );
     if (!user?.is_active || (expectedPasswordHash && user.password_hash !== expectedPasswordHash)) throw expired();
+    if (beforeIssue) await beforeIssue(c);
     if (user.role !== 'developer') {
       await c.query(
         `UPDATE token_sessions t JOIN login_sessions s ON s.id=t.family_id SET t.revoked_at=NOW(3),t.revoke_reason='device_replaced' WHERE s.user_id=? AND s.client_type=? AND t.revoked_at IS NULL`,

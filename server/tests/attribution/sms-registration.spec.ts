@@ -94,6 +94,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   Object.assign(process.env, {
     SMS_REGISTRATION_ENABLED: '1',
+    SMS_LOGIN_ENABLED: '0',
     SMS_REGISTRATION_PILOT_INVITATIONS: '',
     SMS_SIGN_NAME: '测试签名',
     SMS_TEMPLATE_CODE: 'SMS_123456',

@@ -36,7 +36,9 @@ export function observationWriterState() {
 
 // Do not store arbitrary URLs, request/response bodies, tokens or OpenIDs.
 export function miniRoute(path: string) {
-  const auth = path.match(/^\/core\/auth\/(login|bind|register|wechat-login|me|profile|logout|refresh|registration-policy|registration-code)$/);
+  const auth = path.match(
+    /^\/core\/auth\/(login|bind|register|wechat-login|me|profile|logout|refresh|registration-policy|registration-code|sms-policy|login-code|sms-login|phone-code|verify-phone)$/,
+  );
   if (auth) return '/core/auth/' + auth[1];
   const business = path.match(
     /^\/modules\/zhihu\/(courses|keywords|mini-works|mini-import-works|home-summary|workbench|evidence|invite)(\/|$)/,

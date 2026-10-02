@@ -7,6 +7,9 @@ export const SMS_RETRY_SECONDS = 60;
 export const SMS_MAX_ATTEMPTS = 5;
 
 export function smsSettings(invitationToken?: string) {
+  if (process.env.SMS_LOGIN_ENABLED !== undefined && !['0', '1'].includes(process.env.SMS_LOGIN_ENABLED))
+    throw new AppError(503, 50320, '短信登录开关配置错误，请联系管理员');
+  const loginEnabled = process.env.SMS_LOGIN_ENABLED === '1';
   if (process.env.SMS_REGISTRATION_ENABLED !== undefined && !['0', '1'].includes(process.env.SMS_REGISTRATION_ENABLED))
     throw new AppError(503, 50320, '短信验证开关配置错误，请联系管理员');
   const globalEnabled = process.env.SMS_REGISTRATION_ENABLED === '1';
@@ -22,7 +25,7 @@ export function smsSettings(invitationToken?: string) {
   const secret = process.env.SMS_VERIFICATION_SECRET ?? '';
   const dailyLimit = Number(process.env.SMS_DAILY_LIMIT ?? 100);
   if (
-    (globalEnabled || pilotInvitations.length > 0) &&
+    (globalEnabled || pilotInvitations.length > 0 || loginEnabled) &&
     (!signName ||
       !/^SMS_\d+$/.test(templateCode) ||
       secret.length < 32 ||
@@ -32,7 +35,13 @@ export function smsSettings(invitationToken?: string) {
       dailyLimit > 10000)
   )
     throw new AppError(503, 50320, '短信验证配置不完整，请联系管理员');
-  return { enabled, signName, templateCode, secret, dailyLimit };
+  return { enabled, loginEnabled, signName, templateCode, secret, dailyLimit };
+}
+
+export function requireAccountSmsEnabled() {
+  const settings = smsSettings();
+  if (!settings.loginEnabled) throw new AppError(503, 50320, '短信登录尚未启用，请使用账号密码登录');
+  return settings;
 }
 
 export function requireSmsEnabled(invitationToken?: string) {

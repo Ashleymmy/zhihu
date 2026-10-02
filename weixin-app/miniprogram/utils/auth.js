@@ -47,12 +47,40 @@ async function loginWithWeChat() {
   wx.setStorageSync(TOKEN_KEY, result.token);
   return ensure();
 }
+async function loginWithSms(phone, smsCode) {
+  clear();
+  const version = revision;
+  const result = await request.send("/core/auth/sms-login", {
+    method: "POST",
+    auth: false,
+    data: { phone, smsCode },
+  });
+  if (version !== revision) throw new Error("登录已取消，请重试");
+  wx.setStorageSync(TOKEN_KEY, result.token);
+  return ensure();
+}
+async function verifyPhone(phone, password, smsCode) {
+  const version = revision;
+  const user = await request.post("/core/auth/verify-phone", {
+    phone,
+    password,
+    smsCode,
+  });
+  if (version !== revision) throw new Error("登录已变化，请重新进入个人信息");
+  return store(user);
+}
 async function register(phone, password, inviteCode, displayName, smsCode) {
   clear();
   const version = revision;
   const result = await request.send("/core/auth/register", {
     method: "POST",
-    data: { phone, password, inviteCode, displayName: displayName || "", ...(smsCode ? {smsCode} : {}) },
+    data: {
+      phone,
+      password,
+      inviteCode,
+      displayName: displayName || "",
+      ...(smsCode ? { smsCode } : {}),
+    },
     auth: false,
   });
   if (version !== revision) throw new Error("注册已取消，请重试");
@@ -74,8 +102,7 @@ async function bindWechat(username, password) {
 function ensure() {
   // onLaunch 期间 App 实例尚未注册，getApp() 会返回 undefined，此处与 clear() 同样容忍。
   const app = getApp();
-  if (app && app.globalData.user)
-    return Promise.resolve(app.globalData.user);
+  if (app && app.globalData.user) return Promise.resolve(app.globalData.user);
   if (!wx.getStorageSync(TOKEN_KEY)) return Promise.resolve(null);
   if (pending) return pending;
   const version = revision;
@@ -105,8 +132,28 @@ function entryPath(user) {
     : "/pages/home/index";
 }
 module.exports = {
-  registrationPolicy: (inviteCode) => request.send('/core/auth/registration-policy', {auth:false,data:inviteCode?{inviteCode}:{}}),
-  sendRegistrationCode: (phone,inviteCode) => request.send('/core/auth/registration-code', {method:'POST',auth:false,data:{phone,inviteCode}}),
+  smsPolicy: () => request.send("/core/auth/sms-policy", { auth: false }),
+  sendLoginCode: (phone) =>
+    request.send("/core/auth/login-code", {
+      method: "POST",
+      auth: false,
+      data: { phone },
+    }),
+  sendPhoneCode: (phone, password) =>
+    request.post("/core/auth/phone-code", { phone, password }),
+  loginWithSms,
+  verifyPhone,
+  registrationPolicy: (inviteCode) =>
+    request.send("/core/auth/registration-policy", {
+      auth: false,
+      data: inviteCode ? { inviteCode } : {},
+    }),
+  sendRegistrationCode: (phone, inviteCode) =>
+    request.send("/core/auth/registration-code", {
+      method: "POST",
+      auth: false,
+      data: { phone, inviteCode },
+    }),
   TOKEN_KEY,
   USER_KEY,
   login,
