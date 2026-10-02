@@ -1,44 +1,47 @@
-/* 协议页：正式阅读版式（通栏正文，非卡片） */
+/* 正文使用原生文本节点；长链接换行，支持选择复制。 */
 .agreement-page {
   background: var(--white);
   min-height: 100vh;
+  box-sizing: border-box;
   padding: 40rpx 40rpx 80rpx;
+  color: var(--ink);
 }
 .agreement-doc-title {
   text-align: center;
   font-size: 44rpx;
   font-weight: 700;
   margin: 24rpx 0 28rpx;
-  color: var(--ink);
 }
-.agreement-date {
-  font-size: 24rpx;
-  color: var(--ink-soft);
-  line-height: 1.8;
-}
-.agreement-notice {
-  margin: 32rpx 0;
-  font-size: 26rpx;
-  line-height: 1.9;
-  color: var(--ink);
-}
-.agreement-section {
-  margin-top: 36rpx;
-}
-.agreement-h {
-  font-size: 28rpx;
-  font-weight: 700;
-  margin-bottom: 14rpx;
-  color: var(--ink);
-}
-.agreement-p {
+.agreement-block {
+  margin: 24rpx 0;
   font-size: 27rpx;
   line-height: 1.9;
-  color: var(--ink);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
-.agreement-end {
-  margin-top: 48rpx;
+.agreement-date {
+  margin: 0;
+  font-size: 24rpx;
+  color: var(--ink-soft);
+}
+.agreement-heading-2,
+.agreement-heading-3,
+.agreement-heading-4,
+.agreement-heading-5,
+.agreement-heading-6 {
+  margin: 36rpx 0 14rpx;
+  font-weight: 700;
+}
+.agreement-heading-2 { font-size: 32rpx; }
+.agreement-heading-3 { font-size: 30rpx; }
+.agreement-heading-4,
+.agreement-heading-5,
+.agreement-heading-6 { font-size: 28rpx; }
+.agreement-bold { font-weight: 700; }
+.agreement-quote {
+  border-left: 4rpx solid var(--ink-soft);
+  padding-left: 18rpx;
   font-size: 24rpx;
   color: var(--ink-soft);
 }

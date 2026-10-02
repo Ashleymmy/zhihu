@@ -30,6 +30,16 @@
 
 ## 文档索引
 
+### 小程序协议正文
+
+登录、注册、绑定页面的协议入口共用 `pages/agreement/index`。正文以
+[`docs/用户协议.md`](docs/用户协议.md) 和 [`docs/隐私协议.md`](docs/隐私协议.md) 为唯一来源。
+修改原文后，在 `weixin-app` 运行 `npm run agreements:build`，并将生成的
+`miniprogram/pages/agreement/documents.js` 一并提交。`npm run check` 会检查正文是否同步。
+页面保留原文的标题、日期、章节、加粗文字和链接，不额外拼接条款或当天日期。
+本次正文来自用户提供的 `01-用户协议.md`、`02-隐私协议.md`；按用户确认将经营主体及
+联系条款中的公司名称统一为“芜湖云途文化传媒有限公司”。
+
 | 文档 | 用途 |
 | --- | --- |
 | [cloudbase/REHEARSAL-2026-09-18.md](cloudbase/REHEARSAL-2026-09-18.md) | **测试环境上线预演记录**：逐步操作与每条独立回读证据 |
