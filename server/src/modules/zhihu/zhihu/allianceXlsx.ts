@@ -422,8 +422,8 @@ function validateExtra(buffer: Buffer, offset: number, length: number): void {
 }
 
 function validateFlags(flags: number, method: number): void {
-  const allowed = method === 8 ? 0x0806 : 0x0800;
-  if ((flags & ~allowed) !== 0 || (flags & 0x0001) !== 0 || (flags & 0x0008) !== 0) return invalid();
+  const allowed = method === 8 ? 0x080e : 0x0808;
+  if ((flags & ~allowed) !== 0) return invalid();
 }
 
 function validateExternalAttributes(value: number, madeBy: number, isDirectory: boolean): void {
@@ -524,13 +524,16 @@ function parseZipEntries(buffer: Buffer): ZipEntry[] {
     const uncompressedSize = u32(buffer, local + 22);
     const nameLength = u16(buffer, local + 26);
     const extraLength = u16(buffer, local + 28);
+    const hasDescriptor = (flags & 0x0008) !== 0;
+    // Streaming ZIP writers leave these local fields at zero and put the final
+    // values in a data descriptor. Any populated local field must still match.
     if (
       needed > 20 ||
       flags !== entry.flags ||
       method !== entry.method ||
-      crc !== entry.crc ||
-      compressedSize !== entry.compressedSize ||
-      uncompressedSize !== entry.uncompressedSize
+      (crc !== entry.crc && !(hasDescriptor && crc === 0)) ||
+      (compressedSize !== entry.compressedSize && !(hasDescriptor && compressedSize === 0)) ||
+      (uncompressedSize !== entry.uncompressedSize && !(hasDescriptor && uncompressedSize === 0))
     )
       return invalid();
     if (!rangeIsSafe(local + 30, nameLength + extraLength, centralOffset)) return invalid();
@@ -543,9 +546,28 @@ function parseZipEntries(buffer: Buffer): ZipEntry[] {
   });
   const ordered = [...withRanges].sort((left, right) => left.localOffset - right.localOffset);
   let expectedOffset = 0;
-  for (const entry of ordered) {
+  for (const [index, entry] of ordered.entries()) {
     if (entry.localOffset !== expectedOffset || entry.dataEnd < entry.dataStart) return invalid();
-    expectedOffset = entry.dataEnd;
+    const nextOffset = ordered[index + 1]?.localOffset ?? centralOffset;
+    if ((entry.flags & 0x0008) !== 0) {
+      // PKWARE APPNOTE 4.3.9 permits descriptors with or without a signature.
+      // Use the next record boundary, never a signature scan through compressed
+      // data (or the CRC), to distinguish the two non-ZIP64 layouts.
+      const length = nextOffset - entry.dataEnd;
+      if (length !== 12 && length !== 16) return invalid();
+      let descriptor = entry.dataEnd;
+      if (length === 16) {
+        if (u32(buffer, descriptor) !== 0x08074b50) return invalid();
+        descriptor += 4;
+      }
+      if (
+        u32(buffer, descriptor) !== entry.crc ||
+        u32(buffer, descriptor + 4) !== entry.compressedSize ||
+        u32(buffer, descriptor + 8) !== entry.uncompressedSize
+      )
+        return invalid();
+    } else if (entry.dataEnd !== nextOffset) return invalid();
+    expectedOffset = nextOffset;
   }
   if (expectedOffset !== centralOffset) return invalid();
   return withRanges;
@@ -663,10 +685,10 @@ function parseContentTypes(parts: ReadonlyMap<string, string>): void {
                       : name === 'xl/metadata.xml'
                         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml'
                         : name === 'docProps/app.xml'
-                        ? 'application/vnd.openxmlformats-officedocument.extended-properties+xml'
-                        : name === 'docProps/core.xml'
-                          ? 'application/vnd.openxmlformats-package.core-properties+xml'
-                          : 'application/vnd.openxmlformats-officedocument.custom-properties+xml';
+                          ? 'application/vnd.openxmlformats-officedocument.extended-properties+xml'
+                          : name === 'docProps/core.xml'
+                            ? 'application/vnd.openxmlformats-package.core-properties+xml'
+                            : 'application/vnd.openxmlformats-officedocument.custom-properties+xml';
     if (contentType !== expectedType) return invalid();
   }
 }
@@ -712,9 +734,18 @@ function validateWorkbook(parts: ReadonlyMap<string, string>, workbookRelationsh
   const root = tokens.find((token) => !token.closing && token.depth === 0);
   if (!root || localName(root.name) !== 'workbook') return invalid();
   const sheetIds = new Set<string>();
+  const namespaceScopes: Map<string, string>[] = [];
   let sheetsDepth = -1;
   for (const token of tokens) {
     if (token.closing) continue;
+    // Namespace prefixes are aliases, scoped to the declaring element and its
+    // descendants. Official exports can use relationships:id instead of r:id.
+    namespaceScopes.length = token.depth;
+    const namespaces = new Map(namespaceScopes[token.depth - 1]);
+    for (const item of token.attrs) {
+      if (item.name.startsWith('xmlns:')) namespaces.set(item.name.slice(6), item.value);
+    }
+    if (!token.selfClosing) namespaceScopes.push(namespaces);
     const kind = localName(token.name);
     if (kind === 'sheets') {
       if (sheetsDepth >= 0 || token.depth !== 1) return invalid();
@@ -722,7 +753,17 @@ function validateWorkbook(parts: ReadonlyMap<string, string>, workbookRelationsh
     }
     if (kind !== 'sheet') continue;
     if (token.depth !== sheetsDepth + 1) return invalid();
-    const id = attribute(token, 'r:id');
+    const relationshipIds = token.attrs.filter((item) => {
+      const match = /^([A-Za-z_][A-Za-z0-9_.-]*):id$/u.exec(item.name);
+      return (
+        match &&
+        match[1] !== 'xml' &&
+        match[1] !== 'xmlns' &&
+        namespaces.get(match[1]) === 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+      );
+    });
+    if (relationshipIds.length !== 1) return invalid();
+    const id = relationshipIds[0].value;
     if (!id || sheetIds.has(id)) return invalid();
     const relationship = workbookRelationships.find((item) => item.id === id);
     if (

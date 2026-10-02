@@ -38,6 +38,114 @@ describe('Alliance XLSX fail-closed validator', () => {
     await expect(validateAllianceXlsx(upload(buildMinimalXlsxFixture(8)))).resolves.toBeUndefined();
   });
 
+  it.each([0, 8] as const)(
+    'accepts streamed ZIP entries with method %i and optional descriptor signatures',
+    async (method) => {
+      for (const dataDescriptor of ['signed', 'unsigned'] as const) {
+        for (const populateLocalHeader of [false, true]) {
+          const entries = minimalXlsxEntries(method).map((entry) => ({
+            ...entry,
+            dataDescriptor,
+            populateLocalHeader,
+          }));
+          await expect(validateAllianceXlsx(upload(buildXlsxZipFixture(entries)))).resolves.toBeUndefined();
+        }
+      }
+    },
+  );
+
+  it('accepts a mix of streamed and non-streamed parts regardless of central-directory order', async () => {
+    const buffer = buildXlsxZipFixture(
+      minimalXlsxEntries(8).map((entry, index) => ({
+        ...entry,
+        dataDescriptor: index % 2 ? 'signed' : undefined,
+      })),
+    );
+    const centralOffset = buffer.readUInt32LE(buffer.length - 6);
+    let cursor = centralOffset;
+    const records: Buffer[] = [];
+    while (cursor < buffer.length - 22) {
+      const length =
+        46 + buffer.readUInt16LE(cursor + 28) + buffer.readUInt16LE(cursor + 30) + buffer.readUInt16LE(cursor + 32);
+      records.push(buffer.subarray(cursor, cursor + length));
+      cursor += length;
+    }
+    await expect(
+      validateAllianceXlsxBuffer(
+        Buffer.concat([buffer.subarray(0, centralOffset), ...records.reverse(), buffer.subarray(-22)]),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects missing, truncated, oversized or unflagged data descriptors', async () => {
+    for (const dataDescriptor of [
+      Buffer.alloc(0),
+      Buffer.alloc(11),
+      Buffer.alloc(13),
+      Buffer.alloc(15),
+      Buffer.alloc(20),
+      Buffer.alloc(24),
+    ]) {
+      await rejects(buildXlsxZipFixture(minimalXlsxEntries(8).map((entry) => ({ ...entry, dataDescriptor }))));
+    }
+    await rejects(
+      buildXlsxZipFixture(
+        minimalXlsxEntries(8).map((entry) => ({
+          ...entry,
+          dataDescriptor: 'signed',
+          flags: 0,
+          populateLocalHeader: true,
+        })),
+      ),
+    );
+  });
+
+  it('rejects mismatched descriptor values, signatures and populated local headers', async () => {
+    for (const dataDescriptor of ['signed', 'unsigned'] as const) {
+      const valid = buildXlsxZipFixture(minimalXlsxEntries(8).map((entry) => ({ ...entry, dataDescriptor })));
+      const centralOffset = valid.readUInt32LE(valid.length - 6);
+      const dataStart = 30 + valid.readUInt16LE(26) + valid.readUInt16LE(28);
+      const descriptorStart = dataStart + valid.readUInt32LE(centralOffset + 20);
+      const descriptorLength = dataDescriptor === 'signed' ? 16 : 12;
+      for (let offset = 0; offset < descriptorLength; offset += 4) {
+        const bad = Buffer.from(valid);
+        bad[descriptorStart + offset] ^= 1;
+        await rejects(bad);
+      }
+      for (const offset of [14, 18, 22]) {
+        const bad = Buffer.from(valid);
+        bad.writeUInt32LE(1, offset);
+        await rejects(bad);
+      }
+      const overlapping = Buffer.from(valid);
+      const secondCentral = centralOffset + 46 + valid.readUInt16LE(centralOffset + 28);
+      overlapping.writeUInt32LE(descriptorStart + 4, secondCentral + 42);
+      await rejects(overlapping);
+    }
+  });
+
+  it('still checks actual CRC, encryption, ZIP64, expansion limits and active XML for streamed ZIPs', async () => {
+    const entries = minimalXlsxEntries(8).map((entry) => ({ ...entry, dataDescriptor: 'signed' as const }));
+    for (const first of [
+      { ...entries[0], declaredCrc: 1 },
+      { ...entries[0], flags: 0x0009 },
+      { ...entries[0], localExtra: Buffer.from([1, 0, 0, 0]) },
+      { ...entries[0], declaredUncompressedSize: 16 * 1024 * 1024 + 1 },
+      { ...entries[0], data: `<Types>${'a'.repeat(50_000)}</Types>` },
+    ]) {
+      await rejects(buildXlsxZipFixture([first, ...entries.slice(1)]));
+    }
+    const external = allianceXlsxFixtureXml.rootRelationships.replace(
+      'Target="xl/workbook.xml"',
+      'TargetMode="External" Target="https://attacker.invalid/book"',
+    );
+    await rejects(
+      buildXlsxZipFixture(
+        entries.map((entry) => (entry.name === '_rels/.rels' ? { ...entry, data: external } : entry)),
+      ),
+    );
+  });
+
   it('P0007-R3-ZIP-001 accepts empty standard XLSX directory entries', async () => {
     const directories: XlsxZipFixtureEntry[] = [
       { name: '_rels/', data: Buffer.alloc(0), method: 0, externalAttributes: 0x10 },
@@ -48,6 +156,37 @@ describe('Alliance XLSX fail-closed validator', () => {
     await expect(
       validateAllianceXlsxBuffer(buildXlsxZipFixture([...directories, ...minimalXlsxEntries()])),
     ).resolves.toBeUndefined();
+  });
+
+  it('resolves sheet relationship IDs by namespace on workbook, sheets or sheet elements', async () => {
+    const ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const aliased = allianceXlsxFixtureXml.workbook
+      .replace(` xmlns:r="${ns}"`, '')
+      .replace('r:id=', 'relationships:id=');
+    for (const declarationTarget of ['<workbook ', '<sheets', '<sheet ']) {
+      const workbook = aliased.replace(
+        declarationTarget,
+        `${declarationTarget.trimEnd()} xmlns:relationships="${ns}" `,
+      );
+      await expect(
+        validateAllianceXlsxBuffer(buildXlsxZipFixture(replacePart('xl/workbook.xml', workbook))),
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it('rejects undeclared, wrong, shadowed or duplicate sheet relationship namespaces and missing targets', async () => {
+    const ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const workbook = allianceXlsxFixtureXml.workbook;
+    for (const bad of [
+      workbook.replace(` xmlns:r="${ns}"`, ''),
+      workbook.replace(`xmlns:r="${ns}"`, 'xmlns:r="urn:wrong"'),
+      workbook.replace('<sheets>', '<sheets xmlns:r="urn:wrong">'),
+      workbook.replace('r:id="rId1"', 'r:id="missing"'),
+      workbook.replace('r:id="rId1"', `r:id="rId1" xmlns:other="${ns}" other:id="rId1"`),
+      workbook.replace(` xmlns:r="${ns}"`, '').replace('<sheets>', `<bookViews xmlns:r="${ns}"/><sheets>`),
+    ]) {
+      await rejects(buildXlsxZipFixture(replacePart('xl/workbook.xml', bad)));
+    }
   });
 
   it('P0007-R3-MIME-001 accepts common XLSX MIME variants and enforces safe filename, size, and ZIP magic', async () => {

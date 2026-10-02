@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import { normalizeUploadFilename, parseDataImportWorkbook } from '../../src/modules/zhihu/services/data-import.service';
 import { validateAllianceXlsx, XLSX_MIME } from '../../src/modules/zhihu/zhihu/allianceXlsx';
+import { parseReport } from '../../src/modules/zhihu/attribution/report';
+import { buildOfficialOrderXlsxFixture } from '../support/allianceXlsxFixture';
 
 function workbook(rows: unknown[][]): Buffer {
   const sheet = XLSX.utils.aoa_to_sheet(rows);
@@ -11,6 +13,22 @@ function workbook(rows: unknown[][]): Buffer {
 }
 
 describe('邮件附件 / Excel 导入解析', () => {
+  it('兼容官方订单报表的流式 ZIP 和字符串单元格，新旧入口均可解析', async () => {
+    const buffer = buildOfficialOrderXlsxFixture();
+    const originalname = normalizeUploadFilename(Buffer.from('知乎_OrderData_测试.xlsx', 'utf8').toString('latin1'));
+    const file = { originalname, mimetype: XLSX_MIME, size: buffer.length, buffer };
+    await validateAllianceXlsx(file, { allowFormulas: true });
+    const legacy = parseDataImportWorkbook(buffer);
+    expect(legacy).toMatchObject({ reportType: 'order', totalRows: 1, validRows: 1, errorRows: 0, errors: [] });
+    expect(legacy.rows[0]).toMatchObject({ searchVolume: '200', orderCount: '12', searchConversionRate: '0.060000' });
+    const attribution = await parseReport(file, 'order');
+    expect(attribution).toHaveLength(1);
+    expect(attribution[0]).toMatchObject({
+      error: null,
+      value: { date: '2026-09-27', keyword: '测试关键词', orders: '12' },
+    });
+  });
+
   it('修复 multipart 上传导致的中文文件名乱码，并保留正常文件名', () => {
     const mojibake = Buffer.from('知乎.xlsx', 'utf8').toString('latin1');
 

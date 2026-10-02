@@ -5,6 +5,8 @@ export interface XlsxZipFixtureEntry {
   readonly data: string | Buffer;
   readonly method?: 0 | 8;
   readonly flags?: number;
+  readonly dataDescriptor?: 'signed' | 'unsigned' | Buffer;
+  readonly populateLocalHeader?: boolean;
   readonly localName?: string;
   readonly localExtra?: Buffer;
   readonly centralExtra?: Buffer;
@@ -56,7 +58,7 @@ export function buildXlsxZipFixture(
     const input = bytes(entry.data);
     const method = entry.method ?? 0;
     const compressed = method === 8 ? deflateRawSync(input) : Buffer.from(input);
-    const flags = entry.flags ?? 0;
+    const flags = entry.flags ?? (entry.dataDescriptor !== undefined ? 0x0008 : 0);
     const localName = Buffer.from(entry.localName ?? entry.name, 'utf8');
     const centralName = Buffer.from(entry.name, 'utf8');
     const localExtra = entry.localExtra ?? Buffer.alloc(0);
@@ -65,18 +67,30 @@ export function buildXlsxZipFixture(
     const crc = entry.declaredCrc ?? fixtureCrc32(input);
     const compressedSize = entry.declaredCompressedSize ?? compressed.length;
     const uncompressedSize = entry.declaredUncompressedSize ?? input.length;
+    let descriptor: Buffer = Buffer.alloc(0);
+    if (Buffer.isBuffer(entry.dataDescriptor)) descriptor = entry.dataDescriptor;
+    else if (entry.dataDescriptor) {
+      const signed = entry.dataDescriptor === 'signed';
+      descriptor = Buffer.alloc(signed ? 16 : 12);
+      if (signed) descriptor.writeUInt32LE(0x08074b50, 0);
+      const start = signed ? 4 : 0;
+      descriptor.writeUInt32LE(crc >>> 0, start);
+      descriptor.writeUInt32LE(compressedSize >>> 0, start + 4);
+      descriptor.writeUInt32LE(uncompressedSize >>> 0, start + 8);
+    }
+    const zeroLocal = entry.dataDescriptor !== undefined && !entry.populateLocalHeader;
 
     const localHeader = Buffer.alloc(30);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
     localHeader.writeUInt16LE(flags, 6);
     localHeader.writeUInt16LE(method, 8);
-    localHeader.writeUInt32LE(crc >>> 0, 14);
-    localHeader.writeUInt32LE(compressedSize >>> 0, 18);
-    localHeader.writeUInt32LE(uncompressedSize >>> 0, 22);
+    localHeader.writeUInt32LE(zeroLocal ? 0 : crc >>> 0, 14);
+    localHeader.writeUInt32LE(zeroLocal ? 0 : compressedSize >>> 0, 18);
+    localHeader.writeUInt32LE(zeroLocal ? 0 : uncompressedSize >>> 0, 22);
     localHeader.writeUInt16LE(localName.length, 26);
     localHeader.writeUInt16LE(localExtra.length, 28);
-    localParts.push(localHeader, localName, localExtra, compressed);
+    localParts.push(localHeader, localName, localExtra, compressed, descriptor);
 
     const centralHeader = Buffer.alloc(46);
     centralHeader.writeUInt32LE(0x02014b50, 0);
@@ -95,7 +109,7 @@ export function buildXlsxZipFixture(
     centralHeader.writeUInt32LE(localOffset, 42);
     centralParts.push(centralHeader, centralName, centralExtra, comment);
 
-    localOffset += localHeader.length + localName.length + localExtra.length + compressed.length;
+    localOffset += localHeader.length + localName.length + localExtra.length + compressed.length + descriptor.length;
   }
 
   const centralDirectory = Buffer.concat(centralParts);
@@ -148,6 +162,41 @@ export function minimalXlsxEntries(method: 0 | 8 = 0): XlsxZipFixtureEntry[] {
 
 export function buildMinimalXlsxFixture(method: 0 | 8 = 0): Buffer {
   return buildXlsxZipFixture(minimalXlsxEntries(method));
+}
+
+/** Synthetic rows with the official order export's headers, string cells and streamed ZIP layout. */
+export function buildOfficialOrderXlsxFixture(date = '2026-09-27'): Buffer {
+  const rows = [
+    ['日期时间', '渠道名称', '关键词', '推广任务', '风险判定', '搜索量', '订单量', '搜索转化率（单位%）'],
+    [date, '测试渠道', '测试关键词', '测试任务', '正常', '200', '12', '6'],
+  ];
+  const xmlRows = rows
+    .map(
+      (row, index) =>
+        `<row r="${index + 1}">${row
+          .map(
+            (value, column) =>
+              `<c r="${String.fromCharCode(65 + column)}${index + 1}" t="inlineStr"><is><t>${value}</t></is></c>`,
+          )
+          .join('')}</row>`,
+    )
+    .join('');
+  const sheet = `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:H2"/><sheetData>${xmlRows}</sheetData></worksheet>`;
+  return buildXlsxZipFixture(
+    minimalXlsxEntries(8).map((entry) => ({
+      ...entry,
+      dataDescriptor: 'signed',
+      data:
+        entry.name === 'xl/worksheets/sheet1.xml'
+          ? sheet
+          : entry.name === 'xl/workbook.xml'
+            ? WORKBOOK.replace(
+                'r:id="rId1"',
+                'xmlns:relationships="http://schemas.openxmlformats.org/officeDocument/2006/relationships" relationships:id="rId1"',
+              )
+            : entry.data,
+    })),
+  );
 }
 
 export const allianceXlsxFixtureXml = Object.freeze({
