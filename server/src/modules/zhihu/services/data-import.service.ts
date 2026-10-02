@@ -10,6 +10,8 @@ import { writeAudit } from '../../../services/audit.service';
 import { isDevDemoAuthUser } from '../dev-demo';
 import { AllianceXlsxValidationError, validateAllianceXlsx, type AllianceUploadFile } from '../zhihu/allianceXlsx';
 import type { Scope } from '../attribution/domain';
+import { isStaffRole } from '../../../auth/roles';
+import { readDataImportResult, type DataImportProcessing } from './data-import-result.service';
 
 export type DataImportSourceType = 'email_attachment' | 'manual_excel';
 export type DataImportReportType = 'search' | 'order' | 'unknown';
@@ -167,6 +169,7 @@ export interface DataImportPreview extends DataImportBatch {
 
 /** 已保存批次的明细；预览只返回前 20 行，历史详情按页返回全部行。 */
 export interface DataImportBatchDetail extends DataImportBatch {
+  processing?: DataImportProcessing;
   headers: string[];
   fieldMappings: DataImportFieldMapping[];
   rows: DataImportPreviewRow[];
@@ -960,7 +963,7 @@ export async function parseDataImport(
 }
 
 
-async function resolveLegacyAttributionScope(user: AuthUser): Promise<Scope> {
+export async function resolveLegacyAttributionScope(user: AuthUser): Promise<Scope> {
   const candidates = await rows<RowDataPacket>(
     `SELECT CAST(pi.project_id AS CHAR) project_id,CAST(pi.account_id AS CHAR) account_id,
             EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.project_id=pi.project_id AND er.account_id=pi.account_id) has_route
@@ -968,9 +971,9 @@ async function resolveLegacyAttributionScope(user: AuthUser): Promise<Scope> {
      JOIN integration_accounts a ON a.id=pi.account_id
      JOIN projects p ON p.id=pi.project_id
      WHERE a.module_id='zhihu' AND a.status='active' AND p.is_enabled=1
-       AND (?='admin' OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id=pi.project_id AND pm.user_id=? AND pm.left_at IS NULL))
+       AND (?=1 OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id=pi.project_id AND pm.user_id=? AND pm.left_at IS NULL))
      ORDER BY has_route DESC,pi.project_id,pi.account_id`,
-    [user.role, user.sub],
+    [isStaffRole(user.role) ? 1 : 0, user.sub],
   );
   const latest = await rows<RowDataPacket>(
     'SELECT CAST(project_id AS CHAR) project_id,CAST(account_id AS CHAR) account_id FROM zh_import_batches WHERE created_by=? ORDER BY id DESC LIMIT 1',
@@ -979,7 +982,9 @@ async function resolveLegacyAttributionScope(user: AuthUser): Promise<Scope> {
   const latestScope = latest[0] && candidates.find((row) => String(row.project_id) === String(latest[0].project_id) && String(row.account_id) === String(latest[0].account_id));
   const routed = candidates.filter((row) => Number(row.has_route) === 1);
   const selected = latestScope ?? (routed.length === 1 ? routed[0] : candidates.length === 1 ? candidates[0] : null);
-  if (!selected) throw new AppError(409, 40912, 'Multiple Zhihu project scopes require a workbench selection');
+  if (!selected) throw new AppError(409, 40912, candidates.length
+    ? '存在多个知乎项目，请到“财务做账”选择所属项目后处理报表'
+    : '当前没有可用的知乎项目接入，请先在项目管理中配置接入账号');
   const scope = { projectId: String(selected.project_id), accountId: String(selected.account_id) };
   await assertDataScope(user, scope.projectId, scope.accountId, 'zhihu');
   return scope;
@@ -1004,8 +1009,7 @@ function legacyDate(row: RowDataPacket): string | null {
   } catch {}
   return row.occurred_at ? String(row.occurred_at).slice(0, 10) : null;
 }
-async function bridgeConfirmedImport(user: AuthUser, id: string): Promise<DataImportAttributionSummary> {
-  const scope = await resolveLegacyAttributionScope(user);
+async function bridgeConfirmedImport(user: AuthUser, id: string, scope: Scope): Promise<DataImportAttributionSummary> {
   const imported = await withTransaction(async (connection) => {
     const [batchRows] = await connection.query<RowDataPacket[]>(
       `SELECT * FROM data_import_batches WHERE id=? FOR UPDATE`, [id],
@@ -1118,6 +1122,8 @@ export async function confirmDataImport(
     return { ...batch, imported: batch.validRows, failed: batch.errorRows, taskIds };
   }
 
+  // Resolve and authorize the project before marking a new batch confirmed.
+  const scope = await resolveLegacyAttributionScope(user);
   const result = await withTransaction(async (connection) => {
     const [batchRows] = await connection.query<DataImportBatchRow[]>(
       'SELECT * FROM data_import_batches WHERE id = ? FOR UPDATE',
@@ -1150,7 +1156,7 @@ export async function confirmDataImport(
       taskIds,
     };
   });
-  const attribution = await bridgeConfirmedImport(user, id);
+  const attribution = await bridgeConfirmedImport(user, id, scope);
   if (!attribution.attributionBatchId) {
     const taskIds = await withTransaction((connection) => createAttributionTasksForBatch(connection, id));
     return { ...result, taskIds, attribution };
@@ -1271,6 +1277,7 @@ export async function getDataImportBatch(
 
   return {
     ...batchFromRow(batch),
+    processing: await readDataImportResult(user, { id, fileSha256: batch.file_sha256, status: batch.status }),
     headers: parseHeaders(batch.headers_json),
     fieldMappings: fieldMappings(parseHeaders(batch.headers_json)),
     rows: storedRows.map(previewRowFromDb),

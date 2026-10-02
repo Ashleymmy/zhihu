@@ -11,7 +11,7 @@ import Works from './Works.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
 import {errorText,type EngineOptions,type Option} from './context'
-const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string}>()
+const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
@@ -57,7 +57,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <OperationGuide v-if="guide" :guide="guide" />
 <div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先关联知乎接入账号并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">管理项目接入</button></div>
 <template v-if="ready">
- <Finance v-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
+ <Finance v-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-from="initialFrom" :initial-to="initialTo" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
  <template v-else><nav class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
  <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
  <Works v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />

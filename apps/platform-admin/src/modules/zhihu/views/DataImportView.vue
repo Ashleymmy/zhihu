@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import type {
   DataImportBatch,
   DataImportBatchDetail,
-  DataImportConfirmResult,
   DataImportPreview,
   DataImportPreviewRow,
   DataImportSourceType,
 } from "@zhihu-koc/shared-contracts";
 import { apis } from "../context";
+import {
+  importResultCopy,
+  importResultLink,
+  importIssueLabel,
+} from "../data-import-result";
 
 const sourceType = ref<DataImportSourceType>("email_attachment");
 const selectedFile = ref<File | null>(null);
@@ -25,11 +29,15 @@ const message = ref("");
 const inputKey = ref(0);
 const detailPage = ref(1);
 const detailPageSize = 100;
-const attribution = ref<DataImportConfirmResult["attribution"] | null>(null);
+const resultPanel = ref<HTMLElement | null>(null);
+const processing = computed(() => batchDetail.value?.processing);
+const resultCopy = computed(() => importResultCopy(processing.value));
+let detailRequest = 0;
 
 const hasErrors = computed(() => (preview.value?.errorRows ?? 0) > 0);
 const canConfirm = computed(
-  () => preview.value?.status === "preview" && (preview.value?.validRows ?? 0) > 0,
+  () =>
+    preview.value?.status === "preview" && (preview.value?.validRows ?? 0) > 0,
 );
 const detailTotalPages = computed(() =>
   Math.max(1, Math.ceil((batchDetail.value?.total ?? 0) / detailPageSize)),
@@ -41,7 +49,10 @@ const detailStart = computed(() =>
 );
 const detailEnd = computed(() =>
   batchDetail.value
-    ? Math.min(batchDetail.value.page * batchDetail.value.pageSize, batchDetail.value.total)
+    ? Math.min(
+        batchDetail.value.page * batchDetail.value.pageSize,
+        batchDetail.value.total,
+      )
     : 0,
 );
 
@@ -52,7 +63,7 @@ const reportTypeLabels: Record<string, string> = {
 };
 const batchStatusLabels: Record<string, string> = {
   preview: "待确认",
-  confirmed: "已确认",
+  confirmed: "文件已保存",
   rejected: "已驳回",
 };
 const batchStatusClasses: Record<string, string> = {
@@ -80,16 +91,23 @@ function onFileChange(event: Event) {
   selectedFile.value = input.files?.[0] ?? null;
   preview.value = null;
   batchDetail.value = null;
-  attribution.value = null;
+  detailRequest += 1;
+  detailLoading.value = false;
   error.value = "";
   message.value = "";
 }
 
-async function loadBatches() {
+async function loadBatches(showResult = true) {
   loading.value = true;
   error.value = "";
   try {
     batches.value = await apis.dataImport.listBatches();
+    if (showResult) {
+      const id =
+        batchDetail.value?.id ??
+        batches.value.find((batch) => batch.status === "confirmed")?.id;
+      if (id) await loadBatchDetail(id);
+    }
   } catch (e: any) {
     message.value = "";
     error.value = e?.message ?? String(e);
@@ -99,6 +117,8 @@ async function loadBatches() {
 }
 
 async function parseFile() {
+  detailRequest += 1;
+  detailLoading.value = false;
   error.value = "";
   message.value = "";
   batchDetail.value = null;
@@ -117,7 +137,9 @@ async function parseFile() {
       : preview.value.errorRows
         ? `解析完成，确认时将保存 ${preview.value.validRows} 行有效数据并跳过 ${preview.value.errorRows} 行错误数据。`
         : "解析完成，请核对预览内容后确认。";
-    await loadBatches();
+    if (preview.value.status === "confirmed")
+      await loadBatchDetail(preview.value.id);
+    await loadBatches(false);
   } catch (e: any) {
     message.value = "";
     error.value = e?.message ?? String(e);
@@ -127,12 +149,11 @@ async function parseFile() {
 }
 
 async function confirmImport() {
-  if (!preview.value || !canConfirm.value)
-    return;
+  if (!preview.value || !canConfirm.value) return;
   const batchId = preview.value.id;
   if (
     !window.confirm(
-      `确认后将保存 ${preview.value.validRows} 行有效数据，错误行会保留在暂存批次中但不会进入后续业务；本阶段不会计算归因或写入收益。继续吗？`,
+      `确认后将保存 ${preview.value.validRows} 行有效数据，错误行会保留在暂存批次中但不会进入后续业务；随后按当前业务规则尝试归因；有待办时需补齐信息。本操作不会发起付款。继续吗？`,
     )
   )
     return;
@@ -145,14 +166,17 @@ async function confirmImport() {
       ...preview.value,
       ...result,
     };
-    message.value = result.taskIds.length
-      ? `导入批次已确认，已保存 ${result.imported} 行有效数据并生成 ${result.taskIds.length} 条待处理归因任务；本阶段不执行归因计算。`
-      : "导入批次已确认保存。";
-    await loadBatches();
+    message.value = "文件已保存，请查看下方处理结果和下一步操作。";
+    await loadBatches(false);
     await loadBatchDetail(batchId);
+    await nextTick();
+    resultPanel.value?.scrollIntoView({ block: "start" });
   } catch (e: any) {
     message.value = "";
-    error.value = e?.message ?? String(e);
+    const failure = e?.message ?? String(e);
+    await loadBatches(false);
+    await loadBatchDetail(batchId);
+    error.value = failure;
   } finally {
     confirming.value = false;
   }
@@ -160,7 +184,10 @@ async function confirmImport() {
 
 async function rejectImport() {
   if (!preview.value || preview.value.status !== "preview") return;
-  if (!window.confirm("驳回后该批次会保留在历史记录中，但不能继续确认。继续吗？")) return;
+  if (
+    !window.confirm("驳回后该批次会保留在历史记录中，但不能继续确认。继续吗？")
+  )
+    return;
   rejecting.value = true;
   error.value = "";
   message.value = "";
@@ -171,7 +198,7 @@ async function rejectImport() {
       ...(await apis.dataImport.reject(preview.value.id, reason)),
     };
     message.value = "导入批次已驳回，原始暂存数据已保留。";
-    await loadBatches();
+    await loadBatches(false);
   } catch (e: any) {
     message.value = "";
     error.value = e?.message ?? String(e);
@@ -184,7 +211,8 @@ function clearSelection() {
   selectedFile.value = null;
   preview.value = null;
   batchDetail.value = null;
-  attribution.value = null;
+  detailRequest += 1;
+  detailLoading.value = false;
   inputKey.value += 1;
   error.value = "";
   message.value = "";
@@ -195,29 +223,41 @@ function sourceLabel(value: string) {
 }
 
 async function loadBatchDetail(id: string, page = 1) {
+  const request = ++detailRequest;
   detailLoading.value = true;
   error.value = "";
   try {
-    batchDetail.value = await apis.dataImport.getBatch(id, {
+    const detail = await apis.dataImport.getBatch(id, {
       page,
       pageSize: detailPageSize,
     });
-    detailPage.value = batchDetail.value.page;
+    if (request !== detailRequest) return;
+    batchDetail.value = detail;
+    detailPage.value = detail.page;
   } catch (e: any) {
     message.value = "";
+    if (request !== detailRequest) return;
     error.value = `批次明细读取失败：${e?.message ?? String(e)}`;
   } finally {
-    detailLoading.value = false;
+    if (request === detailRequest) detailLoading.value = false;
   }
 }
 
 function closeBatchDetail() {
+  detailRequest += 1;
+  detailLoading.value = false;
   batchDetail.value = null;
   detailPage.value = 1;
 }
 
 function changeDetailPage(page: number) {
-  if (!batchDetail.value || page < 1 || page > detailTotalPages.value || page === detailPage.value) return;
+  if (
+    !batchDetail.value ||
+    page < 1 ||
+    page > detailTotalPages.value ||
+    page === detailPage.value
+  )
+    return;
   void loadBatchDetail(batchDetail.value.id, page);
 }
 
@@ -225,7 +265,9 @@ function rawHeaderKey(headers: string[], index: number) {
   const header = headers[index] || `列${index + 1}`;
   const sameBefore = headers
     .slice(0, index)
-    .filter((item, itemIndex) => (item || `列${itemIndex + 1}`) === header).length;
+    .filter(
+      (item, itemIndex) => (item || `列${itemIndex + 1}`) === header,
+    ).length;
   return sameBefore ? `${header}#${sameBefore + 1}` : header;
 }
 
@@ -235,7 +277,42 @@ function rawCell(row: DataImportPreviewRow, headers: string[], index: number) {
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
 
-onMounted(loadBatches);
+async function viewBatch(id: string) {
+  await loadBatchDetail(id);
+  await nextTick();
+  resultPanel.value?.scrollIntoView({ block: "start" });
+}
+
+async function continueImport() {
+  const batch = batchDetail.value;
+  if (
+    !batch ||
+    batch.status !== "confirmed" ||
+    !batch.processing?.retryAllowed ||
+    confirming.value
+  )
+    return;
+  if (
+    !window.confirm(
+      "继续处理这批已保存的数据？系统会复用原批次，不重复导入，不会发起付款。",
+    )
+  )
+    return;
+  confirming.value = true;
+  error.value = "";
+  let failure = "";
+  try {
+    await apis.dataImport.confirm(batch.id);
+  } catch (e: any) {
+    failure = e?.message ?? String(e);
+  } finally {
+    await loadBatchDetail(batch.id);
+    if (failure) error.value = failure;
+    confirming.value = false;
+  }
+}
+
+onMounted(() => loadBatches());
 </script>
 
 <template>
@@ -248,17 +325,101 @@ onMounted(loadBatches);
           把邮件中的报表附件上传，系统自动识别报表类型、校验字段并提供人工确认。
         </p>
       </div>
-      <button class="row-action" @click="loadBatches">刷新记录</button>
+      <button class="row-action" @click="loadBatches()">刷新记录</button>
     </header>
 
     <div class="notice">
-      此入口用于旧版报表导入及历史记录查询。独占关键词的报告请进入
-      <router-link to="/modules/zhihu/keywords">归因与对账</router-link>
-      中的“报告与归因”。
+      导入后分三步：保存报表 → 归因并处理待办 → 核对账单。常规报表可直接在
+      <router-link to="/modules/zhihu/finance">财务做账</router-link>
+      上传；这里也可以查看历史文件与处理进度。
     </div>
 
     <div v-if="error" class="notice error-notice">{{ error }}</div>
     <div v-if="message" class="notice success-notice">{{ message }}</div>
+
+    <section
+      v-if="batchDetail?.status === 'confirmed'"
+      ref="resultPanel"
+      class="panel result-panel"
+      aria-labelledby="import-result-title"
+      :aria-busy="detailLoading"
+    >
+      <div class="result-heading">
+        <div>
+          <p class="section-index quiet">本次导入 · 处理结果</p>
+          <h2 id="import-result-title">{{ resultCopy.title }}</h2>
+        </div>
+        <button
+          class="ghost-aurora"
+          :disabled="detailLoading || confirming"
+          @click="loadBatchDetail(batchDetail.id)"
+        >
+          {{ detailLoading ? "读取中…" : "刷新处理结果" }}
+        </button>
+      </div>
+      <p class="result-file">{{ batchDetail.fileName }}</p>
+      <ol class="result-steps" aria-label="报表处理步骤">
+        <li class="done">
+          <strong>1. 保存报表</strong
+          ><span>{{ batchDetail.validRows }} 行有效数据已保存</span>
+        </li>
+        <li :class="processing?.state === 'analyzed' ? 'done' : 'current'">
+          <strong>2. 归因与待办</strong
+          ><span>{{
+            processing?.state === "analyzed" ? "已分析完成" : "请查看处理结果"
+          }}</span>
+        </li>
+        <li>
+          <strong>3. 核对账单</strong><span>确认归属和金额，再办理付款</span>
+        </li>
+      </ol>
+      <p class="result-next" role="status">{{ resultCopy.detail }}</p>
+      <template v-if="processing">
+        <p class="result-summary">
+          业务日期：{{ processing.from || "—" }} 至 {{ processing.to || "—" }} ·
+          报表订单量 {{ processing.sourceOrders }} · 搜索量
+          {{ processing.sourceSearches }}
+        </p>
+        <p v-if="processing.attributionBatchId" class="result-summary">
+          已处理 {{ processing.matchedRows }} 行 · 待分析
+          {{ processing.pendingRows }} 行 · 异常
+          {{ processing.exceptionRows }} 行
+        </p>
+        <ul v-if="processing.issues.length" class="result-issues">
+          <li v-for="issue in processing.issues" :key="issue.code">
+            {{ importIssueLabel(issue.code) }}（{{ issue.count }} 项）
+          </li>
+        </ul>
+        <p v-if="!processing.revenueProvided" class="result-summary">
+          原报表未提供收益金额。订单量不等于收入金额，需结合关键词归属与生效单价核算。
+        </p>
+        <div class="result-actions">
+          <button
+            v-if="processing.retryAllowed"
+            class="primary-action"
+            :disabled="confirming || detailLoading"
+            @click="continueImport"
+          >
+            {{ confirming ? "正在归因…" : "继续归因" }}
+          </button>
+          <router-link
+            v-if="
+              processing.scope &&
+              (processing.issues.length || processing.exceptionRows)
+            "
+            class="primary-action"
+            :to="importResultLink(processing, 'issues')"
+            >去处理数据待办</router-link
+          >
+          <router-link
+            v-if="processing.scope || processing.state === 'needs_scope'"
+            class="ghost-aurora"
+            :to="importResultLink(processing, 'finance')"
+            >查看该日期账单</router-link
+          >
+        </div>
+      </template>
+    </section>
 
     <section class="workspace-grid">
       <article class="panel import-panel">
@@ -336,8 +497,12 @@ onMounted(loadBatches);
             <span>文件来源</span><strong>{{ sourceLabel(sourceType) }}</strong>
           </div>
           <div><span>处理方式</span><strong>解析 → 预览 → 确认</strong></div>
-          <div><span>错误策略</span><strong>错误行跳过，有效行可确认</strong></div>
-          <div><span>业务影响</span><strong>确认后进入归因分析</strong></div>
+          <div>
+            <span>错误策略</span><strong>错误行跳过，有效行可确认</strong>
+          </div>
+          <div>
+            <span>下一步</span><strong>查看归因结果，再核对账单</strong>
+          </div>
         </div>
       </aside>
     </section>
@@ -363,9 +528,9 @@ onMounted(loadBatches);
               ? "已确认"
               : preview.status === "rejected"
                 ? "已驳回"
-              : hasErrors
-                ? "部分可确认"
-                : "待确认"
+                : hasErrors
+                  ? "部分可确认"
+                  : "待确认"
           }}
         </span>
       </div>
@@ -393,14 +558,6 @@ onMounted(loadBatches);
         </div>
       </div>
 
-      <div v-if="attribution" class="attribution-result">
-        <strong>归因分析结果</strong>
-        <span>业务日期：{{ attribution.from || "—" }} 至 {{ attribution.to || "—" }}</span>
-        <span>已分析 {{ attribution.analyzedRows }} 行，已匹配 {{ attribution.matchedRows }} 行，待处理 {{ attribution.exceptionRows }} 行</span>
-        <span>订单量 {{ attribution.orders }}，当前应付 ¥{{ Number(attribution.payable || 0).toFixed(2) }}</span>
-        <span v-if="attribution.issues">还有 {{ attribution.issues }} 项需要运营处理，原因可在归因待办中查看。</span>
-      </div>
-
       <div class="field-mapping">
         <div class="mapping-heading">
           <strong>字段匹配结果</strong>
@@ -409,7 +566,9 @@ onMounted(loadBatches);
         <div class="mapping-grid">
           <div v-for="mapping in preview.fieldMappings" :key="mapping.field">
             <span>{{ mapping.label }}</span>
-            <strong :class="mapping.sourceHeader ? 'mapped-text' : 'unmapped-text'">
+            <strong
+              :class="mapping.sourceHeader ? 'mapped-text' : 'unmapped-text'"
+            >
               {{ mapping.sourceHeader || "未匹配" }}
             </strong>
           </div>
@@ -417,7 +576,9 @@ onMounted(loadBatches);
       </div>
 
       <div v-if="hasErrors" class="validation-summary">
-         <strong>发现 {{ preview.errorRows }} 行错误，确认时会跳过错误行。</strong>
+        <strong
+          >发现 {{ preview.errorRows }} 行错误，确认时会跳过错误行。</strong
+        >
         <span v-for="item in preview.errors.slice(0, 5)" :key="item.rowNumber"
           >第 {{ item.rowNumber }} 行：{{ item.messages.join("；") }}</span
         >
@@ -478,15 +639,24 @@ onMounted(loadBatches);
             <thead>
               <tr>
                 <th>行号</th>
-                <th v-for="(header, index) in preview.headers" :key="`${header}-${index}`">
+                <th
+                  v-for="(header, index) in preview.headers"
+                  :key="`${header}-${index}`"
+                >
                   {{ header || `列${index + 1}` }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in preview.previewRows" :key="`raw-${row.rowNumber}`">
+              <tr
+                v-for="row in preview.previewRows"
+                :key="`raw-${row.rowNumber}`"
+              >
                 <td class="mono-cell">{{ row.rowNumber }}</td>
-                <td v-for="(_header, index) in preview.headers" :key="`${row.rowNumber}-raw-${index}`">
+                <td
+                  v-for="(_header, index) in preview.headers"
+                  :key="`${row.rowNumber}-raw-${index}`"
+                >
                   {{ rawCell(row, preview.headers, index) }}
                 </td>
               </tr>
@@ -576,9 +746,9 @@ onMounted(loadBatches);
                 <button
                   class="ghost-aurora compact-action"
                   :disabled="detailLoading"
-                  @click="loadBatchDetail(batch.id)"
+                  @click="viewBatch(batch.id)"
                 >
-                  {{ detailLoading ? "读取中..." : "查看数据" }}
+                  {{ detailLoading ? "读取中..." : "查看结果与数据" }}
                 </button>
               </td>
             </tr>
@@ -598,8 +768,9 @@ onMounted(loadBatches);
 
       <div class="detail-summary">
         <span>
-          这里展示该批次实际暂存的 Excel 原始字段，共 {{ batchDetail.total }} 行；当前显示
-          {{ detailStart }} - {{ detailEnd }} 行。
+          这里展示该批次实际暂存的 Excel 原始字段，共
+          {{ batchDetail.total }} 行；当前显示 {{ detailStart }} -
+          {{ detailEnd }} 行。
         </span>
         <span>状态：{{ batchStatusLabels[batchDetail.status] }}</span>
       </div>
@@ -609,7 +780,10 @@ onMounted(loadBatches);
           <thead>
             <tr>
               <th>行号</th>
-              <th v-for="(header, index) in batchDetail.headers" :key="`${header}-${index}`">
+              <th
+                v-for="(header, index) in batchDetail.headers"
+                :key="`${header}-${index}`"
+              >
                 {{ header || `列${index + 1}` }}
               </th>
               <th>校验</th>
@@ -618,7 +792,10 @@ onMounted(loadBatches);
           <tbody>
             <tr v-for="row in batchDetail.rows" :key="row.rowNumber">
               <td class="mono-cell">{{ row.rowNumber }}</td>
-              <td v-for="(_header, index) in batchDetail.headers" :key="`${row.rowNumber}-${index}`">
+              <td
+                v-for="(_header, index) in batchDetail.headers"
+                :key="`${row.rowNumber}-${index}`"
+              >
                 {{ rawCell(row, batchDetail.headers, index) }}
               </td>
               <td>
@@ -630,7 +807,9 @@ onMounted(loadBatches);
                 >
                   {{ row.validationStatus === "valid" ? "通过" : "有错误" }}
                 </span>
-                <small v-if="row.errors.length" class="sub-cell">{{ row.errors.join("；") }}</small>
+                <small v-if="row.errors.length" class="sub-cell">{{
+                  row.errors.join("；")
+                }}</small>
               </td>
             </tr>
           </tbody>
@@ -659,7 +838,84 @@ onMounted(loadBatches);
 </template>
 
 <style scoped>
-.attribution-result{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0;padding:16px;border:1px solid #8eb8b9;border-radius:10px;background:#eef6f5}.attribution-result strong{width:100%}.attribution-result span{padding:6px 10px;background:#fff;border-radius:6px}
+.result-panel {
+  padding: 24px;
+  border-top: 3px solid var(--moss, #557766);
+  scroll-margin-top: 24px;
+}
+.result-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.result-heading h2 {
+  margin: 6px 0;
+  font-size: 24px;
+}
+.result-file {
+  color: var(--ink-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.result-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin: 22px 0;
+  gap: 16px;
+}
+.result-steps li {
+  border-top: 2px solid var(--line);
+  padding-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+.result-steps li.done {
+  border-color: var(--moss);
+}
+.result-steps li.current {
+  border-color: var(--clay);
+}
+.result-steps span,
+.result-summary {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+.result-next {
+  font-size: 15px;
+  line-height: 1.8;
+}
+.result-issues {
+  line-height: 1.9;
+  color: #964639;
+}
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.result-actions a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+@media (max-width: 700px) {
+  .result-panel {
+    padding: 16px;
+  }
+  .result-steps {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .result-actions > * {
+    min-height: 44px;
+  }
+}
 .notice {
   padding: 12px 16px;
   border-radius: var(--radius);

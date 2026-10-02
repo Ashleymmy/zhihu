@@ -300,12 +300,29 @@ export interface DataImportPreview extends DataImportBatch {
 
 /** 已保存导入批次的可追溯明细。预览只展示前 20 行，历史详情支持分页查看全部行。 */
 export interface DataImportBatchDetail extends DataImportBatch {
+  processing?: DataImportProcessing
   headers: string[]
   fieldMappings: DataImportFieldMapping[]
   rows: DataImportPreviewRow[]
   page: number
   pageSize: number
   total: number
+}
+
+export interface DataImportProcessing {
+  state: 'not_started' | 'processing' | 'needs_attention' | 'analyzed' | 'legacy_pending' | 'legacy_completed' | 'needs_scope'
+  from: string | null
+  to: string | null
+  sourceOrders: string
+  sourceSearches: string
+  revenueProvided: boolean
+  matchedRows: number
+  pendingRows: number
+  exceptionRows: number
+  issues: { code: string; count: number }[]
+  scope: { projectId: string; accountId: string } | null
+  attributionBatchId: string | null
+  retryAllowed: boolean
 }
 
 /* ===== 系统工具 ===== */

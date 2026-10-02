@@ -3,14 +3,15 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import Issues from './Issues.vue'
 import {CashWallet} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
-const props=defineProps<{context:EngineContext; wallet?:boolean}>()
+const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[]}>()
 interface Entry {id:string;keyword:string;date:string;orders:string|null;payerName:string;payeeName:string;payeeId:string;parentId:string|null;role:string;amount:string;status:string;kind:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;ready:boolean}
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
 interface View {summary:{records:number;orders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string};entries:Entry[];groups:Group[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
 interface Batch {id:string;fileName:string;status:string;lastError?:string}
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
-const period=reactive({from:today.slice(0,7)+'-01',to:today})
+const requestedPeriod = /^\d{4}-\d{2}-\d{2}$/.test(props.initialFrom||'') && /^\d{4}-\d{2}-\d{2}$/.test(props.initialTo||'') && props.initialFrom! <= props.initialTo!
+const period=reactive({from:requestedPeriod?props.initialFrom!:today.slice(0,7)+'-01',to:requestedPeriod?props.initialTo!:today})
 const view=ref<View|null>(null),busy=ref(false),error=ref(''),errorHelp=ref(''),errorAction=ref('none'),notice=ref(''),file=ref<File|null>(null),progress=ref(''),history=ref<Batch[]>([])
 const walletVersion=ref(0)
 const confirming=ref(false),checked=ref(false),selected=ref(''),detailPage=ref(1),detailsOpen=ref(false),detailPanel=ref<HTMLDetailsElement|null>(null)
