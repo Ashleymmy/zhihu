@@ -46,6 +46,7 @@
   </view>
   <view wx:if="{{codeNotice}}" class="form-hint">{{codeNotice}}</view>
   <view wx:if="{{smsRequired && !codeNotice}}" class="form-hint">请先填写邀请码并同意协议，再获取验证码。</view>
+  <view wx:if="{{smsRequired}}" class="form-hint">验证码有效期为 5 分钟。发送时会向阿里云短信服务及通信运营商提供接收手机号和验证码，仅用于手机号验证。</view>
   <view wx:if="{{!policyReady}}" class="form-hint">
     {{policyLoading ? '正在读取注册规则…' : '注册规则读取失败'}}
     <text wx:if="{{!policyLoading}}" class="agreement-link" bindtap="loadPolicy">重试</text>

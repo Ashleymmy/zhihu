@@ -1,0 +1,5 @@
+# Append after the existing production Compose files. Keep SMS_ENV_FILE server-only (mode 600).
+services:
+  app:
+    env_file:
+      - ${SMS_ENV_FILE:?Set SMS_ENV_FILE to the server-only SMS configuration file}
