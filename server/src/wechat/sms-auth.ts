@@ -18,8 +18,7 @@ import { sendAccountCode, verifyAccountCode, consumeAccountCode } from '../sms/r
 const phone = z.string().regex(/^1\d{10}$/);
 const code = z.string().regex(/^\d{6}$/);
 const password = z.string().min(1).max(128);
-const unavailable = () =>
-  new AppError(403, 40320, '暂不能使用验证码登录，请先用账号密码登录，完成微信绑定和手机号验证');
+const unavailable = () => new AppError(403, 40320, '暂不能使用验证码登录，请先用账号密码登录并验证手机号');
 const subject = (user: RowDataPacket) =>
   createHmac('sha256', requireAccountSmsEnabled().secret)
     .update(
@@ -27,20 +26,13 @@ const subject = (user: RowDataPacket) =>
     )
     .digest('hex');
 
-async function boundUser(identity: WechatIdentity) {
-  const [[user]] = await db.query<RowDataPacket[]>(
-    'SELECT u.* FROM users u JOIN wechat_identities w ON w.user_id=u.id WHERE w.app_id=? AND w.open_id=?',
-    [identity.appId, identity.openId],
-  );
+async function phoneUser(number: string) {
+  const [[user]] = await db.query<RowDataPacket[]>('SELECT * FROM users WHERE verified_phone_key=?', [number]);
   return user;
 }
-async function lockedUser(c: PoolConnection, id: string, identity: WechatIdentity) {
+async function lockedUser(c: PoolConnection, id: string) {
   const [[user]] = await c.query<RowDataPacket[]>('SELECT * FROM users WHERE id=? FOR UPDATE', [id]);
-  const [[link]] = await c.query<RowDataPacket[]>(
-    'SELECT user_id FROM wechat_identities WHERE app_id=? AND open_id=? FOR UPDATE',
-    [identity.appId, identity.openId],
-  );
-  if (!user?.is_active || String(link?.user_id) !== id) throw unavailable();
+  if (!user?.is_active) throw unavailable();
   return user;
 }
 function loginEligible(user: RowDataPacket | undefined, number: string) {
@@ -60,10 +52,10 @@ async function availablePhone(c: Pick<PoolConnection, 'query'>, id: string, numb
   );
   if (other) throw new AppError(409, 40920, '该手机号已被其他账号使用，请联系管理员核对');
 }
-async function passwordVerified(id: string, identity: WechatIdentity, number: string, value: string) {
+async function passwordVerified(id: string, number: string, value: string) {
   if (!(await incrRateLimit(`sms:phone-password:${id}`, 10, 300)).allowed)
     throw new AppError(429, 42920, '操作过于频繁，请 5 分钟后重试');
-  const user = await boundUser(identity);
+  const [[user]] = await db.query<RowDataPacket[]>('SELECT * FROM users WHERE id=?', [id]);
   if (!user || String(user.id) !== id || !(await bcrypt.compare(value, user.password_hash)))
     throw new AppError(422, 42202, '账号密码不正确，请重试');
   canVerify(user, number);
@@ -72,6 +64,130 @@ async function passwordVerified(id: string, identity: WechatIdentity, number: st
 }
 
 export const smsAuthRouter = Router();
+const bindingInput = z.object({ phone, password });
+const publicBindingInput = bindingInput.extend({ username: z.string().trim().min(1).max(64) });
+function canBind(user: RowDataPacket, number: string) {
+  if (!user.is_active || user.must_change_pwd) throw new AppError(403, 40320, '请先使用账号密码登录并完成密码设置');
+  if (user.phone && user.phone !== number)
+    throw new AppError(409, 40920, '请验证账号已登记的手机号，修改号码请联系管理员');
+}
+async function checkBinding(c: Pick<PoolConnection, 'query'>, identity: WechatIdentity, id: string, lock = false) {
+  const [links] = await c.query<RowDataPacket[]>(
+    'SELECT user_id,open_id FROM wechat_identities WHERE app_id=? AND (open_id=? OR user_id=?)' +
+      (lock ? ' FOR UPDATE' : ''),
+    [identity.appId, identity.openId, id],
+  );
+  if (links.some((link) => String(link.user_id) !== id || link.open_id !== identity.openId))
+    throw new AppError(409, 40908, '微信或平台账号已绑定其他账号，请联系管理员处理');
+  return links.length > 0;
+}
+async function bindingUser(
+  identity: WechatIdentity,
+  input: { username?: string; phone: string; password: string },
+  id?: string,
+  verified?: (id: string) => void,
+) {
+  const key = id || input.username!;
+  if (
+    !(await incrRateLimit(`wechat:bind:${key}`, 10, 300)).allowed ||
+    !(await incrRateLimit(`wechat:bind-client:${wechatClientId(identity)}`, 20, 300)).allowed
+  )
+    throw new AppError(429, 42920, '操作过于频繁，请 5 分钟后重试');
+  const [[user]] = await db.query<RowDataPacket[]>(
+    id ? 'SELECT * FROM users WHERE id=?' : 'SELECT * FROM users WHERE username=?',
+    [key],
+  );
+  if (!user || !(await bcrypt.compare(input.password, user.password_hash)))
+    throw new AppError(401, 40102, '账号或密码错误');
+  verified?.(String(user.id));
+  canBind(user, input.phone);
+  await availablePhone(db, String(user.id), input.phone);
+  await checkBinding(db, identity, String(user.id));
+  return user;
+}
+smsAuthRouter.get(
+  '/binding-status',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const identity = requireWechatContext(req);
+    const [[link]] = await db.query<RowDataPacket[]>(
+      'SELECT open_id FROM wechat_identities WHERE app_id=? AND user_id=?',
+      [identity.appId, req.user.sub],
+    );
+    res.set('Cache-Control', 'no-store');
+    ok(res, { bound: !!link, currentWechat: !!link && link.open_id === identity.openId });
+  }),
+);
+for (const authenticated of [false, true]) {
+  const guards = authenticated ? [requireAuth] : [];
+  smsAuthRouter.post(
+    authenticated ? '/bind-current-code' : '/bind-code',
+    ...guards,
+    asyncHandler(async (req, res) => {
+      requireAccountSmsEnabled();
+      const input = (authenticated ? bindingInput : publicBindingInput).strict().parse(req.body);
+      const identity = requireWechatContext(req);
+      const user = await bindingUser(identity, input, authenticated ? req.user.sub : undefined, (id) => {
+        res.locals.miniVerifiedUserId = id;
+      });
+      ok(res, await sendAccountCode(input.phone, wechatClientId(identity), 'wechat_bind', subject(user)));
+    }),
+  );
+  smsAuthRouter.post(
+    authenticated ? '/bind-current' : '/bind',
+    ...guards,
+    asyncHandler(async (req, res) => {
+      requireAccountSmsEnabled();
+      const input = (authenticated ? bindingInput : publicBindingInput)
+        .extend({ smsCode: code })
+        .strict()
+        .parse(req.body);
+      const identity = requireWechatContext(req);
+      const user = await bindingUser(identity, input, authenticated ? req.user.sub : undefined, (id) => {
+        res.locals.miniVerifiedUserId = id;
+      });
+      const id = String(user.id),
+        guard = subject(user);
+      let verifiedAt: Date | null = null;
+      const proof = await verifyAccountCode(input.phone, wechatClientId(identity), input.smsCode, 'wechat_bind', guard);
+      const complete = async (c: PoolConnection) => {
+        const current = await lockedUser(c, id);
+        canBind(current, input.phone);
+        if (subject(current) !== guard) throw new AppError(409, 40920, '账号信息已变化，请重新验证');
+        await availablePhone(c, id, input.phone);
+        const bound = await checkBinding(c, identity, id, true);
+        await consumeAccountCode(c, proof);
+        if (!bound)
+          await c.query('INSERT INTO wechat_identities(app_id,open_id,user_id) VALUES(?,?,?)', [
+            identity.appId,
+            identity.openId,
+            id,
+          ]);
+        await c.query('UPDATE users SET phone=?,phone_verified_at=COALESCE(phone_verified_at,NOW(3)) WHERE id=?', [
+          input.phone,
+          id,
+        ]);
+        const [[verified]] = await c.query<RowDataPacket[]>('SELECT phone_verified_at FROM users WHERE id=?', [id]);
+        verifiedAt = verified.phone_verified_at;
+        await writeAudit({ userId: id, action: 'auth.wechat_bind', resourceType: 'user', resourceId: id }, c);
+      };
+      try {
+        if (authenticated) {
+          await withTransaction(complete);
+          ok(res, await me(req.user));
+        } else {
+          const result = await loginVerifiedUser(id, clientIdentity(req), req.ip, user.password_hash, complete);
+          res.locals.miniVerifiedUserId = id;
+          ok(res, { ...result, user: { ...result.user, phone: input.phone, phoneVerifiedAt: verifiedAt } });
+        }
+      } catch (error) {
+        if ((error as { code?: string }).code === 'ER_DUP_ENTRY')
+          throw new AppError(409, 40908, '微信或手机号已被其他账号绑定，请联系管理员核对');
+        throw error;
+      }
+    }),
+  );
+}
 smsAuthRouter.get(
   '/sms-policy',
   asyncHandler(async (_req, res) => {
@@ -85,7 +201,7 @@ smsAuthRouter.post(
     requireAccountSmsEnabled();
     const input = z.object({ phone }).strict().parse(req.body),
       identity = requireWechatContext(req);
-    const user = loginEligible(await boundUser(identity), input.phone);
+    const user = loginEligible(await phoneUser(input.phone), input.phone);
     ok(res, await sendAccountCode(input.phone, wechatClientId(identity), 'login', subject(user)));
   }),
 );
@@ -95,7 +211,7 @@ smsAuthRouter.post(
     requireAccountSmsEnabled();
     const input = z.object({ phone, smsCode: code }).strict().parse(req.body),
       identity = requireWechatContext(req);
-    const user = loginEligible(await boundUser(identity), input.phone),
+    const user = loginEligible(await phoneUser(input.phone), input.phone),
       guard = subject(user);
     const proof = await verifyAccountCode(input.phone, wechatClientId(identity), input.smsCode, 'login', guard);
     const result = await loginVerifiedUser(
@@ -104,7 +220,7 @@ smsAuthRouter.post(
       req.ip,
       user.password_hash,
       async (c) => {
-        const current = loginEligible(await lockedUser(c, String(user.id), identity), input.phone);
+        const current = loginEligible(await lockedUser(c, String(user.id)), input.phone);
         if (subject(current) !== guard) throw unavailable();
         // Consumption and session creation commit together; a replay can never issue another session.
         await consumeAccountCode(c, proof);
@@ -125,7 +241,7 @@ smsAuthRouter.post(
     requireAccountSmsEnabled();
     const input = z.object({ phone, password }).strict().parse(req.body),
       identity = requireWechatContext(req);
-    const user = await passwordVerified(req.user.sub, identity, input.phone, input.password);
+    const user = await passwordVerified(req.user.sub, input.phone, input.password);
     ok(res, await sendAccountCode(input.phone, wechatClientId(identity), 'phone_verify', subject(user)));
   }),
 );
@@ -136,12 +252,12 @@ smsAuthRouter.post(
     requireAccountSmsEnabled();
     const input = z.object({ phone, password, smsCode: code }).strict().parse(req.body),
       identity = requireWechatContext(req);
-    const user = await passwordVerified(req.user.sub, identity, input.phone, input.password),
+    const user = await passwordVerified(req.user.sub, input.phone, input.password),
       guard = subject(user);
     const proof = await verifyAccountCode(input.phone, wechatClientId(identity), input.smsCode, 'phone_verify', guard);
     try {
       await withTransaction(async (c) => {
-        const current = await lockedUser(c, req.user.sub, identity);
+        const current = await lockedUser(c, req.user.sub);
         canVerify(current, input.phone);
         if (subject(current) !== guard) throw new AppError(409, 40920, '账号信息已变化，请重新验证');
         await availablePhone(c, req.user.sub, input.phone);

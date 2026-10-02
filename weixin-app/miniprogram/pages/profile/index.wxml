@@ -32,6 +32,11 @@
       </view>
     </view>
     <view class="card cell-card">
+      <view class="cell"><text class="cell-label">社交账号绑定</text></view>
+      <view class="cell" bindtap="openSocialBinding"><text class="cell-label">微信</text><text class="cell-value muted">{{binding.bound ? (binding.currentWechat ? '已绑定当前微信' : '已绑定其他微信') : '未绑定 · 去绑定'}}</text><text class="cell-arrow" wx:if="{{binding && !binding.bound}}">›</text></view>
+      <view class="muted" style="padding:20rpx 28rpx;font-size:24rpx;line-height:1.7;">{{binding.bound ? '已支持微信快捷登录。更换绑定请联系管理员核对。' : '主动验证手机号并绑定微信后，可使用微信快捷登录。'}}</view>
+    </view>
+    <view class="card cell-card">
       <view class="cell"><text class="cell-label">邀请归属</text><text class="cell-value">{{inviteUsed ? '已绑定' : '自主注册'}}</text></view>
       <view class="cell" wx:if="{{affiliation}}"><text class="cell-label">团队</text><text class="cell-value">{{affiliation.team ? affiliation.team.leaderName : '平台管理 · 独立达人'}}</text></view>
       <view class="cell" data-path="/pages/password/index" bindtap="open">
@@ -55,15 +60,4 @@
     </view>
   </view>
 
-  <view class="modal-mask" wx:if="{{showInviteModal}}" bindtap="closeInviteModal">
-    <view class="modal profile-modal" catchtap="noop">
-      <view class="section-head">
-        <text class="section-title">填写邀请码</text>
-        <button size="mini" bindtap="closeInviteModal">取消</button>
-      </view>
-      <input class="modal-input" value="{{inviteInput}}" placeholder="请输入邀请码" bindinput="onInviteInput" maxlength="20" focus="{{showInviteModal}}" />
-      <view wx:if="{{inviteError}}" class="error">{{inviteError}}</view>
-      <button class="primary" loading="{{inviteBusy}}" disabled="{{inviteBusy}}" bindtap="submitInvite">确认</button>
-    </view>
-  </view>
 </view>

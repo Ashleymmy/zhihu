@@ -1,4 +1,5 @@
 const request = require("./request");
+const invitation = require("./invitation");
 const TOKEN_KEY = "zk_access_token";
 const USER_KEY = "zk_user";
 let revision = 0;
@@ -17,6 +18,7 @@ function clear() {
   }
 }
 function store(user) {
+  invitation.clear();
   wx.setStorageSync(USER_KEY, user);
   getApp().globalData.user = user;
   return user;
@@ -42,7 +44,7 @@ async function loginWithWeChat() {
     auth: false,
   });
   if (version !== revision) throw new Error("登录已取消，请重试");
-  // 当前微信未绑定账号：由小程序引导到绑定页（手机号 + 邀请码）
+  // Only explicit binding enables WeChat quick login.
   if (result && result.needsBind) return { needsBind: true };
   wx.setStorageSync(TOKEN_KEY, result.token);
   return ensure();
@@ -77,7 +79,7 @@ async function register(phone, password, inviteCode, displayName, smsCode) {
     data: {
       phone,
       password,
-      inviteCode,
+      ...(inviteCode ? { inviteCode } : {}),
       displayName: displayName || "",
       ...(smsCode ? { smsCode } : {}),
     },
@@ -87,15 +89,30 @@ async function register(phone, password, inviteCode, displayName, smsCode) {
   wx.setStorageSync(TOKEN_KEY, result.token);
   return ensure();
 }
-async function bindWechat(username, password) {
-  clear();
+async function bindWechat(
+  username,
+  password,
+  phone,
+  smsCode,
+  authenticated = false,
+) {
+  if (!authenticated) clear();
   const version = revision;
-  const result = await request.send("/core/auth/bind", {
-    method: "POST",
-    data: { username, password },
-    auth: false,
-  });
+  const result = await request.send(
+    authenticated ? "/core/auth/bind-current" : "/core/auth/bind",
+    {
+      method: "POST",
+      data: {
+        ...(authenticated ? {} : { username }),
+        password,
+        phone,
+        smsCode,
+      },
+      auth: authenticated,
+    },
+  );
   if (version !== revision) throw new Error("绑定已取消，请重试");
+  if (authenticated) return store(result);
   wx.setStorageSync(TOKEN_KEY, result.token);
   return ensure();
 }
@@ -132,6 +149,16 @@ function entryPath(user) {
     : "/pages/home/index";
 }
 module.exports = {
+  bindingStatus: () => request.get("/core/auth/binding-status"),
+  sendBindingCode: (username, password, phone, authenticated = false) =>
+    request.send(
+      authenticated ? "/core/auth/bind-current-code" : "/core/auth/bind-code",
+      {
+        method: "POST",
+        auth: authenticated,
+        data: { ...(authenticated ? {} : { username }), password, phone },
+      },
+    ),
   smsPolicy: () => request.send("/core/auth/sms-policy", { auth: false }),
   sendLoginCode: (phone) =>
     request.send("/core/auth/login-code", {
@@ -152,7 +179,7 @@ module.exports = {
     request.send("/core/auth/registration-code", {
       method: "POST",
       auth: false,
-      data: { phone, inviteCode },
+      data: { phone, ...(inviteCode ? { inviteCode } : {}) },
     }),
   TOKEN_KEY,
   USER_KEY,

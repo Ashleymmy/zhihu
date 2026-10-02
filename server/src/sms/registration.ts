@@ -16,7 +16,7 @@ const mac = (secret: string, ...values: string[]) =>
 const invalid = () => new AppError(422, 42220, '验证码错误、已过期或已使用，请检查后重试');
 type Scope =
   | { purpose: 'registration'; invitationToken?: string; subjectHash?: never }
-  | { purpose: 'login' | 'phone_verify'; subjectHash: string };
+  | { purpose: 'login' | 'phone_verify' | 'wechat_bind'; subjectHash: string };
 type Proof = {
   phoneHash: string;
   identityHash: string;
@@ -47,7 +47,7 @@ export function sendRegistrationCode(phone: string, identityHash: string, invita
 export function sendAccountCode(
   phone: string,
   identityHash: string,
-  purpose: 'login' | 'phone_verify',
+  purpose: 'login' | 'phone_verify' | 'wechat_bind',
   subjectHash: string,
 ) {
   return sendCode(phone, identityHash, { purpose, subjectHash });
@@ -71,6 +71,8 @@ async function reserveLimit(c: PoolConnection, key: string, window: number, limi
 
 async function sendCode(phone: string, identityHash: string, scope: Scope) {
   const { secret, dailyLimit } = settingsFor(scope);
+  // Future human-verification integration belongs here, before quota reservation and SMS dispatch.
+  // Captcha 2.0 is deliberately not enabled; never accept a client-supplied passed/skip flag.
   const phoneHash = mac(secret, 'phone', phone),
     challengeId = randomBytes(16).toString('hex');
   const code = String(randomInt(0, 1000000)).padStart(6, '0');
@@ -130,7 +132,7 @@ export function verifyAccountCode(
   phone: string,
   identityHash: string,
   code: string,
-  purpose: 'login' | 'phone_verify',
+  purpose: 'login' | 'phone_verify' | 'wechat_bind',
   subjectHash: string,
 ) {
   return verifyCode(phone, identityHash, code, { purpose, subjectHash });

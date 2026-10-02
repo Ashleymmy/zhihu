@@ -1,43 +1,18 @@
+<import src="../../templates/consent.wxml" />
 <view class="login-page">
-  <view class="login-title">绑定网站账号</view>
-  <view class="login-sub">当前微信尚未绑定账号，绑定后下次可微信一键登录</view>
+  <view class="login-title">绑定账号</view>
+  <view class="login-sub">验证账号密码和手机号，将当前微信绑定到平台账号</view>
   <view class="login-form">
-    <view class="input-row"
-      ><input
-        type="text"
-        data-name="phone"
-        value="{{phone}}"
-        maxlength="64"
-        placeholder="请输入网站登录账号"
-        placeholder-class="ph"
-        bindinput="input"
-    /></view>
-    <view class="input-row"
-      ><input
-        data-name="password"
-        value="{{password}}"
-        password
-        placeholder="请输入网站账号密码"
-        placeholder-class="ph"
-        bindinput="input"
-    /></view>
+    <view class="input-row"><input data-name="username" value="{{username}}" disabled="{{fromProfile || busy || sendingCode}}" maxlength="64" placeholder="平台登录账号" placeholder-class="ph" bindinput="input" /></view>
+    <view class="input-row"><input data-name="password" value="{{password}}" password placeholder="当前账号密码" placeholder-class="ph" bindinput="input" /></view>
+    <view class="input-row"><input data-name="phone" value="{{phone}}" disabled="{{registeredPhone || busy || sendingCode}}" type="number" maxlength="11" placeholder="账号登记的手机号" placeholder-class="ph" bindinput="input" /></view>
+    <view class="input-row sms-input-row"><input data-name="smsCode" value="{{smsCode}}" type="number" maxlength="6" placeholder="6 位短信验证码" bindinput="input" /><button class="sms-send" bindtap="sendCode" loading="{{sendingCode}}" disabled="{{busy || sendingCode || cooldown>0 || !ready}}">{{cooldown>0 ? cooldown+' 秒后重发' : '获取验证码'}}</button></view>
   </view>
-  <view class="form-hint">已有网站账号验证密码后绑定微信。新用户请返回登录页，使用邀请码注册。</view>
+  <view class="form-hint">已登记手机号需要验证原号码；尚未登记手机号的账号可在这里补充。绑定后可使用微信快捷登录。</view>
+  <view class="form-hint">验证码 5 分钟内有效。发送时向阿里云短信服务及通信运营商提供接收手机号和验证码，仅用于本次验证。</view>
+  <view wx:if="{{codeNotice}}" class="form-hint">{{codeNotice}}</view>
   <view wx:if="{{error}}" class="error">{{error}}</view>
-  <view class="agree-row">
-    <view class="agree-check {{agreed ? 'agree-on' : ''}}" bindtap="toggleAgree">{{agreed ? '✓' : ''}}</view>
-    <text class="agree-text">已阅读并同意<text class="agreement-link" data-type="user" bindtap="openAgreement">《用户协议》</text>与<text class="agreement-link" data-type="privacy" bindtap="openAgreement">《隐私协议》</text></text>
-  </view>
-  <button
-    class="primary login-btn"
-    loading="{{busy}}"
-    disabled="{{busy}}"
-    bindtap="submit"
-    >完成绑定</button
-  >
-  <view class="login-links"
-    ><text class="login-link-strong" bindtap="toLogin">返回登录</text
-    ><text class="muted" bindtap="backHome">返回首页</text></view
-  >
-  <confirm-sheet id="confirmSheet" />
+  <template is="authConsent" data="{{agreed,consentOpen}}" />
+  <button class="primary login-btn {{!agreed ? 'consent-locked' : ''}}" aria-disabled="{{!agreed}}" loading="{{busy}}" disabled="{{busy || sendingCode}}" bindtap="submit">完成绑定</button>
+  <view class="login-links" wx:if="{{!fromProfile}}"><text class="login-link-strong" bindtap="toRegister">没有账号？去注册</text><text class="muted" bindtap="toLogin">返回登录</text></view>
 </view>

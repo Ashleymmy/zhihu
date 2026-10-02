@@ -25,7 +25,7 @@ export async function memberClientInfo(ids: string[]) {
       rows(
         `SELECT user_id,MAX(occurred_at) last_activity_at,MAX(CASE WHEN result_code=40908 THEN occurred_at END) last_conflict_at,
         MAX(CASE WHEN result_code=40908 THEN id ELSE 0 END) conflict_id,
-        MAX(CASE WHEN result_code=0 AND http_status<400 AND route_key IN ('/core/auth/login','/core/auth/bind','/core/auth/register','/core/auth/wechat-login') THEN id ELSE 0 END) recovered_id
+        MAX(CASE WHEN result_code=0 AND http_status<400 AND route_key IN ('/core/auth/bind','/core/auth/bind-current','/core/auth/wechat-login') THEN id ELSE 0 END) recovered_id
         FROM mini_request_events WHERE user_id IN (${placeholders}) AND occurred_at>=DATE_SUB(NOW(3),INTERVAL 7 DAY) GROUP BY user_id`,
         batch,
       ),

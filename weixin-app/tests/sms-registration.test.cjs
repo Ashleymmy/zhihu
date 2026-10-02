@@ -1,57 +1,156 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const {harness} = require('./harness.cjs');
-const fields={phone:'13900001234',password:'Sms_test_123',inviteCode:'ABCDEFGH',agreed:true};
-function setup(overrides={}) {
- return harness(call=>{
-  if(overrides[call.path]) return overrides[call.path](call);
-  if(call.path==='/core/auth/registration-policy') return {smsRequired:true};
-  if(call.path==='/core/auth/registration-code') return {retryAfterSeconds:60,expiresInSeconds:300};
-  if(call.path==='/core/auth/register')return {token:'sms_test_token'};
-  if(call.path==='/core/auth/me')return {id:'1',role:'creator',phoneVerifiedAt:'2026-10-01T00:00:00Z'};
-  return {};
- });
+const test = require("node:test"),
+  assert = require("node:assert/strict");
+const { harness, deferred } = require("./harness.cjs");
+const fields = { phone: "13900001234", password: "Sms_test_123", agreed: true };
+function setup(overrides = {}) {
+  return harness((c) => {
+    if (overrides[c.path]) return overrides[c.path](c);
+    if (c.path.endsWith("/registration-policy"))
+      return { smsRequired: true, smsEnabled: true };
+    if (c.path.endsWith("/registration-code"))
+      return { retryAfterSeconds: 60, expiresInSeconds: 300 };
+    if (c.path.endsWith("/register")) return { token: "fixture" };
+    if (c.path.endsWith("/me"))
+      return { id: "1", role: "creator", phoneVerifiedAt: "2026-10-02" };
+    return {};
+  });
 }
-test('loads server policy, preserves hidden invitation and refuses registration without six digits',async()=>{
- const h=setup(),p=h.page('register');await p.onLoad({code:'abcdefgh'});p.setData(fields);
- assert.equal(p.data.smsRequired,true);assert.equal(p.data.inviteCode,'ABCDEFGH');
- assert.equal(h.calls.find(c=>c.path.endsWith('/registration-policy')).data.inviteCode,'ABCDEFGH');
- await p.submit();assert.match(p.data.error,/6 位/);assert.equal(h.calls.filter(c=>c.path.endsWith('/register')).length,0);
- p.setData({smsCode:'123456'});await p.submit();const sent=h.calls.find(c=>c.path.endsWith('/register'));assert.equal(sent.data.smsCode,'123456');assert.equal(sent.data.inviteCode,'ABCDEFGH');assert.ok(h.navigation.includes('/pages/home/index'));
+test("share invitation is hidden, normalized and preserved through SMS registration", async () => {
+  const h = setup(),
+    p = h.page("register");
+  await p.onLoad({ invite: "abcdefgh" });
+  p.setData(fields);
+  assert.equal(p.data.inviteCode, "ABCDEFGH");
+  await p.submit();
+  assert.match(p.data.error, /6 位/);
+  p.setData({ smsCode: "123456" });
+  await p.submit();
+  const sent = h.calls.find((c) => c.path.endsWith("/register"));
+  assert.equal(sent.data.inviteCode, "ABCDEFGH");
+  assert.equal(sent.data.smsCode, "123456");
+  assert.equal(h.load("utils/invitation").get(), "");
 });
-test('cannot silently bypass policy on network failure; retry can recover',async()=>{
- let failed=true;const h=setup({'/core/auth/registration-policy':()=>failed?{http:503,body:{code:50320,message:'稍后重试'}}:{smsRequired:false}}),p=h.page('register');
- await p.onLoad();p.setData(fields);await p.submit();assert.equal(p.data.policyReady,false);assert.equal(h.calls.filter(c=>c.path.endsWith('/register')).length,0);
- failed=false;await p.loadPolicy();await p.submit();assert.equal(h.calls.find(c=>c.path.endsWith('/register')).data.smsCode,undefined);
+test("no invitation is allowed and no captcha service is requested", async () => {
+  const h = setup(),
+    p = h.page("register");
+  await p.onLoad();
+  p.setData(fields);
+  await p.sendCode();
+  const sent = h.calls.find((c) => c.path.endsWith("/registration-code"));
+  assert.equal(sent.data.inviteCode, undefined);
+  assert.equal(p.data.cooldown, 60);
+  assert.ok(h.calls.every((c) => !/captcha/.test(c.path)));
+  p.onUnload();
 });
-test('requires consent and valid invite before sending; repeated taps send only once',async()=>{
- const h=setup(),p=h.page('register');await p.onLoad();p.setData({...fields,agreed:false});await p.sendCode();assert.match(p.data.error,/同意/);
- p.setData({agreed:true,inviteCode:''});await p.sendCode();assert.match(p.data.error,/邀请码/);
- p.setData({inviteCode:'abcdefgh'});await Promise.all([p.sendCode(),p.sendCode()]);assert.equal(h.calls.filter(c=>c.path.endsWith('/registration-code')).length,1);assert.equal(p.data.cooldown,60);assert.match(p.data.codeNotice,/已发送/);
- await p.sendCode();assert.equal(h.calls.filter(c=>c.path.endsWith('/registration-code')).length,1);p.onUnload();
+test("malformed and revoked invitations block rather than falling back to independent registration", async () => {
+  const h = setup({
+      "/core/auth/registration-policy": () => ({
+        http: 422,
+        body: { code: 42220, message: "邀请已失效" },
+      }),
+    }),
+    p = h.page("register");
+  await p.onLoad({ invite: "bad" });
+  p.setData({ ...fields, smsCode: "123456" });
+  assert.equal(p.data.inviteCode, "BAD");
+  await p.submit();
+  await p.sendCode();
+  assert.equal(p.data.policyReady, false);
+  assert.ok(!h.calls.some((c) => /\/register$|-code$/.test(c.path)));
 });
-test('changing phone clears code; hiding and reopening does not reset cooldown',async()=>{
- const h=setup(),p=h.page('register');await p.onLoad();p.setData(fields);await p.sendCode();p.setData({smsCode:'123456'});
- p.input({currentTarget:{dataset:{name:'phone'}},detail:{value:'13900001235'}});assert.equal(p.data.smsCode,'');assert.equal(p.data.codeNotice,'');p.onHide();p.onShow();assert.ok(p.data.cooldown>0);
- p._retryAt=Date.now()-1;p.onShow();assert.equal(p.data.cooldown,0);p.onUnload();
+test("network failure or old policy cannot bypass required SMS; retry recovers safely", async () => {
+  let policy = { http: 503, body: { code: 50320, message: "稍后重试" } };
+  const h = setup({ "/core/auth/registration-policy": () => policy }),
+    p = h.page("register");
+  await p.onLoad();
+  p.setData({ ...fields, smsCode: "123456" });
+  await p.submit();
+  assert.equal(p.data.policyReady, false);
+  policy = { smsRequired: false };
+  await p.loadPolicy();
+  assert.equal(p.data.policyReady, false);
+  policy = { smsRequired: true, smsEnabled: true };
+  await p.loadPolicy();
+  await p.submit();
+  assert.ok(h.calls.some((c) => c.path.endsWith("/register")));
 });
-test('provider failure never displays sent notice or starts success countdown',async()=>{
- const h=setup({'/core/auth/registration-code':()=>({http:503,body:{code:50321,message:'短信暂时无法发送，请稍后再试'}})}),p=h.page('register');await p.onLoad();p.setData(fields);await p.sendCode();assert.equal(p.data.sendingCode,false);assert.equal(p.data.cooldown,0);assert.equal(p.data.codeNotice,'');assert.match(p.data.error,/无法发送/);
+test("consent gates sending, double taps send once and cooldown survives hide/show", async () => {
+  const sending = deferred(),
+    h = setup({ "/core/auth/registration-code": () => sending.promise }),
+    p = h.page("register");
+  await p.onLoad();
+  p.setData({ ...fields, agreed: false });
+  await p.sendCode();
+  assert.equal(p.data.consentOpen, true);
+  p.confirmConsent();
+  const pending = p.sendCode();
+  await p.sendCode();
+  sending.resolve({ retryAfterSeconds: 60 });
+  await pending;
+  assert.equal(
+    h.calls.filter((c) => c.path.endsWith("/registration-code")).length,
+    1,
+  );
+  assert.equal(p.data.cooldown, 60);
+  p.onHide();
+  p.onShow();
+  assert.ok(p.data.cooldown > 0);
+  p._smsRetryAt = Date.now() - 1;
+  p.onShow();
+  assert.equal(p.data.cooldown, 0);
+  p.onUnload();
 });
-test('server enabling SMS after page load refreshes policy instead of falling back',async()=>{
- let enabled=false;const h=setup({'/core/auth/registration-policy':()=>({smsRequired:enabled}),'/core/auth/register':()=>{enabled=true;return {http:422,body:{code:42220,message:'请填写短信验证码'}}}}),p=h.page('register');await p.onLoad();p.setData(fields);await p.submit();assert.equal(p.data.smsRequired,true);assert.match(p.data.error,/验证码/);assert.equal(h.navigation.length,0);
+test("phone edits discard code and provider errors never report success", async () => {
+  const h = setup({
+      "/core/auth/registration-code": () => ({
+        http: 503,
+        body: { code: 50321, message: "短信发送失败" },
+      }),
+    }),
+    p = h.page("register");
+  await p.onLoad();
+  p.setData({ ...fields, smsCode: "123456" });
+  p.input({
+    currentTarget: { dataset: { name: "phone" } },
+    detail: { value: "13900001235" },
+  });
+  assert.equal(p.data.smsCode, "");
+  await p.sendCode();
+  assert.equal(p.data.cooldown, 0);
+  assert.equal(p.data.codeNotice, "");
+  assert.equal(p.data.sendingCode, false);
+  assert.match(p.data.error, /失败/);
 });
-test('changing invitation reloads its policy and ignores a stale response',async()=>{
- let releaseOld;
- const h=setup({'/core/auth/registration-policy':call=>call.data.inviteCode==='ABCDEFGH'
-   ? new Promise(resolve=>{releaseOld=resolve}) : {smsRequired:false}}),p=h.page('register');
- await p.onLoad();
- p.setData({smsCode:'123456',codeNotice:'old notice'});
- const first=p.input({currentTarget:{dataset:{name:'inviteCode'}},detail:{value:'ABCDEFGH'}});
- await new Promise(resolve=>setImmediate(resolve));
- assert.equal(p.data.policyReady,false);assert.equal(p.data.smsCode,'');
- await p.input({currentTarget:{dataset:{name:'inviteCode'}},detail:{value:'JKLMNPQR'}});
- assert.equal(p.data.smsRequired,false);assert.equal(p.data.policyReady,true);
- releaseOld({smsRequired:true});await first;
- assert.equal(p.data.smsRequired,false);assert.equal(p.data.policyLoading,false);
+test("new and legacy invitation links and QR scenes survive login/register navigation without persistent storage", async () => {
+  for (const options of [
+    { invite: "abcdefgh" },
+    { code: "abcdefgh" },
+    { scene: "invite%3DABCDEFGH" },
+  ]) {
+    const h = setup(),
+      p = h.page("register");
+    await p.onLoad(options);
+    p.toLogin();
+    assert.equal(h.navigation.at(-1), "/pages/login/index?invite=ABCDEFGH");
+    const login = h.page("login");
+    await login.onLoad();
+    login.toRegister();
+    assert.equal(h.navigation.at(-1), "/pages/register/index?invite=ABCDEFGH");
+    assert.equal(h.storage.size, 0);
+  }
+});
+test("stale registration policy cannot overwrite a newer retry", async () => {
+  const old = deferred();
+  let calls = 0;
+  const h = setup({
+      "/core/auth/registration-policy": () =>
+        ++calls === 1 ? old.promise : { smsRequired: true, smsEnabled: true },
+    }),
+    p = h.page("register");
+  const first = p.onLoad({ invite: "ABCDEFGH" });
+  await new Promise((r) => setImmediate(r));
+  await p.loadPolicy();
+  old.resolve({ smsRequired: false });
+  await first;
+  assert.equal(p.data.policyReady, true);
 });

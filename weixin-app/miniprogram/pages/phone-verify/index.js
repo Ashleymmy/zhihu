@@ -1,7 +1,9 @@
+const consent = require("../../utils/consent");
 const auth = require("../../utils/auth");
 const request = require("../../utils/request");
 const countdown = require("../../utils/sms-countdown");
 Page({
+  ...consent.methods,
   data: {
     phone: "",
     password: "",
@@ -13,6 +15,7 @@ Page({
     sendingCode: false,
     cooldown: 0,
     agreed: false,
+    consentOpen: false,
     error: "",
     codeNotice: "",
     verified: false,
@@ -58,15 +61,8 @@ Page({
     if (name === "phone") this.setData({ smsCode: "", codeNotice: "" });
     this.setData({ [name]: e.detail.value });
   },
-  toggleAgree() {
-    this.setData({ agreed: !this.data.agreed });
-  },
-  openAgreement(e) {
-    wx.navigateTo({
-      url: "/pages/agreement/index?type=" + e.currentTarget.dataset.type,
-    });
-  },
   valid() {
+    if (!consent.ensure(this)) return false;
     if (!this.data.enabled || this.data.loading || this.data.verified)
       return false;
     if (!/^1\d{10}$/.test(this.data.phone.trim())) {
@@ -75,10 +71,6 @@ Page({
     }
     if (!this.data.password) {
       this.setData({ error: "请输入当前账号密码" });
-      return false;
-    }
-    if (!this.data.agreed) {
-      this.setData({ error: "请先阅读并同意用户协议和隐私协议" });
       return false;
     }
     return true;

@@ -37,7 +37,7 @@ test("SMS mode follows server policy, validates consent and submits no password 
   mode(p);
   p.setData({ ...fields, agreed: false });
   await p.submit();
-  assert.match(p.data.error, /同意/);
+  assert.equal(p.data.consentOpen, true);
   assert.equal(h.calls.filter((c) => c.path.endsWith("/sms-login")).length, 0);
   p.setData({ agreed: true, smsCode: "123" });
   await p.submit();
@@ -62,7 +62,7 @@ test("disabled or failed policy retains password login without SMS requests", as
     await p.onLoad();
     mode(p);
     assert.equal(p.data.mode, "password");
-    p.setData({ username: "legacy", password: "fixture" });
+    p.setData({ username: "legacy", password: "fixture", agreed: true });
     await p.submit();
     assert.ok(h.calls.some((c) => c.path.endsWith("/login")));
     assert.ok(!h.calls.some((c) => c.path.endsWith("/sms-login")));
@@ -140,11 +140,12 @@ test("phone verification requires login, current password and explicit consent",
   await p.onLoad();
   assert.equal(p.data.registeredPhone, true);
   assert.equal(p.data.phone, user.phone);
+  p.setData({ agreed: true });
   await p.sendCode();
   assert.match(p.data.error, /密码/);
-  p.setData({ password: "fixture" });
+  p.setData({ password: "fixture", agreed: false });
   await p.sendCode();
-  assert.match(p.data.error, /同意/);
+  assert.equal(p.data.consentOpen, true);
   assert.equal(h.calls.filter((c) => c.path.endsWith("/phone-code")).length, 0);
   p.input({
     currentTarget: { dataset: { name: "phone" } },

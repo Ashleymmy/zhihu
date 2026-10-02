@@ -40,8 +40,11 @@ test("profile loads for every supported role and stays inaccessible to guests an
     null,
   ]) {
     const h = harness((call) => {
-      if(call.path==="/core/auth/profile") return user;
-      if(call.path==="/core/team/affiliation") return {team:null,inviter:null};
+      if (call.path === "/core/auth/profile") return user;
+      if (call.path === "/core/auth/binding-status")
+        return { bound: false, currentWechat: false };
+      if (call.path === "/core/team/affiliation")
+        return { team: null, inviter: null };
       assert.equal(call.path, "/modules/zhihu/invite/status");
       return { used: true };
     });
@@ -51,7 +54,10 @@ test("profile loads for every supported role and stays inaccessible to guests an
     const allowed = !!user && user.role !== "unknown";
     assert.equal(page.data.allowed, allowed);
     assert.equal(page.data.denied, !!user && !allowed);
-    assert.equal(h.calls.length, allowed ? user.role === "creator" ? 3 : 2 : 0);
+    assert.equal(
+      h.calls.length,
+      allowed ? (user.role === "creator" ? 4 : 3) : 0,
+    );
     if (allowed) assert.equal(page.data.inviteUsed, true);
   }
 });

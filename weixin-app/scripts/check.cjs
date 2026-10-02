@@ -45,7 +45,11 @@ for (const page of app.pages) {
   const source = fs.readFileSync(path.join(root, page + ".wxml"), "utf8");
   // Only validate shared handlers for pages that actually import that template.
   const wxml =
-    source + (source.includes("templates/shared.wxml") ? shared : "");
+    source +
+    (source.includes("templates/shared.wxml") ? shared : "") +
+    (source.includes("templates/consent.wxml")
+      ? fs.readFileSync(path.join(root, "templates/consent.wxml"), "utf8")
+      : "");
   for (const event of wxml.matchAll(/(?:bind|catch):?[\w-]+="([A-Za-z]\w*)"/g))
     assert.equal(
       typeof instance[event[1]],

@@ -102,7 +102,7 @@ export function mountWechatBridge(app: Express) {
       if (body.token) req.headers.authorization = `Bearer ${body.token}`;
       req.headers['content-type'] = 'application/json';
       const specialAuth =
-        /^\/core\/auth\/(login|register|bind|wechat-login|profile|registration-policy|registration-code|sms-policy|login-code|sms-login|phone-code|verify-phone)$/.test(
+        /^\/core\/auth\/(login|register|bind|wechat-login|profile|registration-policy|registration-code|sms-policy|login-code|sms-login|phone-code|verify-phone|bind-code|bind-current-code|bind-current|binding-status)$/.test(
           body.path,
         );
       const path = specialAuth ? body.path.replace('/auth/', '/mini-auth/') : body.path;

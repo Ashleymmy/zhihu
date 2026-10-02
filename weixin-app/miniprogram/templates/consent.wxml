@@ -1,0 +1,16 @@
+<template name="authConsent">
+  <view class="auth-agreement">
+    <checkbox-group bindchange="toggleAgree"><label><checkbox checked="{{agreed}}" color="#214239" value="agree" />已阅读并同意</label></checkbox-group>
+    <text class="agreement-link" data-type="user" bindtap="openAgreement">《用户协议》</text>
+    <text>与</text><text class="agreement-link" data-type="privacy" bindtap="openAgreement">《隐私协议》</text>
+  </view>
+  <view wx:if="{{consentOpen}}" class="auth-consent-mask" bindtap="cancelConsent">
+    <view class="auth-consent-dialog" catchtap="consentNoop" role="dialog" aria-modal="true">
+      <view class="section-title">请阅读并同意相关协议</view>
+      <view class="auth-consent-copy">继续前，请阅读《用户协议》和《隐私协议》，了解账号使用规则以及个人信息的收集和使用方式。</view>
+      <view class="auth-consent-links"><text class="agreement-link" data-type="user" bindtap="openAgreement">查看用户协议</text><text class="agreement-link" data-type="privacy" bindtap="openAgreement">查看隐私协议</text></view>
+      <button class="primary auth-consent-confirm" bindtap="confirmConsent">我已确认并阅读</button>
+      <button class="auth-consent-cancel" bindtap="cancelConsent">取消</button>
+    </view>
+  </view>
+</template>

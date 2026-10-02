@@ -1,67 +1,17 @@
 <import src="../../templates/shared.wxml" />
 <view class="page">
-  <view class="row page-heading">
-    <view>
-      <view class="title">邀请好友</view>
-    </view>
-    <button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button>
-  </view>
-  <template
-    is="status"
-    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
-  />
-  <skeleton wx:if="{{allowed && scopeReady && loading && !code}}" rows="{{2}}" />
+  <view class="row page-heading"><view class="title">邀请好友</view><button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button></view>
+  <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest,skeleton:true}}" />
   <block wx:if="{{allowed && scopeReady && code}}">
-    <!-- 邀请码主卡 -->
     <view class="invite-card rise">
-      <view class="invite-label">我的邀请码</view>
-      <view class="invite-code mono">{{code}}</view>
-      <view class="invite-sub">好友在注册页填写此邀请码，注册成功后自动记录邀请归属，团长邀请的达人会加入对应团队</view>
-      <view class="invite-actions">
-        <button class="invite-btn" bindtap="copyCode">复制邀请码</button>
-        <button class="invite-btn" bindtap="makePoster" disabled="{{busy}}">分享海报</button>
-        <button class="invite-btn invite-btn-primary" open-type="share">分享给好友</button>
-      </view>
+      <view class="invite-label">一起加入 TIMO</view>
+      <view class="invite-sub">通过下方卡片邀请好友，注册时会自动携带邀请信息，无需填写邀请码。团长邀请的达人会自动加入对应团队。</view>
+      <view class="invite-actions"><button class="invite-btn invite-btn-primary" open-type="share" disabled="{{loading || busy}}">分享给微信好友</button></view>
     </view>
-
-    <!-- 隐藏画布：海报渲染目标（不参与布局） -->
-    <canvas type="2d" id="posterCanvas" class="poster-canvas" />
-
-    <!-- 海报预览弹层 -->
-    <view wx:if="{{posterOpen}}" class="modal-mask">
-      <view class="modal poster-modal">
-        <view class="section-head">
-          <view class="section-title">分享海报</view>
-          <button size="mini" bindtap="closePoster">关闭</button>
-        </view>
-        <image class="poster-preview" src="{{posterUrl}}" mode="widthFix" />
-        <view class="muted poster-tip">保存后发给好友，注册时填写海报上的邀请码即可</view>
-        <button class="primary" bindtap="savePoster">保存图片到相册</button>
-      </view>
-    </view>
-
-    <!-- 奖励汇总 -->
-    <view class="card stats-row rise rise-d1">
-      <view class="stat">
-        <text class="stat-num">{{usageCount}}</text>
-        <text class="stat-label">成功邀请（人）</text>
-      </view>
-    </view>
-
-    <!-- 邀请记录 -->
-    <view class="card rise rise-d2">
-      <view class="section-title">邀请记录</view>
-      <view class="list-item" wx:for="{{records}}" wx:key="id">
-        <view class="row">
-          <view class="item-title">{{item.name}}</view>
-          <text class="muted">已注册</text>
-        </view>
-        <view class="muted">{{item.timeText}}</view>
-      </view>
-      <state-view
-        wx:if="{{!records.length}}"
-        text="暂无邀请记录，把邀请码发给好友开始邀请吧。"
-      />
+    <view class="card stats-row"><view class="stat"><text class="stat-num">{{usageCount}}</text><text class="stat-label">成功邀请（人）</text></view></view>
+    <view class="card"><view class="section-title">邀请记录</view>
+      <view class="list-item" wx:for="{{records}}" wx:key="id"><view class="row"><view class="item-title">{{item.name}}</view><text class="muted">已注册</text></view><view class="muted">{{item.timeText}}</view></view>
+      <state-view wx:if="{{!records.length}}" text="暂无邀请记录，分享卡片给好友开始邀请吧。" />
     </view>
   </block>
 </view>

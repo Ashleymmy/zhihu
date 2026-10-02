@@ -1,4 +1,5 @@
 const screen = require("../../utils/screen");
+const auth = require("../../utils/auth");
 const request = require("../../utils/request");
 
 Page(
@@ -6,10 +7,7 @@ Page(
     scoped: false,
     data: {
       inviteUsed: false,
-      showInviteModal: false,
-      inviteInput: "",
-      inviteError: "",
-      inviteBusy: false,
+      binding: null,
       showEditModal: false,
       editModalTitle: "",
       editInput: "",
@@ -24,34 +22,12 @@ Page(
           ? await request.get("/core/team/affiliation")
           : null;
       const profile = await request.get("/core/auth/profile");
-      return { inviteUsed: res.used, affiliation, user: profile };
+      const binding = await auth.bindingStatus();
+      return { inviteUsed: res.used, affiliation, user: profile, binding };
     },
-    openInviteModal() {
-      this.setData({ showInviteModal: true, inviteInput: "", inviteError: "" });
-    },
-    closeInviteModal() {
-      if (this.data.inviteBusy) return;
-      this.setData({ showInviteModal: false });
-    },
-    onInviteInput(e) {
-      this.setData({ inviteInput: e.detail.value });
-    },
-    async submitInvite() {
-      const code = this.data.inviteInput.trim().toUpperCase();
-      if (!code) {
-        this.setData({ inviteError: "请输入邀请码" });
-        return;
-      }
-      if (this.data.inviteBusy) return;
-      this.setData({ inviteBusy: true, inviteError: "" });
-      try {
-        await request.post("/modules/zhihu/invite/use", { code });
-        this.setData({ showInviteModal: false, inviteUsed: true });
-      } catch (err) {
-        this.setData({ inviteError: err.message || "邀请码无效" });
-      } finally {
-        this.setData({ inviteBusy: false });
-      }
+    openSocialBinding() {
+      if (!this.data.binding || this.data.binding.bound) return;
+      wx.navigateTo({ url: "/pages/bind/index?from=profile" });
     },
     openDisplayNameModal() {
       this.setData({

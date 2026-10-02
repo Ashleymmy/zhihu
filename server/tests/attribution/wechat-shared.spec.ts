@@ -8,10 +8,14 @@ import request from 'supertest';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
 import { runMigrations } from '../../scripts/migrationRunner';
 import path from 'node:path';
+vi.mock('../../src/sms/aliyun', () => ({
+  sendRegistrationSms: vi.fn(async () => undefined),
+  sendAccountSms: vi.fn(async () => undefined),
+}));
 vi.mock('../../src/modules/zhihu/queue', () => ({ enqueue: vi.fn(async () => ({ id: 'isolated' })) }));
 let container: StartedMySqlContainer, c: Connection, app: express.Express, pool: typeof import('../../src/db').db;
 const secret = 'isolated_wechat_bridge_signing_secret_32_chars',
-  appId = 'wx22b91776ccf37354',
+  appId = 'wx0000000000000001',
   password = 'shared_account_test_password';
 const openId = (name: string) => 'wechat_test_identity_' + name;
 const tokens: Record<string, string> = {};
@@ -39,16 +43,32 @@ async function login(name: string) {
   tokens[name] = r.body.data.token;
   return r;
 }
-const webSessions = new Map<string,{token:string;client:string}>();
+async function verifiedSignup(name: string, data: Record<string, unknown>) {
+  const sent = await call(name, '/core/auth/registration-code', 'POST', {
+    phone: data.phone,
+    ...(data.inviteCode ? { inviteCode: data.inviteCode } : {}),
+  });
+  if (sent.status !== 200) return sent;
+  const smsCode = vi.mocked((await import('../../src/sms/aliyun')).sendRegistrationSms).mock.calls.at(-1)![1];
+  return call(name, '/core/auth/register', 'POST', { ...data, smsCode });
+}
+const webSessions = new Map<string, { token: string; client: string }>();
 async function webMonitor(name: string) {
-  let session=webSessions.get(name);
-  if(!session) {
-    const client=crypto.randomUUID();
-    const response=await request(app).post('/api/v1/core/auth/login').set('X-Client-Id',client).send({username:name,password});
-    expect(response.status,JSON.stringify(response.body)).toBe(200);
-    session={token:response.body.data.token,client};webSessions.set(name,session);
+  let session = webSessions.get(name);
+  if (!session) {
+    const client = crypto.randomUUID();
+    const response = await request(app)
+      .post('/api/v1/core/auth/login')
+      .set('X-Client-Id', client)
+      .send({ username: name, password });
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    session = { token: response.body.data.token, client };
+    webSessions.set(name, session);
   }
-  return request(app).get('/api/v1/core/mini-monitor').set('X-Client-Id',session.client).auth(session.token,{type:'bearer'});
+  return request(app)
+    .get('/api/v1/core/mini-monitor')
+    .set('X-Client-Id', session.client)
+    .auth(session.token, { type: 'bearer' });
 }
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
@@ -73,6 +93,13 @@ beforeAll(async () => {
     WECHAT_APP_ID: appId,
     OPC_MODULES: 'zhihu',
     DEV_DEMO_AUTH: '0',
+    SMS_REGISTRATION_ENABLED: '1',
+    SMS_LOGIN_ENABLED: '1',
+    SMS_REGISTRATION_PILOT_INVITATIONS: '',
+    SMS_SIGN_NAME: '测试签名',
+    SMS_TEMPLATE_CODE: 'SMS_123456',
+    SMS_VERIFICATION_SECRET: 'isolated_wechat_verification_secret_long_enough',
+    SMS_DAILY_LIMIT: '100',
   });
   await runOpcMigrations(target, ['zhihu']);
   c = await mysql.createConnection(target);
@@ -82,6 +109,16 @@ beforeAll(async () => {
       'INSERT INTO users(id,username,password_hash,role,role_id,display_name,admin_duty,must_change_pwd) VALUES(?,?,?,?,(SELECT id FROM roles WHERE role_key=?),?,?,0)',
       [i + 1, role, hash, role, role, role, role === 'operator' ? 'operations' : 'all'],
     );
+  for (const [id, name] of [
+    [3, 'creator'],
+    [2, 'leader'],
+  ])
+    await c.query('INSERT INTO wechat_identities(app_id,open_id,user_id) VALUES(?,?,?)', [
+      appId,
+      openId(String(name)),
+      id,
+    ]);
+  await c.query('UPDATE users SET phone=? WHERE id=2', ['13800000002']);
   await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3)');
   const [[account]] = await c.query<RowDataPacket[]>('SELECT id FROM integration_accounts LIMIT 1');
   scope.accountId = String(account.id);
@@ -135,7 +172,7 @@ it('rejects unsigned, modified, stale, replayed and foreign-app envelopes; HTTP 
     (await request(app).post('/api/v1/core/mini-auth/wechat-login').set('X-OpenId', openId('admin')).send({})).status,
   ).toBe(403);
 });
-it('binds the existing website account and keeps web/mobile sessions active independently', async () => {
+it('logs into the existing website account and keeps web/mobile sessions active independently', async () => {
   const webId = crypto.randomUUID(),
     mobileId = crypto.randomUUID();
   const web = await request(app)
@@ -172,10 +209,16 @@ it('requires the website password and forbids stealing bindings or reusing a tok
   expect((await call('other', '/core/auth/login', 'POST', { username: 'creator', password: 'wrong' })).status).toBe(
     401,
   );
-  expect((await call('other', '/core/auth/login', 'POST', { username: 'creator', password })).status).toBe(409);
+  expect(
+    (await call('other', '/core/auth/bind-code', 'POST', { username: 'creator', password, phone: '13800000003' }))
+      .status,
+  ).toBe(409);
   tokens.other = tokens.creator;
   expect((await call('other', '/core/auth/me')).status).toBe(401);
-  expect((await call('creator', '/core/auth/login', 'POST', { username: 'leader', password })).status).toBe(409);
+  expect(
+    (await call('creator', '/core/auth/bind-code', 'POST', { username: 'leader', password, phone: '13800000002' }))
+      .status,
+  ).toBe(409);
 });
 it('handles every canonical role including operator/developer without granting project management to operator', async () => {
   for (const name of ['admin', 'leader', 'operator', 'developer'])
@@ -188,7 +231,7 @@ it('a mini invitation registers the same website creator, leader provenance, and
   expect(invite.status, JSON.stringify(invite.body)).toBe(200);
   inviteCode = invite.body.data.code;
   expect(invite.body.data).toMatchObject({ rewardsEnabled: false, rewardAmount: '0.00' });
-  const registered = await call('invited', '/core/auth/register', 'POST', {
+  const registered = await verifiedSignup('invited', {
     phone: '13900008881',
     password,
     inviteCode,
@@ -207,7 +250,7 @@ it('a mini invitation registers the same website creator, leader provenance, and
   expect(rewards.n).toBe(0);
   expect(
     (await call('invited', '/core/auth/register', 'POST', { phone: '13900008882', password, inviteCode })).status,
-  ).toBe(409);
+  ).toBe(422);
   const [[rolled]] = await c.query<RowDataPacket[]>("SELECT COUNT(*) n FROM users WHERE username='13900008882'");
   expect(rolled.n).toBe(0);
 });
@@ -215,7 +258,7 @@ it('leader grants a shared project, which appears after relogin; the grant is vi
   const grant = await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] });
   expect(grant.status, JSON.stringify(grant.body)).toBe(200);
   expect((await call('invited', '/core/projects')).status).toBe(401);
-  const fast = await call('invited', '/core/auth/wechat-login', 'POST');
+  const fast = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
   tokens.invited = fast.body.data.token;
   expect((await call('invited', '/core/projects')).body.data.some((p: any) => p.id === '1')).toBe(true);
   const members = await call('leader', '/core/team/members');
@@ -324,7 +367,7 @@ it('revoked invitation codes cannot register and do not create half-bound users'
 it('creator referrals preserve the actual leader and expire when that relationship changes; staff referrals are platform managed', async () => {
   const own = await call('invited', '/modules/zhihu/invite/me');
   expect(own.status).toBe(200);
-  const child = await call('referral', '/core/auth/register', 'POST', {
+  const child = await verifiedSignup('referral', {
     phone: '13900008885',
     password,
     inviteCode: own.body.data.code,
@@ -343,7 +386,7 @@ it('creator referrals preserve the actual leader and expire when that relationsh
   ).toBe(422);
   const staff = await call('operator', '/modules/zhihu/invite/me');
   expect(staff.status).toBe(200);
-  const independent = await call('platform', '/core/auth/register', 'POST', {
+  const independent = await verifiedSignup('platform', {
     phone: '13900008887',
     password,
     inviteCode: staff.body.data.code,
@@ -431,78 +474,130 @@ it('unpublished or deleted college lessons stay hidden across reads and migratio
 
 it('mini monitoring separates technical access, operations summaries and denied roles', async () => {
   await (await import('../../src/wechat/observability')).flushMiniObservations();
-  for (const name of ['admin','developer']) {
-    const result=await webMonitor(name);
-    expect(result.status,JSON.stringify(result.body)).toBe(200);
+  for (const name of ['admin', 'developer']) {
+    const result = await webMonitor(name);
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
     expect(result.body.data.technical.configured).toBe(true);
     expect(result.body.data.technical.requests).toBeGreaterThan(0);
     expect(result.body.data.business.publishedCourses).toBe(0);
   }
-  const ops=await webMonitor('operator');
-  expect(ops.status).toBe(200);expect(ops.body.data.technical).toBe(null);
+  const ops = await webMonitor('operator');
+  expect(ops.status).toBe(200);
+  expect(ops.body.data.technical).toBe(null);
   expect(JSON.stringify(ops.body)).not.toMatch(/appId|routeKey|writer|cloudEnv/);
   expect((await webMonitor('leader')).status).toBe(403);
   expect((await webMonitor('college')).status).toBe(403);
-  const hash=await bcrypt.hash(password,4);
-  await c.query("INSERT INTO users(id,username,display_name,password_hash,role,admin_duty,must_change_pwd) VALUES(930,'finance','财务',?,'admin','finance',0)",[hash]);
+  const hash = await bcrypt.hash(password, 4);
+  await c.query(
+    "INSERT INTO users(id,username,display_name,password_hash,role,admin_duty,must_change_pwd) VALUES(930,'finance','财务',?,'admin','finance',0)",
+    [hash],
+  );
   await login('finance');
   expect((await webMonitor('finance')).status).toBe(403);
 });
 
 it('member bindings and separate client sessions respect the leader member scope and redact identity', async () => {
-  const hash=await bcrypt.hash(password,4);
-  await c.query("INSERT INTO users(id,username,display_name,password_hash,role,parent_id,must_change_pwd) VALUES(941,'membermini','本团达人',?,'creator',2,0)",[hash]);
-  await c.query('INSERT INTO wechat_identities(app_id,open_id,user_id) VALUES(?,?,941)',[appId,'private_member_openid_1234']);
-  for(const [type,until,revoked] of [['web',1,false],['mobile',-1,false],['mini',1,true]] as const) {
-    await c.query('INSERT INTO login_sessions(id,user_id,client_type,client_id_hash,expires_at,revoked_at) VALUES(?,941,?,?,TIMESTAMPADD(DAY,?,NOW(3)),IF(?,NOW(3),NULL))',[crypto.randomUUID(),type,'x'.repeat(64),until,revoked]);
+  const hash = await bcrypt.hash(password, 4);
+  await c.query(
+    "INSERT INTO users(id,username,display_name,password_hash,role,parent_id,must_change_pwd) VALUES(941,'membermini','本团达人',?,'creator',2,0)",
+    [hash],
+  );
+  await c.query('INSERT INTO wechat_identities(app_id,open_id,user_id) VALUES(?,?,941)', [
+    appId,
+    'private_member_openid_1234',
+  ]);
+  for (const [type, until, revoked] of [
+    ['web', 1, false],
+    ['mobile', -1, false],
+    ['mini', 1, true],
+  ] as const) {
+    await c.query(
+      'INSERT INTO login_sessions(id,user_id,client_type,client_id_hash,expires_at,revoked_at) VALUES(?,941,?,?,TIMESTAMPADD(DAY,?,NOW(3)),IF(?,NOW(3),NULL))',
+      [crypto.randomUUID(), type, 'x'.repeat(64), until, revoked],
+    );
   }
-  const list=await call('leader','/core/team/members');expect(list.status).toBe(200);
-  expect(list.body.data.some((m:any)=>m.id==='910')).toBe(false);
-  const member=list.body.data.find((m:any)=>m.id==='941');
-  expect(member.miniProgram).toMatchObject({bindingStatus:'bound',maskedIdentity:'***1234'});
-  expect(member.miniProgram.sessions.map((s:any)=>s.state)).toEqual(['valid','expired','revoked']);
+  const list = await call('leader', '/core/team/members');
+  expect(list.status).toBe(200);
+  expect(list.body.data.some((m: any) => m.id === '910')).toBe(false);
+  const member = list.body.data.find((m: any) => m.id === '941');
+  expect(member.miniProgram).toMatchObject({ bindingStatus: 'bound', maskedIdentity: '***1234' });
+  expect(member.miniProgram.sessions.map((s: any) => s.state)).toEqual(['valid', 'expired', 'revoked']);
   expect(JSON.stringify(list.body)).not.toContain('private_member_openid');
   expect(JSON.stringify(list.body)).not.toMatch(/clientIdHash|passwordHash|refreshTokenHash/);
-  const monitor=await webMonitor('operator');expect(monitor.body.data.business.boundNoProject).toBeGreaterThan(0);
+  const monitor = await webMonitor('operator');
+  expect(monitor.body.data.business.boundNoProject).toBeGreaterThan(0);
   await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,941)');
-  const after=await webMonitor('operator');expect(after.body.data.business.boundNoProject).toBe(monitor.body.data.business.boundNoProject-1);
+  const after = await webMonitor('operator');
+  expect(after.body.data.business.boundNoProject).toBe(monitor.body.data.business.boundNoProject - 1);
   await c.query('UPDATE project_members SET left_at=NOW() WHERE user_id=941');
 });
 
 it('records verified-account binding conflicts without trusting caller identity and clears attention after login', async () => {
-  const failed=await call('conflicting','/core/auth/login','POST',{username:'leader',password,userId:'1'});
+  const failed = await call('conflicting', '/core/auth/bind-code', 'POST', {
+    username: 'leader',
+    password,
+    phone: '13800000002',
+  });
   expect(failed.status).toBe(409);
   await (await import('../../src/wechat/observability')).flushMiniObservations();
-  const [[event]]=await c.query<RowDataPacket[]>('SELECT user_id,result_code FROM mini_request_events WHERE result_code=40908 ORDER BY id DESC LIMIT 1');
+  const [[event]] = await c.query<RowDataPacket[]>(
+    'SELECT user_id,result_code FROM mini_request_events WHERE result_code=40908 ORDER BY id DESC LIMIT 1',
+  );
   expect(String(event.user_id)).toBe('2');
-  const list=await call('admin','/core/team/members');
-  expect(list.body.data.find((m:any)=>m.id==='2').miniProgram.recentBindingConflict).toBe(true);
+  const list = await call('admin', '/core/team/members');
+  expect(list.body.data.find((m: any) => m.id === '2').miniProgram.recentBindingConflict).toBe(true);
   await login('leader');
   await (await import('../../src/wechat/observability')).flushMiniObservations();
-  expect((await call('admin','/core/team/members')).body.data.find((m:any)=>m.id==='2').miniProgram.recentBindingConflict).toBe(false);
+  expect(
+    (await call('admin', '/core/team/members')).body.data.find((m: any) => m.id === '2').miniProgram
+      .recentBindingConflict,
+  ).toBe(true);
+  const fast = await call('leader', '/core/auth/wechat-login', 'POST');
+  tokens.leader = fast.body.data.token;
+  await (await import('../../src/wechat/observability')).flushMiniObservations();
+  expect(
+    (await call('admin', '/core/team/members')).body.data.find((m: any) => m.id === '2').miniProgram
+      .recentBindingConflict,
+  ).toBe(false);
 });
 
 it('observes deployment metadata while supporting older envelopes and never persists secrets', async () => {
-  const signedBody=signed({appId,openId:openId('observe'),path:'/core/auth/wechat-login',method:'POST',data:{password:'never_record_me'},observation:{environment:'isolated-cloud',version:'2026.10.01.2',clientVersion:'1.1.2',clientEnv:'trial'}});
-  expect((await request(app).post('/api/v1/mini/bridge').set(signedBody.headers).send(signedBody.raw)).status).toBe(200);
+  const signedBody = signed({
+    appId,
+    openId: openId('observe'),
+    path: '/core/auth/wechat-login',
+    method: 'POST',
+    data: { password: 'never_record_me' },
+    observation: { environment: 'isolated-cloud', version: '2026.10.01.2', clientVersion: '1.1.2', clientEnv: 'trial' },
+  });
+  expect((await request(app).post('/api/v1/mini/bridge').set(signedBody.headers).send(signedBody.raw)).status).toBe(
+    200,
+  );
   await (await import('../../src/wechat/observability')).flushMiniObservations();
-  const [[event]]=await c.query<RowDataPacket[]>('SELECT * FROM mini_request_events WHERE cloud_env=? ORDER BY id DESC LIMIT 1',['isolated-cloud']);
-  expect(event.bridge_version).toBe('2026.10.01.2');expect(event.client_version).toBe('1.1.2');
+  const [[event]] = await c.query<RowDataPacket[]>(
+    'SELECT * FROM mini_request_events WHERE cloud_env=? ORDER BY id DESC LIMIT 1',
+    ['isolated-cloud'],
+  );
+  expect(event.bridge_version).toBe('2026.10.01.2');
+  expect(event.client_version).toBe('1.1.2');
   expect(JSON.stringify(event)).not.toMatch(/never_record_me|wechat_test_identity|isolated_wechat_bridge_signing/);
-  expect((await call('observe','/core/auth/wechat-login','POST')).status).toBe(200);
+  expect((await call('observe', '/core/auth/wechat-login', 'POST')).status).toBe(200);
 });
 
-it('telemetry write failures do not change successful business responses and are visible after recovery',async()=>{
-  const observations=await import('../../src/wechat/observability');
+it('telemetry write failures do not change successful business responses and are visible after recovery', async () => {
+  const observations = await import('../../src/wechat/observability');
   await observations.flushMiniObservations();
-  const before=observations.observationWriterState();
+  const before = observations.observationWriterState();
   await c.query('RENAME TABLE mini_request_events TO isolated_events_unavailable');
   try {
-    expect((await call('telemetry-down','/core/auth/wechat-login','POST')).status).toBe(200);
+    expect((await call('telemetry-down', '/core/auth/wechat-login', 'POST')).status).toBe(200);
     await observations.flushMiniObservations();
     expect(observations.observationWriterState().failures).toBeGreaterThan(before.failures);
     expect(observations.observationWriterState().dropped).toBeGreaterThan(before.dropped);
-  } finally { await c.query('RENAME TABLE isolated_events_unavailable TO mini_request_events'); }
-  const read=await webMonitor('admin');
-  expect(read.status).toBe(200);expect(read.body.data.technical.writer.failures).toBeGreaterThan(0);
+  } finally {
+    await c.query('RENAME TABLE isolated_events_unavailable TO mini_request_events');
+  }
+  const read = await webMonitor('admin');
+  expect(read.status).toBe(200);
+  expect(read.body.data.technical.writer.failures).toBeGreaterThan(0);
 });

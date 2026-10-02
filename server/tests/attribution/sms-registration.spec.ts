@@ -113,7 +113,10 @@ afterAll(async () => {
 });
 it('defaults off and never exposes signing settings; malformed configuration fails closed', async () => {
   delete process.env.SMS_REGISTRATION_ENABLED;
-  expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toEqual({ smsRequired: false });
+  expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toEqual({
+    smsRequired: true,
+    smsEnabled: false,
+  });
   expect(
     (await call('policy', '/core/auth/registration-code', 'POST', { phone: fresh().phone, inviteCode })).status,
   ).toBe(503);
@@ -157,7 +160,7 @@ it('only returns TTL; stores hashes, requires OTP even for old clients and prese
   const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [p.phone]);
   expect(count.n).toBe(0);
 });
-it('registers one unified, verified, WeChat-bound account with the correct leader and consumes once', async () => {
+it('registers one unified, verified account without automatically binding WeChat with the correct leader and consumes once', async () => {
   const p = fresh(),
     code = await send(p),
     r = await signup(p, code);
@@ -165,11 +168,11 @@ it('registers one unified, verified, WeChat-bound account with the correct leade
   expect(r.body.data.user.phoneVerifiedAt).toBeTruthy();
   expect(r.body.data.user.parentId).toBe('1');
   const [[row]] = await c.query<RowDataPacket[]>(
-    'SELECT u.phone_verified_at,w.open_id,i.user_id FROM users u JOIN wechat_identities w ON w.user_id=u.id JOIN member_invitation_uses i ON i.user_id=u.id WHERE u.username=?',
+    'SELECT u.phone_verified_at,w.open_id,i.user_id FROM users u LEFT JOIN wechat_identities w ON w.user_id=u.id JOIN member_invitation_uses i ON i.user_id=u.id WHERE u.username=?',
     [p.phone],
   );
   expect(row.phone_verified_at).toBeTruthy();
-  expect(row.open_id).toBe(identity(p.name).openId);
+  expect(row.open_id).toBeNull();
   expect((await signup(p, code)).status).toBe(422);
 });
 it('wrong identity or phone cannot use a code, and expiry blocks registration', async () => {
@@ -224,7 +227,7 @@ it('concurrent registration consumes one invitation and produces one member', as
   const [[row]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [p.phone]);
   expect(row.n).toBe(1);
 });
-it('rolls back account, invitation and SMS consumption when WeChat binding conflicts; valid code remains retryable', async () => {
+it('registration preserves an existing WeChat binding and does not switch its owner', async () => {
   const p = fresh(),
     code = await send(p);
   await c.query('INSERT INTO wechat_identities(app_id,open_id,user_id) VALUES(?,?,1)', [
@@ -232,13 +235,31 @@ it('rolls back account, invitation and SMS consumption when WeChat binding confl
     identity(p.name).openId,
   ]);
   const r = await signup(p, code);
-  expect(r.status).toBe(409);
-  const [[row]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [p.phone]);
-  expect(row.n).toBe(0);
-  const [[otp]] = await c.query<RowDataPacket[]>('SELECT state FROM sms_registration_challenges');
-  expect(otp.state).toBe('sent');
-  await c.query('DELETE FROM wechat_identities WHERE app_id=? AND open_id=?', [appId, identity(p.name).openId]);
-  expect((await signup(p, code)).status).toBe(201);
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  const [[link]] = await c.query<RowDataPacket[]>(
+    'SELECT user_id FROM wechat_identities WHERE app_id=? AND open_id=?',
+    [appId, identity(p.name).openId],
+  );
+  expect(String(link.user_id)).toBe('1');
+  await c.query('DELETE FROM wechat_identities WHERE user_id=1');
+});
+it('no invitation registers a verified independent creator with no WeChat link or invitation use', async () => {
+  const p = fresh();
+  expect((await call(p.name, '/core/auth/registration-code', 'POST', { phone: p.phone })).status).toBe(200);
+  const smsCode = (await provider()).mock.calls.at(-1)![1];
+  const r = await call(p.name, '/core/auth/register', 'POST', {
+    phone: p.phone,
+    password: 'Sms_test_password_123',
+    smsCode,
+  });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  expect(r.body.data.user).toMatchObject({ role: 'creator', parentId: null });
+  expect(r.body.data.user.phoneVerifiedAt).toBeTruthy();
+  const id = r.body.data.user.id;
+  for (const table of ['member_invitation_uses', 'wechat_identities']) {
+    const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM ' + table + ' WHERE user_id=?', [id]);
+    expect(count.n).toBe(0);
+  }
 });
 it('keeps failures charged to quotas and never accepts a code whose send failed', async () => {
   const { AppError } = await import('../../src/middleware/errors');
@@ -284,15 +305,15 @@ it('same phone edit preserves verification, changed phone clears it through both
   [[row]] = await c.query<RowDataPacket[]>('SELECT phone_verified_at FROM users WHERE id=?', [id]);
   expect(row.phone_verified_at).toBeNull();
 });
-it('disabled rollout keeps legacy registration unverified, never assumes WeChat binding proves phone ownership', async () => {
+it('disabled rollout never permits registration without phone verification', async () => {
   process.env.SMS_REGISTRATION_ENABLED = '0';
   const p = fresh(),
     r = await signup(p);
-  expect(r.status).toBe(201);
-  expect(r.body.data.user.phoneVerifiedAt).toBeNull();
+  expect(r.status).toBe(422);
+  expect((await signup(p, '123456')).status).toBe(503);
   expect(await provider()).not.toHaveBeenCalled();
 });
-it('pilot policy uses validated invitations and preserves other invitations registration rules', async () => {
+it('pilot policy uses validated invitations and does not permit non-pilot unverified registration', async () => {
   const pilot = fresh(),
     outsider = fresh();
   const invitation = await (
@@ -309,6 +330,7 @@ it('pilot policy uses validated invitations and preserves other invitations regi
   process.env.SMS_REGISTRATION_PILOT_INVITATIONS = record.token_hash;
   expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode })).body.data).toEqual({
     smsRequired: true,
+    smsEnabled: true,
   });
   expect(
     (
@@ -318,7 +340,7 @@ it('pilot policy uses validated invitations and preserves other invitations regi
         smsRequired: true,
       })
     ).body.data,
-  ).toEqual({ smsRequired: false });
+  ).toEqual({ smsRequired: true, smsEnabled: false });
   expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode: 'ZZZZZZZZ' })).status).toBe(
     422,
   );
@@ -332,8 +354,7 @@ it('pilot policy uses validated invitations and preserves other invitations regi
     ).status,
   ).toBe(503);
   const old = await signup(outsider, undefined, 'JKLMNPQR');
-  expect(old.status).toBe(201);
-  expect(old.body.data.user.phoneVerifiedAt).toBeNull();
+  expect(old.status).toBe(422);
   expect(await provider()).not.toHaveBeenCalled();
   const code = await send(pilot);
   expect(
@@ -363,8 +384,9 @@ it('removing a pilot denies pending proof verification; global enable still requ
   });
   process.env.SMS_REGISTRATION_ENABLED = '1';
   expect(
-    (await call(outsider.name, '/core/auth/registration-policy', 'GET', { smsRequired: false })).body.data,
-  ).toEqual({ smsRequired: true });
+    (await call(outsider.name, '/core/auth/registration-policy', 'GET', { smsRequired: true, smsEnabled: false })).body
+      .data,
+  ).toEqual({ smsRequired: true, smsEnabled: true });
   expect((await signup(outsider)).status).toBe(422);
   expect((await signup(pilot, code)).status).toBe(201);
 });

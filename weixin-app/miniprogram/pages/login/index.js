@@ -1,5 +1,7 @@
 const auth = require("../../utils/auth");
 const countdown = require("../../utils/sms-countdown");
+const consent = require("../../utils/consent");
+const invitation = require("../../utils/invitation");
 Page({
   data: {
     username: "",
@@ -12,10 +14,13 @@ Page({
     sendingCode: false,
     cooldown: 0,
     agreed: false,
+    consentOpen: false,
     smsLoginEnabled: false,
     codeNotice: "",
   },
-  async onLoad() {
+  ...consent.methods,
+  async onLoad(options = {}) {
+    invitation.capture(options);
     try {
       const user = await auth.ensure();
       if (user) {
@@ -53,8 +58,12 @@ Page({
       codeNotice: "",
     });
   },
-  toggleAgree() {
-    this.setData({ agreed: !this.data.agreed });
+  toggleMode() {
+    this.setMode({
+      currentTarget: {
+        dataset: { mode: this.data.mode === "password" ? "sms" : "password" },
+      },
+    });
   },
   async sendCode() {
     if (
@@ -64,11 +73,10 @@ Page({
       this.data.cooldown
     )
       return;
+    if (!consent.ensure(this)) return;
     const phone = this.data.phone.trim();
     if (!/^1\d{10}$/.test(phone))
       return this.setData({ error: "请输入正确的 11 位手机号" });
-    if (!this.data.agreed)
-      return this.setData({ error: "请先阅读并同意用户协议和隐私协议" });
     this.setData({ sendingCode: true, error: "", smsCode: "", codeNotice: "" });
     try {
       const result = await auth.sendLoginCode(phone);
@@ -92,7 +100,7 @@ Page({
     wx.switchTab({ url: "/pages/home/index" });
   },
   toRegister() {
-    wx.navigateTo({ url: "/pages/register/index" });
+    wx.navigateTo({ url: invitation.route("/pages/register/index") });
   },
   openAgreement(e) {
     wx.navigateTo({
@@ -104,13 +112,14 @@ Page({
     wx.showModal({
       title: "忘记密码",
       content:
-        "已验证手机号且绑定当前微信的账号可尝试验证码登录。重置密码请联系团长或运营管理员（团队页 → 成员管理 → 重置密码）。",
+        "已验证手机号的账号可尝试验证码登录。重置密码请联系团长或运营管理员（团队页 → 成员管理 → 重置密码）。",
       confirmText: "知道了",
       showCancel: false,
     });
   },
   async submit() {
     if (this.data.busy || this.data.sendingCode) return;
+    if (!consent.ensure(this)) return;
     if (this.data.mode === "sms") {
       if (!this.data.smsLoginEnabled) return;
       if (
@@ -118,8 +127,6 @@ Page({
         !/^\d{6}$/.test(this.data.smsCode.trim())
       )
         return this.setData({ error: "请输入正确手机号和 6 位验证码" });
-      if (!this.data.agreed)
-        return this.setData({ error: "请先阅读并同意用户协议和隐私协议" });
       this.setData({ busy: true, error: "" });
       try {
         const user = await auth.loginWithSms(
@@ -158,10 +165,11 @@ Page({
   },
   async wechatLogin() {
     if (this.data.busy || this.data.sendingCode) return;
+    if (!consent.ensure(this)) return;
     this.setData({ busy: true, error: "" });
     try {
       const result = await auth.loginWithWeChat();
-      // 当前微信未绑定账号：引导到绑定页（手机号 + 邀请码）
+      // Unbound identities require explicit account/password and phone verification.
       if (result && result.needsBind) {
         wx.navigateTo({ url: "/pages/bind/index" });
         return;
