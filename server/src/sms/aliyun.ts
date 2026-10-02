@@ -6,8 +6,8 @@ import { requireSmsEnabled } from './config';
 import { AppError } from '../middleware/errors';
 
 let client: Dysmsapi | undefined;
-export async function sendRegistrationSms(phone: string, code: string): Promise<void> {
-  const { signName, templateCode } = requireSmsEnabled();
+export async function sendRegistrationSms(phone: string, code: string, invitationToken?: string): Promise<void> {
+  const { signName, templateCode } = requireSmsEnabled(invitationToken);
   try {
     // ECS role is the default; explicit server-only RAM credentials support isolated deployments.
     if (!client) {

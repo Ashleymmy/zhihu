@@ -42,11 +42,11 @@ async function send(person: ReturnType<typeof fresh>) {
   expect(response.status, JSON.stringify(response.body)).toBe(200);
   return (await provider()).mock.calls.at(-1)![1];
 }
-function signup(person: ReturnType<typeof fresh>, smsCode?: string) {
+function signup(person: ReturnType<typeof fresh>, smsCode?: string, selectedInviteCode = inviteCode) {
   return call(person.name, '/core/auth/register', 'POST', {
     phone: person.phone,
     password: 'Sms_test_password_123',
-    inviteCode,
+    inviteCode: selectedInviteCode,
     ...(smsCode ? { smsCode } : {}),
   });
 }
@@ -94,6 +94,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   Object.assign(process.env, {
     SMS_REGISTRATION_ENABLED: '1',
+    SMS_REGISTRATION_PILOT_INVITATIONS: '',
     SMS_SIGN_NAME: '测试签名',
     SMS_TEMPLATE_CODE: 'SMS_123456',
     SMS_VERIFICATION_SECRET: 'isolated_sms_verification_secret_longer_than_32',
@@ -289,6 +290,82 @@ it('disabled rollout keeps legacy registration unverified, never assumes WeChat 
   expect(r.status).toBe(201);
   expect(r.body.data.user.phoneVerifiedAt).toBeNull();
   expect(await provider()).not.toHaveBeenCalled();
+});
+it('pilot policy uses validated invitations and preserves other invitations registration rules', async () => {
+  const pilot = fresh(),
+    outsider = fresh();
+  const invitation = await (
+    await import('../../src/services/invitations.service')
+  ).createInvitation(actor, { label: 'non_pilot', validDays: 7, maxUses: 10 });
+  await c.query(
+    'INSERT INTO mini_invitation_codes(invitation_id,code,token_hash) SELECT id,?,token_hash FROM member_invitations WHERE id=?',
+    ['JKLMNPQR', invitation.id],
+  );
+  const [[record]] = await c.query<RowDataPacket[]>('SELECT token_hash FROM member_invitations WHERE id=?', [
+    invitationId,
+  ]);
+  process.env.SMS_REGISTRATION_ENABLED = '0';
+  process.env.SMS_REGISTRATION_PILOT_INVITATIONS = record.token_hash;
+  expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode })).body.data).toEqual({
+    smsRequired: true,
+  });
+  expect(
+    (
+      await call(outsider.name, '/core/auth/registration-policy', 'GET', {
+        inviteCode: 'JKLMNPQR',
+        invitationHash: record.token_hash,
+        smsRequired: true,
+      })
+    ).body.data,
+  ).toEqual({ smsRequired: false });
+  expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode: 'ZZZZZZZZ' })).status).toBe(
+    422,
+  );
+  expect((await signup(pilot)).status).toBe(422);
+  expect(
+    (
+      await call(outsider.name, '/core/auth/registration-code', 'POST', {
+        phone: outsider.phone,
+        inviteCode: 'JKLMNPQR',
+      })
+    ).status,
+  ).toBe(503);
+  const old = await signup(outsider, undefined, 'JKLMNPQR');
+  expect(old.status).toBe(201);
+  expect(old.body.data.user.phoneVerifiedAt).toBeNull();
+  expect(await provider()).not.toHaveBeenCalled();
+  const code = await send(pilot);
+  expect(
+    crypto
+      .createHash('sha256')
+      .update((await provider()).mock.calls.at(-1)![2]!)
+      .digest('hex'),
+  ).toBe(record.token_hash);
+  const verified = await signup(pilot, code);
+  expect(verified.status).toBe(201);
+  expect(verified.body.data.user.phoneVerifiedAt).toBeTruthy();
+});
+it('removing a pilot denies pending proof verification; global enable still requires OTP', async () => {
+  const { wechatClientId } = await import('../../src/wechat/context');
+  const { verifyRegistrationCode } = await import('../../src/sms/registration');
+  const pilot = fresh(),
+    outsider = fresh();
+  const [[record]] = await c.query<RowDataPacket[]>('SELECT token_hash FROM member_invitations WHERE id=?', [
+    invitationId,
+  ]);
+  process.env.SMS_REGISTRATION_ENABLED = '0';
+  process.env.SMS_REGISTRATION_PILOT_INVITATIONS = record.token_hash;
+  const code = await send(pilot);
+  process.env.SMS_REGISTRATION_PILOT_INVITATIONS = '';
+  await expect(verifyRegistrationCode(pilot.phone, wechatClientId(identity(pilot.name)), code)).rejects.toMatchObject({
+    code: 50320,
+  });
+  process.env.SMS_REGISTRATION_ENABLED = '1';
+  expect(
+    (await call(outsider.name, '/core/auth/registration-policy', 'GET', { smsRequired: false })).body.data,
+  ).toEqual({ smsRequired: true });
+  expect((await signup(outsider)).status).toBe(422);
+  expect((await signup(pilot, code)).status).toBe(201);
 });
 it('enforces five daily sends per recipient across different WeChat identities', async () => {
   const p = fresh();

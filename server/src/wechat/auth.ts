@@ -106,22 +106,28 @@ const signup = z
   .strict();
 wechatAuthRouter.get(
   '/registration-policy',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    ok(res, { smsRequired: smsSettings().enabled });
+    const code = z
+      .string()
+      .regex(/^[A-Z2-9]{8}$/)
+      .optional()
+      .parse(req.query.inviteCode);
+    const invitationToken = code ? await resolveInvitationCode(code) : undefined;
+    ok(res, { smsRequired: smsSettings(invitationToken).enabled });
   }),
 );
 wechatAuthRouter.post(
   '/registration-code',
   asyncHandler(async (req, res) => {
-    requireSmsEnabled();
+    const identity = requireWechatContext(req);
     const input = z
       .object({ phone: z.string().regex(/^1\d{10}$/), inviteCode: z.string().regex(/^[A-Z2-9]{8}$/) })
       .strict()
       .parse(req.body);
-    const identity = requireWechatContext(req);
     // Validate invitation and existing accounts before spending an SMS. Never consume an invitation here.
-    await resolveInvitationCode(input.inviteCode);
+    const invitationToken = await resolveInvitationCode(input.inviteCode);
+    requireSmsEnabled(invitationToken);
     const [existing] = await rows<RowDataPacket>('SELECT id FROM users WHERE username=? OR phone=? LIMIT 1', [
       input.phone,
       input.phone,
@@ -131,7 +137,7 @@ wechatAuthRouter.post(
       identity.openId,
     ]);
     if (existing || bound) throw new AppError(409, 40920, '该手机号或微信已有账号，请使用原账号密码登录');
-    ok(res, await sendRegistrationCode(input.phone, wechatClientId(identity)));
+    ok(res, await sendRegistrationCode(input.phone, wechatClientId(identity), invitationToken));
   }),
 );
 wechatAuthRouter.post(
@@ -141,9 +147,11 @@ wechatAuthRouter.post(
       identity = requireWechatContext(req),
       address = `wechat:${wechatClientId(identity)}`;
     const invitationToken = await resolveInvitationCode(input.inviteCode);
-    const required = smsSettings().enabled;
+    const required = smsSettings(invitationToken).enabled;
     if (required && !input.smsCode) throw new AppError(422, 42220, '请填写短信验证码；旧版小程序请更新后重试');
-    const proof = required ? await verifyRegistrationCode(input.phone, wechatClientId(identity), input.smsCode!) : null;
+    const proof = required
+      ? await verifyRegistrationCode(input.phone, wechatClientId(identity), input.smsCode!, invitationToken)
+      : null;
     const result = await register(
       {
         username: input.phone,

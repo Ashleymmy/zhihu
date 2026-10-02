@@ -26,8 +26,8 @@ async function reserveLimit(c: PoolConnection, key: string, window: number, limi
   if (Number(row.count) > limit) throw new AppError(429, 42920, '验证码发送过于频繁或今日额度已用完，请稍后再试');
 }
 
-export async function sendRegistrationCode(phone: string, identityHash: string) {
-  const { secret, dailyLimit } = requireSmsEnabled();
+export async function sendRegistrationCode(phone: string, identityHash: string, invitationToken?: string) {
+  const { secret, dailyLimit } = requireSmsEnabled(invitationToken);
   const phoneHash = mac(secret, 'phone', phone),
     challengeId = randomBytes(16).toString('hex');
   const code = String(randomInt(0, 1000000)).padStart(6, '0');
@@ -55,7 +55,7 @@ export async function sendRegistrationCode(phone: string, identityHash: string) 
     );
   });
   try {
-    await sendRegistrationSms(phone, code);
+    await sendRegistrationSms(phone, code, invitationToken);
     const [result] = await db.query<ResultSetHeader>(
       "UPDATE sms_registration_challenges SET state='sent' WHERE phone_hash=? AND challenge_id=? AND state='pending' AND expires_at>NOW(3)",
       [phoneHash, challengeId],
@@ -74,8 +74,13 @@ export async function sendRegistrationCode(phone: string, identityHash: string) 
   return { retryAfterSeconds: SMS_RETRY_SECONDS, expiresInSeconds: SMS_TTL_SECONDS };
 }
 
-export async function verifyRegistrationCode(phone: string, identityHash: string, code: string): Promise<Proof> {
-  const { secret } = requireSmsEnabled();
+export async function verifyRegistrationCode(
+  phone: string,
+  identityHash: string,
+  code: string,
+  invitationToken?: string,
+): Promise<Proof> {
+  const { secret } = requireSmsEnabled(invitationToken);
   const phoneHash = mac(secret, 'phone', phone);
   const proof = await withTransaction(async (c) => {
     const [[row]] = await c.query<RowDataPacket[]>(

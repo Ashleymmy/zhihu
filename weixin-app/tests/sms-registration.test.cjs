@@ -15,6 +15,7 @@ function setup(overrides={}) {
 test('loads server policy, preserves hidden invitation and refuses registration without six digits',async()=>{
  const h=setup(),p=h.page('register');await p.onLoad({code:'abcdefgh'});p.setData(fields);
  assert.equal(p.data.smsRequired,true);assert.equal(p.data.inviteCode,'ABCDEFGH');
+ assert.equal(h.calls.find(c=>c.path.endsWith('/registration-policy')).data.inviteCode,'ABCDEFGH');
  await p.submit();assert.match(p.data.error,/6 位/);assert.equal(h.calls.filter(c=>c.path.endsWith('/register')).length,0);
  p.setData({smsCode:'123456'});await p.submit();const sent=h.calls.find(c=>c.path.endsWith('/register'));assert.equal(sent.data.smsCode,'123456');assert.equal(sent.data.inviteCode,'ABCDEFGH');assert.ok(h.navigation.includes('/pages/home/index'));
 });
@@ -39,4 +40,18 @@ test('provider failure never displays sent notice or starts success countdown',a
 });
 test('server enabling SMS after page load refreshes policy instead of falling back',async()=>{
  let enabled=false;const h=setup({'/core/auth/registration-policy':()=>({smsRequired:enabled}),'/core/auth/register':()=>{enabled=true;return {http:422,body:{code:42220,message:'请填写短信验证码'}}}}),p=h.page('register');await p.onLoad();p.setData(fields);await p.submit();assert.equal(p.data.smsRequired,true);assert.match(p.data.error,/验证码/);assert.equal(h.navigation.length,0);
+});
+test('changing invitation reloads its policy and ignores a stale response',async()=>{
+ let releaseOld;
+ const h=setup({'/core/auth/registration-policy':call=>call.data.inviteCode==='ABCDEFGH'
+   ? new Promise(resolve=>{releaseOld=resolve}) : {smsRequired:false}}),p=h.page('register');
+ await p.onLoad();
+ p.setData({smsCode:'123456',codeNotice:'old notice'});
+ const first=p.input({currentTarget:{dataset:{name:'inviteCode'}},detail:{value:'ABCDEFGH'}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(p.data.policyReady,false);assert.equal(p.data.smsCode,'');
+ await p.input({currentTarget:{dataset:{name:'inviteCode'}},detail:{value:'JKLMNPQR'}});
+ assert.equal(p.data.smsRequired,false);assert.equal(p.data.policyReady,true);
+ releaseOld({smsRequired:true});await first;
+ assert.equal(p.data.smsRequired,false);assert.equal(p.data.policyLoading,false);
 });

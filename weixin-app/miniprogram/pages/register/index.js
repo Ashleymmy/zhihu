@@ -24,16 +24,17 @@ Page({
     await this.loadPolicy();
   },
   async loadPolicy() {
-    if (this.data.policyLoading) return;
+    const sequence = this._policySequence = (this._policySequence || 0) + 1;
+    const inviteCode = this.data.inviteCode.trim().toUpperCase();
     this.setData({ policyLoading: true, policyReady: false, error: "" });
     try {
-      const policy = await auth.registrationPolicy();
+      const policy = await auth.registrationPolicy(/^[A-Z2-9]{8}$/.test(inviteCode) ? inviteCode : undefined);
       if (!policy || typeof policy.smsRequired !== 'boolean') throw new Error('无法读取注册规则，请刷新后重试');
-      if (!this._disposed) this.setData({ smsRequired: policy.smsRequired, policyReady: true });
+      if (!this._disposed && sequence === this._policySequence) this.setData({ smsRequired: policy.smsRequired, policyReady: true });
     } catch (e) {
-      if (!this._disposed) this.setData({ error: e.message || '无法读取注册规则，请重试' });
+      if (!this._disposed && sequence === this._policySequence) this.setData({ error: e.message || '无法读取注册规则，请重试' });
     } finally {
-      if (!this._disposed) this.setData({ policyLoading: false });
+      if (!this._disposed && sequence === this._policySequence) this.setData({ policyLoading: false });
     }
   },
   onShow() { this.startCountdown(); },
@@ -71,6 +72,10 @@ Page({
   input(e) {
     if (e.currentTarget.dataset.name === 'phone') this.setData({smsCode:'',codeNotice:''});
     this.setData({ [e.currentTarget.dataset.name]: e.detail.value });
+    if (e.currentTarget.dataset.name === 'inviteCode') {
+      this.setData({smsCode:'',codeNotice:''});
+      return this.loadPolicy();
+    }
   },
   backHome() {
     wx.switchTab({ url: "/pages/home/index" });

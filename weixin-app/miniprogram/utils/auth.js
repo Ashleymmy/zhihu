@@ -105,7 +105,7 @@ function entryPath(user) {
     : "/pages/home/index";
 }
 module.exports = {
-  registrationPolicy: () => request.send('/core/auth/registration-policy', {auth:false}),
+  registrationPolicy: (inviteCode) => request.send('/core/auth/registration-policy', {auth:false,data:inviteCode?{inviteCode}:{}}),
   sendRegistrationCode: (phone,inviteCode) => request.send('/core/auth/registration-code', {method:'POST',auth:false,data:{phone,inviteCode}}),
   TOKEN_KEY,
   USER_KEY,
