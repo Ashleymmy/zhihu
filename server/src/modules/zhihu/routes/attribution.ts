@@ -12,7 +12,7 @@ import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
-import { listWorks } from '../attribution/works';
+import { listWorks, workActivity, workDetail } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
 import { requirePermission } from '../permissions';
 import { XLSX_MAX_BYTES } from '../zhihu/allianceXlsx';
@@ -82,9 +82,22 @@ export const pagingSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 const key = (req: import('express').Request) => req.header('Idempotency-Key') ?? String(req.body?.requestKey ?? '');
+const workFiltersSchema=scopeSchema.merge(pagingSchema).extend({
+  from:z.string().date().optional(),to:z.string().date().optional(),
+  view:z.enum(['self','team','all']).optional(),ownerId:idSchema.optional(),
+  registeredOnly:z.enum(['1','true']).optional().transform(v=>!!v),
+  result:z.enum(['submitted','failed','pending']).optional(),
+}).refine(q=>!q.from||!q.to||q.from<=q.to,{message:'开始日期不能晚于结束日期'});
+attributionRouter.get('/workbench/work-activity',asyncHandler(async(req,res)=>{
+  const q=workFiltersSchema.parse(req.query);ok(res,await workActivity(req.user,q,q,q.page,q.pageSize));
+}));
+attributionRouter.get('/workbench/work-detail',asyncHandler(async(req,res)=>{
+  const q=scopeSchema.extend({id:z.string().regex(/^(composition:)?[0-9]+$/)}).parse(req.query);
+  ok(res,await workDetail(req.user,q,q.id));
+}));
 attributionRouter.get('/workbench/works', asyncHandler(async (req, res) => {
-  const query = scopeSchema.merge(pagingSchema).parse(req.query);
-  ok(res, await listWorks(req.user, query, query.page, query.pageSize));
+  const query = workFiltersSchema.parse(req.query);
+  ok(res, await listWorks(req.user, query, query.page, query.pageSize,query));
 }));
 attributionRouter.get(
   '/attribution-options',

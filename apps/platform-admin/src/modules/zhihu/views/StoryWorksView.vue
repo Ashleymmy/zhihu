@@ -4,8 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import type { Composition, Plan } from '@zhihu-koc/shared-contracts/zhihu'
 import { SearchableSelect } from '@zhihu-koc/shared-components'
 import { fetchAllPages } from '@zhihu-koc/shared-services'
-import { useAuthStore, apis } from '../context'
+import { useAuthStore, apis, http } from '../context'
 import { upstreamReview } from '@zhihu-koc/zhihu-module-views/work-status'
+import WorkDetail, {type WorkDetailRecord} from '@zhihu-koc/zhihu-module-views/WorkDetail.vue'
 import WorkImportDialog from '@zhihu-koc/zhihu-module-views/WorkImportDialog.vue'
 import WorkImportDrafts from '@zhihu-koc/zhihu-module-views/WorkImportDrafts.vue'
 import type { WorkImportOptions } from '@zhihu-koc/shared-services/zhihu'
@@ -13,8 +14,11 @@ import type { WorkImportOptions } from '@zhihu-koc/shared-services/zhihu'
 const route=useRoute(), router=useRouter()
 const registrationPage=computed(()=>route.path.endsWith('/works/new'))
 function cancelRegistration(){showCreate.value=false;if(registrationPage.value)void router.push({path:'/modules/zhihu/works',query:{planId:selectedPlan.value,keyword:route.query.keyword}})}
-type LinkedComposition=Composition & {keywordProjectId?:string;keywordAccountId?:string}
+type LinkedComposition=Composition & {assigneeName?:string;keywordProjectId?:string;keywordAccountId?:string}
 const works = ref<LinkedComposition[]>([])
+const detail=ref<LinkedComposition|null>(null)
+const detailRecord=computed(()=>detail.value?({...detail.value,source:'composition',compositionId:detail.value.id,workUrl:detail.value.promoUrl,description:detail.value.title,executorName:detail.value.assigneeName} as WorkDetailRecord):null)
+const detailScope=computed(()=>detail.value?.keywordProjectId&&detail.value?.keywordAccountId?{projectId:detail.value.keywordProjectId,accountId:detail.value.keywordAccountId}:undefined)
 const page=ref(1),pageSize=25,keywordFilter=ref(String(route.query.keyword||''))
 const selectedPlan=computed(()=>/^\d+$/.test(String(route.query.planId||''))?String(route.query.planId):undefined)
 const total = ref(0)
@@ -192,7 +196,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
               <td style="font-size: 13px;">{{ TYPE_OPTIONS.find(t => t.value === w.compositionType)?.label ?? '其他' }} / {{ SUB_TYPES.find(s => s.value === w.compositionSubType)?.label ?? '—' }}</td>
 
               <td>{{ upstreamReview({...w,source:'composition'}).label }}<small style="display:block">{{ upstreamReview({...w,source:'composition'}).reason }}</small></td>
-              <td><button v-if="w.canEdit" @click="openEdit(w)">修改并重新提交</button></td>
+              <td><button @click="detail=w">查看详情</button> <button v-if="w.canEdit" @click="openEdit(w)">修改并重新提交</button></td>
             </tr>
           </tbody>
         </table>
@@ -261,6 +265,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
     <WorkImportDrafts :api="apis.story" :refresh-key="draftsVersion" @resume="resumeImport" />
     <WorkImportDialog v-if="showImport" :api="apis.story" :plans="plans" :initial-plan-id="form.planId" :initial-file="importInitialFile" :initial-options="importInitialOptions" @close="showImport = false; if(registrationPage) showCreate = true" @imported="page = 1; load(); draftsVersion++" @saved="draftsVersion++" />
   </div>
+<WorkDetail :work="detailRecord" :http="http" :scope="detailScope" @close="detail=null" />
 </template>
 
 <style scoped>

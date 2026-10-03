@@ -17,13 +17,13 @@ function canFinance(user) {
 function allowed(user, page) {
   if (!known(user)) return false;
   if (
-    ["home", "mine", "profile", "password", "college", "tools", "income", "zhihu"].includes(
+    ["home", "mine", "profile", "password", "college", "tools", "income", "zhihu", "work-data", "work-detail", "works"].includes(
       page,
     )
   )
     return true;
   if (page === "invite") return canOperate(user);
-  if (["keywords", "keywords-create", "works"].includes(page)) return canOperate(user);
+  if (["keywords", "keywords-create"].includes(page)) return canOperate(user);
   if (["wallet", "withdrawals"].includes(page)) return canFinance(user);
   if (page === "reports") return duty(user, "finance");
   if (page === "projects") return ["admin","developer"].includes(user.role) && duty(user,"operations");

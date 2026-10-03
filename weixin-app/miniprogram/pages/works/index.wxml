@@ -1,17 +1,18 @@
 <import src="../../templates/shared.wxml" />
 <view class="page">
-  <view class="row page-heading"><view class="title">作品提交结果</view><button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button></view>
+  <view class="row page-heading"><view class="title">作品记录</view><button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button></view>
+  <view wx:if="{{from || to || ownerId || registeredOnly}}" class="notice"><view>{{ownerName || (view === 'self' ? '我的作品' : view === 'team' ? '团队成员' : '可查看的作品')}} · {{from || '不限开始日期'}} 至 {{to || '今天'}}</view><view wx:if="{{result}}">{{result === 'submitted' ? '已提交知乎' : result === 'failed' ? '提交失败' : '待提交'}}</view><button size="mini" bindtap="clearFilters">查看全部作品</button></view>
   <view class="muted">登记后自动提交知乎，无需管理员逐条审核。</view>
   <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest,skeleton:true}}" />
   <skeleton wx:if="{{allowed && scopeReady && loading && !list.length}}" rows="{{3}}" />
   <block wx:if="{{allowed && scopeReady}}">
     <view class="card" wx:for="{{list}}" wx:key="id">
-      <view class="row"><view class="item-title">{{item.keyword}}</view><text class="tag {{item.syncStatus === 'failed' ? 'tag-clay' : ''}}">{{item.statusText}}</text></view>
-      <view class="muted">{{item.upstreamText}}</view>
+      <view class="row"><view class="item-title" data-id="{{item.id}}" bindtap="showDetail">{{item.keyword}}</view><text class="tag {{item.syncStatus === 'failed' ? 'tag-clay' : ''}}">{{item.statusText}}</text></view>
+      <view class="muted" wx:if="{{user.role !== 'creator'}}">{{item.executorName || '项目成员'}}</view><view class="muted">{{item.upstreamText}}</view>
       <view class="notice" wx:if="{{item.upstreamReason}}">{{item.upstreamReason}}</view>
       <view class="link-text" user-select>{{item.workUrl}}</view>
       <view class="muted" wx:if="{{item.verificationStatus === 'disputed'}}">该作品存在归属争议，等待处理。</view>
-      <view class="wrap actions"><button size="mini" data-text="{{item.workUrl}}" bindtap="copy">复制作品链接</button><button wx:if="{{item.canEdit}}" size="mini" class="primary" data-index="{{index}}" bindtap="choose">修改并重新提交</button></view>
+      <view class="wrap actions"><button size="mini" data-id="{{item.id}}" bindtap="showDetail">查看详情</button><button size="mini" data-text="{{item.workUrl}}" bindtap="copy">复制作品链接</button><button wx:if="{{item.canEdit}}" size="mini" class="primary" data-index="{{index}}" bindtap="choose">修改并重新提交</button></view>
     </view>
     <block wx:if="{{!loading && !error && list.length === 0}}"><state-view text="暂无作品，登记后可在这里查看提交结果。" guide-text="去登记作品" guide-path="/pages/keywords/index" /></block>
     <template is="loadmore" data="{{total,page,loadingMore,pageSize:20}}" />

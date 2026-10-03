@@ -1,0 +1,17 @@
+<import src="../../templates/shared.wxml" />
+<view class="page"><view class="row page-heading"><view class="title">作品详情</view><button size="mini" disabled="{{loading}}" bindtap="load">刷新</button></view>
+ <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest}}" />
+ <block wx:if="{{allowed && scopeReady && work && !error}}">
+  <view class="card"><view class="item-title">{{work.keyword}}</view><view class="muted">{{work.taskName || '知乎推广作品'}}</view><view class="result">{{work.upstreamText}}</view><view class="notice" wx:if="{{work.upstreamReason}}">{{work.upstreamReason}}</view></view>
+  <view class="card"><view class="section-title">登记信息</view>
+   <view class="detail-row"><text class="muted">登记人</text><text>{{work.executorName || '项目成员'}}</text></view>
+   <view class="detail-row"><text class="muted">标题 / 说明</text><text>{{work.description || '未填写'}}</text></view>
+   <view class="detail-row"><text class="muted">发布平台</text><text>{{work.mediaType || '未填写'}}</text></view>
+   <view class="detail-row"><text class="muted">平台账号</text><text user-select>{{work.mediaAccount || '未填写'}}</text></view>
+   <view class="detail-row"><text class="muted">作品分类</text><text>{{work.typeText}} / {{work.subTypeText}}</text></view>
+   <view class="detail-row"><text class="muted">发布时间</text><text>{{work.releaseText}}</text></view>
+   <view class="detail-row"><text class="muted">登记时间</text><text>{{work.createdText}}</text></view>
+  </view>
+  <view class="card"><view class="section-title">作品原链接</view><view class="full-link" user-select>{{work.workUrl}}</view><button data-text="{{work.workUrl}}" bindtap="copy">复制链接</button><view class="muted">复制后可在作品对应平台或浏览器打开。</view></view>
+ </block>
+</view>

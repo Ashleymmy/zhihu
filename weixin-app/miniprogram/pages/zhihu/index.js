@@ -18,9 +18,9 @@ const ITEMS = [
     fg: "#c98f1b",
   },
   {
-    key: "wallet",
+    key: "work-data",
     label: "数据",
-    path: "/pages/wallet/index",
+    path: "/pages/work-data/index",
     iconImg: "/images/icons/data.png",
     tint: "#e8eff5",
     fg: "#3a6ea5",

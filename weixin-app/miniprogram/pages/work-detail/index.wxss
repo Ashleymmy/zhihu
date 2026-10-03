@@ -1,0 +1,1 @@
+.detail-row{display:flex;justify-content:space-between;gap:24rpx;padding:22rpx 0;border-bottom:1rpx solid #eef0ef}.detail-row>.muted{flex-shrink:0}.detail-row>text:last-child{text-align:right;word-break:break-all}.full-link{word-break:break-all;line-height:1.65;margin:20rpx 0 30rpx}.result{margin-top:24rpx;font-weight:600}.card>.muted{margin-top:16rpx}

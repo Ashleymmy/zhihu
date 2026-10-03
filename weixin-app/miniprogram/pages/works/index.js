@@ -2,27 +2,17 @@ const permissions = require("../../utils/permissions");
 const screen = require("../../utils/screen");
 const request = require("../../utils/request");
 const composition = require("../../utils/composition");
-function reviewDisplay(item) {
-  let status=item.zhihuStatusJson;
-  if(typeof status==='string'){try{status=JSON.parse(status)}catch(_){status=null}}
-  const data=status&&typeof status==='object'?status:{};
-  const code=data.auditStatus??data.audit_status??data.status;
-  const labels={pending:'待审核',reviewing:'审核中',approved:'已通过',passed:'已通过',rejected:'已拒绝'};
-  return {
-    statusText:item.syncStatus==='failed'?'提交失败':item.syncStatus==='synced'?'已提交知乎':'正在提交',
-    upstreamText:item.planSyncStatus==='failed'?'关键词创建失败，作品未进入知乎审核':item.syncStatus==='failed'?'作品提交失败，请修改后重新提交':['local','syncing'].includes(item.syncStatus)?'正在提交知乎':item.compositionId?(code==null||code===''?'已提交知乎，等待审核结果':'知乎审核：'+(labels[code]||String(code))):'尚未登记知乎推广作品',
-    syncText:{local:'待提交知乎',syncing:'知乎提交中',synced:'已提交知乎',failed:'知乎提交失败',simulated:'联测作品'}[item.syncStatus]||'',
-    upstreamReason:item.failureReason||data.rejectReason||data.reject_reason||''
-  };
-}
+const {reviewDisplay,decode}=require('../../utils/work-display');
+const nav=require('../../utils/nav');
 Page(
   screen("works", {
     infinite: true,
-    data: {list:[],selected:null,form:{},platforms:composition.mediaTypes,types:composition.types.map(t=>t.label),categories:[]},
+    onLoad(query={}){this.setData({from:query.from||'',to:query.to||'',view:query.view||'all',ownerId:query.ownerId||'',ownerName:decode(query.ownerName),result:query.result||'',registeredOnly:query.registeredOnly||'',editId:query.edit||''});},
+    data: {from:'',to:'',view:'all',ownerId:'',ownerName:'',result:'',registeredOnly:'',editId:'',list:[],selected:null,form:{},platforms:composition.mediaTypes,types:composition.types.map(t=>t.label),categories:[]},
     async fetch({ user, scope }) {
       const result = await request.get(
         "/modules/zhihu/workbench/works",
-        Object.assign({}, scope, { page: this.data.page, pageSize: 20 }),
+        Object.assign({}, scope, this.filters(), { page: this.data.page, pageSize: 20 }),
       );
       return {
         total: result.total,
@@ -34,6 +24,9 @@ Page(
         ),
       };
     },
+    filters(){const out={};for(const key of ['from','to','view','ownerId','result','registeredOnly'])if(this.data[key])out[key]=this.data[key];return out;},
+    showDetail(e){if(this.canAct())nav.go('/pages/work-detail/index?id='+encodeURIComponent(e.currentTarget.dataset.id));},
+    clearFilters(){this.setData({from:'',to:'',view:'all',ownerId:'',ownerName:'',result:'',registeredOnly:'',list:[]});return this.load();},
     choose(e) {
       const item=this.data.list[e.currentTarget.dataset.index];
       if(!this.canAct()||this.data.busy||!item?.canEdit)return;

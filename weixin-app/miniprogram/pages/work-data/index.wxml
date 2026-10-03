@@ -1,0 +1,23 @@
+<import src="../../templates/shared.wxml" />
+<view class="page">
+ <view class="row page-heading"><view class="title">作品数据</view><button size="mini" disabled="{{loading}}" bindtap="load">刷新</button></view>
+ <view class="muted">按登记时间统计知乎业务作品，修改和重试不重复计数。</view>
+ <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest}}" />
+ <block wx:if="{{allowed && scopeReady}}">
+  <view class="card"><view class="wrap tabs"><button wx:for="{{views}}" wx:key="key" size="mini" class="{{view === item.key ? 'primary' : ''}}" data-view="{{item.key}}" bindtap="changeView">{{item.label}}</button></view>
+   <view class="row dates"><view><text class="muted">开始日期</text><picker mode="date" value="{{from}}" data-name="from" bindchange="dateChange"><view class="input">{{from}} ▾</view></picker></view><view><text class="muted">结束日期</text><picker mode="date" value="{{to}}" data-name="to" bindchange="dateChange"><view class="input">{{to}} ▾</view></picker></view></view>
+  </view>
+  <view class="metrics" wx:if="{{summary && !error}}">
+   <view class="card metric" bindtap="works"><text class="muted">登记作品</text><view class="number">{{summary.registered}}</view><text class="hint">查看作品 ›</text></view>
+   <view class="card metric" data-result="submitted" bindtap="works"><text class="muted">已提交知乎</text><view class="number">{{summary.submitted}}</view><text class="hint">查看作品 ›</text></view>
+   <view class="card metric" data-result="failed" bindtap="works"><text class="muted">提交失败</text><view class="number">{{summary.failed}}</view><text class="hint">查看原因 ›</text></view>
+   <view class="card metric" data-result="pending" bindtap="works"><text class="muted">待提交</text><view class="number">{{summary.pending}}</view><text class="hint">查看作品 ›</text></view>
+  </view>
+  <view class="muted" wx:if="{{summary}}">已提交知乎不代表审核通过，审核结果在作品详情中查看。</view>
+  <view wx:if="{{view !== 'self'}}" class="card"><view class="section-title">成员明细</view><view class="muted">点击成员查看本期登记的作品。</view>
+   <view wx:for="{{list}}" wx:key="id" class="member" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="works"><view class="row"><text class="item-title">{{item.name}}</text><text>{{item.registered}} 件 ›</text></view><view class="muted">已提交 {{item.submitted}} · 失败 {{item.failed}} · 待提交 {{item.pending}}</view></view>
+   <view wx:if="{{!loading && !list.length}}" class="muted">当前范围没有成员。</view>
+  </view>
+  <template wx:if="{{view !== 'self'}}" is="loadmore" data="{{total,page,loadingMore,pageSize:20}}" />
+ </block>
+</view>
