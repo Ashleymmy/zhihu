@@ -35,7 +35,7 @@ test("changing project clears prior records and dialogs before loading new data"
       ];
     return c.data.projectId === "2"
       ? second.promise
-      : { list: [{ id: "11", source: "evidence", executorId: "3", status: "pending" }], total: 1 };
+      : { list: [{ id: "11", source: "evidence", executorId: "3", status: "pending",canEdit:true,compositionId:"1",compositionType:1,compositionSubType:1 }], total: 1 };
   });
   h.session({ id: "2", role: "leader" });
   const page = h.page("works");

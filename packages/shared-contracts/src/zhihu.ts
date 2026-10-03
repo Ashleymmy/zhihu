@@ -379,6 +379,10 @@ export interface SiteInfo {
 
 /** 推广作品（compositions 表）；mediaType 为 KOC视频号/KOC抖音 等媒体枚举字符串 */
 export interface Composition {
+  failureReason?: string | null
+  planSyncStatus?: string | null
+  canEdit?: boolean
+
   id: string
   planId: string
   ownerId: string

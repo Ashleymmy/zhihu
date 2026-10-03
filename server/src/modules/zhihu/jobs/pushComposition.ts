@@ -2,6 +2,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { db, rows } from '../../../db';
 import { zhihuPost, zhihuPut, zhihuSyncErrorDetail } from '../zhihu/client';
 import { COMPOSITION_ID_INVALID_ERROR, isCanonicalCompositionId } from '../zhihu/allianceVersionPolicy';
+import { confirmSubmittedWorks } from '../services/automatic-work-check';
 
 export interface CompositionPayloadInput {
   zhihu_plan_id: string;
@@ -62,6 +63,11 @@ export async function pushComposition(data: Record<string, unknown>) {
     [id],
   );
   if (!item || item.status === 'ended') return;
+  // Retry a failed bookkeeping update without sending the work upstream again.
+  if (item.sync_status === 'synced') {
+    await confirmSubmittedWorks(id);
+    return;
+  }
 
   const [claimed] = await db.query<ResultSetHeader>(
     "UPDATE compositions SET sync_status = 'syncing', sync_error = NULL WHERE id = ? AND sync_status IN ('local', 'failed')",
@@ -109,4 +115,5 @@ export async function pushComposition(data: Record<string, unknown>) {
     );
     throw error;
   }
+  await confirmSubmittedWorks(id);
 }

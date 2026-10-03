@@ -2,12 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCompositionPayload, pushComposition } from '../../src/modules/zhihu/jobs/pushComposition';
 
 const mocks = vi.hoisted(() => ({
+  confirm: vi.fn(),
   dbQuery: vi.fn(),
   rows: vi.fn(),
   zhihuPost: vi.fn(),
   zhihuPut: vi.fn(),
   zhihuSyncErrorDetail: vi.fn(() => '知乎同步失败，请稍后重试'),
 }));
+
+vi.mock('../../src/modules/zhihu/services/automatic-work-check', () => ({confirmSubmittedWorks:mocks.confirm}));
 
 vi.mock('../../src/db', () => ({
   db: { query: mocks.dbQuery },
@@ -55,6 +58,7 @@ describe('知乎推广作品 v2 payload', () => {
 
 describe('知乎推广作品同步', () => {
   beforeEach(() => {
+    mocks.confirm.mockReset().mockResolvedValue({});
     mocks.dbQuery.mockReset();
     mocks.rows.mockReset();
     mocks.zhihuPost.mockReset();
@@ -123,6 +127,14 @@ describe('知乎推广作品同步', () => {
       expect.stringContaining("WHERE id = ? AND sync_status = 'syncing'"),
       ['2071266138193975100', '1'],
     );
+  });
+
+  it('bookkeeping retry never sends an already submitted work to Zhihu twice', async () => {
+    mocks.rows.mockResolvedValue([{...item,sync_status:'synced',zhihu_composition_id:'2071266138193975100'}]);
+    await pushComposition({compositionId:'1'});
+    expect(mocks.confirm).toHaveBeenCalledWith('1');
+    expect(mocks.zhihuPost).not.toHaveBeenCalled();
+    expect(mocks.dbQuery).not.toHaveBeenCalled();
   });
 
   it('未抢到 local/failed 状态时不调用知乎接口', async () => {

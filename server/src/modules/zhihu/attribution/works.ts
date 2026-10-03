@@ -4,7 +4,7 @@ import { withTransaction } from '../../../db';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { planAccountSql } from '../services/plan-account';
 import type { Scope } from './domain';
-import { keywordFailureMessage } from './keyword-usability';
+import { compositionLinkProblem, submissionFailure } from '../services/submission-feedback';
 import { authorize, select } from './store';
 
 // Link the two review sources without inventing a binding or financial approval.
@@ -16,7 +16,7 @@ export async function listWorks(user: AuthUser, scope: Scope, page: number, page
       SELECT CAST(e.id AS CHAR) id,'evidence' source,CAST(e.binding_id AS CHAR) binding_id,
         CAST(p.id AS CHAR) plan_id,p.keyword,e.work_url,e.description,e.status,e.reason,
         b.verification_status,CAST(b.executor_id AS CHAR) executor_id,u.display_name executor_name,
-        CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,e.created_at
+        CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,c.media_type,c.media_account,c.composition_type,c.composition_sub_type,c.release_time,e.created_at
       FROM zh_evidence e JOIN zh_keyword_bindings b ON b.id=e.binding_id
       JOIN zh_keywords k ON k.id=b.keyword_id JOIN plans p ON p.id=k.plan_id
       LEFT JOIN users u ON u.id=b.executor_id
@@ -29,7 +29,7 @@ export async function listWorks(user: AuthUser, scope: Scope, page: number, page
         CAST(p.id AS CHAR) plan_id,p.keyword,c.promo_url work_url,c.title description,
         c.status,c.reject_reason reason,NULL verification_status,
         CAST(c.owner_id AS CHAR) executor_id,u.display_name executor_name,
-        CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,c.created_at
+        CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,c.media_type,c.media_account,c.composition_type,c.composition_sub_type,c.release_time,c.created_at
       FROM compositions c JOIN plans p ON p.id=c.plan_id LEFT JOIN users u ON u.id=c.owner_id
       WHERE p.project_id=? AND ${planAccountSql()}=? AND ${visibility.clause}
         AND NOT EXISTS(SELECT 1 FROM zh_evidence e JOIN zh_keyword_bindings b ON b.id=e.binding_id
@@ -44,8 +44,8 @@ export async function listWorks(user: AuthUser, scope: Scope, page: number, page
     const list = await select(c, `SELECT * FROM (${query}) works ORDER BY created_at DESC,source,id DESC LIMIT ? OFFSET ?`,
       [...args, pageSize, (page - 1) * pageSize]);
     for (const item of list) {
-      item.failure_reason = item.plan_sync_status === 'failed' ? keywordFailureMessage(item.plan_sync_error)
-        : item.sync_status === 'failed' ? '作品提交知乎失败，请联系管理员查看原因并处理' : null;
+      item.failure_reason = item.sync_status === 'failed' || item.plan_sync_status === 'failed' ? compositionLinkProblem(String(item.media_type),String(item.work_url)) || submissionFailure(item.plan_sync_status==='failed'?item.plan_sync_error:item.sync_error,item.plan_sync_status==='failed'?'keyword':'composition') : null;
+      item.can_edit = !!item.composition_id && item.sync_status !== 'syncing' && item.plan_sync_status === 'synced';
       if (!isStaffRole(user.role)) { delete item.sync_error; delete item.plan_sync_error; }
     }
     return { list, total: Number(count.total), page, pageSize };

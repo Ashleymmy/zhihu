@@ -23,7 +23,7 @@ function worksSetup(pages, total) {
       state.gets.push(call.data.page)
       return { list: pages[call.data.page] || [], total }
     }
-    if (call.path.indexOf('/modules/zhihu/evidence/') === 0 && call.method === 'POST') {
+    if (call.path.indexOf('/modules/zhihu/compositions/') === 0 && call.method === 'PATCH') {
       state.posts.push(call.data)
       return { ok: true }
     }
@@ -206,53 +206,24 @@ test('withdrawals cancel posts after confirmation', async () => {
   assert.ok(state.posts[0].requestKey, '写操作必须带请求键')
 })
 
-// ---------- works 审核：退回必须二次确认 ----------
-
-test('works reject requires confirmation and skips the request when cancelled', async () => {
-  const item = Object.assign(workItem('x1'), { status: 'pending', executorId: '1' })
-  const { h, state } = worksSetup({ 1: [item] }, 1)
-  h.wx.showModal = () => Promise.resolve({ confirm: false })
-  const page = h.page('works')
-  await page.onShow()
-  page.choose({ currentTarget: { dataset: { index: 0 } } })
-  page.setData({ reason: '链接打不开' })
-
-  await page.review({ currentTarget: { dataset: { accept: 'false' } } })
-
-  assert.equal(state.posts.length, 0, '确认弹层取消后不得发出退回请求')
-})
-
-test('works reject without a reason never reaches the confirm sheet', async () => {
-  const item = Object.assign(workItem('x2'), { status: 'pending', executorId: '1' })
-  const { h, state } = worksSetup({ 1: [item] }, 1)
-  let modalCalls = 0
-  h.wx.showModal = () => { modalCalls += 1; return Promise.resolve({ confirm: true }) }
-  const page = h.page('works')
-  await page.onShow()
-  page.choose({ currentTarget: { dataset: { index: 0 } } })
-
-  await page.review({ currentTarget: { dataset: { accept: 'false' } } })
-
-  assert.equal(modalCalls, 0)
-  assert.equal(state.posts.length, 0)
-  assert.equal(page.data.error, '请填写退回原因')
-})
-
-test('works approve succeeds with a success toast and no confirm sheet', async () => {
-  const item = Object.assign(workItem('x3'), { status: 'pending', executorId: '1' })
-  const { h, state } = worksSetup({ 1: [item] }, 1)
-  let modalCalls = 0
-  h.wx.showModal = () => { modalCalls += 1; return Promise.resolve({ confirm: true }) }
-  const page = h.page('works')
-  await page.onShow()
-  page.choose({ currentTarget: { dataset: { index: 0 } } })
-
-  await page.review({ currentTarget: { dataset: { accept: 'true' } } })
-
-  assert.equal(modalCalls, 0, '通过审核不弹危险确认')
-  assert.equal(state.posts.length, 1)
-  assert.ok(state.toasts.includes('作品已通过审核'), '成功后要有 toast 反馈')
-})
+// ---------- works: edit existing work, no manual approval step ----------
+const editableWork=id=>({...workItem(id),compositionId:id,planId:'5',canEdit:true,mediaType:'KOC抖音',mediaAccount:'原账号',compositionType:1,compositionSubType:1,releaseTime:'2026-10-03T04:32:00.000Z',description:'原标题'});
+test('works prefill every editable field and submit directly without a review step',async()=>{
+ const {h,state}=worksSetup({1:[editableWork('x1')]},1);let prompts=0;h.wx.showModal=()=>{prompts++;return Promise.resolve({confirm:true})};
+ const page=h.page('works');await page.onShow();page.choose({currentTarget:{dataset:{index:0}}});
+ assert.equal(page.data.form.mediaAccount,'原账号');assert.equal(page.data.form.title,'原标题');assert.equal(page.data.form.publishDate,'2026-10-03');
+ page.setData({'form.platformIndex':5,'form.mediaAccount':'新账号','form.url':'https://www.xiaohongshu.com/explore/new','form.title':'新标题'});
+ page.editType({detail:{value:1}});page.editCategory({detail:{value:1}});page.editDate({detail:{value:'2026-10-02'}});
+ await page.save();assert.equal(prompts,0);assert.equal(state.posts.length,1);assert.equal(page.review,undefined);
+ assert.deepEqual(JSON.parse(JSON.stringify(state.posts[0])),{planId:'5',mediaType:'KOC小红书',mediaAccount:'新账号',promoUrl:'https://www.xiaohongshu.com/explore/new',title:'新标题',releaseTime:'2026-10-02T00:00:00+08:00',compositionType:2,compositionSubType:6});
+ assert.equal(page.data.selected,null);
+});
+test('incomplete edits preserve the form and never send a write',async()=>{
+ const {h,state}=worksSetup({1:[editableWork('x2')]},1);const page=h.page('works');await page.onShow();page.choose({currentTarget:{dataset:{index:0}}});page.setData({'form.url':'bad'});await page.save();assert.equal(state.posts.length,0);assert.ok(page.data.selected);assert.match(page.data.error,/链接/);
+});
+test('read-only works do not expose a mutation dialog',async()=>{
+ const {h,state}=worksSetup({1:[{...editableWork('x3'),canEdit:false}]},1);const page=h.page('works');await page.onShow();page.choose({currentTarget:{dataset:{index:0}}});await page.save();assert.equal(page.data.selected,null);assert.equal(state.posts.length,0);
+});
 
 // ---------- keywords 页：合并后按当前页签重新过滤 ----------
 

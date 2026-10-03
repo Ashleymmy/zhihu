@@ -16,7 +16,7 @@ const CHANNELS = [
   {
     key: "zhihu",
     name: "知乎",
-    desc: "关键词推广 · 作品审核 · 收益结算",
+    desc: "关键词推广 · 作品登记 · 收益查询",
     icon: "知",
     logo: "/images/channels/zhihu.png",
     tint: "#e6efff",

@@ -27,6 +27,7 @@ interface SafeUpstreamDiagnostic {
   status: number;
   code: string | null;
   messageKey: 'keyword_rule' | 'channel_invalid' | 'composition_duplicate' | null;
+  message?: string | null;
 }
 
 class ZhihuUpstreamError extends AppError {
@@ -45,16 +46,28 @@ function safeUpstreamCode(value: unknown): string {
   return '';
 }
 
-function safeMessageKey(code: string, value: unknown): SafeUpstreamDiagnostic['messageKey'] {
+function safeMessageKey(value: unknown): SafeUpstreamDiagnostic['messageKey'] {
   const message = upstreamText(value);
   if (message.includes('作品链接') && message.includes('重复绑定')) return 'composition_duplicate';
-  if (code === '400402') return 'keyword_rule';
   if (!message) return null;
   if (message.includes('关键词') && (message.includes('词根') || message.includes('更换关键词'))) {
     return 'keyword_rule';
   }
   if (message.includes('渠道') && message.includes('无效')) return 'channel_invalid';
   return null;
+}
+
+function safeBusinessMessage(value: string): string | null {
+  // Keep actionable Chinese business text, never credentials, URLs or payloads.
+  if (!/[\u4e00-\u9fff]/.test(value)) return null;
+  let redacted = value;
+  for (const secret of [config.zhihu.accessToken, config.zhihu.secretKey]) {
+    if (secret) redacted = redacted.split(secret).join('[已隐藏]');
+  }
+  const clean = redacted.replace(/(?:access[_-]?token|token|secret[_-]?key|app[_-]?secret|secret|signature|password|authorization|cookie)["']?\s*[:=：]\s*(?:"[^"]*"|'[^']*'|\S+)/gi, '')
+    .replace(/https?:\/\/\S+/gi, '[链接]').replace(/[\u0000-\u001f]/g, ' ').trim();
+  if (/[{}<>]|(?:bearer|private.key|stack.trace)/i.test(clean)) return null;
+  return clean.slice(0, 300) || null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -83,7 +96,8 @@ function translatedUpstreamError(data: unknown, status: number): AppError | Zhih
   return new ZhihuUpstreamError({
     status,
     code: upstreamCode || null,
-    messageKey: safeMessageKey(upstreamCode, upstream),
+    messageKey: safeMessageKey(upstream),
+    message: safeBusinessMessage(upstream),
   });
 }
 
@@ -105,8 +119,9 @@ function responseData<T>(endpoint: AllianceEndpoint, data: unknown, status: numb
 
 export function zhihuSyncErrorDetail(error: unknown): string {
   if (error instanceof ZhihuUpstreamError) {
-    const { status, code, messageKey } = error.diagnostic;
+    const { status, code, messageKey, message } = error.diagnostic;
     const prefix = `知乎接口失败（HTTP ${status}${code ? ` / code ${code}` : ''}）`;
+    if (message) return `${prefix}：知乎返回：${message}`;
     if (messageKey === 'keyword_rule') return `${prefix}：关键词不符合知乎规则，请更换关键词`;
     if (messageKey === 'channel_invalid') return `${prefix}：渠道 ID 无效，请重新同步渠道`;
     if (messageKey === 'composition_duplicate') return `${prefix}：作品链接已绑定，请更换作品链接`;

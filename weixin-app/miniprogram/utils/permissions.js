@@ -35,7 +35,7 @@ function allowed(user, page) {
 function menus(user) {
   const labels = {
     keywords: isAdmin(user) ? "关键词管理" : "我的关键词",
-    works: user && user.role === "creator" ? "审核进度" : "作品审核",
+    works: "作品记录",
     wallet: isAdmin(user) ? "财务账单" : "收入与提现",
     reports: "报表与异常",
     team: "团队成员",

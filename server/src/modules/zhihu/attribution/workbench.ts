@@ -75,7 +75,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
    if(route?.mode==='stopped')blocked='业务已暂停，请联系运营';
    else if(Number(r.pending_revision)>0)blocked='待财务核对报表更正';
    else if(r.reason_code)blocked='待运营补齐归属或定价资料';
-   else if(r.verification_status!=='passed')blocked=r.verification_status==='disputed'?'作品有争议，待运营处理':'待审核作品';
+   else if(r.verification_status!=='passed')blocked=r.verification_status==='disputed'?'作品有争议，待运营处理':'等待作品提交成功，系统将自动核对归属';
    const confirmed=String(r.source_version??'')===String(r.result_id)&&!r.blocked_reason&&!blocked;
    tokens.push([r.id,r.result_id,r.revision_id,r.verification_status,r.pending_revision,r.source_version,r.blocked_reason,targets]);
    for(const a of targets.list){

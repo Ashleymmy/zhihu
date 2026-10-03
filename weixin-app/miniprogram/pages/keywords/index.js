@@ -53,6 +53,7 @@ Page(
       editKeyword: "",
       editLandingUrl: "",
       editMappingIndex: -1,
+      editTaskIndex: -1,
     },
     async fetch({ user, scope }) {
       const [options, result] = await Promise.all([
@@ -125,6 +126,7 @@ Page(
     chooseContentType(e) {
       this.setData({ contentTypeIndex: Number(e.detail.value) });
     },
+    chooseEditTask(e) { this.setData({editTaskIndex:Number(e.detail.value)}); },
     chooseEditMapping(e) {
       this.setData({ editMappingIndex: Number(e.detail.value) });
     },
@@ -155,9 +157,10 @@ Page(
         batchItems: [],
         // 编辑重试：预填当前值
         editKeyword: ["edit-retry","copy-retry"].includes(name) ? item.keyword : "",
-        editLandingUrl: name === "edit-retry" ? item.landingUrl || "" : "",
+        editLandingUrl: item.landingUrl || "",
+        editTaskIndex: this.data.options.tasks.findIndex(t=>String(t.id)===String(item.taskId)),
         editMappingIndex:
-          name === "edit-retry"
+          ["edit-retry","copy-retry"].includes(name)
             ? this.data.options.mappings.findIndex(
                 (m) => String(m.id) === String(item.mappingId),
               )
@@ -240,6 +243,10 @@ Page(
           if(name !== "delete") {
             payload.keyword = this.data.editKeyword.trim();
             if(!payload.keyword) throw new Error("请填写关键词");
+            const task=this.data.options.tasks[this.data.editTaskIndex],mapping=this.data.options.mappings[this.data.editMappingIndex];
+            if(!task||!mapping)throw new Error('请选择任务和渠道');
+            if(!actions.publicUrl(this.data.editLandingUrl.trim()))throw new Error('请填写有效的推广内容链接');
+            Object.assign(payload,{taskId:String(task.id),mappingId:String(mapping.id),landingUrl:this.data.editLandingUrl.trim(),popularizeType:0});
           }
         } else if (["claim", "distribute", "retry-upstream"].includes(name)) {
           path = "/keywords/" + item.id + "/" + name;

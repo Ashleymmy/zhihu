@@ -58,7 +58,7 @@ async function confirm(){
  if(!view.value||!checked.value)return
  const r=await post('/workbench/confirm',{...period,reviewHash:view.value.reviewHash,acknowledged:true}) as {confirmed:number;waiting:number}
  confirming.value=false;checked.value=false
- notice.value='已核对本期金额，确认 '+r.confirmed+' 条账单。'+(r.waiting?'其余账单待作品审核或数据问题处理完成后再确认。':'')
+ notice.value='已核对本期金额，确认 '+r.confirmed+' 条账单。'+(r.waiting?'其余账单待作品提交成功或数据问题处理完成后再确认。':'')
  await refresh();walletVersion.value++
 }
 function openDetails(payeeId:string){

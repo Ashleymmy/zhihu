@@ -23,6 +23,7 @@ const loading = ref(true)
 const error = ref('')
 const statusFilter = ref('')
 
+const editingId=ref<string|null>(null)
 const showCreate = ref(false)
 const showImport = ref(false)
 const draftsVersion = ref(0)
@@ -63,8 +64,6 @@ const form = ref({ planId: '', mediaType: 'KOC抖音', mediaAccount: '', composi
 
 const subTypeOptions = computed(() => SUB_TYPES.filter((s) => s.parent === form.value.compositionType))
 
-const statusLabels: Record<string, string> = { pending: '待审核', active: '已发布', rejected: '已拒绝', ended: '已结束' }
-const syncLabels: Record<string, string> = { local: '本地', syncing: '同步中', synced: '已同步', failed: '同步失败' }
 
 let loadVersion=0
 async function load() {
@@ -76,17 +75,25 @@ async function load() {
     if(version!==loadVersion)return
     works.value = data.list
     total.value = data.total
+    const edit=String(route.query.edit||'');const work=data.list.find(w=>w.id===edit);if(work&&!showCreate.value){openEdit(work);void router.replace({query:{...route.query,edit:undefined}})}
   } catch (e: any) { if(version===loadVersion)error.value = e?.message ?? String(e) }
   finally { if(version===loadVersion)loading.value = false }
 }
 
 async function openCreate() {
+  editingId.value=null
   showCreate.value = true
   createError.value = ''
   form.value.planId=selectedPlan.value ?? ''
   await loadPlans()
 }
 
+function openEdit(work: Composition) {
+  editingId.value=work.id;showCreate.value=true;createError.value='';plansError.value='';plansLoading.value=false;
+  const date=work.releaseTime?new Date(work.releaseTime):null;
+  const local=date?new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16):'';
+  form.value={planId:work.planId,mediaType:work.mediaType,mediaAccount:work.mediaAccount,compositionType:work.compositionType,compositionSubType:work.compositionSubType,title:work.title||'',promoUrl:work.promoUrl,releaseTime:local};
+}
 async function loadPlans() {
   const version = ++planSearchVersion
   plansLoading.value = true
@@ -110,13 +117,13 @@ async function loadPlans() {
 async function submitCreate() {
   if (creating.value) return
   createError.value = ''
-  if (plansLoading.value || plansError.value || !plans.value.some(plan => plan.id === form.value.planId) || !form.value.mediaAccount.trim() || !form.value.promoUrl.trim() || !form.value.releaseTime) {
+  if (plansLoading.value || plansError.value || (!editingId.value && !plans.value.some(plan => plan.id === form.value.planId)) || !form.value.mediaAccount.trim() || !form.value.promoUrl.trim() || !form.value.releaseTime) {
     createError.value = '请完整填写计划、媒体账号、推广链接和发布时间'
     return
   }
   creating.value = true
   try {
-    await apis.story.createWork({
+    const payload = {
       planId: form.value.planId,
       mediaType: form.value.mediaType,
       mediaAccount: form.value.mediaAccount.trim(),
@@ -125,7 +132,9 @@ async function submitCreate() {
       title: form.value.title.trim() || null,
       promoUrl: form.value.promoUrl.trim(),
       releaseTime: new Date(form.value.releaseTime).toISOString(),
-    })
+    }
+    if(editingId.value)await apis.story.updateWork(editingId.value,payload);else await apis.story.createWork(payload)
+    editingId.value=null
     showCreate.value = false
     form.value = { planId: '', mediaType: 'KOC抖音', mediaAccount: '', compositionType: 1, compositionSubType: 1, title: '', promoUrl: '', releaseTime: '' }
     if(registrationPage.value)await router.replace({path:'/modules/zhihu/works',query:{planId:selectedPlan.value,keyword:route.query.keyword}})
@@ -148,12 +157,12 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
       <div>
         <p class="section-index">02 / 作品管理</p>
         <h1>{{registrationPage?'登记作品':'推广作品'}}</h1>
-        <p>挂在推广计划下的内容与素材作品，跟踪审核与同步状态。</p>
+        <p>登记后自动提交知乎，无需管理员逐条审核；失败时可直接修改原表单。</p>
       </div>
       <div v-if="!registrationPage" class="page-actions">
         <select v-model="statusFilter" @change="page=1;load()">
           <option value="">全部状态</option>
-          <option value="pending">待审核</option>
+          <option value="pending">已登记</option>
           <option value="active">已发布</option>
           <option value="rejected">已拒绝</option>
           <option value="ended">已结束</option>
@@ -174,16 +183,16 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
       <div v-else-if="!works.length" class="empty-panel"><span>还没有登记作品。点击「登记作品」开始。</span></div>
       <div v-else class="responsive-table">
         <table>
-          <thead><tr><th>标题</th><th>所属计划</th><th>媒体账号</th><th>分类</th><th>本地状态</th><th>知乎审核</th><th>同步</th></tr></thead>
+          <thead><tr><th>标题</th><th>所属计划</th><th>媒体账号</th><th>分类</th><th>提交与审核结果</th><th>操作</th></tr></thead>
           <tbody>
             <tr v-for="w in works" :key="w.id">
               <td><strong>{{ w.title || '未命名作品' }}</strong><br /><a :href="w.promoUrl" target="_blank" style="color: var(--ink-soft); font-size: 12px;">{{ w.promoUrl.slice(0, 48) }}</a></td>
               <td style="font-size: 13px;"><router-link v-if="w.keywordProjectId&&w.keywordAccountId" :to="{path:'/modules/zhihu/operations',query:{projectId:w.keywordProjectId,accountId:w.keywordAccountId,keyword:w.keyword,tab:'keywords'}}">{{w.keyword}}</router-link><span v-else>{{w.keyword??'—'}}</span></td>
               <td style="font-size: 13px;">{{ w.mediaType }}<br /><small style="color: var(--ink-soft);">{{ w.mediaAccount }}</small></td>
               <td style="font-size: 13px;">{{ TYPE_OPTIONS.find(t => t.value === w.compositionType)?.label ?? '其他' }} / {{ SUB_TYPES.find(s => s.value === w.compositionSubType)?.label ?? '—' }}</td>
-              <td><span :class="['status-badge', w.status]">{{ statusLabels[w.status] ?? w.status }}</span></td>
-              <td>{{ upstreamReview({...w,source:'composition'}).label }}<small style="display:block">{{ upstreamReview({...w,source:'composition'}).reason }}</small><router-link v-if="w.keywordProjectId&&w.keywordAccountId" :to="{path:'/modules/zhihu/operations',query:{projectId:w.keywordProjectId,accountId:w.keywordAccountId,tab:'works'}}">查看平台核验</router-link></td>
-              <td><span :class="['status-badge', w.syncStatus === 'synced' ? 'active' : w.syncStatus === 'failed' ? 'rejected' : 'draft']">{{ syncLabels[w.syncStatus] ?? w.syncStatus }}</span></td>
+
+              <td>{{ upstreamReview({...w,source:'composition'}).label }}<small style="display:block">{{ upstreamReview({...w,source:'composition'}).reason }}</small></td>
+              <td><button v-if="w.canEdit" @click="openEdit(w)">修改并重新提交</button></td>
             </tr>
           </tbody>
         </table>
@@ -194,57 +203,57 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
     </template>
     <Teleport to="body" :disabled="registrationPage">
       <div v-if="showCreate" :class="registrationPage ? 'registration-page' : 'dialog-overlay'" @click.self="!registrationPage && cancelRegistration()">
-        <div class="dialog-card" :style="{width:registrationPage?'min(760px, 100%)':'min(520px, 92vw)'}">
+        <div class="dialog-card" role="dialog" :aria-label="editingId?'修改作品':'登记作品'" :style="{width:registrationPage?'min(760px, 100%)':'min(520px, 92vw)'}">
           <div class="dialog-header">
-            <h3>作品信息</h3>
-            <button type="button" class="work-batch-button" :disabled="creating" @click="showCreate = false; importInitialFile = undefined; importInitialOptions = undefined; showImport = true; loadPlans()">批量上传</button>
+            <h3>{{editingId?'修改作品':'作品信息'}}</h3>
+            <button v-if="!editingId" type="button" class="work-batch-button" :disabled="creating" @click="showCreate = false; importInitialFile = undefined; importInitialOptions = undefined; showImport = true; loadPlans()">批量上传</button>
             <button type="button" class="dialog-close" @click="cancelRegistration">×</button>
           </div>
           <div class="dialog-body">
             <p v-if="createError" role="alert" style="color: var(--clay)">{{ createError }}</p>
             <div class="form-field">
               <label for="work-plan">所属计划</label>
-              <SearchableSelect id="work-plan" v-model="form.planId" :options="planOptions" :loading="plansLoading" placeholder="输入关键词、渠道或计划编号搜索" />
+              <input v-if="editingId" :value="works.find(w=>w.id===editingId)?.keyword||form.planId" readonly /><SearchableSelect v-else id="work-plan" v-model="form.planId" :options="planOptions" :loading="plansLoading" placeholder="输入关键词、渠道或计划编号搜索" />
               <small v-if="plansError" role="alert">{{ plansError }} <button type="button" @click="loadPlans">重新加载</button></small>
-              <small v-else>可按关键词、渠道或计划编号搜索，共 {{ plans.length }} 条可选计划</small>
+              <small v-else-if="!editingId">可按关键词、渠道或计划编号搜索，共 {{ plans.length }} 条可选计划</small>
             </div>
             <div class="form-field">
-              <label>媒体类型</label>
-              <select v-model="form.mediaType">
+              <label for="work-mediaType">媒体类型</label>
+              <select id="work-mediaType" v-model="form.mediaType">
                 <option v-for="m in MEDIA_TYPES" :key="m" :value="m">{{ m }}</option>
               </select>
             </div>
             <div class="form-field">
-              <label>媒体账号</label>
-              <input v-model="form.mediaAccount" placeholder="发布作品的媒体账号名" />
+              <label for="work-mediaAccount">媒体账号</label>
+              <input id="work-mediaAccount" v-model="form.mediaAccount" placeholder="发布作品的媒体账号名" />
             </div>
             <div class="form-field">
               <label>作品分类</label>
               <div style="display: flex; gap: 10px;">
-                <select v-model="form.compositionType" style="flex: 1;" @change="form.compositionSubType = subTypeOptions[0]?.value ?? 11">
+                <select aria-label="作品类型" v-model="form.compositionType" style="flex: 1;" @change="form.compositionSubType = subTypeOptions[0]?.value ?? 11">
                   <option v-for="t in TYPE_OPTIONS" :key="t.value" :value="t.value">{{ t.label }}</option>
                 </select>
-                <select v-model="form.compositionSubType" style="flex: 1;">
+                <select aria-label="作品子分类" v-model="form.compositionSubType" style="flex: 1;">
                   <option v-for="s in subTypeOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
               </div>
             </div>
             <div class="form-field">
-              <label>标题（可选）</label>
-              <input v-model="form.title" maxlength="255" />
+              <label for="work-title">标题（可选）</label>
+              <input id="work-title" v-model="form.title" maxlength="255" />
             </div>
             <div class="form-field">
-              <label>推广链接</label>
-              <input v-model="form.promoUrl" type="url" placeholder="https://" />
+              <label for="work-promoUrl">推广链接</label>
+              <input id="work-promoUrl" v-model="form.promoUrl" type="url" placeholder="https://" />
             </div>
             <div class="form-field">
-              <label>发布时间</label>
-              <input v-model="form.releaseTime" type="datetime-local" />
+              <label for="work-releaseTime">发布时间</label>
+              <input id="work-releaseTime" v-model="form.releaseTime" type="datetime-local" />
             </div>
           </div>
           <div class="dialog-footer">
             <button class="ghost-aurora" @click="cancelRegistration">取消</button>
-            <button class="primary-action" :disabled="creating || plansLoading || !!plansError || !form.planId" @click="submitCreate">{{ creating ? '提交中...' : '确认登记' }}</button>
+            <button class="primary-action" :disabled="creating || plansLoading || !!plansError || !form.planId" @click="submitCreate">{{ creating ? '提交中...' : editingId?'保存并重新提交':'确认登记' }}</button>
           </div>
         </div>
       </div>

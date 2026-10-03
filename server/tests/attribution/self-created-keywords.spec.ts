@@ -245,7 +245,7 @@ it('upstream failure blocks leader assignment and all work entry points before a
     const saved=await binding(word.id);expect(saved.used_at).toBeNull();expect(saved.used_ever_at).toBeNull();
     const row=(await resources.listKeywords(team,scope,1,100)).list.find(r=>r.id===word.id)!;
     expect(row.usage_ready).toBe(0);
-    if(status==='failed') expect(row.sync_error).toBe('关键词不符合知乎规则，请更换关键词');
+    if(status==='failed') expect(String(row.sync_error)).toContain('未返回可识别的具体原因');
     await ready(word.planId);
     expect((await createComposition(team,work(word.planId))).id).toBeTruthy();
     await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'2'})).rejects.toThrow('保留原归属');
@@ -322,6 +322,61 @@ it('historical works belonging to another owner block new use while preserving r
   const b=await binding(word.id);
   await expect(resources.changeBinding(direct,scope,String(b.id),key(),{action:'activate'})).rejects.toThrow('归属与当前使用人不一致');
   const row=(await resources.listKeywords(direct,scope,1,100)).list.find(r=>r.id===word.id)!;expect(row.usage_ready).toBe(0);expect(Number(row.ownership_conflict)).toBe(1);
+});
+
+
+it('failed keyword can change task, channel and URL while keeping its exclusive owner',async()=>{
+  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(2,1,'task-two','另一任务',NOW())");
+  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(2,1,'channel-two',1,'另一渠道')");
+  const original=input();const word=await resources.createKeyword(leader,scope,key(),original);const owner=await binding(word.id);
+  await c.query("UPDATE plans SET sync_status='failed',sync_error='code 400402' WHERE id=?",[word.planId]);
+  const patch={taskId:'2',channelId:'2',landingUrl:'https://example.com/new-content',popularizeType:0};
+  actor=leader;
+  await expect(resources.editFailedKeyword(leader,scope,word.id,key(),original.keyword,{...patch,taskId:'99999'})).rejects.toThrow('可用的任务和渠道');
+  const r=await request(app).post(`/keywords/${word.id}/edit-retry`).send({...scope,...patch,keyword:original.keyword,requestKey:key()});
+  expect(r.status,JSON.stringify(r.body)).toBe(200);
+  const [[plan]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[word.planId]);
+  expect(plan).toMatchObject({keyword:original.keyword,zhihu_task_id:'task-two',channel_id:'channel-two',landing_url:patch.landingUrl,sync_status:'local'});
+  expect(String((await binding(word.id)).id)).toBe(String(owner.id));
+  const row=(await resources.listKeywords(leader,scope,1,100,original.keyword)).list[0];
+  expect(String(row.task_id)).toBe('2');expect(row.landing_url).toBe(patch.landingUrl);expect(String(row.mapping_id)).toBeTruthy();
+});
+it('work editing retains attribution, updates every field and rejects other owners or mismatched platform links',async()=>{
+  const {createComposition,updateComposition,listCompositions}=await import('../../src/modules/zhihu/services/compositions.service');
+  const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
+  const word=await resources.createKeyword(team,scope,key(),input());await ready(word.planId);
+  const bad={planId:word.planId,mediaType:'KOC抖音',mediaAccount:'old',compositionType:1,compositionSubType:1,promoUrl:'https://www.tiktok.com/@example/video/123',releaseTime:'2026-10-03T12:00:00+08:00'};
+  await expect(createComposition(team,bad)).rejects.toThrow('链接来自“TikTok”');expect((await binding(word.id)).used_at).toBeNull();
+  const original={...bad,promoUrl:'https://www.douyin.com/video/123'};const work=await createComposition(team,original);const b=await binding(word.id);
+  await c.query('INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by) VALUES(?,?,?,3)',[b.id,original.promoUrl,'旧描述']);
+  await c.query("UPDATE compositions SET sync_status='failed',sync_error='知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词' WHERE id=?",[work.id]);
+  expect(((await listCompositions(team,{planId:word.planId})).list[0] as RowDataPacket).failure_reason).toContain('旧版提示未保留具体原因');
+  const patch={mediaType:'KOC小红书',mediaAccount:'new',compositionType:2,compositionSubType:6,promoUrl:'https://www.xiaohongshu.com/explore/abc',releaseTime:'2026-10-02T12:30:00+08:00',title:'修改标题'};
+  await expect(updateComposition(direct,work.id,patch)).rejects.toMatchObject({httpStatus:404});
+  await expect(updateComposition(team,work.id,{...patch,mediaType:'KOC抖音'})).rejects.toThrow('发布平台与作品链接不一致');
+  const saved=await updateComposition(team,work.id,patch) as RowDataPacket;
+  expect(saved).toMatchObject({media_type:patch.mediaType,media_account:'new',promo_url:patch.promoUrl,composition_type:2,composition_sub_type:6,title:patch.title,sync_status:'local',sync_error:null});
+  expect(String(saved.owner_id)).toBe(team.sub);expect(String(saved.plan_id)).toBe(word.planId);
+  const joined=(await listWorks(team,scope,1,100)).list.filter(r=>r.composition_id===work.id);expect(joined).toHaveLength(1);expect(joined[0].work_url).toBe(patch.promoUrl);
+  await c.query("UPDATE compositions SET sync_status='syncing' WHERE id=?",[work.id]);
+  await expect(updateComposition(team,work.id,{title:'too soon'})).rejects.toThrow('正在提交');
+  await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'2'})).rejects.toThrow('保留原归属');
+});
+it('successful submission automatically checks routine ownership; failed, conflicting and disputed works remain untouched',async()=>{
+  const {createComposition}=await import('../../src/modules/zhihu/services/compositions.service');
+  const {confirmSubmittedWorks}=await import('../../src/modules/zhihu/services/automatic-work-check');
+  for(const mode of ['normal','web','failed','missing-id','disputed','rejected','conflicting','ended']){
+    const word=await resources.createKeyword(direct,scope,key(),input());await ready(word.planId);
+    const url='https://example.com/auto/'+word.id;
+    const work=await createComposition(direct,{planId:word.planId,mediaType:'KOC抖音',mediaAccount:'test',compositionType:1,compositionSubType:1,promoUrl:url,releaseTime:'2026-10-03T12:00:00+08:00'});const b=await binding(word.id);
+    if(mode!=='web')await c.query('INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by,status) VALUES(?,?,?,4,?)',[b.id,url,'test',mode==='rejected'?'rejected':'pending']);
+    await c.query('UPDATE compositions SET sync_status=?,zhihu_composition_id=?,status=? WHERE id=?',[mode==='failed'?'failed':'synced',mode==='missing-id'?null:String(2089756298078437900n+BigInt(work.id)),mode==='ended'?'ended':'pending',work.id]);
+    if(mode==='disputed')await c.query("UPDATE zh_keyword_bindings SET verification_status='disputed' WHERE id=?",[b.id]);
+    if(mode==='conflicting')await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,3,'KOC抖音','other',1,1,?)",[word.planId,url+'/other']);
+    await confirmSubmittedWorks(work.id);await confirmSubmittedWorks(work.id);
+    expect((await binding(word.id)).verification_status,mode).toBe(['normal','web'].includes(mode)?'passed':mode==='disputed'?'disputed':'pending');
+    if(mode!=='web'){const [[e]]=await c.query<RowDataPacket[]>('SELECT status,reviewed_by FROM zh_evidence WHERE binding_id=?',[b.id]);expect(e.status,mode).toBe(mode==='normal'?'passed':mode==='rejected'?'rejected':'pending');expect(e.reviewed_by).toBeNull();}
+  }
 });
 
 it('simulation worker preserves self-created bindings and public pool creation retains its priority window', async () => {

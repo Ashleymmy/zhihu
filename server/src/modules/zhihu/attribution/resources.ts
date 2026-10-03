@@ -120,9 +120,21 @@ async function failedKeyword(c: PoolConnection, user: AuthUser, scope: Scope, id
   return {word,plan};
 }
 
-export async function editFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string, value: string) {
+export interface KeywordEditFields { taskId?: string; mappingId?: string; channelId?: string; landingUrl?: string; popularizeType?: number; }
+async function keywordFields(c: PoolConnection, user: AuthUser, scope: Scope, word: Record<string,unknown>, plan: Record<string,unknown>, patch: KeywordEditFields) {
+  const taskId=patch.taskId ?? String(word.task_id);
+  const mappingId=patch.mappingId ?? (patch.channelId ? await ensurePoolMapping(c,user,scope,patch.channelId) : String(word.channel_mapping_id));
+  const [task]=await select(c,'SELECT zhihu_task_id FROM tasks WHERE id=? AND project_id=?',[taskId,scope.projectId]);
+  const [mapping]=await select(c,`SELECT ch.zhihu_channel_id FROM zh_channel_mappings m JOIN channels ch ON ch.id=m.channel_id
+    WHERE m.id=? AND m.project_id=? AND m.account_id=? AND m.canonical_id IS NULL AND ch.is_enabled=1`,[mappingId,scope.projectId,scope.accountId]);
+  if(!task||!mapping) fail('请选择当前项目中可用的任务和渠道');
+  const landingUrl=patch.landingUrl ?? String(plan.landing_url);
+  try { const url=new URL(landingUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error(); } catch { fail('请填写有效的推广内容链接'); }
+  return {taskId,mappingId,zhihuTaskId:String(task.zhihu_task_id),channelId:String(mapping.zhihu_channel_id),landingUrl,popularizeType:patch.popularizeType??Number(plan.popularize_type)};
+}
+export async function editFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string, value: string, patch: KeywordEditFields = {}) {
   const keyword = keywordText(value);
-  const result = await mutate(user,scope,'keyword.edit-retry',key,{id,keyword},async c=>{
+  const result = await mutate(user,scope,'keyword.edit-retry',key,{id,keyword,...patch},async c=>{
     await lockKeywordSpace(c);
     const {word,plan}=await failedKeyword(c,user,scope,id);
     if (word.lifecycle_status === 'retired') fail('该词已停止使用，请沿用信息新建',409);
@@ -132,9 +144,9 @@ export async function editFailedKeyword(user: AuthUser, scope: Scope, id: string
     }
     await assertKeywordUnused(c,id);
     if (keyword !== word.keyword) await assertKeywordFree(c,keyword,String(word.plan_id));
-    else if (/400402|请更换关键词/.test(String(plan.sync_error))) fail('请修改关键词后再提交',409);
-    await c.query("UPDATE plans SET keyword=?,sync_status='local',sync_error=NULL WHERE id=?",[keyword,word.plan_id]);
-    await c.query("UPDATE zh_keywords SET keyword=?,upstream_status='pending',version=version+1 WHERE id=?",[keyword,id]);
+    const fields=await keywordFields(c,user,scope,word,plan,patch);
+    await c.query("UPDATE plans SET keyword=?,zhihu_task_id=?,channel_id=?,landing_url=?,popularize_type=?,sync_status='local',sync_error=NULL WHERE id=?",[keyword,fields.zhihuTaskId,fields.channelId,fields.landingUrl,fields.popularizeType,word.plan_id]);
+    await c.query("UPDATE zh_keywords SET keyword=?,task_id=?,channel_mapping_id=?,upstream_status='pending',version=version+1 WHERE id=?",[keyword,fields.taskId,fields.mappingId,id]);
     await audit(c,user,'keyword.edit-retry',id,{previousKeyword:word.keyword,keyword,planId:String(word.plan_id)});
     return {id,planId:String(word.plan_id)};
   });
@@ -155,12 +167,13 @@ export async function deleteFailedKeyword(user: AuthUser, scope: Scope, id: stri
   });
 }
 
-export async function copyFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string, keyword: string) {
+export async function copyFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string, keyword: string, patch: KeywordEditFields = {}) {
   await authorize(user,scope);
   const input=await withTransaction(async c=>{
     await scopeLock(c,scope,user);
     const {word,plan}=await failedKeyword(c,user,scope,id);
-    return {keyword,sourceKeywordId:id,taskId:String(word.task_id),mappingId:String(word.channel_mapping_id),landingUrl:String(plan.landing_url),popularizeType:Number(plan.popularize_type),secondChannelId:plan.second_channel_id as string|null,name:plan.name as string|null,dailyBudget:plan.daily_budget as number|null,startDate:plan.start_date as string|null,endDate:plan.end_date as string|null};
+    const fields=await keywordFields(c,user,scope,word,plan,patch);
+    return {keyword,sourceKeywordId:id,taskId:fields.taskId,mappingId:fields.mappingId,landingUrl:fields.landingUrl,popularizeType:fields.popularizeType,secondChannelId:plan.second_channel_id as string|null,name:plan.name as string|null,dailyBudget:plan.daily_budget as number|null,startDate:plan.start_date as string|null,endDate:plan.end_date as string|null};
   });
   return createKeyword(user,scope,key,input);
 }
@@ -350,7 +363,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
     const list = await select(
       c,
       `SELECT COALESCE(CAST(k.id AS CHAR),CONCAT('plan:',p.id)) id,p.keyword,
-      CAST(k.task_id AS CHAR) task_id,CAST(p.id AS CHAR) plan_id,
+      CAST(k.task_id AS CHAR) task_id,CAST(p.id AS CHAR) plan_id,CAST(k.channel_mapping_id AS CHAR) mapping_id,p.landing_url,p.popularize_type,
       (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name,
       COALESCE(k.lifecycle_status,'historical') lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,
       (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,p.sync_error AS sync_error,
@@ -385,7 +398,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       word.can_delete_failed = Number(canFix);
       word.can_edit_failed = Number(canFix && !Number(word.has_usage_history) && word.lifecycle_status !== 'retired' && word.release_status !== 'requested');
       word.can_copy_failed = Number(canFix && (Number(word.has_usage_history) === 1 || word.lifecycle_status === 'retired'));
-      if (!isStaffRole(user.role)) word.sync_error = word.sync_status === 'failed' ? keywordFailureMessage(word.sync_error) : null;
+      word.sync_error = word.sync_status === 'failed' ? keywordFailureMessage(word.sync_error) : null;
       if (Number(word.ownership_conflict) && word.sync_status !== 'failed') word.sync_error = '关键词历史作品归属与当前使用人不一致，请联系管理员核对，暂不可新增使用';
       word.usage_ready = Number(!Number(word.ownership_conflict) && !stopped.length && !word.read_only && Number(word.upstream_ready) === 1 && !!word.binding_id && !word.released_at && !word.stop_new_use_at && word.release_status !== 'requested' && ['reserved','assigned','active'].includes(String(word.lifecycle_status)));
       word.allocation_ready = Number(Number(word.allocation_ready) === 1 && !stopped.length && !word.read_only && !word.binding_id && word.lifecycle_status === 'available' && word.plan_status === 'active'

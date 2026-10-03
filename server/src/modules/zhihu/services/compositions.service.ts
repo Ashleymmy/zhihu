@@ -12,6 +12,7 @@ import { DEV_DEMO_USER_IDS, isDevDemoAuthUser } from '../dev-demo';
 import { planAccountSql } from './plan-account';
 import { compositionPlanScope } from './composition-access';
 import { assertKeywordReady } from '../attribution/keyword-usability';
+import { compositionLinkProblem, submissionFailure } from './submission-feedback';
 import { businessDay } from '../attribution/domain';
 
 interface CountRow extends RowDataPacket {
@@ -119,7 +120,7 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM compositions c JOIN plans p ON p.id=c.plan_id WHERE ${clause}`, bindings);
   const list = await rows<ItemRow>(
-    `SELECT c.*, p.keyword, p.channel_id, ch.name channel_name,
+    `SELECT c.*, p.keyword, p.channel_id, ch.name channel_name,p.sync_status plan_sync_status,p.sync_error plan_sync_error,
             CAST(p.project_id AS CHAR) keyword_project_id,
             CAST(${planAccountSql()} AS CHAR) keyword_account_id,
             u.display_name assignee_name
@@ -133,6 +134,10 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
      LIMIT ? OFFSET ?`,
     [...bindings, pageSize, pageOffset(page, pageSize)],
   );
+  for (const item of list) {
+    item.failure_reason = item.sync_status === 'failed' ? compositionLinkProblem(String(item.media_type),String(item.promo_url)) || submissionFailure(item.plan_sync_status==='failed'?item.plan_sync_error:item.sync_error,item.plan_sync_status==='failed'?'keyword':'composition') : null;
+    item.can_edit = item.sync_status !== 'syncing' && item.status !== 'ended' && item.plan_sync_status === 'synced';
+  }
   return { list, total: Number(count?.total ?? 0), page, pageSize };
 }
 
@@ -167,6 +172,7 @@ export async function getComposition(user: AuthUser, id: string) {
 }
 
 export async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection) {
+  const problem=compositionLinkProblem(input.mediaType,input.promoUrl);if(problem)throw new AppError(422,42200,problem);
   const ownerId = await planOwner(user, input.planId, connection);
   const [result] = await connection.query<ResultSetHeader>(
     `INSERT INTO compositions
@@ -248,6 +254,7 @@ export async function updateComposition(user: AuthUser, id: string, patch: Recor
     throw new AppError(422, 42200, '作品分类组合不正确');
   }
   const mapping: Record<string, string> = {
+    mediaType: 'media_type',
     mediaAccount: 'media_account',
     compositionType: 'composition_type',
     compositionSubType: 'composition_sub_type',
@@ -266,7 +273,20 @@ export async function updateComposition(user: AuthUser, id: string, patch: Recor
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
 
   await withTransaction(async (connection) => {
-    await connection.query(`UPDATE compositions SET ${fields.join(', ')}, sync_status = 'local' WHERE id = ?`, [
+    const access=scopeFilter(user,'owner_id');
+    const [locked]=await connection.query<ItemRow[]>(`SELECT * FROM compositions WHERE id=? AND ${access.clause} FOR UPDATE`,[id,...access.bindings]);
+    const current=locked[0];if(!current)throw new AppError(404,40401,'作品不存在');
+    if(current.sync_status==='syncing')throw new AppError(409,40900,'作品正在提交，请稍后修改');
+    if(current.status==='ended')throw new AppError(409,40900,'作品已结束');
+    const problem=compositionLinkProblem(String(patch.mediaType??current.media_type),String(patch.promoUrl??current.promo_url));
+    if(problem)throw new AppError(422,42200,problem);
+    if(patch.releaseTime===null)throw new AppError(422,42200,'请填写作品发布时间');
+    const owner=await planOwner(user,String(current.plan_id),connection);
+    if(owner!==String(current.owner_id))throw new AppError(409,40900,'作品归属已变化，请刷新后重试');
+    if(!isCompositionCategoryValid(Number(patch.compositionType??current.composition_type),Number(patch.compositionSubType??current.composition_sub_type)))throw new AppError(422,42200,'作品分类组合不正确');
+    await connection.query(`UPDATE zh_evidence e JOIN zh_keyword_bindings b ON b.id=e.binding_id JOIN zh_keywords k ON k.id=b.keyword_id
+      SET e.work_url=?,e.description=IF(?,?,e.description) WHERE k.plan_id=? AND b.executor_id=? AND BINARY e.work_url=BINARY ?`,[patch.promoUrl??current.promo_url,Object.hasOwn(patch,'title'),patch.title??'',current.plan_id,current.owner_id,current.promo_url]);
+    await connection.query(`UPDATE compositions SET ${fields.join(', ')}, sync_status = 'local',sync_error=NULL,zhihu_status_json=NULL,status='pending',reject_reason=NULL WHERE id = ?`, [
       ...bindings,
       id,
     ]);

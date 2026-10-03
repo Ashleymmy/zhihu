@@ -1,91 +1,32 @@
 <import src="../../templates/shared.wxml" />
 <view class="page">
-  <view class="row page-heading"
-    ><view
-      ><view class="title">作品与审核</view
-      ></view
-    ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
-      >刷新</button
-    ></view
-  >
-  <template
-    is="status"
-    data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
-  />
+  <view class="row page-heading"><view class="title">作品提交结果</view><button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button></view>
+  <view class="muted">登记后自动提交知乎，无需管理员逐条审核。</view>
+  <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest,skeleton:true}}" />
   <skeleton wx:if="{{allowed && scopeReady && loading && !list.length}}" rows="{{3}}" />
   <block wx:if="{{allowed && scopeReady}}">
-    <view class="card" wx:for="{{list}}" wx:key="id"
-      ><view class="row"
-        ><view class="item-title">{{item.keyword}}</view
-        ><text class="tag {{item.status === 'rejected' ? 'tag-clay' : ''}}"
-          >{{item.statusText}}</text
-        ></view
-      >
-      <view class="muted">{{item.upstreamText}} · {{item.syncText}}</view><view class="notice" wx:if="{{item.upstreamReason}}">{{item.upstreamReason}}</view>
-      <view class="link-text" user-select>{{item.workUrl}}</view
-      ><view class="muted">{{item.description}}</view>
-      <view class="notice" wx:if="{{item.reason}}"
-        >审核说明：{{item.reason}}</view
-      >
-      <view class="wrap actions"
-        ><button size="mini" data-text="{{item.workUrl}}" bindtap="copy"
-          >复制作品链接</button
-        ><button
-          wx:if="{{item.canReview}}"
-          size="mini"
-          class="primary"
-          disabled="{{busy}}"
-          data-index="{{index}}"
-          bindtap="choose"
-          >审核作品</button
-        ></view
-      >
-      <view class="muted" wx:if="{{item.status === 'rejected'}}"
-        >请在关键词页修改作品后重新提交。</view
-      >
+    <view class="card" wx:for="{{list}}" wx:key="id">
+      <view class="row"><view class="item-title">{{item.keyword}}</view><text class="tag {{item.syncStatus === 'failed' ? 'tag-clay' : ''}}">{{item.statusText}}</text></view>
+      <view class="muted">{{item.upstreamText}}</view>
+      <view class="notice" wx:if="{{item.upstreamReason}}">{{item.upstreamReason}}</view>
+      <view class="link-text" user-select>{{item.workUrl}}</view>
+      <view class="muted" wx:if="{{item.verificationStatus === 'disputed'}}">该作品存在归属争议，等待处理。</view>
+      <view class="wrap actions"><button size="mini" data-text="{{item.workUrl}}" bindtap="copy">复制作品链接</button><button wx:if="{{item.canEdit}}" size="mini" class="primary" data-index="{{index}}" bindtap="choose">修改并重新提交</button></view>
     </view>
-    <state-view
-      wx:if="{{!loading && !error && !list.length}}"
-      text="暂无作品，提交后可在这里查看审核进度。"
-      guide-text="去提交作品"
-      guide-path="/pages/keywords/index"
-    /><template
-      is="loadmore"
-      data="{{total, page, loadingMore, pageSize: 20}}"
-    />
+    <block wx:if="{{!loading && !error && list.length === 0}}"><state-view text="暂无作品，登记后可在这里查看提交结果。" guide-text="去登记作品" guide-path="/pages/keywords/index" /></block>
+    <template is="loadmore" data="{{total,page,loadingMore,pageSize:20}}" />
   </block>
-  <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask"
-    ><scroll-view scroll-y class="modal"
-      ><view class="row"
-        ><view class="section-title">审核 {{selected.keyword}}</view
-        ><button size="mini" disabled="{{busy}}" bindtap="close"
-          >关闭</button
-        ></view
-      ><view class="link-text">{{selected.workUrl}}</view
-      ><button size="mini" data-text="{{selected.workUrl}}" bindtap="copy"
-        >复制链接核对</button
-      ><view class="field"
-        ><text class="field-label">审核说明（退回必填）</text
-        ><textarea
-          data-name="reason"
-          value="{{reason}}"
-          maxlength="500"
-          bindinput="input"
-        /></view
-      ><view class="error" wx:if="{{error}}">{{error}}</view
-      ><view class="row"
-        ><button disabled="{{busy}}" data-accept="false" bindtap="review"
-          >退回修改</button
-        ><button
-          class="primary"
-          disabled="{{busy}}"
-          loading="{{busy}}"
-          data-accept="true"
-          bindtap="review"
-          >通过审核</button
-        ></view
-      ></scroll-view
-    ></view
-  >
-  <confirm-sheet id="confirmSheet" />
+  <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask"><scroll-view scroll-y class="modal">
+    <view class="row"><view class="section-title">修改作品</view><button size="mini" disabled="{{busy}}" bindtap="close">关闭</button></view>
+    <view class="muted">{{selected.keyword}} · 已填入上次信息，可直接修改。</view>
+    <view class="field"><text class="field-label">发布平台</text><picker range="{{platforms}}" value="{{form.platformIndex}}" bindchange="editPlatform"><view class="input">{{form.platformIndex >= 0 ? platforms[form.platformIndex] : '请选择'}} ▾</view></picker></view>
+    <view class="field"><text class="field-label">平台账号</text><input value="{{form.mediaAccount}}" data-field="mediaAccount" bindinput="editInput" maxlength="128" /></view>
+    <view class="field"><text class="field-label">作品链接</text><input value="{{form.url}}" data-field="url" bindinput="editInput" maxlength="1024" /></view>
+    <view class="field"><text class="field-label">作品类型</text><picker range="{{types}}" value="{{form.workTypeIndex}}" bindchange="editType"><view class="input">{{types[form.workTypeIndex]}} ▾</view></picker></view>
+    <view class="field"><text class="field-label">作品子分类</text><picker range="{{categories}}" value="{{form.contentTypeIndex}}" bindchange="editCategory"><view class="input">{{form.contentTypeIndex >= 0 ? categories[form.contentTypeIndex] : '请选择'}} ▾</view></picker></view>
+    <view class="field"><text class="field-label">发布日期</text><picker mode="date" value="{{form.publishDate}}" bindchange="editDate"><view class="input">{{form.publishDate || '请选择'}} ▾</view></picker></view>
+    <view class="field"><text class="field-label">标题（选填）</text><input value="{{form.title}}" data-field="title" bindinput="editInput" maxlength="255" /></view>
+    <view class="error" wx:if="{{error}}">{{error}}</view>
+    <button class="primary" loading="{{busy}}" disabled="{{busy}}" bindtap="save">保存并重新提交</button>
+  </scroll-view></view>
 </view>

@@ -1,6 +1,7 @@
 import type { PoolConnection } from 'mysql2/promise';
 import { fail } from './domain';
 import { select } from './store';
+import { submissionFailure } from '../services/submission-feedback';
 
 // A local reservation is exclusive, but is not permission to publish or assign.
 export function readyPlanSql(p = 'p', k = 'k', lock = '') {
@@ -27,10 +28,7 @@ export function ownershipConflictSql(k = 'k', b = 'b', lock = '') {
 }
 
 export function keywordFailureMessage(error: unknown) {
-  // Do not expose upstream payloads, credentials or internal connection errors.
-  const text = String(error ?? '');
-  if (/400402|关键词不符合|请更换关键词/.test(text)) return '关键词不符合知乎规则，请更换关键词';
-  return '知乎创建关键词失败，请联系管理员查看原因并处理';
+  return submissionFailure(error, 'keyword');
 }
 
 export async function assertKeywordReady(c: PoolConnection, keywordId: string) {

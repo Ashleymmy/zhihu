@@ -219,6 +219,8 @@ export function createZhihuStoryApi(http: HttpClient) {
   return {
     ...createWorkImportApi(http),
     /** 作品管理（compositions） */
+    getWork: (id: string) => http.get<Composition>(`/compositions/${id}`),
+    updateWork: (id: string, data: Partial<Composition>) => http.patch<Composition>(`/compositions/${id}`, data),
     listWorks: (params: { page?: number; pageSize?: number; planId?: string; status?: string; keyword?: string } = {}) =>
       http.get<PageResp<Composition>>('/compositions', params),
     createWork: (data: {

@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "作品与审核",
+  "navigationBarTitleText": "作品记录",
   "usingComponents": {
     "state-view": "/components/state/index",
     "skeleton": "/components/skeleton/index",

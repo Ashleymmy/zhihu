@@ -142,12 +142,12 @@ attributionRouter.post(
   }),
 );
 attributionRouter.post('/keywords/:id/edit-retry',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
-  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128)}).parse(req.body);
-  ok(res,await resource.editFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword));
+  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128),taskId:idSchema.optional(),mappingId:idSchema.optional(),channelId:idSchema.optional(),landingUrl:z.string().url().max(1024).optional(),popularizeType:z.literal(0).optional()}).parse(req.body);
+  ok(res,await resource.editFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword,{...(input.taskId?{taskId:input.taskId}:{}),...(input.mappingId?{mappingId:input.mappingId}:{}),...(input.channelId?{channelId:input.channelId}:{}),...(input.landingUrl?{landingUrl:input.landingUrl}:{}),...(input.popularizeType!==undefined?{popularizeType:input.popularizeType}:{})}));
 }));
 attributionRouter.post('/keywords/:id/copy-retry',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
-  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128)}).parse(req.body);
-  ok(res,await resource.copyFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword),201);
+  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128),taskId:idSchema.optional(),mappingId:idSchema.optional(),channelId:idSchema.optional(),landingUrl:z.string().url().max(1024).optional(),popularizeType:z.literal(0).optional()}).parse(req.body);
+  ok(res,await resource.copyFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword,{...(input.taskId?{taskId:input.taskId}:{}),...(input.mappingId?{mappingId:input.mappingId}:{}),...(input.channelId?{channelId:input.channelId}:{}),...(input.landingUrl?{landingUrl:input.landingUrl}:{}),...(input.popularizeType!==undefined?{popularizeType:input.popularizeType}:{})}),201);
 }));
 attributionRouter.post('/keywords/:id/delete-failed',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
   ok(res,await resource.deleteFailedKeyword(req.user,scopeSchema.parse(req.body),idSchema.parse(req.params.id),key(req)));

@@ -43,5 +43,5 @@ test('leader project editor preserves memberships outside own scope',async()=>{
  h.session({id:'2',role:'leader'});const p=h.page('team');await p.onShow();p.manage({currentTarget:{dataset:{index:0}}});p.projectChange({detail:{value:['1']}});await p.saveMember();assert.deepEqual(Array.from(h.calls.find(c=>c.method==='PATCH').data.projectIds).sort(),['1','9']);
 });
 test('official rejection never becomes a platform manual approval action',async()=>{
- const h=harness(c=>scoped(c)??{list:[{id:'composition:1',source:'composition',compositionId:'1',status:'active',syncStatus:'synced',zhihuStatusJson:{audit_status:'rejected',reject_reason:'内容不符'}}],total:1});h.session({id:'1',role:'admin'});const p=h.page('works');await p.onShow();assert.equal(p.data.list[0].canReview,false);assert.equal(p.data.list[0].upstreamText,'知乎审核：已拒绝');assert.equal(p.data.list[0].upstreamReason,'内容不符');
+ const h=harness(c=>scoped(c)??{list:[{id:'composition:1',source:'composition',compositionId:'1',status:'active',syncStatus:'synced',zhihuStatusJson:{audit_status:'rejected',reject_reason:'内容不符'}}],total:1});h.session({id:'1',role:'admin'});const p=h.page('works');await p.onShow();assert.equal(p.review,undefined);assert.equal(p.data.list[0].upstreamText,'知乎审核：已拒绝');assert.equal(p.data.list[0].upstreamReason,'内容不符');
 });

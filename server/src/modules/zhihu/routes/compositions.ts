@@ -132,3 +132,5 @@ compositionsRouter.get(
     });
   }),
 );
+
+compositionsRouter.get('/:id',asyncHandler(async(req,res)=>ok(res,await getComposition(req.user,id.parse(req.params.id)))));

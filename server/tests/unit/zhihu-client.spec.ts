@@ -154,7 +154,7 @@ describe('知乎后台 Client', () => {
     expect(JSON.stringify(error)).not.toContain('real-token');
   });
 
-  it('keeps the stable known error translations', async () => {
+  it('preserves the actual business explanation and removes credentials', async () => {
     server.use(
       http.post('https://open.zhihu.com/alliance/api/popularize_plan', () =>
         HttpResponse.json(
@@ -168,12 +168,12 @@ describe('知乎后台 Client', () => {
       (reason) => reason,
     );
     expect(zhihuSyncErrorDetail(error)).toBe(
-      '知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词',
+      '知乎接口失败（HTTP 400 / code 400402）：知乎返回：关键词，不能包含违规词词根，请更换关键词',
     );
     expect(zhihuSyncErrorDetail(error)).not.toContain('sentinel');
   });
 
-  it('maps changed 400402 wording by code', async () => {
+  it('never assumes 400402 means an invalid keyword', async () => {
     server.use(
       http.post('https://open.zhihu.com/alliance/api/popularize_plan', () =>
         HttpResponse.json({ code: 400402, message: 'upstream wording changed access_token=sentinel' }, { status: 400 }),
@@ -183,7 +183,7 @@ describe('知乎后台 Client', () => {
       (reason) => reason,
     );
     expect(zhihuSyncErrorDetail(error)).toBe(
-      '知乎接口失败（HTTP 400 / code 400402）：关键词不符合知乎规则，请更换关键词',
+      '知乎接口失败（HTTP 400 / code 400402）',
     );
     expect(JSON.stringify(error)).not.toContain('sentinel');
   });
@@ -200,7 +200,7 @@ describe('知乎后台 Client', () => {
     const error = await zhihuPost('/alliance/api/popularize_composition/v2', validComposition).catch(
       (reason) => reason,
     );
-    expect(zhihuSyncErrorDetail(error)).toBe('知乎接口失败（HTTP 400 / code 400402）：作品链接已绑定，请更换作品链接');
+    expect(zhihuSyncErrorDetail(error)).toBe('知乎接口失败（HTTP 400 / code 400402）：知乎返回：作品链接重复绑定');
   });
 
   it('treats HTTP 200 error and success:false envelopes as failures', async () => {

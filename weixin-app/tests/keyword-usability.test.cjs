@@ -28,12 +28,14 @@ test('correction actions follow backend ownership and preserve history restricti
  assert.deepEqual(Array.from(k.flags(leader,used)),['copy-retry','delete']);
  assert.deepEqual(Array.from(k.flags(creator,{...used,canCopyFailed:0,canDeleteFailed:0})),[]);
 });
-test('editing a failed word submits only the changed keyword and the server keeps original fields',async()=>{
- const h=harness(call=>scoped(call)??(call.path.endsWith('/attribution-options')?{tasks:[],users:[],mappings:[]}:{list:[{id:'7',keyword:'旧词',syncStatus:'failed',canEditFailed:1,canDeleteFailed:1}],total:1}));
+test('failed word editor prefills all creation fields and allows changing each one',async()=>{
+ const opts={tasks:[{id:'1',name:'原任务'},{id:'2',name:'新任务'}],users:[],mappings:[{id:'10',channelName:'原渠道'},{id:'11',channelName:'新渠道'}]};
+ const h=harness(call=>scoped(call)??(call.path.endsWith('/attribution-options')?opts:{list:[{id:'7',keyword:'旧词',taskId:'1',mappingId:'10',landingUrl:'https://example.com/old',syncStatus:'failed',canEditFailed:1,canDeleteFailed:1}],total:1}));
  h.session(leader);const p=h.page('keywords');await p.onShow();
- p.choose({currentTarget:{dataset:{index:0,action:'edit-retry'}}});assert.equal(p.data.editKeyword,'旧词');
- p.setData({editKeyword:'新词'});await p.runAction();
- const request=h.calls.find(c=>c.method==='POST');assert.equal(request.path,'/modules/zhihu/keywords/7/edit-retry');assert.equal(request.data.keyword,'新词');assert.equal(request.data.landingUrl,undefined);
+ p.choose({currentTarget:{dataset:{index:0,action:'edit-retry'}}});
+ assert.equal(p.data.editKeyword,'旧词');assert.equal(p.data.editTaskIndex,0);assert.equal(p.data.editMappingIndex,0);assert.equal(p.data.editLandingUrl,'https://example.com/old');
+ p.setData({editKeyword:'新词',editTaskIndex:1,editMappingIndex:1,editLandingUrl:'https://example.com/new'});await p.runAction();
+ const request=h.calls.find(c=>c.method==='POST');assert.equal(request.path,'/modules/zhihu/keywords/7/edit-retry');assert.equal(request.data.keyword,'新词');assert.equal(request.data.taskId,'2');assert.equal(request.data.mappingId,'11');assert.equal(request.data.landingUrl,'https://example.com/new');
 });
 test('work card explains keyword rejection without falsely suggesting a pending official review',async()=>{
  const h=harness(call=>scoped(call)??{list:[{id:'1',source:'evidence',status:'pending',compositionId:'1',syncStatus:'failed',planSyncStatus:'failed',failureReason:'关键词不符合知乎规则，请更换关键词'}],total:1});

@@ -246,7 +246,10 @@
           <text class="kw-label">关键词</text>
           <input data-name="editKeyword" value="{{editKeyword}}" maxlength="128" bindinput="input" class="kw-input" />
         </view>
-        <text class="muted">沿用原任务、渠道和推广链接，无需重新填写。提交后等待知乎创建成功，再分配或登记作品。</text>
+        <view class="kw-field"><text class="kw-label">推广任务</text><picker range="{{options.tasks}}" range-key="name" value="{{editTaskIndex}}" bindchange="chooseEditTask"><view class="kw-picker-row">{{editTaskIndex >= 0 ? options.tasks[editTaskIndex].name : '请选择任务'}} ▾</view></picker></view>
+        <view class="kw-field"><text class="kw-label">渠道</text><picker range="{{options.mappings}}" range-key="channelName" value="{{editMappingIndex}}" bindchange="chooseEditMapping"><view class="kw-picker-row">{{editMappingIndex >= 0 ? options.mappings[editMappingIndex].channelName : '请选择渠道'}} ▾</view></picker></view>
+        <view class="kw-field"><text class="kw-label">推广内容链接</text><input data-name="editLandingUrl" value="{{editLandingUrl}}" maxlength="1024" bindinput="input" class="kw-input" /></view>
+        <text class="muted">已填入上次信息，以上内容都可以修改。提交后自动发送知乎。</text>
         <view class="muted" wx:if="{{actionName === 'copy-retry'}}">原词已有使用记录或已停用，本次创建新词；原归属及作品记录保留。</view>
       </view>
       <view wx:elif="{{actionName === 'delete'}}">
