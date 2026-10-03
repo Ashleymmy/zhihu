@@ -1,6 +1,1 @@
-/* 注册/绑定页与登录页共用样式（pages/login/index.wxss） */
-.sms-row { display: flex; align-items: center; gap: 16rpx; }
-.sms-row input { flex: 1; min-width: 0; }
-.sms-send { flex-shrink: 0; margin: 0; padding: 0 18rpx; font-size: 24rpx; color: #256b61; background: #edf3ef; line-height: 72rpx; }
-.sms-send::after { border: none; }
-.sms-send[disabled] { color: #85918d; background: #f1f3f2; }
+/* 注册页使用 app.wxss 中的公共登录样式。 */

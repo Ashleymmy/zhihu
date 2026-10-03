@@ -22,7 +22,11 @@ function setup() {
     if (c.path === "/core/auth/binding-status")
       return { bound: false, currentWechat: false };
     if (c.path === "/core/auth/registration-policy")
-      return { smsRequired: true, smsEnabled: true };
+      return {
+        registrationMode: "account",
+        smsRequired: false,
+        smsEnabled: true,
+      };
     if (c.path.endsWith("-code")) return { retryAfterSeconds: 60 };
     return { token: "fixture" };
   });
@@ -58,7 +62,7 @@ for (const name of ["login", "register", "bind", "phone-verify"])
       assert.ok(h.navigation.includes("/pages/agreement/index?type=privacy"));
     },
   );
-test("password and WeChat login both enforce consent; unbound quick login opens binding page", async () => {
+test("password and WeChat login both enforce consent; unbound quick login stays on password login", async () => {
   const h = setup(),
     p = h.page("login");
   await p.onLoad();
@@ -68,7 +72,9 @@ test("password and WeChat login both enforce consent; unbound quick login opens 
   assert.ok(!h.calls.some((c) => c.path.endsWith("/wechat-login")));
   p.confirmConsent();
   await p.wechatLogin();
-  assert.ok(h.navigation.includes("/pages/bind/index"));
+  assert.ok(!h.navigation.includes("/pages/bind/index"));
+  assert.equal(p.data.mode, "password");
+  assert.match(p.data.error, /先使用账号密码登录/);
 });
 test("password is default and a single toggle switches back and clears secrets", async () => {
   const h = setup(),
@@ -84,25 +90,23 @@ test("password is default and a single toggle switches back and clears secrets",
   assert.equal(p.data.mode, "password");
   assert.equal(p.data.smsCode, "");
 });
-test("registration validates phone, password and mandatory SMS without requiring invite", async () => {
+test("registration validates account and password without requiring phone, SMS or invite", async () => {
   const h = setup(),
     p = h.page("register");
   await p.onLoad();
-  p.setData({ ...fields, agreed: true, phone: "123" });
+  p.setData({ ...fields, agreed: true, username: "12" });
   await p.submit();
-  assert.match(p.data.error, /11 位/);
-  p.setData({ phone: user.phone, password: "short" });
+  assert.match(p.data.error, /账号/);
+  p.setData({ username: "new_creator", password: "short" });
   await p.submit();
   assert.match(p.data.error, /至少 8/);
-  p.setData({ password: fields.password, smsCode: "" });
-  await p.submit();
-  assert.match(p.data.error, /6 位/);
-  assert.ok(!h.calls.some((c) => c.path.endsWith("/register")));
-  p.setData({ smsCode: "123456" });
+  p.setData({ password: fields.password, smsCode: "", phone: "" });
   await p.submit();
   const sent = h.calls.find((c) => c.path.endsWith("/register"));
   assert.equal(sent.data.inviteCode, undefined);
-  assert.equal(sent.data.smsCode, "123456");
+  assert.equal(sent.data.smsCode, undefined);
+  assert.equal(sent.data.phone, undefined);
+  assert.equal(sent.data.username, "new_creator");
   assert.ok(h.navigation.includes("/pages/home/index"));
 });
 test("public binding needs password and fresh phone code and submits only binding fields", async () => {

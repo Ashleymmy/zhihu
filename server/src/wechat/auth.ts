@@ -80,6 +80,19 @@ const signup = z
       .optional(),
   })
   .strict();
+// Account registration does not claim ownership of a phone number. The existing
+// phone + OTP contract remains available to older, already-uploaded clients.
+const accountSignup = signup
+  .omit({ phone: true, smsCode: true })
+  .extend({
+    username: z
+      .string()
+      .trim()
+      .min(3)
+      .max(32)
+      .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/),
+  })
+  .strict();
 wechatAuthRouter.get(
   '/registration-policy',
   asyncHandler(async (req, res) => {
@@ -90,7 +103,13 @@ wechatAuthRouter.get(
       .optional()
       .parse(req.query.inviteCode);
     const invitationToken = code ? await resolveInvitationCode(code) : undefined;
-    ok(res, { smsRequired: true, smsEnabled: smsSettings(invitationToken).enabled });
+    let smsEnabled = false;
+    try {
+      smsEnabled = smsSettings(invitationToken).enabled;
+    } catch {
+      /* SMS cannot block account registration. */
+    }
+    ok(res, { registrationMode: 'account', smsRequired: false, smsEnabled });
   }),
 );
 wechatAuthRouter.post(
@@ -121,10 +140,20 @@ wechatAuthRouter.post(
 wechatAuthRouter.post(
   '/register',
   asyncHandler(async (req, res) => {
-    const input = signup.parse(req.body),
+    const input = z.union([accountSignup, signup]).parse(req.body),
       identity = requireWechatContext(req),
       address = `wechat:${wechatClientId(identity)}`;
     const invitationToken = input.inviteCode ? await resolveInvitationCode(input.inviteCode) : undefined;
+    if ('username' in input) {
+      const result = await register(
+        { username: input.username, password: input.password, displayName: input.displayName, invitationToken },
+        req.ip,
+        undefined,
+        address,
+      );
+      res.locals.miniVerifiedUserId = result.id;
+      return ok(res, await loginVerifiedUser(result.id, clientIdentity(req), req.ip), 201);
+    }
     requireSmsEnabled(invitationToken);
     const proof = await verifyRegistrationCode(input.phone, wechatClientId(identity), input.smsCode, invitationToken);
     const result = await register(

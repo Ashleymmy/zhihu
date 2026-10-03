@@ -9,7 +9,7 @@
       ><input
         data-name="username"
         value="{{username}}"
-        placeholder="请输入账号或手机号"
+        placeholder="请输入登录账号（与网站一致）"
         placeholder-class="ph"
         bindinput="input"
     /></view>

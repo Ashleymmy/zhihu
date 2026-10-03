@@ -114,17 +114,26 @@ afterAll(async () => {
 it('defaults off and never exposes signing settings; malformed configuration fails closed', async () => {
   delete process.env.SMS_REGISTRATION_ENABLED;
   expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toEqual({
-    smsRequired: true,
+    registrationMode: 'account',
+    smsRequired: false,
     smsEnabled: false,
   });
   expect(
     (await call('policy', '/core/auth/registration-code', 'POST', { phone: fresh().phone, inviteCode })).status,
   ).toBe(503);
   process.env.SMS_REGISTRATION_ENABLED = 'typo';
-  expect((await call('policy', '/core/auth/registration-policy', 'GET')).status).toBe(503);
+  expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toMatchObject({
+    registrationMode: 'account',
+    smsRequired: false,
+    smsEnabled: false,
+  });
   process.env.SMS_REGISTRATION_ENABLED = '1';
   process.env.SMS_SIGN_NAME = '';
-  expect((await call('policy', '/core/auth/registration-policy', 'GET')).status).toBe(503);
+  expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toMatchObject({
+    registrationMode: 'account',
+    smsRequired: false,
+    smsEnabled: false,
+  });
   expect(await provider()).not.toHaveBeenCalled();
 });
 it('requires trusted bridge identity; validates invite and account before sending', async () => {
@@ -329,7 +338,8 @@ it('pilot policy uses validated invitations and does not permit non-pilot unveri
   process.env.SMS_REGISTRATION_ENABLED = '0';
   process.env.SMS_REGISTRATION_PILOT_INVITATIONS = record.token_hash;
   expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode })).body.data).toEqual({
-    smsRequired: true,
+    registrationMode: 'account',
+    smsRequired: false,
     smsEnabled: true,
   });
   expect(
@@ -340,7 +350,7 @@ it('pilot policy uses validated invitations and does not permit non-pilot unveri
         smsRequired: true,
       })
     ).body.data,
-  ).toEqual({ smsRequired: true, smsEnabled: false });
+  ).toEqual({ registrationMode: 'account', smsRequired: false, smsEnabled: false });
   expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode: 'ZZZZZZZZ' })).status).toBe(
     422,
   );
@@ -386,7 +396,7 @@ it('removing a pilot denies pending proof verification; global enable still requ
   expect(
     (await call(outsider.name, '/core/auth/registration-policy', 'GET', { smsRequired: true, smsEnabled: false })).body
       .data,
-  ).toEqual({ smsRequired: true, smsEnabled: true });
+  ).toEqual({ registrationMode: 'account', smsRequired: false, smsEnabled: true });
   expect((await signup(outsider)).status).toBe(422);
   expect((await signup(pilot, code)).status).toBe(201);
 });
@@ -430,4 +440,86 @@ it('invitation revoked after delivery cannot register or consume verification', 
     await c.query('UPDATE member_invitations SET revoked_at=NULL WHERE id=?', [invitationId]);
   }
   expect((await signup(p, code)).status).toBe(201);
+});
+
+it('account registration succeeds even with unavailable SMS and is usable on Web and mini without a phone or WeChat binding', async () => {
+  process.env.SMS_REGISTRATION_ENABLED = 'typo';
+  process.env.SMS_SIGN_NAME = '';
+  const p = fresh(),
+    username = 'account_' + p.name,
+    password = 'Account_test_password_123';
+  const r = await call(p.name, '/core/auth/register', 'POST', { username, password });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  expect(r.body.data.user).toMatchObject({
+    username,
+    phone: null,
+    phoneVerifiedAt: null,
+    role: 'creator',
+    parentId: null,
+  });
+  expect((await call(p.name, '/core/auth/login', 'POST', { username, password })).status).toBe(200);
+  const web = await (
+    await import('../../src/services/auth.service')
+  ).login(username, password, 'isolated', { type: 'web', id: crypto.randomUUID() });
+  expect(web.user.id).toBe(r.body.data.user.id);
+  for (const table of ['member_invitation_uses', 'wechat_identities']) {
+    const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM ' + table + ' WHERE user_id=?', [
+      web.user.id,
+    ]);
+    expect(count.n).toBe(0);
+  }
+  expect(await provider()).not.toHaveBeenCalled();
+});
+it('account registration consumes hidden invitation once and rejects concurrent duplicate names', async () => {
+  const p = fresh(),
+    username = 'account_' + p.name;
+  const input = { username, password: 'Account_test_password_123', inviteCode };
+  const results = await Promise.all([
+    call(p.name, '/core/auth/register', 'POST', input),
+    call(p.name, '/core/auth/register', 'POST', input),
+  ]);
+  expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+  const [[row]] = await c.query<RowDataPacket[]>(
+    'SELECT id,parent_id,phone,phone_verified_at FROM users WHERE username=?',
+    [username],
+  );
+  expect(String(row.parent_id)).toBe('1');
+  expect(row.phone).toBeNull();
+  expect(row.phone_verified_at).toBeNull();
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM member_invitation_uses WHERE user_id=?', [
+    row.id,
+  ]);
+  expect(count.n).toBe(1);
+  expect(await provider()).not.toHaveBeenCalled();
+});
+it('account registration does not silently ignore invalid invitations or accept forged phone verification and roles', async () => {
+  const p = fresh(),
+    input = { username: 'account_' + p.name, password: 'Account_test_password_123' };
+  for (const extra of [
+    { inviteCode: 'ZZZZZZZZ' },
+    { phone: p.phone },
+    { smsCode: '123456' },
+    { phoneVerifiedAt: '2026-10-03' },
+    { role: 'admin' },
+  ])
+    expect((await call(p.name, '/core/auth/register', 'POST', { ...input, ...extra })).status).toBe(422);
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [input.username]);
+  expect(count.n).toBe(0);
+});
+it('new account names cannot reserve an unverified phone number', async () => {
+  for (const username of ['13900009001', 'ab', 'name with spaces'])
+    expect(
+      (await call(fresh().name, '/core/auth/register', 'POST', { username, password: 'Account_test_password_123' }))
+        .status,
+    ).toBe(422);
+});
+it('account signup retains registration rate limits when SMS is deferred', async () => {
+  const p = fresh();
+  for (let n = 0; n < 6; n++) {
+    const r = await call(p.name, '/core/auth/register', 'POST', {
+      username: 'limited_' + p.name + '_' + n,
+      password: 'Account_test_password_123',
+    });
+    expect(r.status).toBe(n < 5 ? 201 : 429);
+  }
 });

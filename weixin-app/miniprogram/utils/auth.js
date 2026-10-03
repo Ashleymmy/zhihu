@@ -71,17 +71,16 @@ async function verifyPhone(phone, password, smsCode) {
   if (version !== revision) throw new Error("登录已变化，请重新进入个人信息");
   return store(user);
 }
-async function register(phone, password, inviteCode, displayName, smsCode) {
+async function register(username, password, inviteCode, displayName) {
   clear();
   const version = revision;
   const result = await request.send("/core/auth/register", {
     method: "POST",
     data: {
-      phone,
+      username,
       password,
       ...(inviteCode ? { inviteCode } : {}),
       displayName: displayName || "",
-      ...(smsCode ? { smsCode } : {}),
     },
     auth: false,
   });

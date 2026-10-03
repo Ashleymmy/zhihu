@@ -169,9 +169,13 @@ Page({
     this.setData({ busy: true, error: "" });
     try {
       const result = await auth.loginWithWeChat();
-      // Unbound identities require explicit account/password and phone verification.
+      // An unbound WeChat identity must not turn login into mandatory phone verification.
       if (result && result.needsBind) {
-        wx.navigateTo({ url: "/pages/bind/index" });
+        this.setData({
+          mode: "password",
+          error:
+            "当前微信尚未绑定，请先使用账号密码登录；之后可在个人信息中绑定微信。",
+        });
         return;
       }
       if (result) wx.reLaunch({ url: auth.entryPath(result) });

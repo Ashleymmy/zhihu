@@ -7,6 +7,7 @@
   <template is="status" data="{{error, loading}}" />
   <block wx:if="{{!loading && user}}">
     <view class="card cell-card">
+      <view class="cell"><text class="cell-label">登录账号</text><text class="cell-value">{{user.username}}</text></view>
       <view class="cell" bindtap="openDisplayNameModal">
         <text class="cell-label">昵称</text>
         <text class="cell-value muted">{{user.displayName || user.username}}</text>
@@ -21,6 +22,7 @@
         <text class="cell-value muted">{{user.phoneVerifiedAt ? '已通过短信验证' : '去验证'}}</text>
         <text class="cell-arrow" wx:if="{{!user.phoneVerifiedAt}}">›</text>
       </view>
+      <view wx:if="{{!user.phoneVerifiedAt}}" class="muted" style="padding:0 28rpx 20rpx;font-size:24rpx;line-height:1.7;">可稍后验证手机号，不影响账号密码登录。验证后可使用短信验证码登录。</view>
       <view class="cell" bindtap="openContactModal">
         <text class="cell-label">备用联系方式</text>
         <text class="cell-value muted">{{user.contact || '未填写'}}</text>

@@ -58,6 +58,33 @@ async function person(verified = true, bound = true) {
 }
 type Person = Awaited<ReturnType<typeof person>>;
 const provider = async () => vi.mocked((await import('../../src/sms/aliyun')).sendAccountSms);
+
+it('new account can defer phone verification until profile, then SMS-login without changing account or binding', async () => {
+  const name = 'deferred_profile',
+    phone = '13877771234';
+  const r = await call(name, 'register', { username: name, password });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  const id = r.body.data.user.id,
+    token = r.body.data.token;
+  expect(r.body.data.user.phone).toBeNull();
+  expect(r.body.data.user.phoneVerifiedAt).toBeNull();
+  expect((await call(name, 'login-code', { phone })).status).toBe(403);
+  expect((await call(name, 'phone-code', { phone, password }, token)).status).toBe(200);
+  const code = (await provider()).mock.calls.at(-1)![1];
+  expect((await call(name, 'verify-phone', { phone, password, smsCode: code }, token)).status).toBe(200);
+  const [[row]] = await c.query<RowDataPacket[]>('SELECT phone,phone_verified_at FROM users WHERE id=?', [id]);
+  expect(row.phone).toBe(phone);
+  expect(row.phone_verified_at).toBeTruthy();
+  // Move past the shared 60-second recipient cooldown before trying SMS login.
+  await c.query('UPDATE sms_registration_challenges SET created_at=DATE_SUB(NOW(3),INTERVAL 61 SECOND)');
+  await c.query('DELETE FROM sms_registration_limits WHERE expires_at<TIMESTAMPADD(SECOND,130,NOW(3))');
+  expect((await call(name, 'login-code', { phone })).status).toBe(200);
+  const login = await call(name, 'sms-login', { phone, smsCode: (await provider()).mock.calls.at(-1)![1] });
+  expect(login.status, JSON.stringify(login.body)).toBe(200);
+  expect(login.body.data.user.id).toBe(id);
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM wechat_identities WHERE user_id=?', [id]);
+  expect(count.n).toBe(0);
+});
 async function send(p: Person) {
   const r = await call(p.name, 'login-code', { phone: p.phone });
   expect(r.status, JSON.stringify(r.body)).toBe(200);
