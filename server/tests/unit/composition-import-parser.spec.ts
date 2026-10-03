@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { balancedVideoCategories, compositionUrlKey, importOptionsSchema, parseCompositionFile, parseMedia, parseReleaseTime } from '../../src/modules/zhihu/services/composition-import-parser';
+import { balancedVideoCategories, compositionUrlKey, detectMapping, importOptionsSchema, parseCompositionFile, parseMedia, parseReleaseTime } from '../../src/modules/zhihu/services/composition-import-parser';
 
 const workbook = (sheets: Record<string, unknown[][]>, bookType: XLSX.BookType = 'xlsx') => {
   const book = XLSX.utils.book_new();
@@ -8,6 +8,22 @@ const workbook = (sheets: Record<string, unknown[][]>, bookType: XLSX.BookType =
   return { originalname: `works.${bookType}`, buffer: XLSX.write(book, { type: 'buffer', bookType }) as Buffer };
 };
 describe('作品登记表解析', () => {
+  it('多平台回填表优先读取明确的关键词列，空白发布时间不影响其他字段', () => {
+    const file = workbook({ 视频链接回填: [
+      ['推广计划', '媒体类型', '推广链接', '作品分类', '作品子分类', '发布时间', '关键词', '媒体账号', '标题'],
+      ['', '抖音', 'https://v.douyin.com/DWq3Z1dWKbY/ f@o.qE :6pm oQx:/ 06/27 ', '视频', '解压', '', '岁岁共同舟', '77592572371', '岁岁共同舟'],
+    ] });
+    const parsed = parseCompositionFile(file, importOptionsSchema.parse({}));
+    expect(parsed.mapping).toMatchObject({ keyword: 6, mediaType: 1, promoUrl: 2, compositionType: 3, compositionSubType: 4, releaseTime: 5, mediaAccount: 7, title: 8 });
+    expect(parsed.parsedRows[0].values.keyword).toBe('岁岁共同舟');
+    expect(parsed.parsedRows[0].values.releaseTime).toBe('');
+  });
+  it('兼容旧表头，但不会擅自选取两个同名关键词列', () => {
+    expect(detectMapping(['推广计划', '作品链接']).keyword).toBe(0);
+    expect(detectMapping(['关键词', '推广计划', '关键词']).keyword).toBeNull();
+    expect(detectMapping(['关键词', ' keyword ', '推广计划']).keyword).toBeNull();
+    expect(detectMapping(['推广计划', ' 关 键 词 ']).keyword).toBe(1);
+  });
   it('识别达人记录的真实列名，选择有数据的工作表，保留物理行号', () => {
     const file = workbook({ '9月20日': [['日期', '达人视频登记表', 'id', '微信/qq', '平台', '视频链接', '关键词'], [46285]], '9月21日': [['日期', '平台id', '微信/qq', '平台', '视频链接', '关键词'], [46286, 35809749761, '联系人', 'KOC抖音', 'https://v.douyin.com/AbC/', '示例关键词'], [], [46286, '000123', '', '小红书', 'https://xhslink.cn/o/abc', '另一个词']] });
     const parsed = parseCompositionFile(file, importOptionsSchema.parse({}));

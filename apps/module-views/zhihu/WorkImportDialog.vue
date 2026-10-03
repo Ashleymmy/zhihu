@@ -26,6 +26,11 @@ const page = ref(1)
 const input = ref<HTMLInputElement>()
 const options = ref<WorkImportOptions>(props.initialOptions ? JSON.parse(JSON.stringify(props.initialOptions)) : { defaults: { planId: props.initialPlanId || undefined }, categoryMode: 'manual' })
 options.value.defaults ||= {}
+// A saved batch may contain a failed automatic match from an older parser.
+// Retry missing fields while retaining columns the user already selected.
+if (props.initialOptions?.mapping) {
+  options.value.mapping = Object.fromEntries(Object.entries(props.initialOptions.mapping).filter(([, column]) => column !== null))
+}
 onMounted(() => { if (props.initialFile) { file.value = props.initialFile; void analyze() } })
 const statusLabels = { ready: '可上传', duplicate: '重复，跳过', invalid: '需补充', created: '已保存' }
 const types = [{ value: 0, label: '其他' }, { value: 1, label: '图文' }, { value: 2, label: '视频' }]
@@ -148,6 +153,7 @@ function downloadIssues() {
               </div>
               <details class="import-mapping">
                 <summary>字段识别 · 已对应 {{ Object.values(options.mapping || {}).filter(v => v !== null).length }} 个字段（点击调整）</summary>
+                <button type="button" class="import-recheck" :disabled="busy" @click="analyze(true)">重新识别字段</button>
                 <div v-if="options.mapping" class="mapping-grid"><label v-for="field in preview.fields" :key="field.key">{{ field.label }}<select v-model="options.mapping[field.key]" @change="changed"><option :value="null">表格中没有此字段</option><option v-for="column in preview.columns" :key="column.index" :value="column.index">{{ column.index + 1 }}. {{ column.label }}{{ column.samples[0] ? `（${column.samples[0].slice(0, 26)}）` : '' }}</option></select></label></div>
               </details>
               <div class="import-controls defaults">
