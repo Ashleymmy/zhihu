@@ -48,9 +48,18 @@ const headerKey = (value: unknown) => cellText(value).toLowerCase().replace(/[\s
 export function detectMapping(headers: unknown[]): ImportMapping {
   const result: ImportMapping = {};
   for (const field of importFields) {
-    const aliases = [field.label, field.key, ...field.aliases].map(headerKey);
-    const matches = headers.map((value, index) => aliases.includes(headerKey(value)) ? index : -1).filter(i => i >= 0);
-    result[field.key] = matches.length === 1 ? matches[0] : null;
+    // An explicit field name takes precedence over legacy names. In particular,
+    // "推广计划" must not hide a separate "关键词" column in the same sheet.
+    const names = [[field.label, field.key], field.aliases];
+    result[field.key] = null;
+    for (const group of names) {
+      const aliases = group.map(headerKey);
+      const matches = headers.map((value, index) => aliases.includes(headerKey(value)) ? index : -1).filter(i => i >= 0);
+      if (matches.length) {
+        result[field.key] = matches.length === 1 ? matches[0] : null;
+        break;
+      }
+    }
   }
   return result;
 }
