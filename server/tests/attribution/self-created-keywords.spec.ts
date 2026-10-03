@@ -296,6 +296,11 @@ it('failed words can be edited in place with ownership and form fields preserved
   await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'3'})).rejects.toMatchObject({httpStatus:409});
   await ready(word.planId);
   await expect(resources.deleteFailedKeyword(leader,scope,word.id,key())).rejects.toThrow('仅可处理');
+  // Legacy plan-only rows cannot be sent to the exclusive-keyword mutation API.
+  const oldWord=input().keyword;
+  await c.query("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,sync_status) VALUES(1,'task','channel',?,'https://example.com',0,1,1,'failed')",[oldWord]);
+  const old=(await resources.listKeywords(admin,scope,1,20,oldWord)).list[0];
+  expect(String(old.id)).toMatch(/^plan:/);expect(old).toMatchObject({read_only:1,can_edit_failed:0,can_copy_failed:0,can_delete_failed:0});
 });
 it('failed used records can be copied or hidden without changing historical attribution or deleting works',async()=>{
   const original=input();const word=await resources.createKeyword(direct,scope,key(),original);await ready(word.planId);

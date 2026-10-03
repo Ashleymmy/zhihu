@@ -394,7 +394,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       if (!word.binding_id && Number(word.has_usage_history)) { word.lifecycle_status = 'historical'; word.read_only = 1; }
       word.read_only = Number(word.read_only);
       word.composition_count = Number(word.composition_count);
-      const canFix = word.sync_status === 'failed' && !Number(word.has_upstream_plan) && word.plan_status !== 'ended' && (isStaffRole(user.role) || String(word.created_by) === user.sub || String(word.leader_id) === user.sub || String(word.executor_id) === user.sub);
+      const canFix = !String(word.id).startsWith('plan:') && word.sync_status === 'failed' && !Number(word.has_upstream_plan) && word.plan_status !== 'ended' && (isStaffRole(user.role) || String(word.created_by) === user.sub || String(word.leader_id) === user.sub || String(word.executor_id) === user.sub);
       word.can_delete_failed = Number(canFix);
       word.can_edit_failed = Number(canFix && !Number(word.has_usage_history) && word.lifecycle_status !== 'retired' && word.release_status !== 'requested');
       word.can_copy_failed = Number(canFix && (Number(word.has_usage_history) === 1 || word.lifecycle_status === 'retired'));
