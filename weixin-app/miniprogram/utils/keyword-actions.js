@@ -136,7 +136,7 @@ function decorate(user, item, options) {
         ? "本人"
         : item.executorId
           ? "成员 " + item.executorId
-          : "待分配",
+          : item.lifecycleStatus === "historical" ? item.ownerName || "保留原归属" : "待分配",
     actions: flags(user, item).map((key) => ({ key, label: labels[key] })),
   });
 }

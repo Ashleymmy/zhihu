@@ -4,7 +4,8 @@ import { scopeFilter } from '../../../utils/scopeFilter';
 import { readyPlanSql, ownershipConflictSql } from '../attribution/keyword-usability';
 import { independentCreatorSql } from '../attribution/relationships';
 
-// Reading the public keyword pool is not permission to submit works for it.
+// Creators must own a keyword. Staff can also register historical works against
+// an unassigned platform plan; the insert permanently removes it from the pool.
 // Keep the picker, spreadsheet preview and transactional insert on one policy.
 export function compositionPlanScope(user: AuthUser, currentRead = false, requireReady = true) {
   // Inserts can follow an Excel preview in a REPEATABLE READ transaction.
@@ -25,6 +26,13 @@ export function compositionPlanScope(user: AuthUser, currentRead = false, requir
         ? '(cb.executor_id=? OR cb.leader_id=?)'
         : 'cb.executor_id=?';
   const actorBindings = isStaffRole(user.role) ? [] : user.role === 'leader' ? [user.sub, user.sub] : [user.sub];
+  const platformRegistration = isStaffRole(user.role) ? `OR (
+    ck.current_binding_id IS NULL AND ck.lifecycle_status IN ('available','active')
+    AND EXISTS(SELECT 1 FROM users platform_owner WHERE platform_owner.id=p.owner_id AND platform_owner.role IN ('developer','admin','operator')${lock})
+    AND NOT EXISTS(SELECT 1 FROM zh_keyword_bindings previous WHERE previous.keyword_id=ck.id AND (previous.released_at IS NULL OR previous.used_at IS NOT NULL)${lock})
+    AND NOT EXISTS(SELECT 1 FROM zh_evidence previous_work JOIN zh_keyword_bindings previous_binding ON previous_binding.id=previous_work.binding_id WHERE previous_binding.keyword_id=ck.id${lock})
+    AND NOT EXISTS(SELECT 1 FROM compositions previous_composition WHERE previous_composition.plan_id=p.id AND previous_composition.owner_id<>p.owner_id${lock})
+  )` : '';
   return {
     clause: `(p.status<>'ended' AND (
       (NOT EXISTS(SELECT 1 FROM zh_keywords legacy WHERE legacy.plan_id=p.id${lock}) AND ${legacy.clause}
@@ -40,13 +48,13 @@ export function compositionPlanScope(user: AuthUser, currentRead = false, requir
         ${requireReady ? `AND ${readyPlanSql('p','ck',lock)} AND NOT ${ownershipConflictSql('ck','cb',lock)}` : ''}
         AND NOT EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.project_id=ck.project_id AND er.account_id=ck.account_id AND er.mode='stopped'${lock})
         AND (${isStaffRole(user.role) ? '1=1' : `EXISTS(SELECT 1 FROM project_members viewer WHERE viewer.project_id=ck.project_id AND viewer.user_id=? AND viewer.left_at IS NULL${lock})`})
-        AND (ck.lifecycle_status IN ('assigned','active') AND cb.released_at IS NULL
+        AND ((ck.lifecycle_status IN ('assigned','active') AND cb.released_at IS NULL
             AND cb.stop_new_use_at IS NULL AND cb.release_status<>'requested'
             AND executor.id IS NOT NULL AND ${actor}
             AND EXISTS(SELECT 1 FROM project_members member WHERE member.project_id=ck.project_id AND member.user_id=cb.executor_id AND member.left_at IS NULL${lock})
             AND ((cb.path_type='direct_creator' AND executor.role='creator' AND ${independentCreatorSql('executor', lock)})
               OR (cb.path_type='team_creator' AND executor.role='creator' AND executor.parent_id=cb.leader_id)
-              OR (cb.path_type='leader_self' AND executor.role='leader' AND executor.id=cb.leader_id)))${lock}
+              OR (cb.path_type='leader_self' AND executor.role='leader' AND executor.id=cb.leader_id))) ${platformRegistration})${lock}
       )
     ))`,
     bindings: [...legacy.bindings, ...(isStaffRole(user.role) ? [] : [user.sub, user.sub]), ...actorBindings],

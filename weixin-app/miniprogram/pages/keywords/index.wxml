@@ -55,7 +55,7 @@
       </view>
       <view class="kw-card-meta text-sun" wx:if="{{item.releaseStatus === 'requested'}}">已申请释放，等待运营审核</view>
       <view class="kw-card-meta text-clay" wx:if="{{item.syncError}}">{{item.syncError}}</view>
-      <view class="kw-card-meta" wx:if="{{item.compositionCount}}">已登记作品 {{item.compositionCount}} 条；审核结果请查看“作品与审核”。</view>
+      <view class="kw-card-meta" wx:if="{{item.compositionCount}}">已登记作品 {{item.compositionCount}} 条；提交结果请查看“作品记录”。</view>
       <view class="kw-card-actions" wx:if="{{item.actions.length}}">
         <button
           wx:for="{{item.actions}}"

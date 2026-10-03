@@ -70,6 +70,10 @@ async function planOwner(user: AuthUser, planId: string, connection: PoolConnect
     await connection.query('UPDATE zh_keyword_bindings SET used_at=COALESCE(used_at,NOW(3)),activated_on=COALESCE(activated_on,?),version=version+1 WHERE id=?',
       [businessDay(),plan.binding_id]);
     await connection.query("UPDATE zh_keywords SET used_ever_at=COALESCE(used_ever_at,NOW(3)),lifecycle_status='active',version=version+1 WHERE id=?",[plan.keyword_id]);
+  } else if (plan.keyword_id) {
+    // Staff historical registration preserves the platform plan's original
+    // owner, without inventing a creator or a commission-bearing assignment.
+    await connection.query("UPDATE zh_keywords SET used_ever_at=COALESCE(used_ever_at,NOW(3)),lifecycle_status='active',version=version+1 WHERE id=?",[plan.keyword_id]);
   }
   return String(plan.executor_id ?? plan.owner_id);
 }
@@ -171,9 +175,10 @@ export async function getComposition(user: AuthUser, id: string) {
   return item;
 }
 
-export async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection) {
+export async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection, expectedOwnerId?: string) {
   const problem=compositionLinkProblem(input.mediaType,input.promoUrl);if(problem)throw new AppError(422,42200,problem);
   const ownerId = await planOwner(user, input.planId, connection);
+  if (expectedOwnerId !== undefined && ownerId !== expectedOwnerId) throw new AppError(409,40900,'关键词归属刚发生变化，请刷新预览后重试');
   const [result] = await connection.query<ResultSetHeader>(
     `INSERT INTO compositions
       (plan_id, owner_id, media_type, media_account, composition_type,

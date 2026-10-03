@@ -358,6 +358,8 @@ it('work editing retains attribution, updates every field and rejects other owne
   expect(saved).toMatchObject({media_type:patch.mediaType,media_account:'new',promo_url:patch.promoUrl,composition_type:2,composition_sub_type:6,title:patch.title,sync_status:'local',sync_error:null});
   expect(String(saved.owner_id)).toBe(team.sub);expect(String(saved.plan_id)).toBe(word.planId);
   const joined=(await listWorks(team,scope,1,100)).list.filter(r=>r.composition_id===work.id);expect(joined).toHaveLength(1);expect(joined[0].work_url).toBe(patch.promoUrl);
+  await updateComposition(team,work.id,{title:null});
+  const cleared=(await listWorks(team,scope,1,100)).list.find(r=>r.composition_id===work.id);expect(cleared?.description).toBe('');
   await c.query("UPDATE compositions SET sync_status='syncing' WHERE id=?",[work.id]);
   await expect(updateComposition(team,work.id,{title:'too soon'})).rejects.toThrow('正在提交');
   await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'2'})).rejects.toThrow('保留原归属');
@@ -377,6 +379,49 @@ it('successful submission automatically checks routine ownership; failed, confli
     expect((await binding(word.id)).verification_status,mode).toBe(['normal','web'].includes(mode)?'passed':mode==='disputed'?'disputed':'pending');
     if(mode!=='web'){const [[e]]=await c.query<RowDataPacket[]>('SELECT status,reviewed_by FROM zh_evidence WHERE binding_id=?',[b.id]);expect(e.status,mode).toBe(mode==='normal'?'passed':mode==='rejected'?'rejected':'pending');expect(e.reviewed_by).toBeNull();}
   }
+});
+
+it('staff imports public-pool history without a claim, preserving its platform owner and permanent exclusive use',async()=>{
+  const XLSX=await import('xlsx');
+  const {analyzeCompositionImport,commitCompositionImport}=await import('../../src/modules/zhihu/services/composition-import.service');
+  const {importOptionsSchema}=await import('../../src/modules/zhihu/services/composition-import-parser');
+  const {createComposition,updateComposition,insertComposition}=await import('../../src/modules/zhihu/services/compositions.service');
+  const word=await resources.createKeyword(admin,scope,key(),input());await ready(word.planId);
+  const item={planId:word.planId,mediaType:'KOC抖音',mediaAccount:'public-history',compositionType:2,compositionSubType:9,promoUrl:'https://v.douyin.com/history'+word.id+'/',releaseTime:'2026-10-03T12:00:00+08:00'};
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
+    ['推广计划','关键词','媒体类型','媒体账号','推广链接','作品分类','作品子分类','发布时间'],
+    ['',input().keyword,'抖音','public-history',item.promoUrl,'视频','解压','2026-10-03 12:00']
+  ]),'作品');
+  book.Sheets['作品'].B2.v=(await c.query<RowDataPacket[]>('SELECT keyword FROM plans WHERE id=?',[word.planId]))[0][0].keyword;
+  const file={originalname:'history.xlsx',buffer:XLSX.write(book,{type:'buffer',bookType:'xlsx'}) as Buffer},opts=importOptionsSchema.parse({});
+  const preview=await analyzeCompositionImport(admin,file,opts);expect(preview.ready).toBe(1);expect(preview.rows[0].notes).toContain('登记后保留平台原归属，该关键词不再开放领取');
+  for(const who of [leader,direct,team]){expect((await analyzeCompositionImport(who,file,opts)).ready).toBe(0);await expect(createComposition(who,item)).rejects.toMatchObject({httpStatus:404});}
+  const imported=await commitCompositionImport(admin,file,opts);expect(imported.created).toBe(1);
+  const [[saved]]=await c.query<RowDataPacket[]>('SELECT c.owner_id,p.owner_id plan_owner,k.current_binding_id,k.used_ever_at FROM compositions c JOIN plans p ON p.id=c.plan_id JOIN zh_keywords k ON k.plan_id=p.id WHERE c.id=?',[imported.ids[0]]);
+  expect(String(saved.owner_id)).toBe('1');expect(String(saved.plan_owner)).toBe('1');expect(saved.current_binding_id).toBeNull();expect(saved.used_ever_at).not.toBeNull();
+  expect((await resources.listKeywords(leader,scope,1,100,preview.rows[0].keyword,'available')).total).toBe(0);
+  await expect(resources.claim(leader,scope,word.id,key())).rejects.toMatchObject({httpStatus:409});
+  await expect(resources.distribute(admin,scope,word.id,key(),'4')).rejects.toMatchObject({httpStatus:409});
+  expect((await commitCompositionImport(admin,file,opts)).duplicate).toBe(1);
+  await updateComposition(admin,imported.ids[0],{title:'历史作品修正'});
+  // Additional works may retain the same owner; never grant a creator access to the used pool word.
+  expect((await createComposition(admin,{...item,promoUrl:item.promoUrl+'second'})).id).toBeTruthy();
+  await expect(createComposition(direct,item)).rejects.toMatchObject({httpStatus:404});
+  const assigned=await resources.createKeyword(direct,scope,key(),input());await ready(assigned.planId);
+  const owned=await createComposition(admin,{...item,planId:assigned.planId,promoUrl:item.promoUrl+'assigned'});
+  expect(String((await c.query<RowDataPacket[]>('SELECT owner_id FROM compositions WHERE id=?',[owned.id]))[0][0].owner_id)).toBe('4');
+  const failed=await resources.createKeyword(admin,scope,key(),input());
+  await expect(createComposition(admin,{...item,planId:failed.planId})).rejects.toMatchObject({httpStatus:404});
+  // A claim after a spreadsheet snapshot must not silently award history to the new claimant.
+  const raced=await resources.createKeyword(admin,scope,key(),input());await ready(raced.planId);
+  const tx=await pool.getConnection();await tx.beginTransaction();
+  try {
+    await tx.query('SELECT owner_id FROM plans WHERE id=?',[raced.planId]);
+    await resources.claim(leader,scope,raced.id,key());
+    const b=await binding(raced.id);await resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'2'});
+    await expect(insertComposition(admin,{...item,planId:raced.planId},tx,'1')).rejects.toThrow('归属刚发生变化');
+  } finally {await tx.rollback();tx.release();}
+  expect((await binding(raced.id)).used_at).toBeNull();
 });
 
 it('simulation worker preserves self-created bindings and public pool creation retains its priority window', async () => {

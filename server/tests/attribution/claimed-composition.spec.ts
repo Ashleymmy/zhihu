@@ -60,6 +60,7 @@ async function keyword(executor?: AuthUser) {
     item.planId,
   ]);
   await c.query('UPDATE zh_keywords SET priority_until=TIMESTAMPADD(HOUR,-1,NOW()) WHERE id=?', [item.id]);
+  await resources.synchronizeKeywords(scope,item.planId);
   let bindingId = '';
   if (executor) {
     const claimant = executor === team || executor === leader ? leader : executor;
@@ -257,15 +258,15 @@ describe('领取关键词后登记作品', () => {
       }
     },
   );
-  it('旧个人计划仍可登记，独占词必须先分配，批量失败整体回滚', async () => {
+  it('旧个人计划与管理端公池登记保留原归属，达人批量失败整体回滚', async () => {
     await c.query(
       "INSERT INTO plans(id,project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by) VALUES(9001,1,'task','channel','历史个人','https://example.com',0,4,4)",
     );
     expect((await works.createComposition(direct, input('9001'))).id).toBeTruthy();
     const free = await keyword();
-    await expect(works.createComposition(admin, input(free.planId))).rejects.toMatchObject({httpStatus:404});
-    await resources.distribute(admin, scope, free.id, crypto.randomUUID(), direct.sub);
-    expect((await works.createComposition(admin, input(free.planId))).id).toBeTruthy();
+    const registered=await works.createComposition(admin,input(free.planId));
+    expect(String((await c.query<RowDataPacket[]>('SELECT owner_id FROM compositions WHERE id=?',[registered.id]))[0][0].owner_id)).toBe(admin.sub);
+    await expect(resources.distribute(admin,scope,free.id,crypto.randomUUID(),direct.sub)).rejects.toMatchObject({httpStatus:409});
     const mine = await keyword(direct),
       notMine = await keyword(other);
     await expect(

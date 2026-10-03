@@ -17,6 +17,7 @@ export async function confirmSubmittedWorks(compositionId: string | null = null)
     JOIN compositions c ON c.plan_id=k.plan_id AND BINARY c.promo_url=BINARY e.work_url AND c.owner_id=b.executor_id
     SET e.status='passed',e.reason='系统已核对作品归属并收到知乎提交回执',e.reviewed_at=NOW(3)
     WHERE e.status='pending' AND b.verification_status='passed' AND b.released_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM compositions other WHERE other.plan_id=k.plan_id AND other.owner_id<>b.executor_id)
       AND c.status<>'ended' AND c.sync_status='synced' AND NULLIF(TRIM(c.zhihu_composition_id),'') IS NOT NULL
       AND (? IS NULL OR c.id=?)`, [compositionId,compositionId]);
   return { bindings, evidence };

@@ -10,7 +10,7 @@ import { isCompositionCategoryValid } from '../zhihu/composition';
 import { insertComposition, type CompositionInput } from './compositions.service';
 import { balancedVideoCategories, compositionUrlKey, extractCompositionUrl, failImport, importFields, mediaFromUrl, parseCategory, parseCompositionFile, parseMedia, parseReleaseTime, type ImportOptions } from './composition-import-parser';
 
-interface PlanRow extends RowDataPacket { id: string; keyword: string; status: string }
+interface PlanRow extends RowDataPacket { id: string; keyword: string; status: string; platform_registration?: number }
 interface ExistingRow extends RowDataPacket { id: string; promo_url: string }
 export interface WorkImportRow {
   row: number;
@@ -33,7 +33,9 @@ async function analyze(user: AuthUser, file: { originalname: string; buffer: Buf
   if (isDevDemoAuthUser(user)) throw new AppError(409, 40900, '演示账号不支持真实导入，请使用正式账号登录');
   const parsed = parseCompositionFile(file, options);
   const scope = compositionPlanScope(user);
-  const [plans] = await connection.query<PlanRow[]>(`SELECT p.id, p.keyword, p.status FROM plans p WHERE ${scope.clause}`, scope.bindings);
+  const [plans] = await connection.query<PlanRow[]>(`SELECT p.id, p.keyword, p.status,
+    EXISTS(SELECT 1 FROM zh_keywords public_word WHERE public_word.plan_id=p.id AND public_word.current_binding_id IS NULL) platform_registration
+    FROM plans p WHERE ${scope.clause}`, scope.bindings);
   // Only equality matches are exposed: no account, plan or private metadata from other owners.
   const [existing] = await connection.query<ExistingRow[]>('SELECT id, promo_url FROM compositions');
   const existingKeys = new Set(existing.map(item => compositionUrlKey(item.promo_url)).filter(Boolean));
@@ -77,6 +79,7 @@ async function analyze(user: AuthUser, file: { originalname: string; buffer: Buf
       else result.notes.push('使用所选默认计划');
     } else result.errors.push('缺少关键词或计划编号');
     if (plan?.status === 'ended') result.errors.push('该推广计划已结束');
+    if (Number(plan?.platform_registration)) result.notes.push('登记后保留平台原归属，该关键词不再开放领取');
     if (!result.mediaAccount || result.mediaAccount.length > 128) result.errors.push('媒体账号不能为空且不能超过 128 字符');
     if (typeof values.mediaAccount === 'number' && (!Number.isSafeInteger(values.mediaAccount) || values.mediaAccount < 0)) result.errors.push('账号数字精度无效，请在 Excel 中以文本保存账号');
     const linkMedia = mediaFromUrl(promoUrl);
@@ -135,7 +138,13 @@ export async function commitCompositionImport(user: AuthUser, file: { originalna
     if (!preview.total) failImport('当前工作表没有作品数据');
     for (const row of preview.rows) {
       if (row.status !== 'ready' || !row.input) continue;
-      const id = await insertComposition(user, row.input, connection);
+      // Read the preview's transaction snapshot, then compare it with the
+      // locked current owner. A concurrent claim must not silently change
+      // the recipient of a historical work between preview and insert.
+      const [owners] = await connection.query<RowDataPacket[]>(`SELECT COALESCE(b.executor_id,p.owner_id) owner_id
+        FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id
+        LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id AND b.keyword_id=k.id WHERE p.id=?`,[row.input.planId]);
+      const id = await insertComposition(user, row.input, connection, String(owners[0]?.owner_id));
       ids.push(id);
       row.status = 'created';
       row.id = id;
