@@ -279,20 +279,21 @@ const kw = (id, lifecycleStatus) => ({
   taskId: 't1',
 })
 
-test('keywords merge appends the next page and re-filters the active tab', async () => {
+test('keywords tabs request server-filtered pages and merge matching records', async () => {
   const { h } = keywordsSetup(
-    { 1: [kw('a', 'available'), kw('b', 'active')], 2: [kw('c', 'active'), kw('d', 'retired')] },
+    { 1: [kw('b', 'active')], 2: [kw('c', 'active')] },
     60,
   )
   const page = h.page('keywords')
   await page.onShow()
   // 切到「进行中」页签（active,assigned,reserved）
-  page.switchTab({ currentTarget: { dataset: { index: 2 } } })
+  await page.switchTab({ currentTarget: { dataset: { index: 2 } } })
+  assert.equal(h.calls.filter(c=>c.path.endsWith('/keywords')).at(-1).data.view,'ongoing')
   assert.deepEqual(page.data.filteredList.map(i => i.id), ['b'])
 
   await page.onReachBottom()
 
-  assert.deepEqual(page.data.list.map(i => i.id), ['a', 'b', 'c', 'd'])
+  assert.deepEqual(page.data.list.map(i => i.id), ['b', 'c'])
   assert.deepEqual(
     page.data.filteredList.map(i => i.id),
     ['b', 'c'],

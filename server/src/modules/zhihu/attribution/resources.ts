@@ -11,6 +11,7 @@ import { officialPlanReadCapability } from '../zhihu/planReadCapability';
 import { planAccountSql } from '../services/plan-account';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { synchronizeKeywords } from './keyword-readiness';
+import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql } from './keyword-usability';
 import { teamLeader } from './relationships';
 export { synchronizeKeywords } from './keyword-readiness';
 
@@ -82,6 +83,7 @@ export async function retryKeyword(user: AuthUser, scope: Scope, id: string, key
   if (!isStaffRole(user.role)) fail('仅管理员可重试上游创建', 403);
   const result = await mutate(user, scope, 'keyword.retry-upstream', key, { id }, async (c) => {
     const word = await keywordLock(c, scope, id);
+    if (word.lifecycle_status === 'archived') fail('错误记录已删除', 409);
     const [plan] = await select(c, 'SELECT sync_status,zhihu_plan_id,sync_error FROM plans WHERE id=? FOR UPDATE', [
       word.plan_id,
     ]);
@@ -103,6 +105,64 @@ export async function retryKeyword(user: AuthUser, scope: Scope, id: string, key
     logger.warn({ planId: result.planId, error: String(error) }, 'exclusive_plan_delivery_pending');
   }
   return result;
+}
+
+async function failedKeyword(c: PoolConnection, user: AuthUser, scope: Scope, id: string) {
+  const word = await keywordLock(c, scope, id);
+  const [plan] = await select(c, 'SELECT * FROM plans WHERE id=? FOR UPDATE', [word.plan_id]);
+  if (!isStaffRole(user.role) && String(word.created_by) !== user.sub) {
+    const [binding] = await select(c, 'SELECT * FROM zh_keyword_bindings WHERE id=? AND released_at IS NULL FOR UPDATE', [word.current_binding_id]);
+    if (!binding) fail('无权处理此错误记录', 403);
+    ownBinding(user, binding);
+  }
+  if (word.lifecycle_status === 'archived' || plan.status === 'ended' || plan.sync_status !== 'failed' || String(plan.zhihu_plan_id ?? '').trim())
+    fail('仅可处理尚未在知乎创建成功的失败记录，请刷新后重试',409);
+  return {word,plan};
+}
+
+export async function editFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string, value: string) {
+  const keyword = keywordText(value);
+  const result = await mutate(user,scope,'keyword.edit-retry',key,{id,keyword},async c=>{
+    await lockKeywordSpace(c);
+    const {word,plan}=await failedKeyword(c,user,scope,id);
+    if (word.lifecycle_status === 'retired') fail('该词已停止使用，请沿用信息新建',409);
+    if (word.current_binding_id) {
+      const [binding]=await select(c,'SELECT release_status FROM zh_keyword_bindings WHERE id=? FOR UPDATE',[word.current_binding_id]);
+      if (binding?.release_status === 'requested') fail('释放申请中不可修改关键词',409);
+    }
+    await assertKeywordUnused(c,id);
+    if (keyword !== word.keyword) await assertKeywordFree(c,keyword,String(word.plan_id));
+    else if (/400402|请更换关键词/.test(String(plan.sync_error))) fail('请修改关键词后再提交',409);
+    await c.query("UPDATE plans SET keyword=?,sync_status='local',sync_error=NULL WHERE id=?",[keyword,word.plan_id]);
+    await c.query("UPDATE zh_keywords SET keyword=?,upstream_status='pending',version=version+1 WHERE id=?",[keyword,id]);
+    await audit(c,user,'keyword.edit-retry',id,{previousKeyword:word.keyword,keyword,planId:String(word.plan_id)});
+    return {id,planId:String(word.plan_id)};
+  });
+  try { await enqueue('push-plan',{...scope,planId:result.planId},{jobId:`exclusive-plan-${result.planId}`,removeOnComplete:true,removeOnFail:true}); }
+  catch(error) { logger.warn({planId:result.planId,error:String(error)},'exclusive_plan_delivery_pending'); }
+  return result;
+}
+
+export async function deleteFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string) {
+  return mutate(user,scope,'keyword.delete-failed',key,{id},async c=>{
+    const {word}=await failedKeyword(c,user,scope,id);
+    // Hide the error, while retaining immutable ownership, works and financial history.
+    await c.query("UPDATE plans SET status='ended' WHERE id=?",[word.plan_id]);
+    await c.query("UPDATE zh_keywords SET lifecycle_status='archived',version=version+1 WHERE id=?",[id]);
+    if(word.current_binding_id) await c.query('UPDATE zh_keyword_bindings SET stop_new_use_at=COALESCE(stop_new_use_at,NOW(3)),version=version+1 WHERE id=?',[word.current_binding_id]);
+    await audit(c,user,'keyword.delete-failed',id,{keyword:word.keyword,planId:String(word.plan_id),preserveHistory:true});
+    return {id};
+  });
+}
+
+export async function copyFailedKeyword(user: AuthUser, scope: Scope, id: string, key: string, keyword: string) {
+  await authorize(user,scope);
+  const input=await withTransaction(async c=>{
+    await scopeLock(c,scope,user);
+    const {word,plan}=await failedKeyword(c,user,scope,id);
+    return {keyword,sourceKeywordId:id,taskId:String(word.task_id),mappingId:String(word.channel_mapping_id),landingUrl:String(plan.landing_url),popularizeType:Number(plan.popularize_type),secondChannelId:plan.second_channel_id as string|null,name:plan.name as string|null,dailyBudget:plan.daily_budget as number|null,startDate:plan.start_date as string|null,endDate:plan.end_date as string|null};
+  });
+  return createKeyword(user,scope,key,input);
 }
 export async function options(user: AuthUser, scope: Scope) {
   await authorize(user, scope);
@@ -188,7 +248,7 @@ export async function createKeyword(
   user: AuthUser,
   scope: Scope,
   key: string,
-  input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null },
+  input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null; sourceKeywordId?: string },
 ) {
   if (!isStaffRole(user.role) && !['leader', 'creator'].includes(user.role)) fail('无权创建关键词', 403);
   const keyword = keywordText(input.keyword);
@@ -236,7 +296,7 @@ export async function createKeyword(
       await c.query('UPDATE zh_keywords SET current_binding_id=?,lifecycle_status=?,version=version+1 WHERE id=?',
         [bindingId, reserved ? 'reserved' : 'assigned', id]);
     }
-    await audit(c, user, 'keyword.create', id, { ...scope, planId, bindingId });
+    await audit(c, user, 'keyword.create', id, { ...scope, planId, bindingId, sourceKeywordId: input.sourceKeywordId });
     return { id, planId };
   });
   // 计划已经持久化；投递失败仍可按 planId 重试，不重复创建资源。
@@ -251,7 +311,7 @@ export async function createKeyword(
   }
   return result;
 }
-export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '') {
+export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'ongoing' | 'registered' | 'retired' = 'all') {
   await authorize(user, scope);
   await synchronizeKeywords(scope);
   return withTransaction(async (c) => {
@@ -260,10 +320,21 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
     const workScope = scopeFilter(user, 'cw.owner_id');
     const planScope = scopeFilter(user, 'p.owner_id');
     const compositionCount = `(SELECT COUNT(*) FROM compositions cw WHERE cw.plan_id=p.id AND ${workScope.clause})`;
-    const args = [scope.projectId, scope.accountId, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings];
+    const readiness = readyPlanSql();
+    const unused = unusedKeywordSql();
+    const noLiveBinding = 'NOT EXISTS(SELECT 1 FROM zh_keyword_bindings lb WHERE lb.keyword_id=k.id AND lb.released_at IS NULL)';
+    const running = `NOT EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.account_id=k.account_id AND er.project_id=k.project_id AND er.mode='stopped')`;
+    const allocation = `(k.id IS NOT NULL AND k.current_binding_id IS NULL AND k.lifecycle_status='available' AND ${readiness} AND ${unused} AND ${noLiveBinding} AND ${running})`;
+    const claimAccess = user.role === 'creator' ? `AND k.priority_until<=NOW(3) AND NOT EXISTS(SELECT 1 FROM users cu JOIN users parent ON parent.id=cu.parent_id AND parent.role='leader' WHERE cu.id=? )` : '';
+    const filter = view === 'available' ? `${allocation} ${claimAccess}`
+      : view === 'ongoing' ? `k.lifecycle_status IN ('reserved','assigned','active') AND b.released_at IS NULL AND b.stop_new_use_at IS NULL AND b.release_status<>'requested' AND ${readiness} AND NOT ${ownershipConflictSql()}`
+      : view === 'registered' ? `${compositionCount}>0`
+      : view === 'retired' ? `k.lifecycle_status='retired'` : '1=1';
+    const filterArgs = view === 'registered' ? workScope.bindings : view === 'available' && user.role === 'creator' ? [user.sub] : [];
+    const args = [scope.projectId, scope.accountId, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs];
     const where = `p.project_id=? AND ${planAccountSql()}=? AND p.keyword LIKE ?
-      AND (k.id IS NULL OR k.project_id=p.project_id)
-      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0)`;
+      AND (k.id IS NULL OR (k.project_id=p.project_id AND k.lifecycle_status<>'archived'))
+      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0) AND (${filter})`;
     const from = `FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id
       LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id`;
     const [total] = await select(c,
@@ -282,12 +353,16 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       CAST(k.task_id AS CHAR) task_id,CAST(p.id AS CHAR) plan_id,
       (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name,
       COALESCE(k.lifecycle_status,'historical') lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,
-      (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,${isStaffRole(user.role) ? 'p.sync_error' : 'NULL'} AS sync_error,
+      (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,p.sync_error AS sync_error,
+      ${readiness} AS upstream_ready, NOT ${unused} AS has_usage_history,
+      ${ownershipConflictSql()} AS ownership_conflict,
+      ${allocation} AS allocation_ready,b.stop_new_use_at,b.released_at,
       (k.id IS NULL OR NOT (${visibility.clause})) read_only,
       ${compositionCount} composition_count,
       (SELECT u.display_name FROM users u WHERE u.id=p.owner_id) owner_name,
       DATE_FORMAT(TIMESTAMPADD(SECOND,TIMESTAMPDIFF(SECOND,NOW(),UTC_TIMESTAMP()),k.priority_until),'%Y-%m-%dT%H:%i:%s.%fZ') priority_until,k.used_ever_at,k.version,
       CAST(b.id AS CHAR) binding_id,b.path_type,CAST(b.leader_id AS CHAR) leader_id,CAST(b.executor_id AS CHAR) executor_id,b.verification_status,b.release_status,
+      CAST(k.created_by AS CHAR) created_by,
       (k.priority_until<=NOW(3)) AS priority_ended
       ${from}
       WHERE ${where} ORDER BY p.created_at DESC,p.id DESC LIMIT ? OFFSET ?`,
@@ -302,9 +377,18 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
     const simulated = await simulationScope(c, scope);
     const stopped = await select(c, "SELECT id FROM zh_engine_routes WHERE account_id=? AND project_id=? AND mode='stopped'", [scope.accountId, scope.projectId]);
     for (const word of list) {
+      // Historical use without a current binding is not a public-pool word.
+      if (!word.binding_id && Number(word.has_usage_history)) { word.lifecycle_status = 'historical'; word.read_only = 1; }
       word.read_only = Number(word.read_only);
       word.composition_count = Number(word.composition_count);
-      word.allocation_ready = Number(!stopped.length && !word.read_only && !word.binding_id && word.lifecycle_status === 'available' && word.plan_status === 'active'
+      const canFix = word.sync_status === 'failed' && !Number(word.has_upstream_plan) && word.plan_status !== 'ended' && (isStaffRole(user.role) || String(word.created_by) === user.sub || String(word.leader_id) === user.sub || String(word.executor_id) === user.sub);
+      word.can_delete_failed = Number(canFix);
+      word.can_edit_failed = Number(canFix && !Number(word.has_usage_history) && word.lifecycle_status !== 'retired' && word.release_status !== 'requested');
+      word.can_copy_failed = Number(canFix && (Number(word.has_usage_history) === 1 || word.lifecycle_status === 'retired'));
+      if (!isStaffRole(user.role)) word.sync_error = word.sync_status === 'failed' ? keywordFailureMessage(word.sync_error) : null;
+      if (Number(word.ownership_conflict) && word.sync_status !== 'failed') word.sync_error = '关键词历史作品归属与当前使用人不一致，请联系管理员核对，暂不可新增使用';
+      word.usage_ready = Number(!Number(word.ownership_conflict) && !stopped.length && !word.read_only && Number(word.upstream_ready) === 1 && !!word.binding_id && !word.released_at && !word.stop_new_use_at && word.release_status !== 'requested' && ['reserved','assigned','active'].includes(String(word.lifecycle_status)));
+      word.allocation_ready = Number(Number(word.allocation_ready) === 1 && !stopped.length && !word.read_only && !word.binding_id && word.lifecycle_status === 'available' && word.plan_status === 'active'
         && (word.sync_status === 'synced' && Number(word.has_upstream_plan) === 1
           || word.sync_status === 'simulated' && word.upstream_status === 'simulated' && simulated));
     }
@@ -323,8 +407,9 @@ export async function claim(user: AuthUser, scope: Scope, id: string, key: strin
   return mutate(user, scope, 'keyword.claim', key, { id }, async (c) => {
     const word = await keywordLock(c, scope, id);
     if (word.current_binding_id || word.lifecycle_status !== 'available') fail('关键词不可领取或已被占用', 409);
-    const [plan] = await select(c, 'SELECT status,sync_status,zhihu_plan_id FROM plans WHERE id=? FOR SHARE', [word.plan_id]);
-    if (plan.status !== 'active' || !(plan.sync_status === 'synced' && String(plan.zhihu_plan_id ?? '').trim() || plan.sync_status === 'simulated' && word.upstream_status === 'simulated' && await simulationScope(c, scope))) fail('关键词当前不可用，请联系管理员核对接入', 409);
+    await assertKeywordReady(c, id);
+    await assertKeywordUnused(c, id);
+    await assertNoLiveBinding(c, id);
     const [actor] = await select(c, 'SELECT id,role,parent_id,is_active FROM users WHERE id=? FOR SHARE', [user.sub]);
     if (!actor?.is_active || actor.role !== user.role) fail('账号权限已变化，请重新登录', 403);
     const [time] = await select(c, 'SELECT (priority_until<=NOW(3)) AS ended FROM zh_keywords WHERE id=?', [id]);
@@ -366,8 +451,12 @@ export async function changeBinding(
   return mutate(user, scope, `binding.${input.action}`, key, { id, ...input }, async (c) => {
     const { word, binding } = await bindingLock(c, scope, id);
     ownBinding(user, binding);
+    if (String(word.current_binding_id) !== String(binding.id)) fail('绑定已失效，请刷新后重试', 409);
     if (binding.released_at) fail('绑定已经释放', 409);
     if (input.action === 'assign') {
+      await assertKeywordReady(c, String(word.id));
+      await assertKeywordUnused(c, String(word.id));
+      if (binding.release_status === 'requested') fail('释放申请中不可分配', 409);
       if (binding.stop_new_use_at) fail('已停止新增使用，不可重新分配', 409);
       if (
         binding.used_at ||
@@ -404,6 +493,7 @@ export async function changeBinding(
       );
       await c.query("UPDATE zh_keywords SET lifecycle_status='assigned',version=version+1 WHERE id=?", [word.id]);
     } else if (input.action === 'activate') {
+      await assertKeywordReady(c, String(word.id));
       if (String(binding.executor_id) !== user.sub) fail('仅执行人可以声明使用', 403);
       if (binding.used_at) return { id };
       if (binding.stop_new_use_at) fail('已停止新增使用', 409);
@@ -428,8 +518,7 @@ export async function changeBinding(
       await c.query("UPDATE zh_keywords SET lifecycle_status='retired',version=version+1 WHERE id=?", [word.id]);
     } else {
       if (word.used_ever_at || binding.used_at) fail('已使用关键词必须保留原归属', 409);
-      const sourceUse = await select(c, 'SELECT id FROM zh_metric_facts WHERE keyword_id=? LIMIT 1', [word.id]);
-      if (sourceUse.length) fail('该词已有来源事实，不能证明未使用；请先核实来源异常', 409);
+      await assertKeywordUnused(c, String(word.id));
       if (!input.reason?.trim()) fail('请填写未使用核实依据');
       if (input.action === 'release') {
         if (!isStaffRole(user.role) || binding.release_status !== 'requested') fail('仅管理员可审核释放申请', 403);
@@ -459,8 +548,9 @@ export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,
  return mutate(user,scope,'keyword.distribute',key,{id,targetId},async c=>{
   const word=await keywordLock(c,scope,id);
   if(word.current_binding_id||word.lifecycle_status!=='available')fail('关键词已分配或尚不可用',409);
-  const [plan]=await select(c,'SELECT status,sync_status,zhihu_plan_id FROM plans WHERE id=? FOR SHARE',[word.plan_id]);
-  if(plan.status!=='active'||!(plan.sync_status==='synced'&&String(plan.zhihu_plan_id??'').trim()||plan.sync_status==='simulated'&&word.upstream_status==='simulated'&&await simulationScope(c,scope)))fail('关键词尚未创建成功');
+  await assertKeywordReady(c,id);
+  await assertKeywordUnused(c,id);
+  await assertNoLiveBinding(c,id);
   const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE',[targetId,scope.projectId]);
   if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择有效的团长或达人');
   const leader=target.role==='leader'?targetId:await teamLeader(c,scope,target);

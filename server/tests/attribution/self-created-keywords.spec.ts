@@ -176,6 +176,7 @@ it('leaders assign self-created keywords to their own team or themselves, and us
     resources.changeBinding(team, scope, String(b.id), key(), { action: 'request-release', reason: '不能转用' }),
   ).rejects.toThrow('保留原归属');
   const self = await resources.createKeyword(leader, scope, key(), input());
+  await ready(self.planId);
   const selfB = await binding(self.id);
   await resources.changeBinding(leader, scope, String(selfB.id), key(), { action: 'assign', executorId: '2' });
   expect((await binding(self.id)).path_type).toBe('leader_self');
@@ -223,6 +224,106 @@ it('independent creators with a legacy admin parent can claim and register, and 
   await resources.changeBinding(legacy, scope, claimed.id, key(), { action: 'activate' });
   expect((await binding(word.id)).path_type).toBe('direct_creator');
 });
+it('upstream failure blocks leader assignment and all work entry points before any usage is recorded', async () => {
+  const {createComposition,createCompositionBatch}=await import('../../src/modules/zhihu/services/compositions.service');
+  const {compositionPlanScope}=await import('../../src/modules/zhihu/services/composition-access');
+  const work=(planId:string)=>({planId,mediaType:'KOC抖音',mediaAccount:'isolated',compositionType:1,compositionSubType:1,promoUrl:'https://example.com/gates/'+planId,releaseTime:'2026-10-03 12:00:00'});
+  for(const status of ['local','syncing','failed','synced']) {
+    const word=await resources.createKeyword(leader,scope,key(),input());
+    const b=await binding(word.id);
+    await c.query("UPDATE plans SET sync_status=?,sync_error='HTTP 400 / code 400402: private diagnostic',zhihu_plan_id=NULL WHERE id=?",[status,word.planId]);
+    await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'3'})).rejects.toMatchObject({httpStatus:409});
+    // Reproduce an assignment made by the old defective version.
+    await c.query("UPDATE zh_keyword_bindings SET path_type='team_creator',executor_id=3 WHERE id=?",[b.id]);
+    await c.query("UPDATE zh_keywords SET lifecycle_status='assigned' WHERE id=?",[word.id]);
+    await expect(resources.changeBinding(team,scope,String(b.id),key(),{action:'activate'})).rejects.toMatchObject({httpStatus:409});
+    for(const who of [team,leader,admin]) await expect(createComposition(who,work(word.planId))).rejects.toMatchObject({httpStatus:409});
+    await expect(createCompositionBatch(team,[work(word.planId)])).rejects.toMatchObject({httpStatus:409});
+    const access=compositionPlanScope(team);
+    const [picker]=await c.query<RowDataPacket[]>(`SELECT p.id FROM plans p WHERE p.id=? AND ${access.clause}`,[word.planId,...access.bindings]);
+    expect(picker).toHaveLength(0);
+    const saved=await binding(word.id);expect(saved.used_at).toBeNull();expect(saved.used_ever_at).toBeNull();
+    const row=(await resources.listKeywords(team,scope,1,100)).list.find(r=>r.id===word.id)!;
+    expect(row.usage_ready).toBe(0);
+    if(status==='failed') expect(row.sync_error).toBe('关键词不符合知乎规则，请更换关键词');
+    await ready(word.planId);
+    expect((await createComposition(team,work(word.planId))).id).toBeTruthy();
+    await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'2'})).rejects.toThrow('保留原归属');
+  }
+});
+it('historical works and order facts cannot be recycled, including stale available lifecycle and pagination',async()=>{
+  const prefix='历史保护'+Date.now();
+  for(const history of ['work','fact']) {
+    const word=await resources.createKeyword(admin,scope,key(),input(prefix+history));await ready(word.planId);
+    await c.query('UPDATE zh_keywords SET priority_until=TIMESTAMPADD(HOUR,-1,NOW()) WHERE id=?',[word.id]);
+    if(history==='work') await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,4,'KOC抖音','isolated',1,1,?)",[word.planId,'https://example.com/old/'+word.id]);
+    else await c.query("INSERT INTO zh_metric_facts(account_id,project_id,channel_mapping_id,keyword_id,business_date) SELECT account_id,project_id,channel_mapping_id,id,'2026-10-03' FROM zh_keywords WHERE id=?",[word.id]);
+    const pool=(await resources.listKeywords(leader,scope,1,1,prefix,'available'));expect(pool.total).toBe(0);
+    const all=(await resources.listKeywords(admin,scope,1,20,prefix)).list.find(r=>r.id===word.id)!;
+    expect(all.allocation_ready).toBe(0);expect(all.read_only).toBe(1);expect(all.lifecycle_status).toBe('historical');
+    await expect(resources.claim(leader,scope,word.id,key())).rejects.toThrow('保留原归属');
+    await expect(resources.distribute(admin,scope,word.id,key(),'4')).rejects.toThrow('保留原归属');
+  }
+  const free=await resources.createKeyword(admin,scope,key(),input(prefix+'free'));await ready(free.planId);
+  const page=await resources.listKeywords(leader,scope,1,1,prefix,'available');expect(page.total).toBe(1);expect(page.list[0].id).toBe(free.id);
+  expect((await resources.listKeywords(admin,scope,1,1,prefix,'registered')).total).toBe(1);
+  expect((await resources.listKeywords(admin,scope,1,1,prefix,'retired')).total).toBe(0);
+  const concurrent=await Promise.allSettled([resources.claim(leader,scope,free.id,key()),resources.claim(other,scope,free.id,key())]);
+  expect(concurrent.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+});
+it('release and reassignment detect historical works even if usage markers were missing',async()=>{
+  const word=await resources.createKeyword(leader,scope,key(),input());await ready(word.planId);const b=await binding(word.id);
+  await resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'3'});
+  await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,3,'KOC抖音','isolated',1,1,?)",[word.planId,'https://example.com/missing-marker/'+word.id]);
+  await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'2'})).rejects.toThrow('保留原归属');
+  await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'request-release',reason:'test'})).rejects.toThrow('保留原归属');
+});
+
+it('failed words can be edited in place with ownership and form fields preserved, but not stolen or duplicated',async()=>{
+  const original=input();const word=await resources.createKeyword(leader,scope,key(),original);const b=await binding(word.id);
+  await c.query("UPDATE plans SET sync_status='failed',sync_error='code 400402' WHERE id=?",[word.planId]);
+  await expect(resources.editFailedKeyword(other,scope,word.id,key(),'越权改名')).rejects.toMatchObject({httpStatus:403});
+  const taken=input();await resources.createKeyword(admin,scope,key(),taken);
+  await expect(resources.editFailedKeyword(leader,scope,word.id,key(),taken.keyword)).rejects.toThrow('已存在');
+  const retryKey=key(),edited=input().keyword;
+  actor=leader;
+  const response=await request(app).post(`/keywords/${word.id}/edit-retry`).send({...scope,keyword:edited,requestKey:retryKey});
+  expect(response.status,JSON.stringify(response.body)).toBe(200);
+  expect(await resources.editFailedKeyword(leader,scope,word.id,retryKey,edited)).toEqual({id:word.id,planId:word.planId});
+  const [[p]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[word.planId]);
+  expect(p.keyword).toBe(edited);expect(p.landing_url).toBe(original.landingUrl);expect(p.zhihu_task_id).toBe('task');expect(p.channel_id).toBe('channel');expect(p.sync_status).toBe('local');
+  expect(String((await binding(word.id)).id)).toBe(String(b.id));
+  await expect(resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:'3'})).rejects.toMatchObject({httpStatus:409});
+  await ready(word.planId);
+  await expect(resources.deleteFailedKeyword(leader,scope,word.id,key())).rejects.toThrow('仅可处理');
+});
+it('failed used records can be copied or hidden without changing historical attribution or deleting works',async()=>{
+  const original=input();const word=await resources.createKeyword(direct,scope,key(),original);await ready(word.planId);
+  const {createComposition}=await import('../../src/modules/zhihu/services/compositions.service');
+  const work=await createComposition(direct,{planId:word.planId,mediaType:'KOC抖音',mediaAccount:'isolated',compositionType:1,compositionSubType:1,promoUrl:'https://example.com/correction/'+word.id,releaseTime:'2026-10-03 12:00:00'});
+  await c.query("UPDATE plans SET sync_status='failed',zhihu_plan_id=NULL,sync_error='code 400402' WHERE id=?",[word.planId]);
+  await expect(resources.editFailedKeyword(direct,scope,word.id,key(),input().keyword)).rejects.toThrow('保留原归属');
+  const copy=await resources.copyFailedKeyword(direct,scope,word.id,key(),input().keyword);
+  expect(copy.id).not.toBe(word.id);expect(String((await binding(copy.id)).executor_id)).toBe(direct.sub);
+  const [[copied]]=await c.query<RowDataPacket[]>('SELECT landing_url,channel_id FROM plans WHERE id=?',[copy.planId]);expect(copied.landing_url).toBe(original.landingUrl);expect(copied.channel_id).toBe('channel');
+  await expect(resources.deleteFailedKeyword(other,scope,word.id,key())).rejects.toMatchObject({httpStatus:403});
+  const deletion=key();await resources.deleteFailedKeyword(direct,scope,word.id,deletion);await resources.deleteFailedKeyword(direct,scope,word.id,deletion);
+  expect((await resources.listKeywords(direct,scope,1,25,original.keyword)).total).toBe(0);
+  const [rows]=await c.query<RowDataPacket[]>('SELECT owner_id FROM compositions WHERE id=?',[work.id]);expect(rows).toHaveLength(1);expect(String(rows[0].owner_id)).toBe(direct.sub);
+  const b=await binding(word.id);expect(b.lifecycle_status).toBe('archived');expect(b.stop_new_use_at).not.toBeNull();expect(b.released_at).toBeNull();expect(b.used_ever_at).not.toBeNull();
+  await expect(resources.retryKeyword(admin,scope,word.id,key())).rejects.toThrow('已删除');
+  await expect(resources.claim(leader,scope,word.id,key())).rejects.toThrow('不可领取');
+  const {pushPlan}=await import('../../src/modules/zhihu/jobs/pushPlan');await pushPlan({planId:word.planId});
+  const [[p]]=await c.query<RowDataPacket[]>('SELECT status,sync_status FROM plans WHERE id=?',[word.planId]);expect(p.status).toBe('ended');expect(p.sync_status).toBe('failed');
+});
+it('historical works belonging to another owner block new use while preserving records',async()=>{
+  const word=await resources.createKeyword(direct,scope,key(),input());await ready(word.planId);
+  await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,1,'KOC抖音','historical',1,1,?)",[word.planId,'https://example.com/conflict/'+word.id]);
+  const b=await binding(word.id);
+  await expect(resources.changeBinding(direct,scope,String(b.id),key(),{action:'activate'})).rejects.toThrow('归属与当前使用人不一致');
+  const row=(await resources.listKeywords(direct,scope,1,100)).list.find(r=>r.id===word.id)!;expect(row.usage_ready).toBe(0);expect(Number(row.ownership_conflict)).toBe(1);
+});
+
 it('simulation worker preserves self-created bindings and public pool creation retains its priority window', async () => {
   await c.query("UPDATE zhihu_account_settings SET config_json=JSON_OBJECT('mode','simulation') WHERE project_id=1");
   const { pushPlan } = await import('../../src/modules/zhihu/jobs/pushPlan');

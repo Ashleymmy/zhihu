@@ -4,9 +4,11 @@ export interface KeywordProgress {
   planStatus?: string
   allocationReady?: number
   hasUpstreamPlan?: number
+  ownershipConflict?: number
 }
 
 export function keywordProgress(word: KeywordProgress): string {
+  if (word.ownershipConflict) return '归属待核对，禁止新增使用'
   if (word.lifecycleStatus === 'retired' || word.planStatus === 'ended') return '已停用'
   if (word.planStatus === 'paused') return '计划已暂停'
   if (word.planStatus === 'rejected') return '计划已拒绝，暂不可领取'

@@ -257,12 +257,14 @@ describe('领取关键词后登记作品', () => {
       }
     },
   );
-  it('旧个人计划和管理员未分配计划仍可登记，批量失败整体回滚', async () => {
+  it('旧个人计划仍可登记，独占词必须先分配，批量失败整体回滚', async () => {
     await c.query(
       "INSERT INTO plans(id,project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by) VALUES(9001,1,'task','channel','历史个人','https://example.com',0,4,4)",
     );
     expect((await works.createComposition(direct, input('9001'))).id).toBeTruthy();
     const free = await keyword();
+    await expect(works.createComposition(admin, input(free.planId))).rejects.toMatchObject({httpStatus:404});
+    await resources.distribute(admin, scope, free.id, crypto.randomUUID(), direct.sub);
     expect((await works.createComposition(admin, input(free.planId))).id).toBeTruthy();
     const mine = await keyword(direct),
       notMine = await keyword(other);

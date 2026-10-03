@@ -18,9 +18,9 @@ function reviewDisplay(item) {
   const labels={pending:'待审核',reviewing:'审核中',approved:'已通过',passed:'已通过',rejected:'已拒绝'};
   return {
     statusText:item.source==='evidence'?({pending:'平台待审核',passed:'平台已通过',rejected:'平台已退回'}[item.status]||item.status):'推广作品',
-    upstreamText:item.compositionId?(code==null||code===''?'知乎暂未返回审核结果':'知乎审核：'+(labels[code]||String(code))):'尚未登记知乎推广作品',
+    upstreamText:item.planSyncStatus==='failed'?'关键词创建失败，作品未进入知乎审核':item.syncStatus==='failed'?'作品提交失败，尚未进入知乎审核':item.compositionId?(code==null||code===''?'知乎暂未返回审核结果':'知乎审核：'+(labels[code]||String(code))):'尚未登记知乎推广作品',
     syncText:{local:'待提交知乎',syncing:'知乎提交中',synced:'已提交知乎',failed:'知乎提交失败',simulated:'联测作品'}[item.syncStatus]||'',
-    upstreamReason:data.rejectReason||data.reject_reason||''
+    upstreamReason:item.failureReason||data.rejectReason||data.reject_reason||''
   };
 }
 Page(

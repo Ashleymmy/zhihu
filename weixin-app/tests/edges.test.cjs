@@ -88,7 +88,7 @@ test("successful operation does not erase retry keys belonging to another uncert
 });
 test("navigating away during a batch prevents the next composition write", async () => {
   const first=deferred();
-  const word={id:'1',planId:'10',bindingId:'11',keyword:'keyword',executorId:'3',lifecycleStatus:'assigned',releaseStatus:'none',syncStatus:'synced'};
+  const word={id:'1',planId:'10',bindingId:'11',keyword:'keyword',executorId:'3',lifecycleStatus:'assigned',releaseStatus:'none',syncStatus:'synced',usageReady:1};
   const h=harness(c=>{
     const common=scoped(c);if(common!==undefined)return common;
     if(c.path.endsWith('/attribution-options'))return {tasks:[],users:[],mappings:[],hasTeamLeader:false};

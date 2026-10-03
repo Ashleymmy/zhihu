@@ -9,8 +9,9 @@ const labels = {
   release: "批准释放",
   stop: "停止新增使用",
   "retry-upstream": "重试上游",
-  "edit-retry": "编辑重试",
-  delete: "删除",
+  "edit-retry": "编辑并重试",
+  "copy-retry": "沿用信息新建",
+  delete: "删除错误记录",
 };
 function fmtDate(iso) {
   if (!iso) return "";
@@ -18,17 +19,22 @@ function fmtDate(iso) {
   return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 function flags(user, item) {
-  if (!permissions.canOperate(user) || Number(item.readOnly) === 1) return [];
+  if (!permissions.canOperate(user)) return [];
+  const corrections = [];
+  if (Number(item.canEditFailed) === 1) corrections.push("edit-retry");
+  if (Number(item.canCopyFailed) === 1) corrections.push("copy-retry");
+  if (Number(item.canDeleteFailed) === 1) corrections.push("delete");
+  if (Number(item.readOnly) === 1) return corrections;
   const admin = permissions.isAdmin(user);
   const owner =
     admin || same(item.leaderId, user.id) || same(item.executorId, user.id);
-  const available =
+  const available = Number(item.allocationReady) === 1 && !Number(item.hasUsageHistory) &&
     !item.bindingId &&
     item.lifecycleStatus === "available" &&
-    item.syncStatus === "synced" &&
+    (item.syncStatus === "synced" || item.syncStatus === "simulated") &&
     item.planStatus === "active";
   const live = item.bindingId && item.lifecycleStatus !== "retired";
-  const result = [];
+  const result = corrections;
   if (
     available &&
     (user.role === "leader" ||
@@ -39,14 +45,14 @@ function flags(user, item) {
     result.push("claim");
   if (available && admin) result.push("distribute");
   if (
-    live &&
-    !item.usedEverAt &&
+    live && Number(item.usageReady) === 1 &&
+    !item.usedEverAt && !Number(item.hasUsageHistory) &&
     item.leaderId &&
     (admin || (user.role === "leader" && same(item.leaderId, user.id)))
   )
     result.push("assign");
   if (
-    live && item.executorId &&
+    live && Number(item.usageReady) === 1 && item.executorId &&
     (admin || same(item.executorId, user.id)) &&
     item.releaseStatus !== "requested"
   )
@@ -54,19 +60,19 @@ function flags(user, item) {
   if (
     item.bindingId &&
     owner &&
-    !item.usedEverAt &&
+    !item.usedEverAt && !Number(item.hasUsageHistory) &&
     item.releaseStatus !== "requested"
   )
     result.push("request-release");
   if (
     item.bindingId &&
     admin &&
-    !item.usedEverAt &&
+    !item.usedEverAt && !Number(item.hasUsageHistory) &&
     item.releaseStatus === "requested"
   )
     result.push("release");
   if (live && owner) result.push("stop");
-  if (admin && item.syncStatus === "failed" && !item.usedEverAt)
+  if (admin && item.syncStatus === "failed" && !item.usedEverAt && !item.canEditFailed && !item.canDeleteFailed)
     result.push("retry-upstream");
   return result;
 }
@@ -99,15 +105,22 @@ function decorate(user, item, options) {
   // pending 时"是否已提交知乎"和"知乎有没有审核"是两件独立的事，
   // 统一叫"等待同步"会让人误以为是数据没传过去，按 syncStatus 拆开说清楚。
   const pendingStates = {
-    local: "待提交知乎（通常 10-30 秒）",
-    failed: "提交异常，待处理",
-    synced: "已提交知乎，等待审核通过",
+    syncing: "正在提交知乎，暂不可使用",
+    local: "待提交知乎，暂不可使用",
+    failed: "知乎创建失败，禁止使用",
+    synced: "创建记录待核对，暂不可使用",
   };
   const member = options.users.find((u) => same(u.id, item.executorId));
   const task = options.tasks.find((t) => same(t.id, item.taskId));
   return Object.assign({}, item, {
     statusText:
-      item.lifecycleStatus === "pending"
+      item.syncStatus === "failed" ? pendingStates.failed
+      : Number(item.ownershipConflict) ? "归属待核对，禁止新增使用"
+      : ["local","syncing"].includes(item.syncStatus) ? pendingStates[item.syncStatus]
+      : item.lifecycleStatus === "historical" ? "已有历史记录，保留原归属"
+      : item.planStatus === "paused" || item.planStatus === "rejected" || item.planStatus === "ended" ? "计划不可用"
+      : item.lifecycleStatus === "available" && Number(item.allocationReady) !== 1 ? "暂不可领取"
+      : item.lifecycleStatus === "pending"
         ? pendingStates[item.syncStatus] || "等待处理"
         : item.lifecycleStatus === "available" && user.role === "creator"
           ? options.hasTeamLeader
@@ -116,7 +129,7 @@ function decorate(user, item, options) {
               ? "优先期内，暂不可领取"
               : "可领取"
           : states[item.lifecycleStatus] || item.lifecycleStatus,
-    taskName: task ? task.name : "任务 " + item.taskId,
+    taskName: item.taskName || (task ? task.name : "任务 " + item.taskId),
     executorName: member
       ? member.displayName
       : same(item.executorId, user.id)

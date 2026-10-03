@@ -8,6 +8,7 @@ import type { AttributionSnapshot } from './facts';
 import type { Obligation } from './pricing';
 import { assertNewRoute } from './routing';
 import { assertDuty } from '../../../core/duties';
+import { assertKeywordReady } from './keyword-usability';
 import { blockIncome } from '../../../core/finance';
 
 export async function submitEvidence(
@@ -27,9 +28,11 @@ export async function insertEvidence(
 ) {
   const url = new URL(input.url);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('作品地址必须是公开 HTTP 链接');
-  const { binding } = await bindingLock(c, scope, input.bindingId);
+  const { word, binding } = await bindingLock(c, scope, input.bindingId);
   ownBinding(user, binding);
   if (!binding.used_at || binding.released_at) fail('请先声明实际使用关键词');
+  if (String(word.current_binding_id) !== String(binding.id) || binding.stop_new_use_at || binding.release_status === 'requested') fail('关键词已停止或正在释放，不可新增作品',409);
+  await assertKeywordReady(c,String(word.id));
   const id = await insert(c, 'INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by) VALUES(?,?,?,?)', [
     binding.id,
     input.url,

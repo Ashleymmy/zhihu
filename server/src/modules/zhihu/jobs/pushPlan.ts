@@ -66,7 +66,7 @@ export async function pushPlan(data: Record<string, unknown>) {
   }
 
   const [claimed] = await db.query<ResultSetHeader>(
-    "UPDATE plans SET sync_status = 'syncing', sync_error = NULL WHERE id = ? AND keyword = ? AND sync_status IN ('local', 'failed')",
+    "UPDATE plans SET sync_status = 'syncing', sync_error = NULL WHERE id = ? AND keyword = ? AND status<>'ended' AND sync_status IN ('local', 'failed')",
     [id, plan.keyword],
   );
   if (claimed.affectedRows === 0) return;

@@ -10,16 +10,16 @@ const PLATFORMS = composition.mediaTypes;
 const WORK_TYPES = composition.types.map(t=>t.label);
 const CONTENT_TYPES = composition.categories(0).map(t=>t.label);
 const TABS = [
-  { key: "", label: "全部" },
+  { key: "all", label: "全部" },
   { key: "available", label: "可领取" },
-  { key: "active,assigned,reserved", label: "进行中" },
-  { key: "retired", label: "已完成" },
+  { key: "ongoing", label: "进行中" },
+  { key: "registered", label: "已登记作品" },
+  { key: "retired", label: "已停用" },
 ];
 
 function filterByTab(list, tabKey) {
-  if (!tabKey) return list;
-  const keys = tabKey.split(",");
-  return list.filter((i) => keys.includes(i.lifecycleStatus));
+  // The server filters before pagination and returns the matching total.
+  return list;
 }
 
 Page(
@@ -63,6 +63,7 @@ Page(
             page: this.data.page,
             pageSize: 20,
             search: this.data.search.trim(),
+            view: TABS[this.data.tabIndex].key,
           }),
         ),
       ]);
@@ -89,7 +90,7 @@ Page(
     },
     show() {
       clearInterval(this._pollTimer);
-      this._pollTimer = setInterval(() => this.refresh(), 15000);
+      this._pollTimer = setInterval(() => { if (this.data.page === 1) this.refresh(); }, 15000);
     },
     hide() {
       clearInterval(this._pollTimer);
@@ -102,8 +103,9 @@ Page(
     },
     switchTab(e) {
       const idx = Number(e.currentTarget.dataset.index);
-      const filteredList = filterByTab(this.data.list, TABS[idx].key);
-      this.setData({ tabIndex: idx, filteredList });
+      if (this.data.busy || this.data.loading || this.data.loadingMore || !TABS[idx]) return;
+      this.setData({ tabIndex: idx, page: 1, list: [], filteredList: [] });
+      return this.load();
     },
     openCreate() {
       if (this.canAct() && !this.data.busy)
@@ -152,7 +154,7 @@ Page(
         batchMode: false,
         batchItems: [],
         // 编辑重试：预填当前值
-        editKeyword: name === "edit-retry" ? item.keyword : "",
+        editKeyword: ["edit-retry","copy-retry"].includes(name) ? item.keyword : "",
         editLandingUrl: name === "edit-retry" ? item.landingUrl || "" : "",
         editMappingIndex:
           name === "edit-retry"
@@ -233,7 +235,13 @@ Page(
           throw new Error("当前状态不允许此操作，请刷新");
         let path,
           payload = Object.assign({}, scope);
-        if (["claim", "distribute", "retry-upstream"].includes(name)) {
+        if (["edit-retry","copy-retry","delete"].includes(name)) {
+          path = "/keywords/" + item.id + "/" + (name === "delete" ? "delete-failed" : name);
+          if(name !== "delete") {
+            payload.keyword = this.data.editKeyword.trim();
+            if(!payload.keyword) throw new Error("请填写关键词");
+          }
+        } else if (["claim", "distribute", "retry-upstream"].includes(name)) {
           path = "/keywords/" + item.id + "/" + name;
           if (name === "distribute") {
             const target = this.data.targets[this.data.targetIndex];
@@ -253,7 +261,7 @@ Page(
           }
         }
         await actions.post(this, base + path, payload);
-      }, "关键词操作已完成");
+      }, ["edit-retry","copy-retry"].includes(name) ? "修改已提交，等待知乎创建结果" : name === "delete" ? "错误记录已从关键词列表移除" : "关键词操作已完成");
       if (ok) {
         this.setData({ selected: null });
         await this.load();

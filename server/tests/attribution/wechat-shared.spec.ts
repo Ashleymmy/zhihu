@@ -297,6 +297,13 @@ it('mini keyword creation, unique ownership and canonical composition submission
     releaseTime: '2026-10-01T12:00:00+08:00',
     requestKey: crypto.randomUUID(),
   };
+  await c.query("UPDATE plans SET sync_status='failed',zhihu_plan_id=NULL,sync_error='HTTP 400 / code 400402' WHERE id=?",[word.planId]);
+  const rejected = await call('invited', '/modules/zhihu/mini-works', 'POST', payload);
+  expect(rejected.status,JSON.stringify(rejected.body)).toBe(409);
+  expect(rejected.body.message).toContain('请更换关键词');
+  const [[untouched]]=await c.query<RowDataPacket[]>('SELECT used_ever_at FROM zh_keywords WHERE id=?',[word.id]);
+  expect(untouched.used_ever_at).toBeNull();
+  await c.query("UPDATE plans SET sync_status='synced',zhihu_plan_id=?,sync_error=NULL WHERE id=?",['isolated-'+word.planId,word.planId]);
   const submitted = await call('invited', '/modules/zhihu/mini-works', 'POST', payload);
   expect(submitted.status, JSON.stringify(submitted.body)).toBe(201);
   const retry = await call('invited', '/modules/zhihu/mini-works', 'POST', payload);

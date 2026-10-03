@@ -119,9 +119,9 @@ attributionRouter.get(
   asyncHandler(async (req, res) => {
     const query = scopeSchema
       .merge(pagingSchema)
-      .extend({ search: z.string().max(128).default('') })
+      .extend({ search: z.string().max(128).default(''), view: z.enum(['all','available','ongoing','registered','retired']).default('all') })
       .parse(req.query);
-    ok(res, await resource.listKeywords(req.user, query, query.page, query.pageSize, query.search));
+    ok(res, await resource.listKeywords(req.user, query, query.page, query.pageSize, query.search, query.view));
   }),
 );
 attributionRouter.post(
@@ -141,6 +141,17 @@ attributionRouter.post(
     ok(res, await resource.createKeyword(req.user, input, key(req), input), 201);
   }),
 );
+attributionRouter.post('/keywords/:id/edit-retry',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
+  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128)}).parse(req.body);
+  ok(res,await resource.editFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword));
+}));
+attributionRouter.post('/keywords/:id/copy-retry',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
+  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128)}).parse(req.body);
+  ok(res,await resource.copyFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword),201);
+}));
+attributionRouter.post('/keywords/:id/delete-failed',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
+  ok(res,await resource.deleteFailedKeyword(req.user,scopeSchema.parse(req.body),idSchema.parse(req.params.id),key(req)));
+}));
 attributionRouter.post(
   '/keywords/:id/claim',
   asyncHandler(async (req, res) =>

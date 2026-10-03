@@ -11,6 +11,7 @@ import { isCompositionCategoryValid } from '../zhihu/composition';
 import { DEV_DEMO_USER_IDS, isDevDemoAuthUser } from '../dev-demo';
 import { planAccountSql } from './plan-account';
 import { compositionPlanScope } from './composition-access';
+import { assertKeywordReady } from '../attribution/keyword-usability';
 import { businessDay } from '../attribution/domain';
 
 interface CountRow extends RowDataPacket {
@@ -49,7 +50,7 @@ const stableHash = (value: unknown) =>
 const syncJobOptions = (jobId: string) => ({ jobId, removeOnComplete: true, removeOnFail: true });
 
 async function planOwner(user: AuthUser, planId: string, connection: PoolConnection) {
-  const scope = compositionPlanScope(user, true);
+  const scope = compositionPlanScope(user, true, false);
   const [plans] = await connection.query<PlanOwnerRow[]>(
     `SELECT p.owner_id,CAST(k.id AS CHAR) keyword_id,CAST(b.id AS CHAR) binding_id,CAST(b.executor_id AS CHAR) executor_id
      FROM plans p
@@ -61,6 +62,7 @@ async function planOwner(user: AuthUser, planId: string, connection: PoolConnect
   );
   const plan = plans[0];
   if (!plan) throw new AppError(404, 40401, '推广计划不存在');
+  if (plan.keyword_id) await assertKeywordReady(connection, String(plan.keyword_id));
   // Freeze the same assignment used to authorize this work. A failed insert
   // rolls these updates back; the original plan owner is never reassigned.
   if (plan.binding_id && plan.executor_id) {

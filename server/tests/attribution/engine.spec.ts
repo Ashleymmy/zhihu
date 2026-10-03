@@ -1081,7 +1081,7 @@ describe('关键词与推广作品使用同一计划关联', () => {
     managedKeyword=created.id;
     await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,1,'KOC抖音','managed',1,1,'https://example.com/managed-work')",[created.planId]);
     const words=await resource.listKeywords(admin,linkedScope,1,25,'已有词库与作品');
-    expect(words.total).toBe(1);expect(words.list[0].id).toBe(managedKeyword);expect(words.list[0].read_only).toBe(0);
+    expect(words.total).toBe(1);expect(words.list[0].id).toBe(managedKeyword);expect(words.list[0].read_only).toBe(1);expect(words.list[0].allocation_ready).toBe(0);
     await c.query("INSERT INTO integration_accounts(id,module_id,account_key,name,status,created_by) VALUES(993,'zhihu','linked-pages-993','另一个账号','active',1)");
     await c.query('INSERT INTO project_integrations(project_id,account_id) VALUES(992,993)');
     expect((await resource.listKeywords(admin,{projectId:'992',accountId:'993'},1,25,'作品关联改名词')).total).toBe(0);

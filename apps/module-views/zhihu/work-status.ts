@@ -3,9 +3,12 @@ export interface WorkStatus {
   status: string
   syncStatus?: string | null
   zhihuStatusJson?: unknown
+  planSyncStatus?: string | null
+  failureReason?: string | null
 }
 
 export function upstreamReview(work: WorkStatus): { label: string; reason: string } {
+  if (work.planSyncStatus === 'failed' || work.syncStatus === 'failed') return { label: work.planSyncStatus === 'failed' ? '关键词创建失败，作品未进入知乎审核' : '作品提交失败，尚未进入知乎审核', reason: work.failureReason || '请联系管理员处理' }
   let value = work.zhihuStatusJson
   if (typeof value === 'string') {
     try { value = JSON.parse(value) } catch { value = null }

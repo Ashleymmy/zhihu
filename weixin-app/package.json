@@ -2,7 +2,7 @@
   "name": "timo-opc-miniprogram",
   "private": true,
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/session.test.cjs tests/edges.test.cjs tests/interaction.test.cjs tests/upload.test.cjs tests/team-members.test.cjs tests/auth-pages.test.cjs tests/sms-registration.test.cjs tests/sms-login.test.cjs tests/invite-page.test.cjs tests/income-page.test.cjs tests/home-mine.test.cjs tests/admin-page.test.cjs tests/prices-page.test.cjs tests/college-page.test.cjs tests/shared-backend.test.cjs tests/wallet-funding.test.cjs tests/review-readiness.test.cjs",
+    "test": "node --test --test-concurrency=1 tests/session.test.cjs tests/edges.test.cjs tests/interaction.test.cjs tests/upload.test.cjs tests/team-members.test.cjs tests/auth-pages.test.cjs tests/sms-registration.test.cjs tests/sms-login.test.cjs tests/invite-page.test.cjs tests/income-page.test.cjs tests/home-mine.test.cjs tests/admin-page.test.cjs tests/prices-page.test.cjs tests/college-page.test.cjs tests/shared-backend.test.cjs tests/wallet-funding.test.cjs tests/review-readiness.test.cjs tests/keyword-usability.test.cjs",
     "agreements:build": "node scripts/build-agreements.cjs",
     "agreements:check": "node scripts/build-agreements.cjs --check",
     "check": "npm run agreements:check && node scripts/check.cjs",

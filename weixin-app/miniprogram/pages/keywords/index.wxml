@@ -46,7 +46,7 @@
     >
       <view class="kw-card-top">
         <view class="kw-keyword">{{item.keyword}}</view>
-        <text class="tag {{item.lifecycleStatus === 'retired' ? 'tag-clay' : item.lifecycleStatus === 'pending' ? 'tag-sun' : item.lifecycleStatus === 'available' ? 'tag-moss' : ''}}">{{item.statusText}}</text>
+        <text class="tag {{item.syncStatus === 'failed' || item.lifecycleStatus === 'retired' ? 'tag-clay' : item.lifecycleStatus === 'pending' ? 'tag-sun' : item.lifecycleStatus === 'available' ? 'tag-moss' : ''}}">{{item.statusText}}</text>
       </view>
       <view class="kw-card-meta">
         <text>{{item.taskName}}</text>
@@ -55,6 +55,7 @@
       </view>
       <view class="kw-card-meta text-sun" wx:if="{{item.releaseStatus === 'requested'}}">已申请释放，等待运营审核</view>
       <view class="kw-card-meta text-clay" wx:if="{{item.syncError}}">{{item.syncError}}</view>
+      <view class="kw-card-meta" wx:if="{{item.compositionCount}}">已登记作品 {{item.compositionCount}} 条；审核结果请查看“作品与审核”。</view>
       <view class="kw-card-actions" wx:if="{{item.actions.length}}">
         <button
           wx:for="{{item.actions}}"
@@ -71,10 +72,9 @@
       </view>
     </view>
 
-    <state-view
-      wx:if="{{!loading && !error && !filteredList.length}}"
-      text="暂无关键词；可尝试修改搜索条件，或联系团长分配。"
-    />
+    <block wx:if="{{!loading && !error && filteredList.length === 0}}">
+      <state-view text="暂无关键词；可尝试修改搜索条件，或联系团长分配。" />
+    </block>
     <template is="loadmore" data="{{total, page, loadingMore, pageSize: 20}}" />
   </block>
 
@@ -241,29 +241,16 @@
         <text class="muted" wx:if="{{actionName === 'stop'}}">停止后不可新增使用，已有作品和归属记录保留。</text>
       </view>
 
-      <view wx:elif="{{actionName === 'edit-retry'}}">
+      <view wx:elif="{{actionName === 'edit-retry' || actionName === 'copy-retry'}}">
         <view class="kw-field">
           <text class="kw-label">关键词</text>
           <input data-name="editKeyword" value="{{editKeyword}}" maxlength="128" bindinput="input" class="kw-input" />
         </view>
-        <view class="kw-field">
-          <text class="kw-label">落地链接</text>
-          <input data-name="editLandingUrl" value="{{editLandingUrl}}" placeholder="https://" maxlength="2048" bindinput="input" class="kw-input" />
-        </view>
-        <view class="kw-field">
-          <text class="kw-label">渠道映射</text>
-          <picker range="{{options.mappings}}" range-key="channelName" value="{{editMappingIndex}}" bindchange="chooseEditMapping">
-            <view class="kw-picker-row">
-              <text>{{editMappingIndex >= 0 ? options.mappings[editMappingIndex].channelName : '请选择渠道映射'}}</text>
-              <text class="kw-arrow">▾</text>
-            </view>
-          </picker>
-        </view>
-        <text class="muted">保存后重置同步状态并重新提交知乎，通常 10-30 秒内出结果。</text>
+        <text class="muted">沿用原任务、渠道和推广链接，无需重新填写。提交后等待知乎创建成功，再分配或登记作品。</text>
+        <view class="muted" wx:if="{{actionName === 'copy-retry'}}">原词已有使用记录或已停用，本次创建新词；原归属及作品记录保留。</view>
       </view>
-
       <view wx:elif="{{actionName === 'delete'}}">
-        <text class="text-clay">删除后不可恢复：该关键词及其归属记录、上游推送任务将一并移除。仅从未使用的同步异常记录可删除。</text>
+        <text class="text-clay">确认从关键词列表移除此错误记录并停止后续使用？已有归属、作品和订单记录保留供追溯，不会重新开放领取。</text>
       </view>
 
       <view wx:else class="muted">确认{{actionLabel}}该关键词？</view>

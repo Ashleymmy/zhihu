@@ -30,7 +30,7 @@ test('compositions carry canonical media account, category and zoned date',()=>{
  const c=harness().load('utils/composition'),v=c.input('8',{mediaAccount:'账号甲',url:'https://example.com/work',platformIndex:2,publishDate:'2026-10-01',workTypeIndex:1,contentTypeIndex:0});assert.equal(v.mediaAccount,'账号甲');assert.equal(v.mediaType,'KOC抖音');assert.equal(v.compositionType,2);assert.equal(v.compositionSubType,5);assert.equal(v.releaseTime,'2026-10-01T00:00:00+08:00');assert.throws(()=>c.input('8',c.blank()));
 });
 test('batch validates all rows before writing and retains keys after uncertain results',async()=>{
- let fail=true;const word={id:'1',planId:'8',bindingId:'11',executorId:'3',lifecycleStatus:'assigned',releaseStatus:'none',syncStatus:'synced'};
+ let fail=true;const word={id:'1',planId:'8',bindingId:'11',executorId:'3',lifecycleStatus:'assigned',releaseStatus:'none',syncStatus:'synced',usageReady:1};
  const h=harness(c=>{const common=scoped(c);if(common!==undefined)return common;if(c.path.endsWith('/attribution-options'))return {tasks:[],mappings:[],users:[]};if(c.path.endsWith('/mini-works'))return fail&&c.data.promoUrl.endsWith('/2')?{networkError:'timeout'}:{id:'10'};return {list:[word],total:1}});
  h.session({id:'3',role:'creator'});const p=h.page('keywords');await p.onShow();p.choose({currentTarget:{dataset:{index:0,action:'work'}}});
  const row={mediaAccount:'账号甲',url:'https://example.com/1',platformIndex:2,publishDate:'2026-10-01',workTypeIndex:0,contentTypeIndex:0};
