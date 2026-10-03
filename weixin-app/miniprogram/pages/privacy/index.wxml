@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="card">
+    <view class="section-title">帮助、投诉与内容申诉</view>
+    <view class="muted">账号使用、内容审核、侵权投诉或个人信息问题，可通过以下邮箱联系运营人员。请说明问题和登录账号，不要发送密码或验证码。</view>
+    <view class="support-mail">{{supportEmail}}</view>
+    <button bindtap="copyContact">复制联系邮箱</button>
+    <view class="muted">个人信息相关申请一般在 15 个工作日内回复；需要核实身份或业务记录时会说明处理进度。</view>
+  </view>
+  <view class="card">
+    <view class="section-title">协议与个人资料</view>
+    <button data-type="user" bindtap="agreement">用户协议</button>
+    <button data-type="privacy" bindtap="agreement">隐私协议</button>
+    <view class="muted">可在“我的 → 个人信息”修改昵称或清空备用联系方式。手机号验证为可选；需要解除手机号或微信绑定时，可联系上述邮箱核验处理。</view>
+  </view>
+  <view class="card" wx:if="{{user}}">
+    <view class="section-title">注销账号</view>
+    <view class="closure-warning">这是网站与小程序共用的账号。注销后两端同时失效，无法恢复。</view>
+    <view class="muted">将清除登录凭据、手机号、邮箱、备用联系方式、微信绑定和会话，失效所有邀请链接。交易结算、业务履约及必要审计记录按协议保留，不能通过注销抹除未履行的义务。</view>
+    <view wx:if="{{loading}}" class="muted">正在核对账号状态…</view>
+    <block wx:if="{{status && !status.canClose}}">
+      <view class="closure-warning">请先处理以下事项，再申请注销：</view>
+      <view wx:for="{{status.blockers}}" wx:key="*this" class="closure-item">· {{item}}</view>
+      <view class="muted">需要协助请通过上方邮箱联系我们。</view>
+    </block>
+    <block wx:if="{{status && status.canClose}}">
+      <input password maxlength="128" value="{{password}}" bindinput="input" placeholder="输入当前平台账号密码确认身份" disabled="{{busy}}" />
+      <checkbox-group bindchange="acknowledge"><label class="closure-check"><checkbox value="yes" checked="{{acknowledged}}" disabled="{{busy}}" />我已了解两端账号同时注销及数据处理范围</label></checkbox-group>
+      <button class="close-account" bindtap="closeAccount" disabled="{{busy || loading || !password || !acknowledged}}" loading="{{busy}}">注销共用账号</button>
+    </block>
+  </view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+</view>

@@ -5,6 +5,7 @@ import { db } from '../db';
 import { asyncHandler, AppError } from '../middleware/errors';
 import { setWechatContext } from './context';
 import { observeMiniRequest } from './observability';
+import { requireContentProof } from './content-safety';
 
 const envelopeSchema = z
   .object({
@@ -17,6 +18,14 @@ const envelopeSchema = z
     method: z.enum(['GET', 'POST', 'PATCH', 'PUT', 'DELETE']),
     data: z.record(z.unknown()).default({}),
     token: z.string().max(4096).optional(),
+    contentSafety: z
+      .object({
+        version: z.literal(1),
+        digest: z.string().regex(/^[a-f0-9]{64}$/),
+        traceIds: z.array(z.string().max(128)).max(6),
+      })
+      .strict()
+      .optional(),
     observation: z
       .object({
         environment: z
@@ -84,6 +93,7 @@ export function mountWechatBridge(app: Express) {
       const body = envelopeSchema.parse(parsed);
       if (body.appId !== appId || body.path.startsWith('/core/mini-'))
         throw new AppError(403, 40300, '小程序来源或接口不允许');
+      if (process.env.MINI_CONTENT_SAFETY_REQUIRED === '1') requireContentProof(body);
       try {
         await db.query('INSERT INTO wechat_bridge_nonces(nonce,expires_at) VALUES(?,TIMESTAMPADD(SECOND,120,NOW(3)))', [
           nonce,

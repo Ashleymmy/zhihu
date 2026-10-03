@@ -186,12 +186,16 @@ wechatAuthRouter.post(
     const input = z
       .object({
         displayName: z.string().trim().min(1).max(64).optional(),
-        contact: z.string().trim().min(1).max(128).optional(),
+        contact: z.string().trim().max(128).optional(),
       })
       .strict()
       .refine((v) => Object.keys(v).length > 0)
       .parse(req.body);
     await withTransaction(async (c) => {
+      const [[active]] = await c.query<RowDataPacket[]>('SELECT is_active,closed_at FROM users WHERE id=? FOR UPDATE', [
+        req.user.sub,
+      ]);
+      if (!active?.is_active || active.closed_at) throw new AppError(401, 40101, '账号已不可用');
       if (input.displayName !== undefined)
         await c.query('UPDATE users SET display_name=? WHERE id=?', [input.displayName, req.user.sub]);
       if (input.contact !== undefined)
@@ -205,7 +209,7 @@ wechatAuthRouter.post(
           action: 'auth.profile_update',
           resourceType: 'user',
           resourceId: req.user.sub,
-          detail: input,
+          detail: { fields: Object.keys(input) },
         },
         c,
       );

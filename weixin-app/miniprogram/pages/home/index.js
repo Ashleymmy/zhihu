@@ -67,7 +67,7 @@ const BANNERS = [
     key: "income",
     image: "/images/banners/banner-2.png",
     title: "收益与提现",
-    subtitle: "每期报表确认后自动开放提现",
+    subtitle: "账单确认、款项到账并开放后可申请提现",
     path: "/pages/income/index",
   },
   {
@@ -83,7 +83,7 @@ Page(
     scoped: false,
     data: {
       menus: [],
-      channels: CHANNELS,
+      channels: CHANNELS.filter(channel=>channel.open),
       banners: BANNERS,
       announcements: [],
       showAnnouncements: false,

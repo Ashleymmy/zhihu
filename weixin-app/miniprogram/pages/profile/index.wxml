@@ -28,10 +28,6 @@
         <text class="cell-value muted">{{user.contact || '未填写'}}</text>
         <text class="cell-arrow">›</text>
       </view>
-      <view class="cell">
-        <text class="cell-label">实名认证</text>
-        <text class="cell-value muted">未认证</text>
-      </view>
     </view>
     <view class="card cell-card">
       <view class="cell"><text class="cell-label">社交账号绑定</text></view>
@@ -45,6 +41,7 @@
         <text class="cell-label">登录密码</text>
         <text class="cell-arrow">›</text>
       </view>
+      <view class="cell" data-path="/pages/privacy/index" bindtap="open"><text class="cell-label">帮助与隐私 / 注销账号</text><text class="cell-arrow">›</text></view>
     </view>
   </block>
 

@@ -75,7 +75,7 @@
       </view>
       <state-view
         wx:if="{{!records.length}}"
-        text="本期暂无推广收益，提交作品并通过审核后即可结算。"
+        text="本期暂无推广收益。作品审核、官方报表归因和账单确认完成后展示收入，款项到账并开放后可申请提现。"
         guide-text="去看关键词"
         guide-path="/pages/keywords/index"
       />

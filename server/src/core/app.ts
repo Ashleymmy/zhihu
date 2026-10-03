@@ -17,6 +17,7 @@ import { wechatAuthRouter } from '../wechat/auth';
 import { miniInvitationsRouter } from '../wechat/invitations';
 import { miniFilesRouter, attachMiniFile } from '../wechat/files';
 import { miniMonitorRouter } from '../routes/mini-monitor';
+import { accountPrivacyRouter } from '../routes/account-privacy';
 
 export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app: Express) => void) {
   const app = express();
@@ -37,6 +38,7 @@ export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app:
   app.use(express.json({ limit: '1mb' }));
   const publicRoutes: Array<[string, express.Router]> = [
     ['auth', authRouter],
+    ['account-privacy', accountPrivacyRouter],
     ['team', teamRouter],
     ['projects', projectsRouter],
     ['mcn-accounts', mcnRouter],

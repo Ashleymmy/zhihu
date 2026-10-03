@@ -1,1 +1,1 @@
-{"permissions":{"openapi":[]},"timeout":60,"memorySize":256}
+{"permissions":{"openapi":["security.msgSecCheck"]},"timeout":60,"memorySize":256}

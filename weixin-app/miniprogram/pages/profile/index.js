@@ -61,7 +61,7 @@ Page(
     },
     async submitEdit() {
       const value = this.data.editInput.trim();
-      if (!value) {
+      if (!value && this.data.editField !== 'contact') {
         this.setData({ editError: "内容不能为空" });
         return;
       }

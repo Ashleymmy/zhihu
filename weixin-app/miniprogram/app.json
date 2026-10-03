@@ -22,6 +22,7 @@
     "pages/prices/index",
     "pages/password/index",
     "pages/profile/index",
+    "pages/privacy/index",
     "pages/phone-verify/index",
     "pages/reports/index"
   ],

@@ -1,3 +1,4 @@
+import { contentDigest } from '../../src/wechat/content-safety';
 import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
@@ -34,7 +35,7 @@ function signed(body: unknown, nonce = crypto.randomBytes(16).toString('hex'), t
   };
 }
 function call(name: string, path: string, method = 'GET', data: Record<string, unknown> = {}) {
-  const { raw, headers } = signed({ appId, openId: openId(name), path, method, data, token: tokens[name] });
+  const { raw, headers } = signed({ appId, openId: openId(name), path, method, data, token: tokens[name], contentSafety:{version:1,digest:contentDigest(path,method,data),traceIds:["isolated-pass"]} });
   return request(app).post('/api/v1/mini/bridge').set(headers).send(raw);
 }
 async function login(name: string) {
@@ -91,6 +92,7 @@ beforeAll(async () => {
     DB_NAME: target.database,
     WECHAT_BRIDGE_SECRET: secret,
     WECHAT_APP_ID: appId,
+    MINI_CONTENT_SAFETY_REQUIRED: '1',
     OPC_MODULES: 'zhihu',
     DEV_DEMO_AUTH: '0',
     SMS_REGISTRATION_ENABLED: '1',

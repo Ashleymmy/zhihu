@@ -1,3 +1,4 @@
+import { contentDigest } from '../../src/wechat/content-safety';
 import { beforeAll, beforeEach, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
@@ -16,7 +17,7 @@ const appId = 'wx0000000000000001',
 const actor = { sub: '1', role: 'leader', adminDuty: 'all', username: 'smsleader', parentId: null } as AuthUser;
 const identity = (name: string) => ({ appId, openId: 'sms_test_wechat_identity_' + name });
 function call(name: string, path: string, method = 'POST', data: Record<string, unknown> = {}) {
-  const raw = JSON.stringify({ ...identity(name), path, method, data });
+  const raw = JSON.stringify({ ...identity(name), path, method, data, contentSafety:{version:1,digest:contentDigest(path,method,data),traceIds:["isolated-pass"]} });
   const time = String(Date.now()),
     nonce = crypto.randomBytes(16).toString('hex');
   const signature = crypto.createHmac('sha256', secret).update(`${time}\n${nonce}\n${raw}`).digest('hex');
@@ -70,6 +71,7 @@ beforeAll(async () => {
     DB_USER: target.user,
     DB_PASS: target.password,
     WECHAT_APP_ID: appId,
+    MINI_CONTENT_SAFETY_REQUIRED: '1',
     WECHAT_BRIDGE_SECRET: secret,
     OPC_MODULES: '',
     DEV_DEMO_AUTH: '0',

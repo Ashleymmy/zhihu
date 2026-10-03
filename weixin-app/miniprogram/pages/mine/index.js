@@ -47,6 +47,7 @@ Page(
     openProfile() {
       wx.navigateTo({ url: "/pages/profile/index" });
     },
+    openPrivacy() { wx.navigateTo({url:'/pages/privacy/index'}); },
     async logout() {
       if (this.data.busy) return;
       this.setData({ busy: true });

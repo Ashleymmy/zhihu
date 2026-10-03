@@ -1,3 +1,4 @@
+import { contentDigest } from '../../src/wechat/content-safety';
 import { beforeAll, beforeEach, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql, { type Connection, type RowDataPacket, type ResultSetHeader } from 'mysql2/promise';
@@ -23,6 +24,7 @@ function call(name: string, path: string, data: Record<string, unknown> = {}, to
   const raw = JSON.stringify({
     ...identity(name),
     path: '/core/auth/' + path,
+    contentSafety:{version:1,digest:contentDigest('/core/auth/'+path,method,data),traceIds:['isolated-pass']},
     method,
     data,
     ...(token ? { token } : {}),
@@ -116,6 +118,7 @@ beforeAll(async () => {
     DB_PASS: target.password,
     DB_NAME: target.database,
     WECHAT_APP_ID: appId,
+    MINI_CONTENT_SAFETY_REQUIRED: '1',
     WECHAT_BRIDGE_SECRET: bridgeSecret,
     OPC_MODULES: '',
     DEV_DEMO_AUTH: '0',

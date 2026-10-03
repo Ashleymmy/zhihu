@@ -11,7 +11,11 @@ import { memberClientInfo } from './member-clients.service';
 
 const roles: Role[] = ['developer', 'admin', 'operator', 'leader', 'creator'];
 type MemberRecord = RowDataPacket & { id: string; role: string; is_active: number; parent_id?: string | null };
-export function canManageMember(actor: AuthUser, member: { id: unknown; role: unknown; parent_id?: unknown }) {
+export function canManageMember(
+  actor: AuthUser,
+  member: { id: unknown; role: unknown; parent_id?: unknown; closed_at?: unknown },
+) {
+  if (member.closed_at) return false;
   if (String(member.id) === actor.sub || effectiveDuty(actor) === 'finance') return false;
   const role = normalizeRole(member.role);
   if (!role) return false;
@@ -32,7 +36,7 @@ export function editableMemberRoles(actor: AuthUser) {
 }
 export async function listManagedMembers(actor: AuthUser) {
   const list = await rows<MemberRecord>(
-    `SELECT CAST(u.id AS CHAR) id,u.username,u.role,u.parent_id,u.display_name,u.phone,u.phone_verified_at,u.admin_duty,u.is_active,u.must_change_pwd,u.last_login_at,u.created_at,
+    `SELECT CAST(u.id AS CHAR) id,u.username,u.role,u.parent_id,u.display_name,u.phone,u.phone_verified_at,u.admin_duty,u.is_active,u.must_change_pwd,u.last_login_at,u.created_at,u.closed_at,
     creator.display_name created_by_name,leader.display_name parent_name,inviter.display_name inviter_name,invitation.label invitation_label,iu.registered_at invited_at,
     (SELECT COUNT(*) FROM users child WHERE child.parent_id=u.id) member_count,
     (SELECT COUNT(*) FROM project_members pm WHERE pm.user_id=u.id AND pm.left_at IS NULL) project_count,
