@@ -1009,13 +1009,19 @@ function legacyDate(row: RowDataPacket): string | null {
   } catch {}
   return row.occurred_at ? String(row.occurred_at).slice(0, 10) : null;
 }
-async function bridgeConfirmedImport(user: AuthUser, id: string, scope: Scope): Promise<DataImportAttributionSummary> {
+async function bridgeConfirmedImport(user: AuthUser, id: string, scope: Scope, ip?: string): Promise<DataImportAttributionSummary> {
   const imported = await withTransaction(async (connection) => {
     const [batchRows] = await connection.query<RowDataPacket[]>(
       `SELECT * FROM data_import_batches WHERE id=? FOR UPDATE`, [id],
     );
     const batch = batchRows[0];
     if (!batch) throw new AppError(404, 40401, '导入批次不存在');
+    if (!['preview', 'confirmed'].includes(String(batch.status))) throw new AppError(422, 42219, '该批次当前不可确认');
+    const markConfirmed = async () => {
+      if (batch.status !== 'preview') return;
+      await connection.query("UPDATE data_import_batches SET status='confirmed',confirmed_by=?,confirmed_at=NOW() WHERE id=?", [user.sub, id]);
+      await writeAudit({userId:user.sub,action:'data_import.confirm',resourceType:'data_import_batch',resourceId:id,ip}, connection);
+    };
     const [sourceRows] = await connection.query<RowDataPacket[]>(
       "SELECT * FROM data_import_rows WHERE batch_id=? AND validation_status='valid' ORDER BY `row_number`", [id],
     );
@@ -1030,22 +1036,12 @@ async function bridgeConfirmedImport(user: AuthUser, id: string, scope: Scope): 
       `SELECT id FROM zh_import_batches WHERE account_id=? AND project_id=? AND file_sha256=? AND report_kind=? AND template_version='zhihu-v3' FOR UPDATE`,
       [scope.accountId, scope.projectId, hash, reportKind],
     );
-    if (existing[0]) return { id: String(existing[0].id), dates, sourceCount: sourceRows.length };
-    const [routeRows] = await connection.query<RowDataPacket[]>(
-      `SELECT id,DATE_FORMAT(exclusive_from,'%Y-%m-%d') start,mode FROM zh_engine_routes WHERE account_id=? AND project_id=? FOR UPDATE`,
-      [scope.accountId, scope.projectId],
-    );
-    const route = routeRows[0];
-    if (route && dates[0] < String(route.start)) return {
-      id: '',
-      dates,
-      sourceCount: sourceRows.length,
-      legacyOnly: true,
-    };
-    if (!route) await connection.query(
-      `INSERT INTO zh_engine_routes(account_id,project_id,exclusive_from,mode,reason,updated_by) VALUES(?,?,?,'trial',?,?)`,
-      [scope.accountId, scope.projectId, dates[0], '历史导入已确认，进入归因试算', user.sub],
-    );
+    if (existing[0]) {
+      await markConfirmed();
+      return { id: String(existing[0].id), dates, sourceCount: sourceRows.length };
+    }
+    const { extendRouteIfClean } = await import('../attribution/cutover');
+    const start = await extendRouteIfClean(connection, scope, dates[0], user);
     const previewHash = crypto.createHash('sha256').update(`legacy:${hash}:${scope.projectId}:${scope.accountId}`).digest('hex');
     const [created] = await connection.query<ResultSetHeader>(
       `INSERT INTO zh_import_batches
@@ -1067,27 +1063,16 @@ async function bridgeConfirmedImport(user: AuthUser, id: string, scope: Scope): 
         conversionRateRaw: row.search_conversion_rate === null ? null : String(row.search_conversion_rate),
       };
       await connection.query(
-        `INSERT INTO zh_import_rows(batch_id,line_number,normalized_json,raw_json,error_text,processing_status) VALUES(?,?,?,?,NULL,'pending')`,
-        [batchId, row.row_number, JSON.stringify(normalized), JSON.stringify(row.raw_json)],
+        `INSERT INTO zh_import_rows(batch_id,line_number,normalized_json,raw_json,error_text,processing_status) VALUES(?,?,?,?,?,?)`,
+        [batchId, row.row_number, JSON.stringify(normalized), JSON.stringify(row.raw_json), date<start?'这一天已在旧系统结算，不重复计算':null, date<start?'legacy_settled':'pending'],
       );
     }
+    // Confirm together with the bridge. A new upload must not block its own date
+    // extension, and a failed bridge must leave it available for a safe retry.
+    await markConfirmed();
     return { id: batchId, dates, sourceCount: sourceRows.length };
   });
   const facts = await import('../attribution/facts');
-  if (imported.legacyOnly) {
-    return {
-      scope,
-      attributionBatchId: '',
-      analyzedRows: imported.sourceCount,
-      matchedRows: 0,
-      exceptionRows: imported.sourceCount,
-      orders: '0',
-      payable: '0.0000',
-      issues: 0,
-      from: imported.dates[0],
-      to: imported.dates[imported.dates.length - 1],
-    };
-  }
   await facts.processBatch(user, scope, imported.id, 200);
   const workbench = await import('../attribution/workbench');
   const from = imported.dates[0], to = imported.dates[imported.dates.length - 1];
@@ -1138,17 +1123,7 @@ export async function confirmDataImport(
     if (batch.status !== 'preview') throw new AppError(422, 42219, '该批次当前不可确认');
     if (Number(batch.valid_rows) === 0) throw new AppError(422, 42219, '该批次没有可确认的有效行，请修正 Excel 后重新上传');
 
-    await connection.query(
-      `UPDATE data_import_batches
-       SET status = 'confirmed', confirmed_by = ?, confirmed_at = NOW()
-       WHERE id = ? AND status = 'preview'`,
-      [user.sub, id],
-    );
     const taskIds: string[] = [];
-    await writeAudit(
-      { userId: user.sub, action: 'data_import.confirm', resourceType: 'data_import_batch', resourceId: id, ip },
-      connection,
-    );
     return {
       ...batchFromRow(batch, { status: 'confirmed', confirmedAt: new Date().toISOString() }),
       imported: Number(batch.valid_rows),
@@ -1156,11 +1131,7 @@ export async function confirmDataImport(
       taskIds,
     };
   });
-  const attribution = await bridgeConfirmedImport(user, id, scope);
-  if (!attribution.attributionBatchId) {
-    const taskIds = await withTransaction((connection) => createAttributionTasksForBatch(connection, id));
-    return { ...result, taskIds, attribution };
-  }
+  const attribution = await bridgeConfirmedImport(user, id, scope, ip);
   return { ...result, attribution };
 }
 

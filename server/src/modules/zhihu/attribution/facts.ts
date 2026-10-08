@@ -69,6 +69,8 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
     await assertEngineWritable(c, scope);
+    const [route]=await select(c,"SELECT DATE_FORMAT(exclusive_from,'%Y-%m-%d') start FROM zh_engine_routes WHERE account_id=? AND project_id=?",[scope.accountId,scope.projectId]);
+    const alreadySettled=(row:typeof parsed[number])=>!row.error&&!!route&&row.value.date<String(route.start);
     const existing = await select(
       c,
       'SELECT id,project_id,template_version FROM zh_import_batches WHERE account_id=? AND file_sha256=? AND report_kind=? FOR UPDATE',
@@ -91,8 +93,8 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
           row.rowNumber,
           JSON.stringify(row.value),
           JSON.stringify(row.raw),
-          row.error,
-          row.skipped ? 'skipped' : row.error ? 'invalid' : 'pending',
+          alreadySettled(row)?'这一天已在旧系统结算，不重复计算':row.error,
+          row.skipped ? 'skipped' : row.error ? 'invalid' : alreadySettled(row)?'legacy_settled':'pending',
         ],
       );
     await audit(c, user, 'report.preview', id, { ...scope, hash, kind });

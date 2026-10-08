@@ -1,4 +1,5 @@
 import { isStaffRole } from '../../../auth/roles';
+import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../../../types';
 import { withTransaction } from '../../../db';
 import { day, fail, type Scope } from './domain';
@@ -68,6 +69,31 @@ export async function getRoute(user: AuthUser, scope: Scope) {
     );
     return r ?? null;
   });
+}
+export async function extendRouteIfClean(c: PoolConnection, scope: Scope, earliestDate: string, user: AuthUser) {
+  day(earliestDate);
+  await gate(c, true);
+  await scopeLock(c, scope, user);
+  const [old] = await select(c, "SELECT id,DATE_FORMAT(exclusive_from,'%Y-%m-%d') start,mode FROM zh_engine_routes WHERE account_id=? AND project_id=? FOR UPDATE", [scope.accountId, scope.projectId]);
+  if (old?.mode === 'stopped') fail('业务已暂停，运营：恢复项目后再上传报表', 409);
+  if (!old) {
+    // Keep the original first-cutover guard: old money must never be counted again.
+    const sources = await select(c, 'SELECT id FROM earnings WHERE project_id=? AND settle_date>=? LIMIT 1', [scope.projectId, earliestDate]);
+    const metrics = await select(c, 'SELECT id FROM daily_metrics WHERE project_id=? AND stat_date>=? LIMIT 1', [scope.projectId, earliestDate]);
+    const imports = await select(c, "SELECT r.id FROM data_import_rows r JOIN data_import_batches b ON b.id=r.batch_id WHERE b.status='confirmed' AND r.validation_status='valid' AND (r.occurred_at IS NULL OR DATE(r.occurred_at)>=?) LIMIT 1", [earliestDate]);
+    if (sources.length || metrics.length || imports.length) fail('这段日期已有旧系统数据，运营：核对已结算日期后设置项目开始日期', 409);
+    const id = await insert(c, 'INSERT INTO zh_engine_routes(account_id,project_id,exclusive_from,mode,reason,updated_by) VALUES(?,?,?,\'trial\',?,?)', [scope.accountId, scope.projectId, earliestDate, '首次上传后自动计算，等待财务核对金额', user.sub]);
+    await audit(c, user, 'engine.configure', id, { from: earliestDate, mode: 'trial', automatic: true });
+    return earliestDate;
+  }
+  if (earliestDate >= String(old.start)) return String(old.start);
+  const sources = await select(c, 'SELECT id FROM earnings WHERE project_id=? AND settle_date>=? AND settle_date<? LIMIT 1', [scope.projectId, earliestDate, old.start]);
+  const metrics = await select(c, 'SELECT id FROM daily_metrics WHERE project_id=? AND stat_date>=? AND stat_date<? LIMIT 1', [scope.projectId, earliestDate, old.start]);
+  const imports = await select(c, "SELECT r.id FROM data_import_rows r JOIN data_import_batches b ON b.id=r.batch_id WHERE b.status='confirmed' AND r.validation_status='valid' AND (r.occurred_at IS NULL OR (DATE(r.occurred_at)>=? AND DATE(r.occurred_at)<?)) LIMIT 1", [earliestDate, old.start]);
+  if (sources.length || metrics.length || imports.length) return String(old.start);
+  await c.query('UPDATE zh_engine_routes SET exclusive_from=?,updated_by=? WHERE id=?', [earliestDate, user.sub, old.id]);
+  await audit(c, user, 'engine.extend-earlier', String(old.id), { previous: old.start, from: earliestDate });
+  return earliestDate;
 }
 export async function legacyInventory(user: AuthUser, scope: Scope, page: number, pageSize: number) {
   if (!isStaffRole(user.role)) fail('历史盘点仅管理员可见', 403);

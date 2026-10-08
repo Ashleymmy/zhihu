@@ -36,9 +36,7 @@ export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUpload
   }
  }
  const dates=parsed.filter(r=>!r.error&&!r.skipped).map(r=>r.value.date).sort();
- const route=await cutover.getRoute(user,scope);
- if(route&&dates.some(date=>date<String(route.exclusive_from)))fail('这份报表包含 '+dates[0]+' 至 '+dates[dates.length-1]+' 的历史数据，早于新归因规则 '+String(route.exclusive_from)+' 的生效日期。请到“历史邮件 / Excel 导入”页面处理，当前财务做账只接收新规则生效后的报表');
- if(!route&&dates.length)await cutover.configureRoute(user,scope,{from:dates[0],mode:'trial',sampleVerified:false,reason:'首次上传后自动计算，等待财务核对金额'});
+ if(dates.length)await withTransaction(c=>cutover.extendRouteIfClean(c,scope,dates[0],user));
  const b=await facts.previewImport(user,scope,file,kind),detail=await facts.importDetail(user,scope,b.id,1,1);
  await facts.commitImport(user,scope,b.id,'workbench-import-'+b.id,detail.preview_hash);
  await facts.processBatch(user,scope,b.id);

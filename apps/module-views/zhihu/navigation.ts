@@ -19,13 +19,12 @@ export function businessPages<T extends BusinessPage>(
   if (role === "developer") duty = "all";
   if (role === "operator") duty = "operations";
   return pages.filter((page) => {
-    if (["keywords", "more", "works/new"].includes(page.path)) return false;
+    if (["keywords", "more", "works/new", "data-import"].includes(page.path)) return false;
     if (!["developer", "admin", "operator"].includes(role)) return true;
     if (duty === "finance")
       return [
         "dashboard",
         "finance",
-        "data-import",
         "settlements",
         "earnings",
         "withdrawals",
