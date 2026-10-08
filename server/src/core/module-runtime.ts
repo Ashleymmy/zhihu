@@ -6,13 +6,13 @@ export class ModuleRuntime {
   constructor(readonly catalog: ModuleManifest[] = []) {
     const ids = new Set<string>();
     for (const manifest of catalog) {
-      if (ids.has(manifest.id) || manifest.contractVersion !== MODULE_CONTRACT_VERSION)
+      if (ids.has(manifest.id) || ![1, MODULE_CONTRACT_VERSION].includes(manifest.contractVersion))
         throw new Error('模块重复或契约版本不兼容');
       ids.add(manifest.id);
     }
   }
   register(module: BusinessModule) {
-    if (this.entries.has(module.manifest.id) || module.manifest.contractVersion !== MODULE_CONTRACT_VERSION)
+    if (this.entries.has(module.manifest.id) || ![1, MODULE_CONTRACT_VERSION].includes(module.manifest.contractVersion))
       throw new Error('模块重复或契约版本不兼容');
     this.entries.set(module.manifest.id, module);
   }
@@ -30,7 +30,7 @@ export class ModuleRuntime {
         name: m.name,
         version: m.version,
         entryPath: m.entryPath,
-        capabilities: [...m.capabilities, ...(this.entries.get(m.id)?.rateProvider ? ['role-rates'] : [])],
+        capabilities: [...m.capabilities, ...(this.entries.get(m.id)?.rateProvider ? ['role-rates'] : []), ...(this.entries.get(m.id)?.taskProvider ? ['tasks'] : [])],
         accountCreation: m.accountCreation ?? 'self_service',
         accountMessage: m.accountMessage ?? null,
         status: this.entries.has(m.id) ? 'enabled' : this.failures.has(m.id) ? 'unavailable' : 'disabled',

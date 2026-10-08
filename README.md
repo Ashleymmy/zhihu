@@ -11,6 +11,12 @@ OPC 提供公共身份、组织、项目、模块接入和统一工作台。知�
 
 `pnpm verify:opc` 执行公共核心与统一前端构建、类型检查和隔离数据库验收；旧单测的 13 项既有失败见上述说明。
 
+## 平台任务与待办
+
+模块契约版本 2 增加可选的 `todoProvider`、`taskProvider` 和 `rateProvider`，运行时仍接受版本 1。平台任务页与任务大厅统一调用 `/api/v1/core/tasks`，按项目和用户权限聚合；详情和动作分别使用 `/:moduleId/:accountId/:taskId` 与其 `/actions/:action` 子路径。项目提供器负责真实业务权限、使用权和动作校验，公共核心不读取项目表。
+
+`server/examples/sample-api` 演示第二个 API 型项目接入同一任务与待办页面，仅连接本地模拟服务，不注册到生产。验证命令：`cd server && npx vitest run --config vitest.opc.config.ts tests/opc/tasks.integration.spec.ts tests/opc/boundaries.spec.ts`；知乎适配器验证为 `npx vitest run --config vitest.attribution.config.ts tests/attribution/platform-tasks.spec.ts`。真实页面回归为 `node tests/attribution-ui/platform-tasks.cjs`，使用隔离数据库与模拟上游，需先完成 Web 构建并配置本机 Playwright。
+
 ## Docker 快速启动
 
 ```bash

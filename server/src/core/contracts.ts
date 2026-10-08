@@ -2,7 +2,7 @@ import type { Express, Router } from 'express';
 import type { AuthUser, Role } from '../types';
 import type { PoolConnection } from 'mysql2/promise';
 
-export const MODULE_CONTRACT_VERSION = 1;
+export const MODULE_CONTRACT_VERSION = 2;
 export interface ModuleManifest {
   id: string;
   name: string;
@@ -59,6 +59,30 @@ export interface BusinessModule {
   accountLifecycle?: ModuleAccountLifecycle;
   rateProvider?: ModuleRateProvider;
   todoProvider?: ModuleTodoProvider;
+  taskProvider?: ModuleTaskProvider;
+}
+
+export interface TaskScope { projectId: string; accountId: string }
+export interface TaskFilter { page: number; pageSize: number; search: string; view: 'all' | 'available' | 'owned' }
+export interface TaskAction {
+  key: string; label: string; path?: string; confirm?: string;
+  fields?: { key: string; label: string; type: 'text' | 'url' | 'select' | 'textarea'; required?: boolean; value?: string; options?: { value: string; label: string }[] }[];
+}
+export interface TaskItem {
+  id: string; title: string; subtitle?: string;
+  status: { key: string; label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' | 'leader' };
+  executor: string; leader?: string; next: { actor: string; text: string; action?: TaskAction };
+  metrics: { label: string; value: string }[];
+}
+export interface TaskDetail extends TaskItem {
+  fields: { label: string; value: string; url?: string }[];
+  progress: { label: string; status: 'done' | 'current' | 'waiting'; actor: string; description?: string }[];
+  actions: TaskAction[];
+}
+export interface ModuleTaskProvider {
+  list(scope: TaskScope, user: AuthUser, filter: TaskFilter): Promise<{ list: TaskItem[]; total: number; create?: { label: string; path: string } }>;
+  detail(scope: TaskScope, user: AuthUser, id: string): Promise<TaskDetail>;
+  execute(scope: TaskScope, user: AuthUser, id: string, action: string, input: Record<string, unknown>, requestKey: string): Promise<{ message: string }>;
 }
 
 export interface TodoItem {

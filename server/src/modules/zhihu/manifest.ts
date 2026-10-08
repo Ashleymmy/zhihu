@@ -31,7 +31,7 @@ export const zhihuManifest: ModuleManifest = {
   id: 'zhihu',
   name: '知乎',
   version: '1.0.0',
-  contractVersion: 1,
+  contractVersion: 2,
   roles: ['developer', 'admin', 'operator', 'leader', 'creator'],
   entryPath: '/modules/zhihu',
   accountCreation: 'managed',

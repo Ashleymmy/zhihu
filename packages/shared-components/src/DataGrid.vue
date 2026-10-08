@@ -22,6 +22,8 @@ const props = withDefaults(
     busy?: boolean;
     busyRowId?: string;
     emptyText?: string;
+    hideSearch?: boolean;
+    externalDetails?: boolean;
   }>(),
   {
     title: "明细",
@@ -83,7 +85,7 @@ function choose(key: string) {
   emit("update:modelValue", key);
 }
 function inspect(row: DataGridRow) {
-  selectedId.value = row.id;
+  if (!props.externalDetails) selectedId.value = row.id;
   emit("inspect", row);
 }
 defineExpose({inspect});
@@ -119,7 +121,7 @@ function text(row: DataGridRow, column: DataGridColumn) {
         </button>
       </div>
       <div class="grid-filters">
-        <label class="grid-search"
+        <label v-if="!hideSearch" class="grid-search"
           ><span class="sr-only">{{ searchPlaceholder }}</span
           ><input
             v-model="search"

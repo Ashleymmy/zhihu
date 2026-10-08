@@ -349,7 +349,7 @@ export async function updateKeywordNovel(user: AuthUser, scope: Scope, id: strin
     return {id};
   });
 }
-export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'owned' | 'ongoing' | 'registered' | 'retired' = 'all') {
+export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'owned' | 'ongoing' | 'registered' | 'retired' = 'all', recordId?: string) {
   await authorize(user, scope);
   await synchronizeKeywords(scope);
   return withTransaction(async (c) => {
@@ -369,10 +369,11 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       : view === 'registered' ? `${compositionCount}>0`
       : view === 'retired' ? `k.lifecycle_status='retired'` : '1=1';
     const filterArgs = view === 'owned' ? [user.sub, user.sub] : view === 'registered' ? workScope.bindings : view === 'available' && user.role === 'creator' ? [user.sub] : [];
-    const args = [scope.projectId, scope.accountId, `%${search}%`, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs];
+    const args = [scope.projectId, scope.accountId, `%${search}%`, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs, ...(recordId?[recordId]:[])];
     const where = `p.project_id=? AND ${planAccountSql()}=? AND (p.keyword LIKE ? OR p.novel_title LIKE ?)
       AND (k.id IS NULL OR (k.project_id=p.project_id AND k.lifecycle_status<>'archived'))
-      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0) AND (${filter})`;
+      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0) AND (${filter})
+      ${recordId?"AND COALESCE(CAST(k.id AS CHAR),CONCAT('plan:',p.id))=?":''}`;
     const from = `FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id
       LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id`;
     const [total] = await select(c,
