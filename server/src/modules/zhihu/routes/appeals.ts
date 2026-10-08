@@ -1,3 +1,4 @@
+import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../../auth/middleware';
@@ -34,7 +35,7 @@ const decide = review.extend({
 });
 
 export const appealsRouter = Router();
-appealsRouter.use(requireAuth);
+appealsRouter.use(requireAuth, legacyFinanceReadOnly);
 
 appealsRouter.get(
   '/',

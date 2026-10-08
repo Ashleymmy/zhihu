@@ -1,3 +1,4 @@
+import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -64,7 +65,7 @@ const batchInput = z.object({
 });
 
 export const relayRouter = Router();
-relayRouter.use(requireAuth, requirePermission('finance.relay'));
+relayRouter.use(requireAuth, legacyFinanceReadOnly, requirePermission('finance.relay'));
 
 relayRouter.get('/rules', asyncHandler(async (_req, res) => ok(res, await listRules())));
 relayRouter.post(

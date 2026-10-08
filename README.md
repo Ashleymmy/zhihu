@@ -17,6 +17,12 @@ OPC 提供公共身份、组织、项目、模块接入和统一工作台。知�
 
 `server/examples/sample-api` 演示第二个 API 型项目接入同一任务与待办页面，仅连接本地模拟服务，不注册到生产。验证命令：`cd server && npx vitest run --config vitest.opc.config.ts tests/opc/tasks.integration.spec.ts tests/opc/boundaries.spec.ts`；知乎适配器验证为 `npx vitest run --config vitest.attribution.config.ts tests/attribution/platform-tasks.spec.ts`。真实页面回归为 `node tests/attribution-ui/platform-tasks.cjs`，使用隔离数据库与模拟上游，需先完成 Web 构建并配置本机 Playwright。
 
+## 历史账目
+
+模块可用可选 `financeHistoryPath` 声明只读历史入口；共享 `FinanceHistoryLinks` 从模块目录生成折叠入口。知乎旧收益、提现、申诉、结算及邮件 / Excel 页面保留原地址，统一显示只读记录、详情和去新财务入口。历史金额只按原存储单位显示，不重算或写回；团长及达人只读本人金额，运营岗位不能读取资金记录。历史发票仍可由本人或财务下载。
+
+旧资金写接口（包括兼容地址）、旧导入确认和手工结算返回 410，历史账目停止新增；队列中残留的旧结算任务只记录停用结果，不生成旧收益，定时调度也不再投递它。当前平台资金接口与新报表处理不受影响。测试：`cd server && npx vitest run --config vitest.attribution.config.ts tests/attribution/legacy-finance.spec.ts`；真实角色页面验收 `node tests/attribution-ui/finance-history.cjs`。
+
 ## Docker 快速启动
 
 ```bash

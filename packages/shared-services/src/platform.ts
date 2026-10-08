@@ -4,6 +4,7 @@ export interface ModuleInfo {
   name: string
   version: string
   entryPath: string
+  financeHistoryPath?: string | null
   capabilities: string[]
   status: 'enabled' | 'disabled' | 'unavailable'
   message: string | null

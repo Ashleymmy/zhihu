@@ -5,7 +5,7 @@ import { assertLegacyWithdrawalWritesBlocked } from '../../../middleware/finance
 import { AuthUser } from '../../../types';
 import { maskAccount } from '../../../utils/maskSecret';
 import { pageOffset } from '../../../utils/pagination';
-import { scopeFilter } from '../../../utils/scopeFilter';
+import { legacyOwnerScope as scopeFilter } from './legacy-finance-access';
 import { writeAudit } from '../../../services/audit.service';
 import { devDemoEarningsSummary, isDevDemoAuthUser, listDevDemoEarnings } from '../dev-demo';
 

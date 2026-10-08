@@ -1,3 +1,4 @@
+import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../../auth/middleware';
@@ -8,7 +9,7 @@ import { paginationSchema } from '../../../utils/pagination';
 import { ok, okList } from '../../../utils/response';
 const list = paginationSchema.extend({ status: z.enum(['pending', 'confirmed', 'paid']).optional() });
 export const earningsRouter = Router();
-earningsRouter.use(requireAuth);
+earningsRouter.use(requireAuth, legacyFinanceReadOnly);
 earningsRouter.get(
   '/',
   validateQuery(list),

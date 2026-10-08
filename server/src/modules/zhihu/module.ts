@@ -1,3 +1,4 @@
+import { financeHistoryRouter } from './routes/finance-history';
 import { projectsRouter } from './routes/projects';
 import { miniBusinessRouter } from '../../wechat/business';
 import { attributionRouter } from './routes/attribution';
@@ -42,6 +43,7 @@ export function createZhihuModule(): BusinessModule {
     ['meta', metaRouter],
     ['metrics', metricsRouter],
     ['earnings', earningsRouter],
+    ['finance-history', financeHistoryRouter],
     ['withdrawals', withdrawalsRouter],
     ['appeals', appealsRouter],
     ['callbacks', callbacksRouter],

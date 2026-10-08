@@ -34,3 +34,5 @@ export type * from "./analysis-run";
 export type * from "./data-grid";
 export { default as RateSettings } from "./RateSettings.vue";
 export { default as PlatformTasks } from "./PlatformTasks.vue";
+
+export { default as FinanceHistoryLinks } from "./FinanceHistoryLinks.vue";

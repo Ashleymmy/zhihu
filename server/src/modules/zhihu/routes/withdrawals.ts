@@ -1,3 +1,4 @@
+import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -44,7 +45,7 @@ const review = z.object({
 });
 
 export const withdrawalsRouter = Router();
-withdrawalsRouter.use(requireAuth);
+withdrawalsRouter.use(requireAuth, legacyFinanceReadOnly);
 
 /** 列表（按角色分流） */
 withdrawalsRouter.get(

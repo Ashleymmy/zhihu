@@ -11,7 +11,7 @@ export const dailyPages = [
   "works",
   "tasks",
 ];
-export const retiredFinancePages = ['settlements', 'earnings', 'withdrawals', 'appeals'];
+export const retiredFinancePages = ['settlements', 'earnings', 'withdrawals', 'appeals', 'data-import'];
 export const hiddenBusinessPages = ['orders', 'knowledge', 'creative-tools', 'data-import', ...retiredFinancePages];
 export function businessPages<T extends BusinessPage>(
   pages: T[],

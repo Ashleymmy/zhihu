@@ -6,7 +6,7 @@ import { pushPlan } from './pushPlan';
 import { pushComposition } from './pushComposition';
 import { syncMetrics } from './syncMetrics';
 import { syncChannels, syncTasks } from './syncCatalog';
-import { settleEarnings } from './settleEarnings';
+import { logger } from '../../../utils/logger';
 import { syncPlanStatus } from './syncPlanStatus';
 import { syncCompositionStatus } from './syncCompositionStatus';
 
@@ -19,7 +19,8 @@ export function registerJobs() {
   registerJob('sync-metrics', syncMetrics);
   registerJob('sync-channels', syncChannels);
   registerJob('sync-tasks', syncTasks);
-  registerJob('settle-earnings', settleEarnings);
+  // A queued job from the retired finance flow must never create new historical money.
+  registerJob('settle-earnings', async () => { logger.info('Historical settlement job retired; no write performed'); });
   registerJob('sync-plan-status', syncPlanStatus);
   registerJob('sync-composition-status', async () => { await syncCompositionStatus(); });
 }
@@ -34,8 +35,7 @@ export function startScheduler() {
         const acquired = await acquireRateLimit(`metrics-daily-lock:${day}`, 3_600);
         if (!acquired) return;
         await enqueue('sync-metrics', { source: 'cron' }, { jobId: `metrics-daily-${day}` });
-        // 拉完数据后立即触发结算（结算昨天的数据）
-        await enqueue('settle-earnings', { source: 'cron' }, { jobId: `settle-${day}` });
+        // Financial calculation now follows the current report flow.
       })().catch((error) => {
         if (process.env.NODE_ENV !== 'test') {
           console.error('daily_metrics_enqueue_failed', error instanceof Error ? error.message : 'unknown error');

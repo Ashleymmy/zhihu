@@ -12,6 +12,7 @@ export interface ModuleManifest {
   capabilities: string[];
   permissions: Partial<Record<Role, string[]>>;
   entryPath: string;
+  financeHistoryPath?: string;
   accountCreation?: 'managed' | 'self_service';
   accountMessage?: string;
 }

@@ -1,0 +1,177 @@
+[
+  {
+    "role": "admin",
+    "kind": "earnings",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "admin",
+    "kind": "withdrawals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "admin",
+    "kind": "appeals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "admin",
+    "kind": "settlements",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "admin",
+    "kind": "data-import",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "finance",
+    "kind": "earnings",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "finance",
+    "kind": "withdrawals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "finance",
+    "kind": "appeals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "finance",
+    "kind": "settlements",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "finance",
+    "kind": "data-import",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "operations",
+    "restricted": true
+  },
+  {
+    "role": "leader",
+    "kind": "earnings",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "leader",
+    "kind": "withdrawals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "leader",
+    "kind": "appeals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "creator",
+    "kind": "earnings",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "creator",
+    "kind": "withdrawals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "creator",
+    "kind": "appeals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "independent",
+    "kind": "earnings",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "independent",
+    "kind": "withdrawals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  },
+  {
+    "role": "independent",
+    "kind": "appeals",
+    "widths": [
+      1440,
+      375
+    ],
+    "readOnly": true
+  }
+]
