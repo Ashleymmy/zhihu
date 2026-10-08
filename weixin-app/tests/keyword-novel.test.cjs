@@ -1,5 +1,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
 const {harness,scoped}=require('./harness.cjs');
 const user={id:'3',role:'creator'};
 function setup() {
@@ -40,4 +42,22 @@ test('creation sends the optional original name using moderated title field',asy
  assert.equal(sent.data.novel.title,'原始小说名');assert.equal(sent.data.landingUrl,'https://example.com/original');
  const {textsFor}=require('../cloudfunctions/opc-bridge/content-safety');
  assert(textsFor(sent.path,'POST',sent.data).includes('原始小说名'));
+});
+
+test('pasting a complete mobile share URL keeps parameters beyond the native 140-character default',async()=>{
+ const {h}=setup();h.wx.navigateBack=()=>{};
+ const page=h.page('keywords/create');await page.onShow();
+ const url='https://soia.zhihu.com/km_paid_content/share?is_delivery=true&source=e9f03bea58b4524092f6cb42207b6a5f&package=zhihushare0812&channel_id=67154024128158&appkey=2400&ustkn=1&is_share_data=true&fallback_url=zhvip%3A%2F%2Ftab%2Fhome&mst=fixture-complete-story-reference';
+ assert.equal(url.slice(0,140).endsWith('channel_id=6715'),true);
+ const template=fs.readFileSync(path.join(__dirname,'../miniprogram/pages/keywords/create/index.wxml'),'utf8');
+ const input=template.match(/<input\b[^>]*bindinput="inputUrl"[^>]*\/>/)[0];
+ // Model native paste length, not just calling the handler with an already intact value.
+ const maximum=Number(input.match(/maxlength="(-?\d+)"/)?.[1]??140);
+ const pasted=maximum<0?url:url.slice(0,maximum);
+ page.inputKeyword({currentTarget:{dataset:{index:0}},detail:{value:'手机分享测试词'}});
+ page.inputUrl({currentTarget:{dataset:{index:0}},detail:{value:pasted}});
+ await page.confirm();const sent=h.calls.find(c=>c.method==='POST');
+ assert.equal(sent.data.landingUrl,url);
+ assert.equal(new URL(sent.data.landingUrl).searchParams.get('mst'),'fixture-complete-story-reference');
+ assert.equal(maximum,1024);
 });
