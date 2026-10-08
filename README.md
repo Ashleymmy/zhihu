@@ -36,6 +36,16 @@ Web 与后端先完成角色、金额和旧小程序接口回归，再发布；�
 
 后台开关回归：`cd server && npx vitest run tests/unit/background-runtime.spec.ts`。
 
+入口切换工具为 `deploy/switch_timo_upstream.py`（ECS 的 Python 3，无额外依赖）。先执行预览，完成上面的迁移、队列和角色验证后再加 `--apply`：
+
+```bash
+python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candidate-container zhihu-green-<提交号>
+```
+
+工具核对指定容器发布的端口、应用健康，以及两个入口到候选实例的可达性；只替换 Timo 配置中原端口对应的地址。实际切换会备份原配置、校验两处 Nginx 并平滑加载，校验或加载失败时恢复原入口配置。不会自动运行迁移、切换消费者或删除旧容器。备份和操作回执保存在 ECS 的 `/home/ecsdiag/zhihu-app/bluegreen/`。切流后仍需独立验证实际域名请求与业务接口。
+
+工具回归：`python3 -m unittest discover -s deploy -p 'test_switch*.py'`。2026-10-09 已在独立测试容器演练默认预览不切流、两入口切换及反向切换；演练未改动生产入口。
+
 ## 知乎模块历史功能说明
 
 ### 推广计划管理
