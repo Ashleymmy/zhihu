@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 import { incrRateLimit } from '../utils/rateLimit';
 import { AppError } from './errors';
 import { wechatContext, wechatClientId } from '../wechat/context';
+import { verifyToken } from '../auth/jwt';
 
 /**
  * API 级限流（在 IP 登录限流之上叠加）：
@@ -15,7 +16,12 @@ export function apiRateLimit(options: { windowSec?: number; userLimit?: number; 
   const anonLimit = options.anonLimit ?? 120;
   return async (req, _res, next) => {
     try {
-      const uid = req.user?.sub;
+      // This middleware runs before router authentication. Verify the signature only
+      // to select a rate-limit bucket; never populate req.user or grant access here.
+      let uid = req.user?.sub;
+      if (!uid && req.headers.authorization?.startsWith('Bearer ')) {
+        try { uid = verifyToken(req.headers.authorization.slice(7)).sub; } catch { /* Invalid tokens use the anonymous limit. */ }
+      }
       if (uid) {
         const r = await incrRateLimit(`api:user:${uid}`, userLimit, windowSec);
         if (!r.allowed) throw new AppError(429, 42901, '请求过于频繁，请稍后再试');
