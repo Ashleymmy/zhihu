@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process'),{pathToFileURL}=require('node:url');
 const {chromium}=require(process.env.OPC_PLAYWRIGHT_MODULE||'playwright');
-const root=path.resolve(__dirname,'../..'),out=path.resolve(root,'../改造/截图_2026-10-09/P2-tasks');fs.mkdirSync(out,{recursive:true});
+const root=path.resolve(__dirname,'../..'),out=process.env.OPC_REVIEW_OUTPUT?path.resolve(process.env.OPC_REVIEW_OUTPUT):path.resolve(root,'../改造/截图_2026-10-09/P2-tasks');fs.mkdirSync(out,{recursive:true});
 async function main(){
  const log=fs.createWriteStream(path.resolve(root,'../.opc-work/release/p2-tasks-host.log'));
  const host=spawn(process.execPath,['--import',pathToFileURL(path.join(root,'node_modules/tsx/dist/loader.mjs')).href,path.join(__dirname,'review-host.ts')],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc'],env:{...process.env,REMEDIATION_REVIEW:'1'}});host.stdout.pipe(log);host.stderr.pipe(log);
