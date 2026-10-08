@@ -81,6 +81,13 @@ tfoot td{font-weight:600;background:#fafbfc}
 .trace li.cur:before{background:var(--amber)}
 .formula{background:#fafbfc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-variant-numeric:tabular-nums}
 .cards{display:none}
+.type-pick{padding:14px 18px;border-bottom:1px solid var(--line2)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.opt{display:block;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);text-decoration:none;font-weight:600}
+.opt small{display:block;font-weight:400;color:var(--ink3);font-size:12px}
+.opt.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.check{margin-top:8px;font-size:12px;color:var(--green)}
+.t-type{background:#e8f3ff;color:#1f6fd1}
 @media (max-width:900px){
  .page{padding:12px}
  .grid{grid-template-columns:1fr}
@@ -104,7 +111,8 @@ tfoot td{font-weight:600;background:#fafbfc}
  </div>
  <div class="grid">
   <div class="card" id="agent">
-   <div class="drop"><div class="file-ico">X</div><div><div class="file-name">10月8日推广数据.xlsx</div><div class="muted">刚刚上传 · 6 行数据 + 1 行合计 · 来自知乎官方邮件</div></div></div>
+   <div class="type-pick" id="typePick"></div>
+   <div class="drop"><div class="file-ico">X</div><div><div class="file-name" id="fileName"></div><div class="muted" id="fileMeta"></div></div></div>
    <div class="steps" id="steps"></div>
    <div class="conclusion" id="conclusion">
     <div class="muted">分析完成</div>
@@ -115,7 +123,7 @@ tfoot td{font-weight:600;background:#fafbfc}
   </div>
   <div>
    <div class="metrics">
-    <div class="metric"><span class="muted">本次读取</span><b>6 行 · 44 单</b></div>
+    <div class="metric"><span class="muted">本次读取</span><b id="mRead">—</b></div>
     <div class="metric"><span class="muted">可计费</span><b id="mOk">—</b></div>
     <div class="metric warn"><span class="muted">还不能计费（已保留）</span><b id="mTodo">—</b></div>
     <div class="metric"><span class="muted">处理完预计再增加</span><b id="mEst">—</b></div>
@@ -137,7 +145,7 @@ tfoot td{font-weight:600;background:#fafbfc}
 </div>
 <aside class="drawer" id="drawer"></aside>
 <script>
-const rows=[
+const NEW_ROWS=[
  {kw:'重生千金',date:'10-08',orders:20,exec:'小李',role:'达人',leader:'王团长',rule:'达人 8.00 + 团长分成 0.50',lines:[['小李',160],['王团长',10]],status:'ok',next:'财务：确认账单',line:3},
  {kw:'都市逆袭小说',date:'10-08',orders:10,exec:'王团长',role:'团长',leader:'—',rule:'团长本人 8.50',lines:[['王团长',85]],status:'wait',reason:'作品待核验',next:'管理员：核验作品',line:2,act:'去核验'},
  {kw:'甜宠文推荐',date:'10-08',orders:4,exec:'小张',role:'达人',leader:'王团长',rule:'达人 8.00 + 团长分成 0.50',lines:[['小张',32],['王团长',2]],status:'wait',reason:'还没有登记作品',next:'小张：补登记作品',line:4,act:'提醒小张'},
@@ -145,36 +153,60 @@ const rows=[
  {kw:'悬疑短篇',date:'10-08',orders:5,exec:null,role:'',leader:'',rule:'—',lines:[],status:'todo',reason:'没有执行人',next:'运营：指定执行人',line:6,act:'指定执行人'},
  {kw:'未登记的词',date:'10-08',orders:2,exec:null,role:'',leader:'',rule:'—',lines:[],status:'todo',reason:'系统里没有这个关键词',next:'运营：登记并指定执行人',line:7,act:'登记关键词'},
 ];
-const steps=[
+const NEW_STEPS=[
  {t:'读取文件',b:'识别为<b>知乎官方订单报表</b>，日期 2026-10-08，共 6 行数据；最后一行是“合计”，已自动跳过，不影响计算。'},
  {t:'核对渠道',b:'6 行都属于渠道「知乎故事一代渠道」。'},
  {t:'匹配关键词',b:'5 个关键词已找到。',ask:'「未登记的词」系统里没有。可能是在知乎后台直接建的计划。',acts:['登记并指定执行人','这行不计费']},
  {t:'识别执行人',b:'4 个关键词有执行人。',ask:'「悬疑短篇」还没有分配执行人，有 5 单在等它。',acts:['指定执行人']},
  {t:'计算金额',b:'按 10-01 起生效的角色单价计算：可计费 37 单。其中 3 行金额已算出，但作品还没核验或还没登记，确认前需要补齐。'},
 ];
+const ACT_ROWS=[
+ {kw:'浩浩哑女',date:'09-14',orders:1,exec:'小李',role:'达人',leader:'王团长',rule:'拉活：达人 1.20 + 团长分成 0.40',lines:[['小李',1.2],['王团长',0.4]],status:'ok',next:'财务：确认账单',line:2},
+ {kw:'重生千金',date:'09-14',orders:6,exec:'小李',role:'达人',leader:'王团长',rule:'拉活：达人 1.20 + 团长分成 0.40',lines:[['小李',7.2],['王团长',2.4]],status:'ok',next:'财务：确认账单',line:3},
+ {kw:'都市逆袭小说',date:'09-14',orders:2,exec:'王团长',role:'团长',leader:'—',rule:'拉活：团长本人 1.60',lines:[['王团长',3.2]],status:'ok',next:'财务：确认账单',line:4},
+ {kw:'古言虐恋',date:'09-14',orders:3,exec:'小陈',role:'独立达人',leader:'—',rule:'拉活：独立达人（单价未定）',lines:[],status:'todo',reason:'拉活单价还没设置',next:'财务：设置拉活单价',line:5,act:'去设置单价'},
+];
+const ACT_STEPS=[
+ {t:'读取文件',b:'识别为<b>拉活补贴表</b>（代理：广州渡川），日期 2026-09-14，共 4 行。'},
+ {t:'核对渠道',b:'4 行都属于渠道「渡川-知星河」，和拉新订单用的是同一个渠道。'},
+ {t:'匹配关键词',b:'4 个关键词都找到了，执行人沿用关键词当前的归属。'},
+ {t:'核对结算金额',b:'每行“结算金额 = 拉活量 × 2.00 元”，4 行全部一致，合计 ¥24.00。'},
+ {t:'计算金额',b:'按拉活单价计算：可计费 9 个。',ask:'独立达人的拉活单价还没定，小陈的 3 个拉活先保留，不会丢。',acts:['去设置拉活单价']},
+];
+const MODE=location.search.includes('activation')?'activation':'new';
+const rows=MODE==='activation'?ACT_ROWS:NEW_ROWS, steps=MODE==='activation'?ACT_STEPS:NEW_STEPS;
+const UNIT=MODE==='activation'?'个':'单', EST=MODE==='activation'?1.6:8.5;
 const fmt=n=>n.toLocaleString('zh-CN',{minimumFractionDigits:2});
 const amount=r=>r.lines.reduce((s,l)=>s+l[1],0);
 const tag=r=>r.status==='ok'?'<span class="tag t-ok">可确认</span>':r.status==='wait'?`<span class="tag t-wait">${r.reason}</span>`:`<span class="tag t-todo">${r.reason}</span>`;
 const av=(n)=>n?`<span class="person"><span class="avatar" style="background:${n.includes('团长')?'#7f3bf5':'#3370ff'}">${n.slice(-1)}</span>${n}</span>`:'<span class="muted">—</span>';
 let view='keyword';
 function setView(v){view=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.dataset.v===v));render()}
+function header(){
+ const isAct=MODE==='activation';
+ document.getElementById('typePick').innerHTML=`<div class="muted">这份报表是</div><div class="seg"><a class="opt ${isAct?'':'on'}" href="?done">拉新订单<small>知乎邮件订单报表 · 订单量</small></a><a class="opt ${isAct?'on':''}" href="?done&activation">拉活<small>拉活补贴表 · 拉活量</small></a></div><div class="check">✓ 已按表头核对：${isAct?'有“拉活量”“结算金额”列，是拉活表':'有“订单量”列，是拉新订单表'}</div>`;
+ document.getElementById('fileName').textContent=isAct?'渡川-拉活补贴-0914.xlsx':'10月8日推广数据.xlsx';
+ document.getElementById('fileMeta').textContent=isAct?'刚刚上传 · 4 行数据 · 拉活补贴表':'刚刚上传 · 6 行数据 + 1 行合计 · 来自知乎官方邮件';
+}
 function render(){
  const okSum=rows.filter(r=>r.status!=='todo').reduce((s,r)=>s+amount(r),0);
  const todo=rows.filter(r=>r.status!=='ok');
  document.getElementById('todoCount').textContent=todo.length;
- document.getElementById('mOk').textContent='37 单 · ¥'+fmt(okSum);
- document.getElementById('mTodo').textContent='7 单 · 2 行';
- document.getElementById('mEst').textContent='约 ¥'+fmt(7*8.5);
+ const cnt=l=>l.reduce((s,r)=>s+r.orders,0), billable=rows.filter(r=>r.status!=='todo'), blocked=rows.filter(r=>r.status==='todo');
+ document.getElementById('mRead').textContent=rows.length+' 行 · '+cnt(rows)+' '+UNIT;
+ document.getElementById('mOk').textContent=cnt(billable)+' '+UNIT+' · ¥'+fmt(okSum);
+ document.getElementById('mTodo').textContent=cnt(blocked)+' '+UNIT+' · '+blocked.length+' 行';
+ document.getElementById('mEst').textContent='约 ¥'+fmt(cnt(blocked)*EST);
  document.getElementById('sumOk').textContent=fmt(rows.filter(r=>r.status==='ok').reduce((s,r)=>s+amount(r),0));
- document.getElementById('concText').innerHTML=`已算出 <b>¥${fmt(okSum)}</b>，其中 ¥${fmt(rows.filter(r=>r.status==='ok').reduce((s,r)=>s+amount(r),0))} 现在就能确认。<br>还有 <b>${todo.length} 件事</b>：2 件需要运营处理，3 件在等成员补作品或核验。`;
+ document.getElementById('concText').innerHTML=`已算出 <b>¥${fmt(okSum)}</b>，其中 ¥${fmt(rows.filter(r=>r.status==='ok').reduce((s,r)=>s+amount(r),0))} 现在就能确认。<br>${todo.length?`还有 <b>${todo.length} 件事</b>：${rows.filter(r=>r.status==='todo').length} 件需要马上处理，${rows.filter(r=>r.status==='wait').length} 件在等成员补作品或核验。`:'没有需要处理的事。'}`;
  const t=document.getElementById('table'),c=document.getElementById('cards');
  if(view==='person'){
   const people={};
   rows.forEach(r=>r.lines.forEach(([n,a])=>{const p=people[n]||(people[n]={self:0,team:0,orders:0,teamOrders:0,state:new Set()});if(n===r.exec){p.self+=a;p.orders+=r.orders}else{p.team+=a;p.teamOrders+=r.orders}p.state.add(r.status)}));
-  t.innerHTML='<thead><tr><th>收款人</th><th class="num">本人作品订单</th><th class="num">本人作品金额</th><th class="num">团队分成订单</th><th class="num">团队分成金额</th><th class="num">合计</th><th>状态</th></tr></thead><tbody>'+
+  t.innerHTML='<thead><tr><th>收款人</th><th class="num">本人'+(MODE==='activation'?'拉活':'订单')+'</th><th class="num">本人作品金额</th><th class="num">团队分成'+(MODE==='activation'?'拉活':'订单')+'</th><th class="num">团队分成金额</th><th class="num">合计</th><th>状态</th></tr></thead><tbody>'+
    Object.entries(people).map(([n,p])=>`<tr class="row"><td>${av(n)} ${n.includes('团长')?'<span class="tag t-leader">团长</span>':'<span class="tag t-role">达人</span>'}</td><td class="num">${p.orders||'—'}</td><td class="num">${p.self?fmt(p.self):'—'}</td><td class="num">${p.teamOrders||'—'}</td><td class="num">${p.team?fmt(p.team):'—'}</td><td class="num"><b>${fmt(p.self+p.team)}</b></td><td>${p.state.has('wait')?'<span class="tag t-wait">部分待补齐</span>':'<span class="tag t-ok">可确认</span>'}</td></tr>`).join('')+
    `</tbody><tfoot><tr><td>合计</td><td></td><td></td><td></td><td></td><td class="num">${fmt(okSum)}</td><td></td></tr></tfoot>`;
-  c.innerHTML=Object.entries(people).map(([n,p])=>`<div class="mcard"><div class="top">${av(n)}<span class="amt">¥${fmt(p.self+p.team)}</span></div><div class="meta">本人作品 ${p.orders} 单 ¥${fmt(p.self)}${p.team?` · 团队分成 ${p.teamOrders} 单 ¥${fmt(p.team)}`:''}</div></div>`).join('');
+  c.innerHTML=Object.entries(people).map(([n,p])=>`<div class="mcard"><div class="top">${av(n)}<span class="amt">¥${fmt(p.self+p.team)}</span></div><div class="meta">本人 ${p.orders} ${UNIT} ¥${fmt(p.self)}${p.team?` · 团队分成 ${p.teamOrders} ${UNIT} ¥${fmt(p.team)}`:''}</div></div>`).join('');
   return;
  }
  const list=view==='todo'?todo:rows;
@@ -185,19 +217,19 @@ function render(){
   body+=`<tr class="group"><td colspan="8">${label}（${g.length}）</td></tr>`;
   body+=g.map((r,i)=>`<tr class="row" onclick="openRow('${r.kw}')"><td>${tag(r)}</td><td>${r.date}</td><td><b>${r.kw}</b></td><td>${av(r.exec)}${r.role?` <span class="tag ${r.role==='团长'?'t-leader':'t-role'}">${r.role}</span>`:''}</td><td class="num">${r.orders}</td><td class="muted wrap">${r.rule}</td><td class="num">${r.lines.length?fmt(amount(r)):'<span class="muted">待算</span>'}</td><td><div class="next">下一步：<b>${r.next}</b></div>${r.act?`<button class="btn small" onclick="event.stopPropagation()">${r.act}</button>`:''}</td></tr>`).join('');
  }
- t.innerHTML='<thead><tr><th>状态</th><th>日期</th><th>关键词</th><th>执行人</th><th class="num">订单</th><th>计费规则</th><th class="num">金额</th><th>下一步</th></tr></thead><tbody>'+body+`</tbody><tfoot><tr><td colspan="4">合计</td><td class="num">${list.reduce((s,r)=>s+r.orders,0)}</td><td></td><td class="num">${fmt(list.reduce((s,r)=>s+amount(r),0))}</td><td></td></tr></tfoot>`;
- c.innerHTML=list.map(r=>`<div class="mcard" onclick="openRow('${r.kw}')"><div class="top"><b>${r.kw}</b>${tag(r)}</div><div class="meta">${r.exec?r.exec+' · ':''}${r.orders} 单 · ${r.rule}</div><div class="top"><span class="next">下一步：<b>${r.next}</b></span><span class="amt">${r.lines.length?'¥'+fmt(amount(r)):'待算'}</span></div></div>`).join('');
+ t.innerHTML='<thead><tr><th>状态</th><th>日期</th><th>关键词</th><th>执行人</th><th class="num">'+(MODE==='activation'?'拉活量':'订单')+'</th><th>计费规则</th><th class="num">金额</th><th>下一步</th></tr></thead><tbody>'+body+`</tbody><tfoot><tr><td colspan="4">合计</td><td class="num">${list.reduce((s,r)=>s+r.orders,0)}</td><td></td><td class="num">${fmt(list.reduce((s,r)=>s+amount(r),0))}</td><td></td></tr></tfoot>`;
+ c.innerHTML=list.map(r=>`<div class="mcard" onclick="openRow('${r.kw}')"><div class="top"><b>${r.kw}</b>${tag(r)}</div><div class="meta">${r.exec?r.exec+' · ':''}${r.orders} ${UNIT} · ${r.rule}</div><div class="top"><span class="next">下一步：<b>${r.next}</b></span><span class="amt">${r.lines.length?'¥'+fmt(amount(r)):'待算'}</span></div></div>`).join('');
 }
 function openRow(kw){
  const r=rows.find(x=>x.kw===kw),d=document.getElementById('drawer');
- d.innerHTML=`<button class="btn small" style="float:right" onclick="document.getElementById('drawer').classList.remove('on')">关闭</button><h3>${r.kw}</h3><div class="muted">报表第 ${r.line} 行 · 2026-10-08 · 渠道「知乎故事一代渠道」</div>
+ d.innerHTML=`<button class="btn small" style="float:right" onclick="document.getElementById('drawer').classList.remove('on')">关闭</button><h3>${r.kw}</h3><div class="muted">报表第 ${r.line} 行 · ${MODE==='activation'?'2026-09-14 · 渠道「渡川-知星河」 · 拉活':'2026-10-08 · 渠道「知乎故事一代渠道」 · 拉新订单'}</div>
  <ul class="trace">
-  <li>报表记录：${r.orders} 单</li>
+  <li>报表记录：${r.orders} ${UNIT}${MODE==='activation'?'，上游结算 ¥'+fmt(r.orders*2):''}</li>
   <li class="${r.exec?'':'cur'}">执行人：${r.exec?r.exec+'（10-01 分配，'+(r.leader&&r.leader!=='—'?'所属团长 '+r.leader:'无团长')+'）':'还没有，<b>需要运营指定</b>'}</li>
   <li class="${r.status==='wait'?'cur':''}">作品：${r.status==='ok'?'已登记并通过核验':r.reason||'—'}</li>
   <li>计费规则：${r.rule}</li>
  </ul>
- ${r.lines.length?`<div class="formula">${r.lines.map(([n,a])=>`${n}：${r.orders} 单 × ${(a/r.orders).toFixed(2)} 元 = <b>${fmt(a)}</b>`).join('<br>')}</div>`:'<div class="formula">指定执行人后，系统会自动重新计算，不需要重新上传报表。</div>'}
+ ${r.lines.length?`<div class="formula">${r.lines.map(([n,a])=>`${n}：${r.orders} ${UNIT} × ${(a/r.orders).toFixed(2)} 元 = <b>${fmt(a)}</b>`).join('<br>')}</div>`:'<div class="formula">指定执行人后，系统会自动重新计算，不需要重新上传报表。</div>'}
  <p class="next" style="margin-top:14px">下一步：<b>${r.next}</b></p>${r.act?`<button class="btn primary">${r.act}</button>`:''}`;
  d.classList.add('on');
 }
@@ -208,7 +240,7 @@ function play(instant){
   el.classList.add('on','run');setTimeout(()=>{el.classList.remove('run');el.classList.add(steps[i].ask?'ask':'done');el.querySelector('.dot').textContent=steps[i].ask?'!':'✓';show(i+1)},instant?0:700)};
  if(instant){steps.forEach((s,i)=>{const el=document.getElementById('s'+i);el.classList.add('on',s.ask?'ask':'done');el.querySelector('.dot').textContent=s.ask?'!':'✓'});document.getElementById('conclusion').classList.add('on')}else show(0);
 }
-render();play(location.search.includes('done'));
+header();render();play(location.search.includes('done'));
 if(location.search.includes('drawer'))openRow('甜宠文推荐');
 if(location.search.includes('person'))setView('person');
 </script>
