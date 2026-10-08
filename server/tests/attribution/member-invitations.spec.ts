@@ -1,3 +1,4 @@
+import { accountRuntime } from '../support/accountRuntime';
 import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
@@ -71,14 +72,14 @@ beforeAll(async () => {
   await c.query("INSERT INTO project_members(project_id,user_id) SELECT p.id,u.id FROM projects p CROSS JOIN (SELECT 4 id UNION SELECT 6 id) u WHERE p.slug='zhihu'");
   pool = (await import('../../src/db')).db;
   const { authRouter } = await import('../../src/routes/auth');
-  const { teamRouter } = await import('../../src/routes/team');
+  const { createTeamRouter } = await import('../../src/routes/team');
   const { projectsRouter } = await import('../../src/routes/projects');
   const { errorHandler } = await import('../../src/middleware/errors');
   app = express()
     .set('trust proxy', 1)
     .use(express.json())
     .use('/auth', authRouter)
-    .use('/team', teamRouter)
+    .use('/team', createTeamRouter(accountRuntime()))
     .use('/projects', projectsRouter)
     .use(errorHandler);
   for (const name of ['developer', 'admin', 'operator', 'leader', 'creator', 'other_leader', 'finance'])

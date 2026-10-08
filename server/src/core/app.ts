@@ -5,7 +5,7 @@ import { metricsHandler, metricsMiddleware } from '../utils/metrics';
 import { apiRateLimit } from '../middleware/apiRateLimit';
 import { errorHandler, notFound } from '../middleware/errors';
 import { authRouter } from '../routes/auth';
-import { teamRouter } from '../routes/team';
+import { createTeamRouter } from '../routes/team';
 import { projectsRouter } from '../routes/projects';
 import { mcnRouter } from '../routes/mcn';
 import { adminToolsRouter, announcementsRouter, auditLogsRouter } from '../routes/admin-tools';
@@ -17,7 +17,7 @@ import { wechatAuthRouter } from '../wechat/auth';
 import { miniInvitationsRouter } from '../wechat/invitations';
 import { miniFilesRouter, attachMiniFile } from '../wechat/files';
 import { miniMonitorRouter } from '../routes/mini-monitor';
-import { accountPrivacyRouter } from '../routes/account-privacy';
+import { createAccountPrivacyRouter } from '../routes/account-privacy';
 
 export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app: Express) => void) {
   const app = express();
@@ -38,8 +38,8 @@ export function createCoreApp(runtime = new ModuleRuntime(), mountStatic?: (app:
   app.use(express.json({ limit: '1mb' }));
   const publicRoutes: Array<[string, express.Router]> = [
     ['auth', authRouter],
-    ['account-privacy', accountPrivacyRouter],
-    ['team', teamRouter],
+    ['account-privacy', createAccountPrivacyRouter(runtime)],
+    ['team', createTeamRouter(runtime)],
     ['projects', projectsRouter],
     ['mcn-accounts', mcnRouter],
     ['admin-tools', adminToolsRouter],

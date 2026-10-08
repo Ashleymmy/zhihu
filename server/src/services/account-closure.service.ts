@@ -7,13 +7,16 @@ import { revocationStore } from '../auth/revocation';
 import { incrRateLimit } from '../utils/rateLimit';
 import { writeAudit } from './audit.service';
 import type { AuthUser } from '../types';
+import type { ModuleRuntime } from '../core/module-runtime';
+import type { ModuleAccountLifecycle } from '../core/contracts';
+import { lifecycleProviders } from '../core/account-lifecycle';
 
 const select = async (c: PoolConnection, sql: string, params: unknown[] = []) =>
   (await c.query<RowDataPacket[]>(sql, params))[0];
 
 // Retain business/financial evidence and foreign keys. Closing an account is
 // irreversible and is not the staff "disable member" operation.
-async function blockers(c: PoolConnection, user: RowDataPacket) {
+async function blockers(c: PoolConnection, user: RowDataPacket, providers: ModuleAccountLifecycle[]) {
   const id = String(user.id),
     reasons: string[] = [];
   const checks: Array<[string, string, unknown[]]> = [
@@ -25,29 +28,13 @@ async function blockers(c: PoolConnection, user: RowDataPacket) {
     ],
     ['请先移交 MCN 账户', "SELECT id FROM mcn_accounts WHERE owner_user_id=? AND status<>'archived' LIMIT 1", [id]],
     [
-      '请先完成或解除正在使用的关键词绑定',
-      'SELECT id FROM zh_keyword_bindings WHERE (executor_id=? OR leader_id=?) AND released_at IS NULL LIMIT 1',
-      [id, id],
-    ],
-    [
-      '请先处理进行中的作品和计划',
-      "SELECT id FROM compositions WHERE owner_id=? AND (status IN ('pending','active') OR sync_status IN ('local','syncing')) LIMIT 1",
-      [id],
-    ],
-    [
-      '请先处理进行中的计划',
-      "SELECT id FROM plans WHERE owner_id=? AND (status IN ('pending','active','paused') OR sync_status IN ('local','syncing')) LIMIT 1",
-      [id],
-    ],
-    [
       '请先处理提现申请',
       "SELECT id FROM opc_withdrawals WHERE user_id=? AND status IN ('pending','approved') LIMIT 1",
       [id],
     ],
-    ['请先处理历史提现申请', "SELECT id FROM withdrawal_requests WHERE user_id=? AND status='pending' LIMIT 1", [id]],
-    ['请先核清历史收益', "SELECT id FROM earnings WHERE user_id=? AND status<>'paid' AND amount<>0 LIMIT 1", [id]],
   ];
   for (const [label, sql, params] of checks) if ((await select(c, sql, params)).length) reasons.push(label);
+  for (const provider of providers) reasons.push(...(await provider.closureBlockers(c, id)));
   // Check each financial scope independently; different projects cannot offset.
   const unsettled = await select(
     c,
@@ -75,16 +62,16 @@ async function blockers(c: PoolConnection, user: RowDataPacket) {
   return reasons;
 }
 
-export async function closureStatus(auth: AuthUser) {
+export async function closureStatus(auth: AuthUser, runtime: ModuleRuntime) {
   return withTransaction(async (c) => {
     const [user] = await select(c, 'SELECT id,role,is_active,closed_at FROM users WHERE id=?', [auth.sub]);
     if (!user?.is_active || user.closed_at) throw new AppError(401, 40101, '账号已不可用');
-    const reasons = await blockers(c, user);
+    const reasons = await blockers(c, user, await lifecycleProviders(c, runtime));
     return { canClose: reasons.length === 0, blockers: reasons, supportEmail: 'cloudto@timoo.freeqiye.com' };
   });
 }
 
-export async function closeAccount(auth: AuthUser, password: string) {
+export async function closeAccount(auth: AuthUser, password: string, runtime: ModuleRuntime) {
   if (!(await incrRateLimit(`account-close:${auth.sub}`, 5, 900)).allowed)
     throw new AppError(429, 42903, '验证次数过多，请 15 分钟后重试');
   const [before] = await rows<RowDataPacket>('SELECT password_hash,is_active,closed_at FROM users WHERE id=?', [
@@ -103,11 +90,13 @@ export async function closeAccount(auth: AuthUser, password: string) {
     const [current] = await select(c, 'SELECT * FROM users WHERE id=? FOR UPDATE', [auth.sub]);
     if (!current?.is_active || current.closed_at || current.password_hash !== before.password_hash)
       throw new AppError(409, 40900, '账号状态已变化，请刷新后重试');
-    const reasons = await blockers(c, current);
+    const providers = await lifecycleProviders(c, runtime);
+    const reasons = await blockers(c, current, providers);
     if (reasons.length) throw new AppError(409, 40931, reasons.join('；'));
+    for (const provider of providers) await provider.erasePersonalData(c, auth.sub);
     await c.query(
       `UPDATE users SET username=?,display_name='已注销用户',password_hash=?,email=NULL,
-      phone=NULL,phone_verified_at=NULL,zhihu_uid=NULL,parent_id=NULL,mcn_account_id=NULL,
+      phone=NULL,phone_verified_at=NULL,parent_id=NULL,mcn_account_id=NULL,
       is_active=0,must_change_pwd=0,last_login_at=NULL,closed_at=NOW(3) WHERE id=?`,
       ['closed_' + randomBytes(20).toString('hex'), unusablePassword, auth.sub],
     );

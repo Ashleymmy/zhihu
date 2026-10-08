@@ -3,7 +3,8 @@ import type { AuthUser, Role } from '../types';
 import { effectiveDuty, isStaffRole } from '../auth/roles';
 import { hasPermission } from '../auth/permissions';
 import { AppError } from '../middleware/errors';
-import { config } from '../config';
+import type { ModuleRuntime } from '../core/module-runtime';
+import { lifecycleProviders } from '../core/account-lifecycle';
 import { writeAudit } from './audit.service';
 
 export const canAssignMemberProjects = (actor: AuthUser) =>
@@ -16,21 +17,29 @@ export async function assignMemberProjects(
   userId: string,
   role: Role,
   projectIds: string[],
+  runtime: ModuleRuntime,
 ) {
   if (!canAssignMemberProjects(actor)) throw new AppError(403, 40301, '无权分配成员项目');
   if (isStaffRole(role)) throw new AppError(422, 42200, '管理角色按角色权限访问项目，无需单独分配');
   // Recheck the team boundary here as well as in member-access. Never trust submitted project IDs.
   let leaderScope: Set<string> | null = null;
   if (actor.role === 'leader') {
-    const [[member]] = await c.query<RowDataPacket[]>('SELECT role,parent_id FROM users WHERE id=? FOR UPDATE', [userId]);
-    if (userId === actor.sub || role !== 'creator' || member?.role !== 'creator' || String(member.parent_id) !== actor.sub)
+    const [[member]] = await c.query<RowDataPacket[]>('SELECT role,parent_id FROM users WHERE id=? FOR UPDATE', [
+      userId,
+    ]);
+    if (
+      userId === actor.sub ||
+      role !== 'creator' ||
+      member?.role !== 'creator' ||
+      String(member.parent_id) !== actor.sub
+    )
       throw new AppError(403, 40301, '只能为本人团队的达人分配项目');
     const [available] = await c.query<RowDataPacket[]>(
       `SELECT pm.project_id FROM project_members pm JOIN projects p ON p.id=pm.project_id
        WHERE pm.user_id=? AND pm.left_at IS NULL AND p.is_enabled=1 ORDER BY pm.project_id FOR UPDATE`,
       [actor.sub],
     );
-    leaderScope = new Set(available.map(p => String(p.project_id)));
+    leaderScope = new Set(available.map((p) => String(p.project_id)));
   }
   const [memberships] = await c.query<RowDataPacket[]>(
     'SELECT * FROM project_members WHERE user_id=? ORDER BY project_id FOR UPDATE',
@@ -39,10 +48,12 @@ export async function assignMemberProjects(
   const current = memberships.filter((m) => m.left_at === null);
   const wanted = new Set(projectIds);
   const added = projectIds.filter((id) => !current.some((m) => String(m.project_id) === id));
-  if (leaderScope && added.some(id => !leaderScope.has(id)))
+  if (leaderScope && added.some((id) => !leaderScope.has(id)))
     throw new AppError(403, 40301, '只能分配自己已加入且启用中的项目，请刷新后重试');
   // Full-list edits from a leader must preserve grants outside their current scope.
-  const removed = current.filter((m) => !wanted.has(String(m.project_id)) && (!leaderScope || leaderScope.has(String(m.project_id))));
+  const removed = current.filter(
+    (m) => !wanted.has(String(m.project_id)) && (!leaderScope || leaderScope.has(String(m.project_id))),
+  );
   if (!added.length && !removed.length) return false;
   if (added.length) {
     const [projects] = await c.query<RowDataPacket[]>(
@@ -57,13 +68,9 @@ export async function assignMemberProjects(
       throw new AppError(409, 40900, '不能在此移除项目负责人，请先在项目管理中调整负责人');
     if (membership.member_role === 'admin' && !hasPermission(actor.role, 'project.manage'))
       throw new AppError(403, 40301, '项目管理员权限需由管理员在项目管理中调整');
-    if (config.enabledModules.includes('zhihu')) {
-      const [[binding]] = await c.query<RowDataPacket[]>(
-        `SELECT b.id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id
-        WHERE k.project_id=? AND (b.leader_id=? OR b.executor_id=?) AND b.released_at IS NULL AND b.stop_new_use_at IS NULL LIMIT 1 FOR UPDATE`,
-        [membership.project_id, userId, userId],
-      );
-      if (binding) throw new AppError(409, 40900, '该成员在待移除项目中仍有使用中的关键词，请先处理后再移出');
+    for (const provider of await lifecycleProviders(c, runtime)) {
+      const reasons = await provider.accessChangeBlockers?.(c, userId, String(membership.project_id));
+      if (reasons?.length) throw new AppError(409, 40900, reasons.join('；'));
     }
     await c.query('UPDATE project_members SET left_at=NOW(3) WHERE id=?', [membership.id]);
     await writeAudit(

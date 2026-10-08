@@ -4,7 +4,8 @@ import type { AuthUser, Role } from '../types';
 import { canManageRole, effectiveDuty, isStaffRole, normalizeRole } from '../auth/roles';
 import { permissionsFor } from '../auth/permissions';
 import { AppError } from '../middleware/errors';
-import { config } from '../config';
+import type { ModuleRuntime } from '../core/module-runtime';
+import { lifecycleProviders } from '../core/account-lifecycle';
 import { writeAudit } from './audit.service';
 import { assignMemberProjects, canAssignMemberProjects } from './member-projects.service';
 import { openMemberProjects } from './member-onboarding.service';
@@ -49,15 +50,20 @@ export async function listManagedMembers(actor: AuthUser) {
     WHERE ${isStaffRole(actor.role) ? '1=1' : 'u.id=? OR u.parent_id=?'} ORDER BY u.created_at DESC,u.id DESC`,
     isStaffRole(actor.role) ? [] : [actor.sub, actor.sub],
   );
-  const memberships = await rows<RowDataPacket>(`SELECT CAST(pm.user_id AS CHAR) user_id,CAST(p.id AS CHAR) id,p.name,p.is_enabled,pm.member_role
+  const memberships = await rows<RowDataPacket>(
+    `SELECT CAST(pm.user_id AS CHAR) user_id,CAST(p.id AS CHAR) id,p.name,p.is_enabled,pm.member_role
     FROM project_members pm JOIN projects p ON p.id=pm.project_id JOIN users u ON u.id=pm.user_id
-    WHERE pm.left_at IS NULL AND ${isStaffRole(actor.role) ? '1=1' : '(u.id=? OR u.parent_id=?)'} ORDER BY p.id`, isStaffRole(actor.role) ? [] : [actor.sub,actor.sub]);
-  const clients = await memberClientInfo(list.map(member => String(member.id)));
+    WHERE pm.left_at IS NULL AND ${isStaffRole(actor.role) ? '1=1' : '(u.id=? OR u.parent_id=?)'} ORDER BY p.id`,
+    isStaffRole(actor.role) ? [] : [actor.sub, actor.sub],
+  );
+  const clients = await memberClientInfo(list.map((member) => String(member.id)));
   return list.map((member) => ({
     ...member,
     miniProgram: clients.get(String(member.id)),
-    projects: memberships.filter(p => String(p.user_id) === String(member.id)).map(p => ({id:String(p.id),name:p.name,isEnabled:Boolean(p.is_enabled),memberRole:p.member_role})),
-    canAssignProjects: canManageMember(actor,member) && canAssignMemberProjects(actor),
+    projects: memberships
+      .filter((p) => String(p.user_id) === String(member.id))
+      .map((p) => ({ id: String(p.id), name: p.name, isEnabled: Boolean(p.is_enabled), memberRole: p.member_role })),
+    canAssignProjects: canManageMember(actor, member) && canAssignMemberProjects(actor),
     canManage: canManageMember(actor, member),
     editableRoles: canManageMember(actor, member) ? editableMemberRoles(actor) : [],
     permissions: permissionsFor(normalizeRole(member.role)!).filter((p) =>
@@ -78,7 +84,7 @@ export interface MemberAccessPatch {
   parentId?: string | null;
   projectIds?: string[];
 }
-export async function updateMemberAccess(auth: AuthUser, id: string, patch: MemberAccessPatch) {
+export async function updateMemberAccess(auth: AuthUser, id: string, patch: MemberAccessPatch, runtime: ModuleRuntime) {
   await withTransaction(async (c) => {
     const [locked] = await c.query<MemberRecord[]>(
       "SELECT * FROM users WHERE id IN (?,?,?) OR role='developer' ORDER BY id FOR UPDATE",
@@ -118,12 +124,9 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
         id,
       ]);
       if (children) throw new AppError(409, 40900, '该账号名下仍有团队成员，请先调整成员归属');
-      if (config.enabledModules.includes('zhihu')) {
-        const [[binding]] = await c.query<RowDataPacket[]>(
-          'SELECT id FROM zh_keyword_bindings WHERE (leader_id=? OR executor_id=?) AND released_at IS NULL AND stop_new_use_at IS NULL LIMIT 1 FOR UPDATE',
-          [id, id],
-        );
-        if (binding) throw new AppError(409, 40900, '该账号仍有使用中的关键词，请先结束或退回后再调整角色或团队');
+      for (const provider of await lifecycleProviders(c, runtime)) {
+        const reasons = await provider.accessChangeBlockers?.(c, id);
+        if (reasons?.length) throw new AppError(409, 40900, reasons.join('；'));
       }
     }
     const duty =
@@ -148,10 +151,18 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
         id,
       ],
     );
-    if (active && (role !== member.role || changesTeam))
-      await openMemberProjects(c, id, role, parentId, auth.sub);
-    const projectsChanged = patch.projectIds !== undefined ? await assignMemberProjects(c,current,id,role,patch.projectIds) : false;
-    if (role !== member.role || duty !== member.admin_duty || active !== Boolean(member.is_active) || changesTeam || projectsChanged) {
+    if (active && (role !== member.role || changesTeam)) await openMemberProjects(c, id, role, parentId, auth.sub);
+    const projectsChanged =
+      patch.projectIds !== undefined
+        ? await assignMemberProjects(c, current, id, role, patch.projectIds, runtime)
+        : false;
+    if (
+      role !== member.role ||
+      duty !== member.admin_duty ||
+      active !== Boolean(member.is_active) ||
+      changesTeam ||
+      projectsChanged
+    ) {
       await c.query(
         "UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='member_access_changed' WHERE user_id=? AND revoked_at IS NULL",
         [id],

@@ -24,6 +24,7 @@ import { registerJobs, startScheduler, stopScheduler } from './jobs';
 import { logger } from '../../utils/logger';
 import { attributionDataProvider } from './attribution/provider';
 import { registerAttributionJobs, startAttributionWorker, stopAttributionWorker } from './attribution/worker';
+import { zhihuAccountLifecycle } from './services/account-lifecycle';
 export function createZhihuModule(): BusinessModule {
   const router = Router();
   router.use(miniBusinessRouter);
@@ -68,6 +69,7 @@ export function createZhihuModule(): BusinessModule {
         );
     },
     dataProvider: attributionDataProvider,
+    accountLifecycle: zhihuAccountLifecycle,
     start() {
       startScheduler();
       startAttributionWorker();

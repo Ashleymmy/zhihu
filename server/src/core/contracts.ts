@@ -1,5 +1,6 @@
 import type { Express, Router } from 'express';
 import type { AuthUser, Role } from '../types';
+import type { PoolConnection } from 'mysql2/promise';
 
 export const MODULE_CONTRACT_VERSION = 1;
 export interface ModuleManifest {
@@ -53,4 +54,13 @@ export interface BusinessModule {
   stop?: () => void;
   dataProvider?: ModuleDataProvider;
   financeProvider?: FinanceProvider;
+  accountLifecycle?: ModuleAccountLifecycle;
+}
+
+export interface ModuleAccountLifecycle {
+  accessChangeBlockers?(connection: PoolConnection, userId: string, projectId?: string): Promise<string[]>;
+  closureBlockers(connection: PoolConnection, userId: string): Promise<string[]>;
+  // Runs inside the same transaction as platform identity erasure. Business and
+  // financial evidence must remain intact; only personal profile fields change.
+  erasePersonalData(connection: PoolConnection, userId: string): Promise<void>;
 }
