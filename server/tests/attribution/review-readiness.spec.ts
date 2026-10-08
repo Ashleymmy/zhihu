@@ -86,6 +86,7 @@ async function webMonitor(name: string) {
 }
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
+    .withCommand(['--log-bin-trust-function-creators=1'])
     .withDatabase('wechat')
     .withUsername('test')
     .withUserPassword('test')

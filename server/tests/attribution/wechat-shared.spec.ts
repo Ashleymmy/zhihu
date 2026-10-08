@@ -245,7 +245,7 @@ it('a mini invitation registers the same website creator, leader provenance, and
   expect(registered.body.data.user).toMatchObject({ role: 'creator', parentId: '2' });
   const affiliation = await call('invited', '/core/team/affiliation');
   expect(affiliation.body.data.team.leaderId).toBe('2');
-  expect((await call('invited', '/core/projects')).body.data).toHaveLength(0);
+  expect((await call('invited', '/core/projects')).body.data.map((p: {id:string})=>p.id)).toEqual(['1']);
   const [[rewards]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM opc_income_entries WHERE user_id=?', [
     invitedId,
   ]);
@@ -256,9 +256,17 @@ it('a mini invitation registers the same website creator, leader provenance, and
   const [[rolled]] = await c.query<RowDataPacket[]>("SELECT COUNT(*) n FROM users WHERE username='13900008882'");
   expect(rolled.n).toBe(0);
 });
-it('leader grants a shared project, which appears after relogin; the grant is visible to website services', async () => {
+it('unchanged project access preserves the session; changing access requires relogin and is shared with the website', async () => {
   const grant = await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] });
   expect(grant.status, JSON.stringify(grant.body)).toBe(200);
+  expect((await call('invited', '/core/projects')).status).toBe(200);
+  const removed = await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: [] });
+  expect(removed.status, JSON.stringify(removed.body)).toBe(200);
+  expect((await call('invited', '/core/projects')).status).toBe(401);
+  const reduced = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
+  expect(reduced.status).toBe(200);tokens.invited=reduced.body.data.token;
+  expect((await call('invited', '/core/projects')).body.data).toEqual([]);
+  expect((await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] })).status).toBe(200);
   expect((await call('invited', '/core/projects')).status).toBe(401);
   const fast = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
   tokens.invited = fast.body.data.token;
