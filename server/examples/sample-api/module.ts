@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { BusinessModule, ModuleManifest } from '../../src/core/contracts';
+import { sampleTasks } from './tasks';
 export const sampleManifest: ModuleManifest = {
   id: 'sample-api',
   name: '示例 API',
   version: '1.0.0',
-  contractVersion: 1,
+  contractVersion: 2,
   roles: ['admin', 'leader', 'creator'],
   capabilities: ['summary'],
   permissions: {},
@@ -19,6 +20,7 @@ export function createSampleModule(endpoint: string): BusinessModule {
   return {
     manifest: sampleManifest,
     router: Router(),
+    ...sampleTasks(url),
     dataProvider: {
       async summary(scope) {
         const response = await fetch(url, { signal: AbortSignal.timeout(2000) });

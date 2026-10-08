@@ -59,7 +59,7 @@ async function main() {
         if(destination==='dashboard')await page.reload();
         await page.locator('h1').first().waitFor(); assert.equal(new URL(page.url()).pathname, '/app/' + destination);
         if (destination === 'dashboard') await page.waitForFunction(() => document.querySelector('.home-page')?.getAttribute('aria-busy') === 'false');
-        if (['tasks','task-hall','works','finance','income','data-issues'].includes(destination)) await page.waitForFunction(() => !!document.querySelector('.work-card,.financial-review,.finance-work,.issues'));
+        if (['tasks','task-hall','works','finance','income','data-issues'].includes(destination)) await page.waitForFunction(() => !!document.querySelector('.work-card,.financial-review,.finance-work,.issues,.platform-tasks .data-grid'));
         for (const width of [1440, 375]) {
           await page.setViewportSize({ width, height: 1050 });
           if (width===375) { if (await page.locator('.studio-app').getAttribute('data-menu-open')==='true') await page.locator('.menu-toggle').click(); await page.waitForFunction(()=>getComputedStyle(document.querySelector('.studio-backdrop')).opacity==='0'); }
