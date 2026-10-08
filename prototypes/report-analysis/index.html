@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>财务 · 上传与识别（交互原型）</title>
+<style>
+:root{--bg:#f6f7f9;--paper:#fff;--line:#e5e7eb;--line2:#eef0f3;--ink:#1f2329;--ink2:#646a73;--ink3:#8f959e;--brand:#3370ff;--brand-soft:#e1eaff;--green:#2ea121;--green-soft:#e4f5e1;--amber:#d38a00;--amber-soft:#fdf1d6;--red:#d83931;--red-soft:#fde2e1;--gray-soft:#f0f1f3;--purple:#7f3bf5;--purple-soft:#efe5ff;--radius:10px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+.page{max-width:1280px;margin:0 auto;padding:24px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:16px}
+.head h1{margin:0;font-size:22px}
+.head p{margin:2px 0 0;color:var(--ink2)}
+.project{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--gray-soft);color:var(--ink2);font-size:12px;white-space:nowrap}
+.btn{white-space:nowrap;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer;color:var(--ink)}
+.btn:hover{border-color:#c9cdd4}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.link{border:none;background:none;color:var(--brand);padding:0 4px}
+.btn.small{padding:2px 10px;font-size:12px}
+.grid{display:grid;grid-template-columns:400px 1fr;gap:16px;align-items:start}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
+.drop{padding:18px;border-bottom:1px solid var(--line2);display:flex;gap:12px;align-items:center}
+.file-ico{width:40px;height:40px;border-radius:8px;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-weight:700}
+.file-name{font-weight:600}
+.muted{color:var(--ink3);font-size:12px}
+.steps{padding:8px 18px 18px}
+.step{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:12px 0;border-bottom:1px dashed var(--line2);opacity:.35;transition:opacity .3s}
+.step.on{opacity:1}
+.step:last-child{border-bottom:none}
+.dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:#fff;background:var(--ink3);margin-top:1px}
+.step.done .dot{background:var(--green)}
+.step.ask .dot{background:var(--amber)}
+.step.run .dot{background:var(--brand);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.step-title{font-weight:600}
+.step-body{color:var(--ink2);margin-top:2px}
+.ask-box{margin-top:8px;padding:10px 12px;border-radius:8px;background:var(--amber-soft);color:#7a5200}
+.ask-box .acts{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.ask-box.solved{background:var(--green-soft);color:#1d6b14}
+.conclusion{margin:0 18px 18px;padding:14px;border-radius:10px;background:linear-gradient(135deg,#eef3ff,#f7f9ff);border:1px solid #d6e1ff;display:none}
+.conclusion.on{display:block}
+.conclusion .big{font-size:26px;font-weight:700;margin:4px 0}
+.conclusion .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.metric{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.metric b{display:block;font-size:20px;margin-top:2px}
+.metric.warn b{color:var(--amber)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+.views{display:flex;gap:4px}
+.view{padding:5px 12px;border-radius:6px;cursor:pointer;color:var(--ink2)}
+.view.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.count{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--amber);color:#fff;font-size:11px;text-align:center}
+.filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}
+th{white-space:nowrap;font-weight:500;color:var(--ink3);font-size:12px;text-align:left;padding:8px 12px;background:#fafbfc;border-bottom:1px solid var(--line);position:sticky;top:0}
+td{padding:9px 12px;white-space:nowrap;border-bottom:1px solid var(--line2);vertical-align:middle}
+tr.row:hover td{background:#f7f9ff;cursor:pointer}
+tr.group td{background:#fafbfc;font-weight:600;color:var(--ink2);font-size:12px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tfoot td{font-weight:600;background:#fafbfc}
+.wrap{white-space:normal;min-width:110px;max-width:150px}
+.table-wrap{overflow-x:auto}
+.tag{display:inline-block;padding:1px 8px;border-radius:4px;font-size:12px;white-space:nowrap}
+.t-ok{background:var(--green-soft);color:var(--green)}
+.t-wait{background:var(--amber-soft);color:var(--amber)}
+.t-todo{background:var(--red-soft);color:var(--red)}
+.t-role{background:var(--gray-soft);color:var(--ink2)}
+.t-leader{background:var(--purple-soft);color:var(--purple)}
+.person{display:inline-flex;align-items:center;gap:6px}
+.avatar{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;background:#8f959e}
+.next{font-size:12px;color:var(--ink2);white-space:normal;min-width:140px}
+.next b{color:var(--ink)}
+.drawer{position:fixed;top:0;right:-440px;width:420px;height:100vh;background:var(--paper);border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.06);transition:right .25s;padding:20px;overflow:auto;z-index:5}
+.drawer.on{right:0}
+.drawer h3{margin:0 0 4px}
+.trace{margin:14px 0;padding:0;list-style:none}
+.trace li{position:relative;padding:0 0 14px 20px;border-left:2px solid var(--line);margin-left:6px}
+.trace li:before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--green)}
+.trace li.cur:before{background:var(--amber)}
+.formula{background:#fafbfc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-variant-numeric:tabular-nums}
+.cards{display:none}
+@media (max-width:900px){
+ .page{padding:12px}
+ .grid{grid-template-columns:1fr}
+ .metrics{grid-template-columns:repeat(2,1fr)}
+ .head{flex-direction:column;align-items:flex-start}
+ table.desk{display:none}
+ .cards{display:block;padding:8px}
+ .mcard{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px;background:var(--paper)}
+ .mcard .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+ .mcard .amt{font-size:18px;font-weight:700}
+ .mcard .meta{color:var(--ink2);font-size:12px;margin:6px 0}
+ .drawer{width:100%;right:-100%}
+}
+</style>
+</head>
+<body>
+<div class="page">
+ <div class="head">
+  <div><h1>财务 · 上传与识别</h1><p>上传知乎官方邮件里的报表，系统会逐步说明每一行归谁、算多少钱、还差什么。</p></div>
+  <div class="project"><span class="chip">项目：知乎故事推广</span><span class="chip">账期：2026-10-01 至 2026-10-08</span><button class="btn">单价设置</button></div>
+ </div>
+ <div class="grid">
+  <div class="card" id="agent">
+   <div class="drop"><div class="file-ico">X</div><div><div class="file-name">10月8日推广数据.xlsx</div><div class="muted">刚刚上传 · 6 行数据 + 1 行合计 · 来自知乎官方邮件</div></div></div>
+   <div class="steps" id="steps"></div>
+   <div class="conclusion" id="conclusion">
+    <div class="muted">分析完成</div>
+    <div class="big">可确认 ¥<span id="sumOk">0</span></div>
+    <div id="concText"></div>
+    <div class="acts"><button class="btn primary" onclick="setView('todo')">先处理待办</button><button class="btn" onclick="setView('person')">按人员核对</button></div>
+   </div>
+  </div>
+  <div>
+   <div class="metrics">
+    <div class="metric"><span class="muted">本次读取</span><b>6 行 · 44 单</b></div>
+    <div class="metric"><span class="muted">可计费</span><b id="mOk">—</b></div>
+    <div class="metric warn"><span class="muted">还不能计费（已保留）</span><b id="mTodo">—</b></div>
+    <div class="metric"><span class="muted">处理完预计再增加</span><b id="mEst">—</b></div>
+   </div>
+   <div class="card">
+    <div class="toolbar">
+     <div class="views">
+      <div class="view active" data-v="keyword" onclick="setView('keyword')">按关键词</div>
+      <div class="view" data-v="person" onclick="setView('person')">按人员</div>
+      <div class="view" data-v="todo" onclick="setView('todo')">需要跟进<span class="count" id="todoCount">0</span></div>
+     </div>
+     <div class="filters"><span class="chip">分组：状态</span><span class="chip">筛选：全部人员</span><button class="btn small">导出</button></div>
+    </div>
+    <div class="table-wrap"><table class="desk" id="table"></table></div>
+    <div class="cards" id="cards"></div>
+   </div>
+  </div>
+ </div>
+</div>
+<aside class="drawer" id="drawer"></aside>
+<script>
+const rows=[
+ {kw:'重生千金',date:'10-08',orders:20,exec:'小李',role:'达人',leader:'王团长',rule:'达人 8.00 + 团长分成 0.50',lines:[['小李',160],['王团长',10]],status:'ok',next:'财务：确认账单',line:3},
+ {kw:'都市逆袭小说',date:'10-08',orders:10,exec:'王团长',role:'团长',leader:'—',rule:'团长本人 8.50',lines:[['王团长',85]],status:'wait',reason:'作品待核验',next:'管理员：核验作品',line:2,act:'去核验'},
+ {kw:'甜宠文推荐',date:'10-08',orders:4,exec:'小张',role:'达人',leader:'王团长',rule:'达人 8.00 + 团长分成 0.50',lines:[['小张',32],['王团长',2]],status:'wait',reason:'还没有登记作品',next:'小张：补登记作品',line:4,act:'提醒小张'},
+ {kw:'古言虐恋',date:'10-08',orders:3,exec:'小陈',role:'独立达人',leader:'—',rule:'达人 8.00',lines:[['小陈',24]],status:'wait',reason:'还没有登记作品',next:'小陈：补登记作品',line:5,act:'提醒小陈'},
+ {kw:'悬疑短篇',date:'10-08',orders:5,exec:null,role:'',leader:'',rule:'—',lines:[],status:'todo',reason:'没有执行人',next:'运营：指定执行人',line:6,act:'指定执行人'},
+ {kw:'未登记的词',date:'10-08',orders:2,exec:null,role:'',leader:'',rule:'—',lines:[],status:'todo',reason:'系统里没有这个关键词',next:'运营：登记并指定执行人',line:7,act:'登记关键词'},
+];
+const steps=[
+ {t:'读取文件',b:'识别为<b>知乎官方订单报表</b>，日期 2026-10-08，共 6 行数据；最后一行是“合计”，已自动跳过，不影响计算。'},
+ {t:'核对渠道',b:'6 行都属于渠道「知乎故事一代渠道」。'},
+ {t:'匹配关键词',b:'5 个关键词已找到。',ask:'「未登记的词」系统里没有。可能是在知乎后台直接建的计划。',acts:['登记并指定执行人','这行不计费']},
+ {t:'识别执行人',b:'4 个关键词有执行人。',ask:'「悬疑短篇」还没有分配执行人，有 5 单在等它。',acts:['指定执行人']},
+ {t:'计算金额',b:'按 10-01 起生效的角色单价计算：可计费 37 单。其中 3 行金额已算出，但作品还没核验或还没登记，确认前需要补齐。'},
+];
+const fmt=n=>n.toLocaleString('zh-CN',{minimumFractionDigits:2});
+const amount=r=>r.lines.reduce((s,l)=>s+l[1],0);
+const tag=r=>r.status==='ok'?'<span class="tag t-ok">可确认</span>':r.status==='wait'?`<span class="tag t-wait">${r.reason}</span>`:`<span class="tag t-todo">${r.reason}</span>`;
+const av=(n)=>n?`<span class="person"><span class="avatar" style="background:${n.includes('团长')?'#7f3bf5':'#3370ff'}">${n.slice(-1)}</span>${n}</span>`:'<span class="muted">—</span>';
+let view='keyword';
+function setView(v){view=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.dataset.v===v));render()}
+function render(){
+ const okSum=rows.filter(r=>r.status!=='todo').reduce((s,r)=>s+amount(r),0);
+ const todo=rows.filter(r=>r.status!=='ok');
+ document.getElementById('todoCount').textContent=todo.length;
+ document.getElementById('mOk').textContent='37 单 · ¥'+fmt(okSum);
+ document.getElementById('mTodo').textContent='7 单 · 2 行';
+ document.getElementById('mEst').textContent='约 ¥'+fmt(7*8.5);
+ document.getElementById('sumOk').textContent=fmt(rows.filter(r=>r.status==='ok').reduce((s,r)=>s+amount(r),0));
+ document.getElementById('concText').innerHTML=`已算出 <b>¥${fmt(okSum)}</b>，其中 ¥${fmt(rows.filter(r=>r.status==='ok').reduce((s,r)=>s+amount(r),0))} 现在就能确认。<br>还有 <b>${todo.length} 件事</b>：2 件需要运营处理，3 件在等成员补作品或核验。`;
+ const t=document.getElementById('table'),c=document.getElementById('cards');
+ if(view==='person'){
+  const people={};
+  rows.forEach(r=>r.lines.forEach(([n,a])=>{const p=people[n]||(people[n]={self:0,team:0,orders:0,teamOrders:0,state:new Set()});if(n===r.exec){p.self+=a;p.orders+=r.orders}else{p.team+=a;p.teamOrders+=r.orders}p.state.add(r.status)}));
+  t.innerHTML='<thead><tr><th>收款人</th><th class="num">本人作品订单</th><th class="num">本人作品金额</th><th class="num">团队分成订单</th><th class="num">团队分成金额</th><th class="num">合计</th><th>状态</th></tr></thead><tbody>'+
+   Object.entries(people).map(([n,p])=>`<tr class="row"><td>${av(n)} ${n.includes('团长')?'<span class="tag t-leader">团长</span>':'<span class="tag t-role">达人</span>'}</td><td class="num">${p.orders||'—'}</td><td class="num">${p.self?fmt(p.self):'—'}</td><td class="num">${p.teamOrders||'—'}</td><td class="num">${p.team?fmt(p.team):'—'}</td><td class="num"><b>${fmt(p.self+p.team)}</b></td><td>${p.state.has('wait')?'<span class="tag t-wait">部分待补齐</span>':'<span class="tag t-ok">可确认</span>'}</td></tr>`).join('')+
+   `</tbody><tfoot><tr><td>合计</td><td></td><td></td><td></td><td></td><td class="num">${fmt(okSum)}</td><td></td></tr></tfoot>`;
+  c.innerHTML=Object.entries(people).map(([n,p])=>`<div class="mcard"><div class="top">${av(n)}<span class="amt">¥${fmt(p.self+p.team)}</span></div><div class="meta">本人作品 ${p.orders} 单 ¥${fmt(p.self)}${p.team?` · 团队分成 ${p.teamOrders} 单 ¥${fmt(p.team)}`:''}</div></div>`).join('');
+  return;
+ }
+ const list=view==='todo'?todo:rows;
+ const groups=[['todo','需要处理 · 不处理就不会计费'],['wait','金额已算出 · 等成员补齐'],['ok','可以确认']];
+ let body='';
+ for(const [s,label] of groups){
+  const g=list.filter(r=>r.status===s);if(!g.length)continue;
+  body+=`<tr class="group"><td colspan="8">${label}（${g.length}）</td></tr>`;
+  body+=g.map((r,i)=>`<tr class="row" onclick="openRow('${r.kw}')"><td>${tag(r)}</td><td>${r.date}</td><td><b>${r.kw}</b></td><td>${av(r.exec)}${r.role?` <span class="tag ${r.role==='团长'?'t-leader':'t-role'}">${r.role}</span>`:''}</td><td class="num">${r.orders}</td><td class="muted wrap">${r.rule}</td><td class="num">${r.lines.length?fmt(amount(r)):'<span class="muted">待算</span>'}</td><td><div class="next">下一步：<b>${r.next}</b></div>${r.act?`<button class="btn small" onclick="event.stopPropagation()">${r.act}</button>`:''}</td></tr>`).join('');
+ }
+ t.innerHTML='<thead><tr><th>状态</th><th>日期</th><th>关键词</th><th>执行人</th><th class="num">订单</th><th>计费规则</th><th class="num">金额</th><th>下一步</th></tr></thead><tbody>'+body+`</tbody><tfoot><tr><td colspan="4">合计</td><td class="num">${list.reduce((s,r)=>s+r.orders,0)}</td><td></td><td class="num">${fmt(list.reduce((s,r)=>s+amount(r),0))}</td><td></td></tr></tfoot>`;
+ c.innerHTML=list.map(r=>`<div class="mcard" onclick="openRow('${r.kw}')"><div class="top"><b>${r.kw}</b>${tag(r)}</div><div class="meta">${r.exec?r.exec+' · ':''}${r.orders} 单 · ${r.rule}</div><div class="top"><span class="next">下一步：<b>${r.next}</b></span><span class="amt">${r.lines.length?'¥'+fmt(amount(r)):'待算'}</span></div></div>`).join('');
+}
+function openRow(kw){
+ const r=rows.find(x=>x.kw===kw),d=document.getElementById('drawer');
+ d.innerHTML=`<button class="btn small" style="float:right" onclick="document.getElementById('drawer').classList.remove('on')">关闭</button><h3>${r.kw}</h3><div class="muted">报表第 ${r.line} 行 · 2026-10-08 · 渠道「知乎故事一代渠道」</div>
+ <ul class="trace">
+  <li>报表记录：${r.orders} 单</li>
+  <li class="${r.exec?'':'cur'}">执行人：${r.exec?r.exec+'（10-01 分配，'+(r.leader&&r.leader!=='—'?'所属团长 '+r.leader:'无团长')+'）':'还没有，<b>需要运营指定</b>'}</li>
+  <li class="${r.status==='wait'?'cur':''}">作品：${r.status==='ok'?'已登记并通过核验':r.reason||'—'}</li>
+  <li>计费规则：${r.rule}</li>
+ </ul>
+ ${r.lines.length?`<div class="formula">${r.lines.map(([n,a])=>`${n}：${r.orders} 单 × ${(a/r.orders).toFixed(2)} 元 = <b>${fmt(a)}</b>`).join('<br>')}</div>`:'<div class="formula">指定执行人后，系统会自动重新计算，不需要重新上传报表。</div>'}
+ <p class="next" style="margin-top:14px">下一步：<b>${r.next}</b></p>${r.act?`<button class="btn primary">${r.act}</button>`:''}`;
+ d.classList.add('on');
+}
+function play(instant){
+ const box=document.getElementById('steps');
+ box.innerHTML=steps.map((s,i)=>`<div class="step" id="s${i}"><div class="dot">${i+1}</div><div><div class="step-title">${s.t}</div><div class="step-body">${s.b}</div>${s.ask?`<div class="ask-box">${s.ask}<div class="acts">${s.acts.map(a=>`<button class="btn small" onclick="this.closest('.ask-box').classList.add('solved');this.closest('.ask-box').innerHTML='已记下：${a}。处理后会自动重算。'">${a}</button>`).join('')}</div></div>`:''}</div></div>`).join('');
+ const show=i=>{const el=document.getElementById('s'+i);if(!el){document.getElementById('conclusion').classList.add('on');return}
+  el.classList.add('on','run');setTimeout(()=>{el.classList.remove('run');el.classList.add(steps[i].ask?'ask':'done');el.querySelector('.dot').textContent=steps[i].ask?'!':'✓';show(i+1)},instant?0:700)};
+ if(instant){steps.forEach((s,i)=>{const el=document.getElementById('s'+i);el.classList.add('on',s.ask?'ask':'done');el.querySelector('.dot').textContent=s.ask?'!':'✓'});document.getElementById('conclusion').classList.add('on')}else show(0);
+}
+render();play(location.search.includes('done'));
+if(location.search.includes('drawer'))openRow('甜宠文推荐');
+if(location.search.includes('person'))setView('person');
+</script>
+</body>
+</html>
