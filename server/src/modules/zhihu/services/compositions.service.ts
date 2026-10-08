@@ -50,10 +50,10 @@ const stableHash = (value: unknown) =>
 
 const syncJobOptions = (jobId: string) => ({ jobId, removeOnComplete: true, removeOnFail: true });
 
-async function planOwner(user: AuthUser, planId: string, connection: PoolConnection) {
+async function planOwner(user: AuthUser, planId: string, connection: PoolConnection, releaseTime?:string) {
   const scope = compositionPlanScope(user, true, false);
   const [plans] = await connection.query<PlanOwnerRow[]>(
-    `SELECT p.owner_id,CAST(k.id AS CHAR) keyword_id,CAST(b.id AS CHAR) binding_id,CAST(b.executor_id AS CHAR) executor_id
+    `SELECT p.owner_id,CAST(k.id AS CHAR) keyword_id,CAST(b.id AS CHAR) binding_id,CAST(b.executor_id AS CHAR) executor_id,CAST(k.project_id AS CHAR) project_id,CAST(k.account_id AS CHAR) account_id
      FROM plans p
      LEFT JOIN zh_keywords k ON k.plan_id=p.id
      LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id AND b.keyword_id=k.id
@@ -67,9 +67,11 @@ async function planOwner(user: AuthUser, planId: string, connection: PoolConnect
   // Freeze the same assignment used to authorize this work. A failed insert
   // rolls these updates back; the original plan owner is never reassigned.
   if (plan.binding_id && plan.executor_id) {
-    await connection.query('UPDATE zh_keyword_bindings SET used_at=COALESCE(used_at,NOW(3)),activated_on=COALESCE(activated_on,?),version=version+1 WHERE id=?',
-      [businessDay(),plan.binding_id]);
+    const {bindingStartDay,recomputeStartDateFacts}=await import('../attribution/activation-date');
+    await connection.query('UPDATE zh_keyword_bindings SET used_at=COALESCE(used_at,NOW(3)),activated_on=?,version=version+1 WHERE id=?',
+      [await bindingStartDay(connection,String(plan.binding_id),releaseTime?businessDay(new Date(releaseTime)):undefined),plan.binding_id]);
     await connection.query("UPDATE zh_keywords SET used_ever_at=COALESCE(used_ever_at,NOW(3)),lifecycle_status='active',version=version+1 WHERE id=?",[plan.keyword_id]);
+    await recomputeStartDateFacts(connection,{projectId:String(plan.project_id),accountId:String(plan.account_id)},String(plan.keyword_id));
   } else if (plan.keyword_id) {
     // Staff historical registration preserves the platform plan's original
     // owner, without inventing a creator or a commission-bearing assignment.
@@ -177,7 +179,7 @@ export async function getComposition(user: AuthUser, id: string) {
 
 export async function insertComposition(user: AuthUser, input: CompositionInput, connection: PoolConnection, expectedOwnerId?: string) {
   const problem=compositionLinkProblem(input.mediaType,input.promoUrl);if(problem)throw new AppError(422,42200,problem);
-  const ownerId = await planOwner(user, input.planId, connection);
+  const ownerId = await planOwner(user, input.planId, connection,input.releaseTime);
   if (expectedOwnerId !== undefined && ownerId !== expectedOwnerId) throw new AppError(409,40900,'关键词归属刚发生变化，请刷新预览后重试');
   const [result] = await connection.query<ResultSetHeader>(
     `INSERT INTO compositions
@@ -286,7 +288,7 @@ export async function updateComposition(user: AuthUser, id: string, patch: Recor
     const problem=compositionLinkProblem(String(patch.mediaType??current.media_type),String(patch.promoUrl??current.promo_url));
     if(problem)throw new AppError(422,42200,problem);
     if(patch.releaseTime===null)throw new AppError(422,42200,'请填写作品发布时间');
-    const owner=await planOwner(user,String(current.plan_id),connection);
+    const owner=await planOwner(user,String(current.plan_id),connection,patch.releaseTime===undefined?undefined:String(patch.releaseTime));
     if(owner!==String(current.owner_id))throw new AppError(409,40900,'作品归属已变化，请刷新后重试');
     if(!isCompositionCategoryValid(Number(patch.compositionType??current.composition_type),Number(patch.compositionSubType??current.composition_sub_type)))throw new AppError(422,42200,'作品分类组合不正确');
     await connection.query(`UPDATE zh_evidence e JOIN zh_keyword_bindings b ON b.id=e.binding_id JOIN zh_keywords k ON k.id=b.keyword_id

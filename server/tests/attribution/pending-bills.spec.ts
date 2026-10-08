@@ -3,6 +3,8 @@ import {MySqlContainer,type StartedMySqlContainer} from '@testcontainers/mysql';
 import mysql,{type Connection} from 'mysql2/promise';
 import type {AuthUser} from '../../src/types';
 import {runOpcMigrations} from '../../scripts/opcMigrations';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 vi.mock('../../src/modules/zhihu/queue',()=>({enqueue:vi.fn(async()=>({id:'isolated'}))}));
 let container:StartedMySqlContainer,c:Connection,pool:typeof import('../../src/db').db;
 let resources:typeof import('../../src/modules/zhihu/attribution/resources'),facts:typeof import('../../src/modules/zhihu/attribution/facts'),workbench:typeof import('../../src/modules/zhihu/attribution/workbench');
@@ -150,3 +152,55 @@ it('补录重算跳过已确认的两类记录，只计算未确认日期并保�
  expect((await q('SELECT id,current_result_id,current_revision_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[word.id])).slice(0,2)).toEqual(before);
  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(bills);
 });
+
+it('开始使用按分配日追溯，之前两天的订单自动恢复计费',async()=>{
+ const {businessDay}=await import('../../src/modules/zhihu/attribution/domain');
+ const beforeDay=businessDay(new Date(Date.now()-2*86400000));
+ await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(2,1,'date-task','开始日测试',NOW())");
+ const pricing=await import('../../src/modules/zhihu/attribution/pricing');
+ for(const [payer,payeeId,unitPrice] of [[admin,'2','8.5'],[leader,'3','8']] as const){const p=await pricing.draftPrice(payer,scope,key(),{taskId:'2',payeeId,unitPrice,from:beforeDay,reason:'开始日测试报价'});await pricing.publishPrice(payer,scope,p.id,key());}
+ const [mapping]=await q('SELECT id FROM zh_channel_mappings LIMIT 1');await c.query('UPDATE zh_channel_mappings SET effective_from=? WHERE id=?',[beforeDay,mapping.id]);
+ const word=await resources.createKeyword(admin,scope,key(),{keyword:'按分配日起算',taskId:'2',mappingId:String(mapping.id),landingUrl:'https://example.com/date',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id='start-day-plan' WHERE id=?",[word.planId]);await resources.synchronizeKeywords(scope);
+ const binding=await resources.distribute(admin,scope,word.id,key(),creator.sub);
+ await c.query('UPDATE zh_keyword_bindings SET assigned_at=? WHERE id=?',[beforeDay+' 12:00:00',binding.id]);
+ const secondDay=businessDay(new Date(Date.now()-86400000));
+ await workbench.uploadReport(admin,scope,csv(`日期,渠道,关键词,订单量\n${beforeDay},待处理渠道,按分配日起算,1\n${secondDay},待处理渠道,按分配日起算,2`,'分配日起算.csv'));
+ await resources.changeBinding(creator,scope,binding.id,key(),{action:'activate'});
+ expect((await q("SELECT DATE_FORMAT(activated_on,'%Y-%m-%d') d FROM zh_keyword_bindings WHERE id=?",[binding.id]))[0].d).toBe(beforeDay);
+ const view=await workbench.overview(creator,scope,{from:beforeDay,to:secondDay});
+ expect(view.entries.filter(e=>e.keyword==='按分配日起算').map(e=>e.amount)).toEqual(['8.0000','16.0000']);
+});
+it('首次作品的发布时间更早时按作品日开始，后续登记不会推后',async()=>{
+ const {businessDay}=await import('../../src/modules/zhihu/attribution/domain'),{withTransaction}=await import('../../src/db');
+ const {insertComposition}=await import('../../src/modules/zhihu/services/compositions.service');
+ const earlier=businessDay(new Date(Date.now()-2*86400000));
+ const [mapping]=await q('SELECT id FROM zh_channel_mappings LIMIT 1');
+ const word=await resources.createKeyword(admin,scope,key(),{keyword:'作品更早起算',taskId:'2',mappingId:String(mapping.id),landingUrl:'https://example.com/work-day',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id='work-day-plan' WHERE id=?",[word.planId]);await resources.synchronizeKeywords(scope);
+ const binding=await resources.distribute(admin,scope,word.id,key(),creator.sub);
+ await workbench.uploadReport(admin,scope,csv(`日期,渠道,关键词,订单量\n${earlier},待处理渠道,作品更早起算,3`,'作品日起算.csv'));
+ await withTransaction(connection=>insertComposition(creator,{planId:word.planId,mediaType:'KOC抖音',mediaAccount:'date-test',compositionType:1,compositionSubType:1,title:'补登记作品',promoUrl:'https://www.douyin.com/video/7300000000000000002',releaseTime:earlier+'T12:00:00+08:00'},connection));
+ expect((await q("SELECT DATE_FORMAT(activated_on,'%Y-%m-%d') d FROM zh_keyword_bindings WHERE id=?",[binding.id]))[0].d).toBe(earlier);
+ const {bindingStartDay}=await import('../../src/modules/zhihu/attribution/activation-date');
+ expect(await withTransaction(connection=>bindingStartDay(connection,binding.id,date))).toBe(earlier);
+ expect((await workbench.overview(creator,scope,{from:earlier,to:date})).entries.find(e=>e.keyword==='作品更早起算')?.amount).toBe('24.0000');
+});
+it('修复脚本默认只预览，显式应用只提前日期、恢复未确认金额且保留已确认账',async()=>{
+ const {businessDay}=await import('../../src/modules/zhihu/attribution/domain');
+ const earlier=businessDay(new Date(Date.now()-2*86400000));
+ const [word]=await q("SELECT k.id,k.current_binding_id FROM zh_keywords k WHERE k.keyword='按分配日起算'");
+ await c.query('UPDATE zh_keyword_bindings SET activated_on=? WHERE id=?',[date,word.current_binding_id]);
+ const targets=await q('SELECT id FROM zh_metric_facts WHERE keyword_id=?',[word.id]);for(const target of targets)await facts.recompute(admin,scope,String(target.id));
+ const before=await q('SELECT id,activated_on,version FROM zh_keyword_bindings ORDER BY id'),bills=await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id"),ledger=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ const args=['--import','tsx','scripts/fix-activated-on.ts','--project',scope.projectId,'--account',scope.accountId,'--actor','1'];
+ const preview=await promisify(execFile)(process.execPath,args,{env:process.env,windowsHide:true});
+ const dry=JSON.parse(preview.stdout);expect(dry.apply).toBe(false);expect(dry.changes.some((change:{keyword:string;after:string})=>change.keyword==='按分配日起算'&&change.after===earlier)).toBe(true);
+ expect(await q('SELECT id,activated_on,version FROM zh_keyword_bindings ORDER BY id')).toEqual(before);
+ const applied=JSON.parse((await promisify(execFile)(process.execPath,[...args,'--apply'],{env:process.env,windowsHide:true})).stdout);
+ expect(applied.apply).toBe(true);expect(applied.changes.find((change:{keyword:string})=>change.keyword==='按分配日起算').recalculated).toBe(2);
+ console.info('ACTIVATION_DATE_REPAIR_REVIEW',JSON.stringify({preview:dry,applied}));
+ expect((await workbench.overview(creator,scope,{from:earlier,to:date})).entries.filter(e=>e.keyword==='按分配日起算').map(e=>e.amount)).toEqual(['8.0000','16.0000']);
+ expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(bills);expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);
+ const repeated=JSON.parse((await promisify(execFile)(process.execPath,[...args,'--apply'],{env:process.env,windowsHide:true})).stdout);expect(repeated.changes).toEqual([]);
+},30000);
