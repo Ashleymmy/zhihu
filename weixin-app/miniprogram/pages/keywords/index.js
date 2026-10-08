@@ -50,6 +50,8 @@ Page(
       contentTypes: CONTENT_TYPES,
       batchMode: false,
       batchItems: [],
+      editNovelTitle: "",
+      editNovelUrl: "",
       editKeyword: "",
       editLandingUrl: "",
       editMappingIndex: -1,
@@ -158,6 +160,8 @@ Page(
         // 编辑重试：预填当前值
         editKeyword: ["edit-retry","copy-retry"].includes(name) ? item.keyword : "",
         editLandingUrl: item.landingUrl || "",
+        editNovelTitle: item.novelTitle || "",
+        editNovelUrl: (name === "novel" ? item.novelUrl || item.landingUrl : item.novelUrlOverride) || "",
         editTaskIndex: this.data.options.tasks.findIndex(t=>String(t.id)===String(item.taskId)),
         editMappingIndex:
           ["edit-retry","copy-retry"].includes(name)
@@ -238,9 +242,15 @@ Page(
           throw new Error("当前状态不允许此操作，请刷新");
         let path,
           payload = Object.assign({}, scope);
-        if (["edit-retry","copy-retry","delete"].includes(name)) {
+        if (name === "novel") {
+          path = "/keywords/" + item.id + "/novel";
+          payload.novel = {title:this.data.editNovelTitle.trim(),url:this.data.editNovelUrl.trim()};
+          if(payload.novel.url && !actions.publicUrl(payload.novel.url))throw new Error("请填写有效的小说原文链接");
+        } else if (["edit-retry","copy-retry","delete"].includes(name)) {
           path = "/keywords/" + item.id + "/" + (name === "delete" ? "delete-failed" : name);
           if(name !== "delete") {
+            payload.novel = {title:this.data.editNovelTitle.trim(),url:this.data.editNovelUrl.trim()};
+            if(payload.novel.url && !actions.publicUrl(payload.novel.url))throw new Error("请填写有效的小说原文链接");
             payload.keyword = this.data.editKeyword.trim();
             if(!payload.keyword) throw new Error("请填写关键词");
             const task=this.data.options.tasks[this.data.editTaskIndex],mapping=this.data.options.mappings[this.data.editMappingIndex];
@@ -268,7 +278,7 @@ Page(
           }
         }
         await actions.post(this, base + path, payload);
-      }, ["edit-retry","copy-retry"].includes(name) ? "修改已提交，等待知乎创建结果" : name === "delete" ? "错误记录已从关键词列表移除" : "关键词操作已完成");
+      }, name === "novel" ? "小说资料已保存" : ["edit-retry","copy-retry"].includes(name) ? "修改已提交，等待知乎创建结果" : name === "delete" ? "错误记录已从关键词列表移除" : "关键词操作已完成");
       if (ok) {
         this.setData({ selected: null });
         await this.load();

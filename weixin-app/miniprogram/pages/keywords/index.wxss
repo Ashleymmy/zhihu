@@ -50,3 +50,5 @@
 .kw-batch-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
 .kw-batch-item-no { font-size: 26rpx; font-weight: 600; color: #888; }
 .kw-batch-item-head button { display: inline-block !important; width: auto !important; margin: 0 !important; }
+
+.kw-novel{margin:20rpx 0;padding:20rpx;border-radius:12rpx;background:#f5f7f6;font-size:24rpx;line-height:1.6}.kw-novel-title{color:#30453e}.kw-novel-url{display:block;word-break:break-all;color:#72817b;margin:8rpx 0}.kw-novel button{margin:12rpx 0 0}

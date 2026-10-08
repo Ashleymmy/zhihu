@@ -33,13 +33,15 @@
           bindinput="inputKeyword"
           disabled="{{busy}}"
         />
+        <view class="field-row" style="margin-top:24rpx"><text class="field-label">小说原名（选填）</text></view>
+        <input class="kw-input" placeholder="填写对应小说的原始书名" value="{{item.novelTitle}}" maxlength="128" data-index="{{index}}" bindinput="inputTitle" disabled="{{busy}}" />
         <view class="field-row" style="margin-top:24rpx">
           <text class="field-req">*</text>
-          <text class="field-label">文章链接</text>
+          <text class="field-label">小说原文链接</text>
         </view>
         <input
           class="kw-input"
-          placeholder="请输入文章链接"
+          placeholder="请输入小说原文链接"
           value="{{item.landingUrl}}"
           data-index="{{index}}"
           bindinput="inputUrl"

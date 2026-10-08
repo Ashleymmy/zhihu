@@ -1,6 +1,8 @@
+const {publicUrl} = require("./actions");
 const permissions = require("./permissions");
 const same = (a, b) => a != null && b != null && String(a) === String(b);
 const labels = {
+  novel: "编辑小说资料",
   claim: "领取",
   distribute: "分发",
   assign: "分配执行人",
@@ -21,6 +23,7 @@ function fmtDate(iso) {
 function flags(user, item) {
   if (!permissions.canOperate(user)) return [];
   const corrections = [];
+  if (Number(item.canEditNovel) === 1) corrections.push("novel");
   if (Number(item.canEditFailed) === 1) corrections.push("edit-retry");
   if (Number(item.canCopyFailed) === 1) corrections.push("copy-retry");
   if (Number(item.canDeleteFailed) === 1) corrections.push("delete");
@@ -113,6 +116,7 @@ function decorate(user, item, options) {
   const member = options.users.find((u) => same(u.id, item.executorId));
   const task = options.tasks.find((t) => same(t.id, item.taskId));
   return Object.assign({}, item, {
+    novelLink: publicUrl(item.novelUrl || item.landingUrl || "") ? (item.novelUrl || item.landingUrl) : "",
     statusText:
       item.syncStatus === "failed" ? pendingStates.failed
       : Number(item.ownershipConflict) ? "归属待核对，禁止新增使用"

@@ -6,7 +6,7 @@ Page(
   screen("keywords-create", {
     scoped: true,
     data: {
-      items: [{ keyword: "", landingUrl: "" }],
+      items: [{ keyword: "", landingUrl: "", novelTitle: "" }],
       taskIndex: 0,
       mappingIndex: 0,
       options: { tasks: [], mappings: [] },
@@ -26,6 +26,12 @@ Page(
       items[index] = Object.assign({}, items[index], { keyword: e.detail.value });
       this.setData({ items });
     },
+    inputTitle(e) {
+      const index = e.currentTarget.dataset.index;
+      const items = this.data.items.slice();
+      items[index] = Object.assign({}, items[index], { novelTitle: e.detail.value });
+      this.setData({ items });
+    },
     inputUrl(e) {
       const index = e.currentTarget.dataset.index;
       const items = this.data.items.slice();
@@ -34,7 +40,7 @@ Page(
     },
     addItem() {
       if (this.data.busy) return;
-      this.setData({ items: this.data.items.concat([{ keyword: "", landingUrl: "" }]) });
+      this.setData({ items: this.data.items.concat([{ keyword: "", landingUrl: "", novelTitle: "" }]) });
     },
     removeItem(e) {
       if (this.data.busy || this.data.items.length <= 1) return;
@@ -65,6 +71,7 @@ Page(
             ...scope,
             keyword: it.keyword.trim(),
             landingUrl: it.landingUrl.trim(),
+            novel: {title: (it.novelTitle || "").trim()},
             taskId: String(task.id),
             ...(mapping.channelId?{channelId:String(mapping.channelId)}:{mappingId:String(mapping.id)}),
             popularizeType: 0,

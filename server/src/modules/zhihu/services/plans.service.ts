@@ -179,8 +179,8 @@ export async function listPlans(user: AuthUser, query: Record<string, unknown>) 
     }
   }
   if (query.keyword) {
-    where.push('p.keyword LIKE ?');
-    bindings.push(`%${String(query.keyword)}%`);
+    where.push('(p.keyword LIKE ? OR p.novel_title LIKE ?)');
+    bindings.push(`%${String(query.keyword)}%`, `%${String(query.keyword)}%`);
   }
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM plans p WHERE ${clause}`, bindings);

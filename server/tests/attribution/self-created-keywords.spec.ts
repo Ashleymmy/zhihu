@@ -123,6 +123,72 @@ it('creator, team creator and leader routes create exactly one initial owner wit
     await expect(resources.distribute(admin, scope, r.body.data.id, key(), other.sub)).rejects.toThrow('已分配');
   }
 });
+it('novel names and original links survive creation, assignment, search and used-keyword edits without changing the promotion', async () => {
+  actor=leader;
+  const payload={...scope,...input(),novel:{title:'长夜书名'},requestKey:key()};
+  const created=await request(app).post('/keywords').send(payload);
+  expect(created.status).toBe(201);
+  const {id,planId}=created.body.data;
+  await ready(planId);
+  const b=await binding(id);
+  await resources.changeBinding(leader,scope,String(b.id),key(),{action:'assign',executorId:team.sub});
+  await c.query("UPDATE zh_keywords SET used_ever_at=NOW(),lifecycle_status='active' WHERE id=?",[id]);
+  const own=await resources.listKeywords(team,scope,1,25,'长夜书名');
+  expect(own.total).toBe(1);
+  expect(own.list[0].novel_url).toBe(payload.landingUrl);
+  expect(own.list[0].can_edit_novel).toBe(1);
+  const before=await binding(id);
+  actor=team;
+  const patch={...scope,novel:{title:'长夜原名',url:'https://zhuanlan.zhihu.com/p/123'},requestKey:key(),executorId:'4',keyword:'恶意改词'};
+  const saved=await request(app).post(`/keywords/${id}/novel`).send(patch);
+  expect(saved.status,JSON.stringify(saved.body)).toBe(200);
+  expect((await request(app).post(`/keywords/${id}/novel`).send(patch)).body.data).toEqual(saved.body.data);
+  const [[plan]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[planId]);
+  expect(plan.novel_title).toBe('长夜原名');
+  expect(plan.novel_url).toBe(patch.novel.url);
+  expect(plan.landing_url).toBe(payload.landingUrl);
+  expect(plan.keyword).toBe(payload.keyword);
+  expect(plan.sync_status).toBe('synced');
+  expect(await binding(id)).toEqual(before);
+  expect((await resources.listKeywords(leader,scope,1,25,'长夜原名')).total).toBe(1);
+  expect((await resources.listKeywords(other,scope,1,25,'长夜原名')).total).toBe(0);
+  const {listPlans}=await import('../../src/modules/zhihu/services/plans.service');
+  expect((await listPlans(team,{page:1,pageSize:20,keyword:'长夜原名'})).total).toBe(1);
+});
+it('novel editing rejects other teams, public-pool viewers, foreign scopes and unsafe links', async () => {
+  const created=await resources.createKeyword(admin,scope,key(),input());
+  await ready(created.planId);
+  const visible=await resources.listKeywords(leader,scope,1,100);
+  expect(visible.list.find(w=>w.id===created.id)?.can_edit_novel).toBe(0);
+  actor=leader;
+  expect((await request(app).post(`/keywords/${created.id}/novel`).send({...scope,novel:{title:'越权'},requestKey:key()})).status).toBe(403);
+  actor=admin;
+  for(const url of ['javascript:alert(1)','https://user:pass@example.com','not-a-link']) {
+    expect((await request(app).post(`/keywords/${created.id}/novel`).send({...scope,novel:{url},requestKey:key()})).status).toBe(422);
+  }
+  expect((await request(app).post(`/keywords/${created.id}/novel`).send({...scope,projectId:'999999',novel:{title:'越权'},requestKey:key()})).status).not.toBe(200);
+});
+it('legacy keyword records can gain a novel name without acquiring a new binding',async()=>{
+  await c.query("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by) VALUES(1,'task','channel','原文旧记录','https://example.com/old',0,4,4)");
+  const [[plan]]=await c.query<RowDataPacket[]>("SELECT id FROM plans WHERE keyword='原文旧记录'");
+  actor=direct;
+  const r=await request(app).post(`/keywords/plan:${plan.id}/novel`).send({...scope,novel:{title:'旧小说'},requestKey:key()});
+  expect(r.status,JSON.stringify(r.body)).toBe(200);
+  const result=await resources.listKeywords(direct,scope,1,25,'旧小说');
+  expect(result.list[0].novel_url).toBe('https://example.com/old');
+  expect(result.list[0].binding_id).toBeNull();
+});
+it('failed-keyword edit and copy preserve novel metadata',async()=>{
+  const created=await resources.createKeyword(direct,scope,key(),{...input(),novel:{title:'失败原名',url:'https://example.com/novel'}});
+  await c.query("UPDATE plans SET sync_status='failed' WHERE id=?",[created.planId]);
+  await resources.editFailedKeyword(direct,scope,created.id,key(),'改词原文保留');
+  let [[plan]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[created.planId]);
+  expect(plan.novel_title).toBe('失败原名');expect(plan.novel_url).toBe('https://example.com/novel');
+  await c.query("UPDATE plans SET sync_status='failed' WHERE id=?",[created.planId]);
+  const copied=await resources.copyFailedKeyword(direct,scope,created.id,key(),'沿用小说资料');
+  [[plan]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[copied.planId]);
+  expect(plan.novel_title).toBe('失败原名');expect(plan.novel_url).toBe('https://example.com/novel');
+});
 it('parallel creators cannot create or use the same keyword twice; existing legacy plans also reserve their words', async () => {
   const data = input();
   const result = await Promise.allSettled([

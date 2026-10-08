@@ -2,8 +2,11 @@
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import type { Plan } from "@zhihu-koc/shared-contracts/zhihu";
+import NovelInfo from "../../../../../module-views/zhihu/NovelInfo.vue";
 import { apis } from "../context";
 type MyPlan = Plan & {
+  novelTitle?: string;
+  novelUrl?: string;
   canRegister?: boolean;
   keywordProjectId?: string;
   keywordAccountId?: string;
@@ -73,7 +76,7 @@ onMounted(load);
         >搜索我的计划<input
           v-model="search"
           type="search"
-          placeholder="输入关键词"
+          placeholder="输入关键词或小说原名"
           maxlength="128" /></label
       ><button :disabled="loading">搜索</button
       ><button type="button" :disabled="loading" @click="load">刷新</button>
@@ -105,7 +108,7 @@ onMounted(load);
             <tr v-for="plan in plans" :key="plan.id">
               <td>
                 <strong>{{ plan.keyword }}</strong
-                ><small>计划编号：{{ plan.id }}</small>
+                ><small>计划编号：{{ plan.id }}</small><NovelInfo :title="plan.novelTitle" :url="plan.novelUrl || plan.landingUrl" />
               </td>
               <td>{{ plan.channelName || "—" }}</td>
               <td>{{ statusLabels[plan.status] || "待确认" }}</td>

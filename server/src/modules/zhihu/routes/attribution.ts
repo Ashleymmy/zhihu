@@ -16,6 +16,7 @@ import { listWorks, workActivity, workDetail } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
 import { requirePermission } from '../permissions';
 import { XLSX_MAX_BYTES } from '../zhihu/allianceXlsx';
+import { novelSchema } from '../attribution/novel';
 
 export const attributionRouter = Router();
 const engineGroups = new Set([
@@ -148,6 +149,7 @@ attributionRouter.post(
         mappingId: idSchema.optional(),
         channelId: idSchema.optional(),
         landingUrl: z.string().url().max(1024),
+        novel: novelSchema.optional(),
         popularizeType: z.literal(0),
       })
       .parse(req.body);
@@ -155,12 +157,18 @@ attributionRouter.post(
   }),
 );
 attributionRouter.post('/keywords/:id/edit-retry',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
-  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128),taskId:idSchema.optional(),mappingId:idSchema.optional(),channelId:idSchema.optional(),landingUrl:z.string().url().max(1024).optional(),popularizeType:z.literal(0).optional()}).parse(req.body);
-  ok(res,await resource.editFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword,{...(input.taskId?{taskId:input.taskId}:{}),...(input.mappingId?{mappingId:input.mappingId}:{}),...(input.channelId?{channelId:input.channelId}:{}),...(input.landingUrl?{landingUrl:input.landingUrl}:{}),...(input.popularizeType!==undefined?{popularizeType:input.popularizeType}:{})}));
+  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128),taskId:idSchema.optional(),mappingId:idSchema.optional(),channelId:idSchema.optional(),landingUrl:z.string().url().max(1024).optional(),popularizeType:z.literal(0).optional(),novel:novelSchema.optional()}).parse(req.body);
+  const {projectId,accountId,keyword,...patch}=input;
+  ok(res,await resource.editFailedKeyword(req.user,{projectId,accountId},idSchema.parse(req.params.id),key(req),keyword,patch));
 }));
 attributionRouter.post('/keywords/:id/copy-retry',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
-  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128),taskId:idSchema.optional(),mappingId:idSchema.optional(),channelId:idSchema.optional(),landingUrl:z.string().url().max(1024).optional(),popularizeType:z.literal(0).optional()}).parse(req.body);
-  ok(res,await resource.copyFailedKeyword(req.user,scopeSchema.parse(input),idSchema.parse(req.params.id),key(req),input.keyword,{...(input.taskId?{taskId:input.taskId}:{}),...(input.mappingId?{mappingId:input.mappingId}:{}),...(input.channelId?{channelId:input.channelId}:{}),...(input.landingUrl?{landingUrl:input.landingUrl}:{}),...(input.popularizeType!==undefined?{popularizeType:input.popularizeType}:{})}),201);
+  const input=scopeSchema.extend({keyword:z.string().trim().min(1).max(128),taskId:idSchema.optional(),mappingId:idSchema.optional(),channelId:idSchema.optional(),landingUrl:z.string().url().max(1024).optional(),popularizeType:z.literal(0).optional(),novel:novelSchema.optional()}).parse(req.body);
+  const {projectId,accountId,keyword,...patch}=input;
+  ok(res,await resource.copyFailedKeyword(req.user,{projectId,accountId},idSchema.parse(req.params.id),key(req),keyword,patch),201);
+}));
+attributionRouter.post('/keywords/:id/novel',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
+  const input=scopeSchema.extend({novel:novelSchema}).parse(req.body);
+  ok(res,await resource.updateKeywordNovel(req.user,input,z.string().regex(/^(plan:)?\d+$/).parse(req.params.id),key(req),input.novel));
 }));
 attributionRouter.post('/keywords/:id/delete-failed',requirePermission('keyword.create'),asyncHandler(async(req,res)=>{
   ok(res,await resource.deleteFailedKeyword(req.user,scopeSchema.parse(req.body),idSchema.parse(req.params.id),key(req)));

@@ -13,6 +13,7 @@ import { scopeFilter } from '../../../utils/scopeFilter';
 import { synchronizeKeywords } from './keyword-readiness';
 import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql } from './keyword-usability';
 import { teamLeader } from './relationships';
+import { canEditNovel, novelSchema, type NovelInput } from './novel';
 export { synchronizeKeywords } from './keyword-readiness';
 
 async function simulationScope(c: PoolConnection, scope: Scope) {
@@ -120,7 +121,7 @@ async function failedKeyword(c: PoolConnection, user: AuthUser, scope: Scope, id
   return {word,plan};
 }
 
-export interface KeywordEditFields { taskId?: string; mappingId?: string; channelId?: string; landingUrl?: string; popularizeType?: number; }
+export interface KeywordEditFields { taskId?: string; mappingId?: string; channelId?: string; landingUrl?: string; popularizeType?: number; novel?: NovelInput; }
 async function keywordFields(c: PoolConnection, user: AuthUser, scope: Scope, word: Record<string,unknown>, plan: Record<string,unknown>, patch: KeywordEditFields) {
   const taskId=patch.taskId ?? String(word.task_id);
   const mappingId=patch.mappingId ?? (patch.channelId ? await ensurePoolMapping(c,user,scope,patch.channelId) : String(word.channel_mapping_id));
@@ -145,7 +146,8 @@ export async function editFailedKeyword(user: AuthUser, scope: Scope, id: string
     await assertKeywordUnused(c,id);
     if (keyword !== word.keyword) await assertKeywordFree(c,keyword,String(word.plan_id));
     const fields=await keywordFields(c,user,scope,word,plan,patch);
-    await c.query("UPDATE plans SET keyword=?,zhihu_task_id=?,channel_id=?,landing_url=?,popularize_type=?,sync_status='local',sync_error=NULL WHERE id=?",[keyword,fields.zhihuTaskId,fields.channelId,fields.landingUrl,fields.popularizeType,word.plan_id]);
+    const novel = novelSchema.parse(patch.novel ?? {title:plan.novel_title ?? '',url:plan.novel_url ?? ''});
+    await c.query("UPDATE plans SET keyword=?,zhihu_task_id=?,channel_id=?,landing_url=?,popularize_type=?,novel_title=?,novel_url=?,sync_status='local',sync_error=NULL WHERE id=?",[keyword,fields.zhihuTaskId,fields.channelId,fields.landingUrl,fields.popularizeType,novel.title||null,novel.url||null,word.plan_id]);
     await c.query("UPDATE zh_keywords SET keyword=?,task_id=?,channel_mapping_id=?,upstream_status='pending',version=version+1 WHERE id=?",[keyword,fields.taskId,fields.mappingId,id]);
     await audit(c,user,'keyword.edit-retry',id,{previousKeyword:word.keyword,keyword,planId:String(word.plan_id)});
     return {id,planId:String(word.plan_id)};
@@ -173,7 +175,7 @@ export async function copyFailedKeyword(user: AuthUser, scope: Scope, id: string
     await scopeLock(c,scope,user);
     const {word,plan}=await failedKeyword(c,user,scope,id);
     const fields=await keywordFields(c,user,scope,word,plan,patch);
-    return {keyword,sourceKeywordId:id,taskId:fields.taskId,mappingId:fields.mappingId,landingUrl:fields.landingUrl,popularizeType:fields.popularizeType,secondChannelId:plan.second_channel_id as string|null,name:plan.name as string|null,dailyBudget:plan.daily_budget as number|null,startDate:plan.start_date as string|null,endDate:plan.end_date as string|null};
+    return {keyword,sourceKeywordId:id,taskId:fields.taskId,mappingId:fields.mappingId,landingUrl:fields.landingUrl,popularizeType:fields.popularizeType,novel:patch.novel??{title:String(plan.novel_title??''),url:String(plan.novel_url??'')},secondChannelId:plan.second_channel_id as string|null,name:plan.name as string|null,dailyBudget:plan.daily_budget as number|null,startDate:plan.start_date as string|null,endDate:plan.end_date as string|null};
   });
   return createKeyword(user,scope,key,input);
 }
@@ -261,10 +263,11 @@ export async function createKeyword(
   user: AuthUser,
   scope: Scope,
   key: string,
-  input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null; sourceKeywordId?: string },
+  input: { keyword: string; taskId: string; mappingId?: string; channelId?: string; landingUrl: string; popularizeType: number; novel?: NovelInput; secondChannelId?: string | null; name?: string | null; dailyBudget?: number | null; startDate?: string | null; endDate?: string | null; sourceKeywordId?: string },
 ) {
   if (!isStaffRole(user.role) && !['leader', 'creator'].includes(user.role)) fail('无权创建关键词', 403);
   const keyword = keywordText(input.keyword);
+  const novel = novelSchema.parse(input.novel ?? {});
   const result = await mutate(user, scope, 'keyword.create', key, input, async (c) => {
     await assertKeywordFree(c, keyword);
     const mappingId = input.mappingId ?? await ensurePoolMapping(c,user,scope,input.channelId ?? '');
@@ -278,8 +281,8 @@ export async function createKeyword(
     if (!task || !mapping) fail('任务或渠道映射不属于当前范围');
     const planId = await insert(
       c,
-      `INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,second_channel_id,name,daily_budget,start_date,end_date)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,second_channel_id,name,daily_budget,start_date,end_date,novel_title,novel_url)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         scope.projectId,
         task.zhihu_task_id,
@@ -290,6 +293,7 @@ export async function createKeyword(
         user.sub,
         user.sub,
         input.secondChannelId ?? null, input.name ?? null, input.dailyBudget ?? null, input.startDate ?? null, input.endDate ?? null,
+        novel.title || null, novel.url || null,
       ],
     );
     const id = await insert(
@@ -324,6 +328,22 @@ export async function createKeyword(
   }
   return result;
 }
+export async function updateKeywordNovel(user: AuthUser, scope: Scope, id: string, key: string, input: NovelInput) {
+  const novel = novelSchema.parse(input);
+  return mutate(user, scope, 'keyword.novel', key, {id,novel}, async c => {
+    const historical = id.startsWith('plan:');
+    const [record] = await select(c, `SELECT p.id,p.owner_id,COALESCE(k.created_by,p.created_by) created_by,
+      k.id keyword_id,k.lifecycle_status,b.id binding_id,b.leader_id,b.executor_id,b.released_at
+      FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
+      WHERE p.project_id=? AND ${planAccountSql()}=? AND ${historical?'p.id=? AND k.id IS NULL':'k.id=?'} FOR UPDATE`,
+      [scope.projectId,scope.accountId,historical?id.slice(5):id]);
+    if (!record) fail('关键词不存在',404);
+    if (!canEditNovel(user,record)) fail('只能编辑本人或所管理团队的小说资料',403);
+    await c.query('UPDATE plans SET novel_title=?,novel_url=? WHERE id=?',[novel.title||null,novel.url||null,record.id]);
+    await audit(c,user,'keyword.novel',id,{planId:String(record.id),...novel});
+    return {id};
+  });
+}
 export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'ongoing' | 'registered' | 'retired' = 'all') {
   await authorize(user, scope);
   await synchronizeKeywords(scope);
@@ -344,8 +364,8 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       : view === 'registered' ? `${compositionCount}>0`
       : view === 'retired' ? `k.lifecycle_status='retired'` : '1=1';
     const filterArgs = view === 'registered' ? workScope.bindings : view === 'available' && user.role === 'creator' ? [user.sub] : [];
-    const args = [scope.projectId, scope.accountId, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs];
-    const where = `p.project_id=? AND ${planAccountSql()}=? AND p.keyword LIKE ?
+    const args = [scope.projectId, scope.accountId, `%${search}%`, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs];
+    const where = `p.project_id=? AND ${planAccountSql()}=? AND (p.keyword LIKE ? OR p.novel_title LIKE ?)
       AND (k.id IS NULL OR (k.project_id=p.project_id AND k.lifecycle_status<>'archived'))
       AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0) AND (${filter})`;
     const from = `FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id
@@ -364,6 +384,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       c,
       `SELECT COALESCE(CAST(k.id AS CHAR),CONCAT('plan:',p.id)) id,p.keyword,
       CAST(k.task_id AS CHAR) task_id,CAST(p.id AS CHAR) plan_id,CAST(k.channel_mapping_id AS CHAR) mapping_id,p.landing_url,p.popularize_type,
+      p.novel_title,COALESCE(NULLIF(p.novel_url,''),p.landing_url) novel_url,p.novel_url novel_url_override,CAST(k.id AS CHAR) keyword_id,CAST(p.owner_id AS CHAR) owner_id,
       (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name,
       COALESCE(k.lifecycle_status,'historical') lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,
       (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,p.sync_error AS sync_error,
@@ -375,7 +396,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       (SELECT u.display_name FROM users u WHERE u.id=p.owner_id) owner_name,
       DATE_FORMAT(TIMESTAMPADD(SECOND,TIMESTAMPDIFF(SECOND,NOW(),UTC_TIMESTAMP()),k.priority_until),'%Y-%m-%dT%H:%i:%s.%fZ') priority_until,k.used_ever_at,k.version,
       CAST(b.id AS CHAR) binding_id,b.path_type,CAST(b.leader_id AS CHAR) leader_id,CAST(b.executor_id AS CHAR) executor_id,b.verification_status,b.release_status,
-      CAST(k.created_by AS CHAR) created_by,
+      CAST(COALESCE(k.created_by,p.created_by) AS CHAR) created_by,
       (k.priority_until<=NOW(3)) AS priority_ended
       ${from}
       WHERE ${where} ORDER BY p.created_at DESC,p.id DESC LIMIT ? OFFSET ?`,
@@ -393,6 +414,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       // Historical use without a current binding is not a public-pool word.
       if (!word.binding_id && Number(word.has_usage_history)) { word.lifecycle_status = 'historical'; word.read_only = 1; }
       word.read_only = Number(word.read_only);
+      word.can_edit_novel = Number(canEditNovel(user, word));
       word.composition_count = Number(word.composition_count);
       const canFix = !String(word.id).startsWith('plan:') && word.sync_status === 'failed' && !Number(word.has_upstream_plan) && word.plan_status !== 'ended' && (isStaffRole(user.role) || String(word.created_by) === user.sub || String(word.leader_id) === user.sub || String(word.executor_id) === user.sub);
       word.can_delete_failed = Number(canFix);
