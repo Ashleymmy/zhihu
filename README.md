@@ -56,7 +56,7 @@ docker build -f deploy/Dockerfile.release --build-arg CANDIDATE_IMAGE=zhihu-koc:
 python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candidate-container zhihu-green-<提交号>
 ```
 
-工具核对指定容器发布的端口、应用健康，以及两个入口到候选实例的可达性；只替换 Timo 配置中原端口对应的地址。实际切换会备份原配置、校验两处 Nginx 并平滑加载，校验或加载失败时恢复原入口配置。不会自动运行迁移、切换消费者或删除旧容器。备份和操作回执保存在 ECS 的 `/home/ecsdiag/zhihu-app/bluegreen/`。切流后仍需独立验证实际域名请求与业务接口。
+工具核对指定容器发布的端口、应用健康、知乎业务路由确已启动（未认证请求应返回 401，不能是模块未加载的 404），以及两个入口到候选实例的可达性；只替换 Timo 配置中原端口对应的地址。实际切换会备份原配置、校验两处 Nginx 并平滑加载，校验或加载失败时恢复原入口配置。不会自动运行迁移、切换消费者或删除旧容器。备份和操作回执保存在 ECS 的 `/home/ecsdiag/zhihu-app/bluegreen/`。切流后仍需独立验证实际域名请求与业务接口。镜像演练必须带齐线上已有的配额策略等必要配置；隔离演练只使用测试密钥、测试 Redis 和无外网数据库副本。
 
 工具回归：`python3 -m unittest discover -s deploy -p 'test_switch*.py'`。2026-10-09 已在独立测试容器演练默认预览不切流、两入口切换及反向切换；演练未改动生产入口。
 

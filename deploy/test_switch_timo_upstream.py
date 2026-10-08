@@ -11,6 +11,13 @@ TLS = "server { ssl_reject_handshake on; }\nserver { server_name timo.clouddo.cc
 
 
 class SwitchTests(unittest.TestCase):
+    def test_health_only_candidate_is_rejected(self):
+        with patch.object(release, "command", return_value=b'{"/api/v1/modules/zhihu/workbench":404}'):
+            with self.assertRaisesRegex(ValueError, "business module is unavailable"):
+                release.verify_business_routes("zhihu-candidate")
+        with patch.object(release, "command", return_value=b'{"/api/v1/modules/zhihu/workbench":401}'):
+            release.verify_business_routes("zhihu-candidate")
+
     def test_preserves_tls_and_other_config(self):
         for original in (HTTP, TLS):
             updated = release.replace_port(original, 3202, 3212)

@@ -68,6 +68,25 @@ def read_config(container, filename):
     return command("docker", "exec", container, "cat", f"/etc/nginx/conf.d/{filename}")
 
 
+def verify_business_routes(container):
+    # /healthz remains available when a module fails to initialize. The protected
+    # route must therefore reach its authentication middleware, rather than 404.
+    script = """(async () => {
+      const routes = ['/api/v1/modules/zhihu/workbench'];
+      const states = {};
+      for (const route of routes) {
+        const response = await fetch('http://127.0.0.1:3000' + route,
+          { signal: AbortSignal.timeout(10000), redirect: 'manual' });
+        states[route] = response.status;
+        await response.arrayBuffer();
+      }
+      console.log(JSON.stringify(states));
+    })().catch(() => process.exit(1));"""
+    states = json.loads(command("docker", "exec", container, "node", "-e", script))
+    if states != {"/api/v1/modules/zhihu/workbench": 401}:
+        raise ValueError("Candidate business module is unavailable; health alone is insufficient")
+
+
 def write_config(entry, contents):
     # Use the already-running ingress image, without pulling or network access.
     # Its directory bind mount allows atomic replacement while retaining metadata.
@@ -153,6 +172,7 @@ def main():
     info = inspect(args.candidate_container)
     verify_binding(info, args.to_port)
     health(args.to_port)
+    verify_business_routes(args.candidate_container)
     entries = []
     for container, filename in INGRESSES:
         ingress = inspect(container)
