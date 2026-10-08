@@ -9,6 +9,7 @@ import {fail,money,moneyText,type Scope} from './domain';
 import {allocations} from './workbench';
 import {resolveRevision,type AttributionSnapshot,type FactSnapshot} from './facts';
 import {nameChoices,applyNameChoice,type NameSelection} from './name-choices';
+import {agencyName} from './agency';
 import {reportComparison} from './report-comparison';
 
 const platformScope=(scope:Scope,id:string)=>({...scope,moduleId:'zhihu',runKey:'import:'+id});
@@ -37,7 +38,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  if(!batch)fail('这份报表不存在或不属于当前项目',404);
  const finance=dutyAllows(user,'finance'),answers=await analysisAnswers(c,platformScope(scope,id));
  const rows=await select(c,`SELECT source.id,source.processing_status,source.error_text,${finance?'source.normalized_json':"JSON_OBJECT('date',JSON_EXTRACT(source.normalized_json,'$.date'),'channel',JSON_EXTRACT(source.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(source.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(source.normalized_json,'$.orders'),'activations',JSON_EXTRACT(source.normalized_json,'$.activations')) normalized_json"},source.fact_id,
-   f.current_result_id,CAST(f.current_revision_id AS CHAR) revision_id,JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,${finance?'r.snapshot_json':'NULL snapshot_json'},r.reason_code,b.executor_id,b.verification_status,
+   f.current_result_id,CAST(f.current_revision_id AS CHAR) revision_id,JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.agency')) reported_agency,JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,${finance?'r.snapshot_json':'NULL snapshot_json'},r.reason_code,b.executor_id,b.verification_status,
    EXISTS(SELECT 1 FROM zh_metric_revisions v WHERE v.fact_id=f.id AND v.status='pending') pending_revision,
    ${finance?"src.source_version,src.blocked_reason,(SELECT CAST(COALESCE(SUM(e.amount),0) AS CHAR) FROM opc_income_entries e WHERE e.source_id=src.id) credited":"NULL source_version,NULL blocked_reason,'0' credited"}
    FROM zh_import_rows source LEFT JOIN zh_metric_facts f ON f.id=source.fact_id AND f.account_id=? AND f.project_id=?
@@ -89,10 +90,13 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    stage('work','核对作品',work,'相关作品已核验',`${work} 条记录等待补登记或核验作品，金额已算出的部分会保留`),
    stage('amount','计算金额',price+conflicts,finance?`${type}可计费 ${billable} ${unit}，共 ¥${cash(billableAmount)}`:'金额由财务核对',`${price?price+' 条记录需要财务核对单价或数量':''}${price&&conflicts?'；':''}${conflicts?conflicts+' 条记录的报表数字不同，等待财务选择':''}`),
  ];
+ const agencyRows=[...unique.values()].filter(row=>String(row.reason_code).startsWith('AGENCY_'));
+ const agency=agencyRows.length?{registeredName:await agencyName(c,scope),rows:agencyRows.length,reportedNames:[...new Set(agencyRows.map(row=>String(row.reported_agency??'')))]}:undefined;
+ if(agency){steps[5].status='ask';steps[5].summary=`${agency.rows} 条记录的代理名称需要运营或财务核对，暂不计费`;}
  if(risk){steps[5].status='ask';steps[5].summary+=`${price||conflicts?'；':'，'}${risk} 条风险记录的金额已保留，等待运营核实后才能确认`;}
  if(choices.length){
    steps[5].asks=choices.map(({ask})=>({...ask,text:ask.text+(answers.get(ask.id)==='skip'?'（已暂时跳过，仍可在这里处理）':'')}));
-   if(choices.every(({ask})=>answers.get(ask.id)==='skip')&&!price&&!risk)steps[5].status='skipped';
+   if(choices.every(({ask})=>answers.get(ask.id)==='skip')&&!price&&!risk&&!agency)steps[5].status='skipped';
  }
  for(const [kind,index] of [['channel',1],['keyword',2]] as const){
    const matching=names.filter(choice=>choice.kind===kind);
@@ -106,7 +110,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  if(channel&&!keywords){steps[2].status='pending';steps[2].summary=`${channel} 行等待渠道确认后核对关键词`;}
  if((channel||keywords)&&!unassigned){steps[3].status='pending';steps[3].summary='渠道和关键词确认后继续核对执行人';}
  if((channel||keywords||unassigned)&&!work){steps[4].status='pending';steps[4].summary='执行人确认后继续核对作品';}
- if((channel||keywords||unassigned)&&!billable&&!price&&!conflicts){steps[5].status='pending';steps[5].summary=finance?'相关资料补齐后自动计算金额':'金额由财务核对';}
+ if((channel||keywords||unassigned)&&!billable&&!price&&!conflicts&&!agency){steps[5].status='pending';steps[5].summary=finance?'相关资料补齐后自动计算金额':'金额由财务核对';}
  const need=problems.size+invalid,failed=pending>0&&batch.job_status==='failed',running=pending>0||batch.status==='preview';
  if(failed){const active=steps.find(step=>step.status==='running');if(active){active.status='failed';active.summary='处理暂时中断，已经读取的记录和结果都已保留。';}}
  const run:AnalysisRun={id,fileName:String(batch.file_name),source:'知乎'+type+'报表',createdAt:String(batch.created_at),
@@ -114,8 +118,8 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    conclusion:{title:finance?'本次报表可计费':'报表处理结果',value:finance?'¥'+cash(billableAmount):rows.length+' 行',
      summary:finance?`${billable} ${unit}可计费${excludedQuantity?' · '+excludedQuantity+' '+unit+'已核实不计费':''} · 可确认金额 ¥${cash(confirmableAmount)}`:`${rows.length} 行已保留，金额由财务核对`,
      pendingText:need?`${need} 条记录仍需处理${finance&&pendingQuantity?'，涉及 '+pendingQuantity+' '+unit:''}，其他记录可以继续核对。`:'没有待处理的数据问题。',
-     actions:[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary'},...(invalid&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
- return {...run,riskCases:[...unique.values()].filter(row=>row.reason_code==='RISK_REVIEW_REQUIRED').map(row=>({factId:String(row.fact_id),revisionId:String(row.revision_id),keyword:json<Record<string,string>>(row.normalized_json).keyword,riskAssessment:String(row.risk_assessment??'')})),nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
+     actions:[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary'},...((invalid||agency)&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
+ return {...run,...(agency?{agencyCheck:agency}:{}),riskCases:[...unique.values()].filter(row=>row.reason_code==='RISK_REVIEW_REQUIRED').map(row=>({factId:String(row.fact_id),revisionId:String(row.revision_id),keyword:json<Record<string,string>>(row.normalized_json).keyword,riskAssessment:String(row.risk_assessment??'')})),nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
    candidates:choice.candidates.map(item=>({id:String(item.id),name:String(item.keyword??item.channel_name)}))})),
    ...(finance?{totals:{billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity),excludedQuantity:String(excludedQuantity)}}:{})};
 }

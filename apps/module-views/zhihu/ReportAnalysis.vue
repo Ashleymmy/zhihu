@@ -3,10 +3,12 @@ import {computed,ref,watch} from 'vue'
 import {AnalysisRun,DetailDrawer} from '@zhihu-koc/shared-components'
 import {errorText,type EngineContext,type Option} from './context'
 import type {NameSelection,ReportAnswer,ReportRun,RiskCase} from './report-analysis'
+import AgencySettings from './AgencySettings.vue'
 import RiskReview from './RiskReview.vue'
 import HistoricalWorks from './HistoricalWorks.vue'
 const props=defineProps<{context:EngineContext;run:ReportRun;busyAskId?:string;errors?:Record<string,string>;busyAction?:string}>()
 const emit=defineEmits<{answer:[answer:ReportAnswer];action:[key:string];refresh:[]}>()
+const agencyOpen=ref(false)
 const risk=ref<RiskCase|null>(null)
 const channelAsk=ref(''),channelId=ref(''),upstreamId=ref(''),generation=ref<1|2>(1),channels=ref<Option[]>([]),mappings=ref<Option[]>([]),loading=ref(false),error=ref('')
 const keywordAsk=ref(''),keywordId=ref('new'),taskId=ref(''),executorId=ref(''),fromDate=ref(''),tasks=ref<Option[]>([]),members=ref<Option[]>([])
@@ -35,6 +37,8 @@ function saveKeyword(){
 </script>
 <template>
  <AnalysisRun :run="run" :busy-ask-id="busyAskId" :errors="errors" :busy-action="busyAction" @answer="answer" @action="emit('action',$event)" />
+ <article v-if="run.agencyCheck" class="agency-check"><strong>{{run.agencyCheck.rows}} 条拉活记录的代理名称需要核对</strong><p>报表填写：{{run.agencyCheck.reportedNames.join('、')}}；项目登记：{{run.agencyCheck.registeredName??'尚未填写'}}。</p><p>下一步：运营或财务核对名称，这些行暂不计费。</p><button @click="agencyOpen=true">核对代理名称</button></article>
+ <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;emit('refresh')" />
  <ul v-if="run.riskCases?.length" class="risk-cases"><li v-for="item in run.riskCases" :key="item.factId"><strong>{{item.keyword}}</strong><span>知乎标记：{{item.riskAssessment}}</span><span>下一步：运营核实，金额已算出的部分保留。</span><button v-if="context.adminDuty!=='finance'" :disabled="!!busyAction||!!busyAskId" @click="risk=item">核实风险</button></li></ul>
  <RiskReview :context="context" :item="risk" @close="risk=null" @saved="risk=null;emit('refresh')" />
  <HistoricalWorks v-if="context.adminDuty!=='finance'&&run.steps.some(step=>step.key==='work'&&step.status==='ask')" :key="run.id" :context="context" :batch-id="run.id" @changed="emit('refresh')" />
@@ -69,6 +73,7 @@ function saveKeyword(){
  </DetailDrawer>
 </template>
 <style scoped>
+.agency-check{display:grid;gap:12px;margin-block:16px;padding:16px;border:1px solid #e7c585;border-radius:8px;background:#fff8e8;overflow-wrap:anywhere}.agency-check p{margin:0}.agency-check button{justify-self:start;min-height:44px;padding:10px;border:1px solid #c8d3d7;border-radius:8px;background:#fff;font:inherit}
 .risk-cases{list-style:none;padding:0;display:grid;gap:12px}.risk-cases li{display:grid;gap:8px;padding:16px;border:1px solid #e7c585;border-radius:8px;background:#fff8e8;overflow-wrap:anywhere}.risk-cases button{justify-self:start;min-height:44px;padding:8px 14px;border:1px solid #c8d3d7;border-radius:8px;background:#fff;font:inherit}
 .channel-choice{display:grid;gap:18px}.channel-choice p{margin:0;overflow-wrap:anywhere}.channel-choice label{display:grid;gap:8px}.channel-choice select,.channel-choice input{box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:10px;border:1px solid var(--line,#ddd);border-radius:8px;color:inherit;background:var(--paper,#fff);font:inherit}.channel-choice button{min-height:44px;justify-self:start;padding:10px 16px;border:1px solid #195e62;border-radius:8px;background:#195e62;color:#fff;font:inherit;cursor:pointer}.channel-choice button:disabled{opacity:.5;cursor:wait}.channel-choice button:focus-visible{outline:3px solid #195e62;outline-offset:3px}.channel-choice .engine-error{padding:12px;border-radius:8px;color:#a02f39;background:#fff1f1}
 </style>

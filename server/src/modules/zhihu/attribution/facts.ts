@@ -16,6 +16,7 @@ import { scheduleImport } from './outbox';
 import { assertNewRoute, assertEngineWritable } from './routing';
 import { factTodoReasons, reasonText } from './reasons';
 import { resolvedNames } from './matching';
+import { agencyCheck } from './agency';
 import { assertDuty, dutyAllows } from '../../../core/duties';
 import { reportComparison } from './report-comparison';
 export interface FactSnapshot {
@@ -63,7 +64,7 @@ function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKind, row
   }
   if(kind==='activation'){
     next.metricType='activation';
-    if((before.agency??null)!==(raw.agency??null))changed=true;
+    if((before.agency??null)!==(raw.agency??null)){changed=true;if(before.agency!=null)conflict=true;}
     next.agency=raw.agency??null;
     next.sources.agency={kind,rowId};
   }
@@ -285,7 +286,9 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   else if (!binding) code = 'BINDING_MISSING';
   else if (!binding.activated_day || String(binding.activated_day) > date) code = 'PERIOD_AMBIGUOUS';
   else if (metricType==='activation') {
-    if(source.activations==null)code='REPORT_INCOMPLETE';
+    const agencyProblem=await agencyCheck(c,scope,source.agency);
+    if(agencyProblem)code=agencyProblem;
+    else if(source.activations==null)code='REPORT_INCOMPLETE';
     else try {
       Object.assign(snapshot,await quoteActivation(c,scope,binding,date,source.activations,source.settlement??null));
     } catch(e) {

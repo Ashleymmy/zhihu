@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed,nextTick,onMounted,reactive,ref} from 'vue'
 import {DataGrid,DetailDrawer,ValueComparison,type AnalysisComparison,type AnalysisRunModel,type DataGridRow} from '@zhihu-koc/shared-components'
+import AgencySettings from './AgencySettings.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
 import RiskReview from './RiskReview.vue'
@@ -10,6 +11,8 @@ const emit=defineEmits<{changed:[]}>()
 interface Issue{id:string;batchId:string|null;reasonCode:string;reason:string;next:string;status:string;resolution?:string|null;factId:string|null;keyword:string|null;revisionId:string|null;expectedRevisionId:string|null;riskAssessment?:string;comparison?:AnalysisComparison[];normalizedJson:{keyword:string;orders:string}|null}
 const list=ref<Issue[]>([]),page=ref(1),total=ref(0),busy=ref(false),error=ref(''),notice=ref(''),selected=ref<Issue|null>(null)
 const finance=props.context.adminDuty==='finance',operations=props.context.adminDuty==='operations'
+const agencyOpen=ref(false)
+const canAgency=(i:Issue)=>i.status==='open'&&i.reasonCode.startsWith('AGENCY_')
 const risk=ref<RiskCase|null>(null)
 const analysis=ref<AnalysisRunModel|null>(null),analysisHost=ref<HTMLElement|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
 const title=(i:Issue)=>i.normalizedJson?.keyword||i.keyword||'报表记录'
@@ -17,7 +20,7 @@ const canMatch=(i:Issue)=>i.status==='open'&&!!i.batchId&&!finance&&['CHANNEL_UN
 const canReviewRisk=(i:Issue)=>!finance&&i.status==='open'&&i.reasonCode==='RISK_REVIEW_REQUIRED'&&!!i.factId&&!!i.expectedRevisionId
 const canChoose=(i:Issue)=>i.status==='open'&&!!i.revisionId&&!operations
 const canRetry=(i:Issue)=>i.status==='open'&&!i.revisionId&&!i.factId&&!!i.batchId&&!finance&&!canMatch(i)&&i.reasonCode!=='RISK_REVIEW_REQUIRED'
-function action(i:Issue){return canMatch(i)?{key:'match',label:i.reasonCode==='KEYWORD_UNKNOWN'?'核对关键词':'确认渠道'}:canReviewRisk(i)?{key:'risk',label:'核实风险'}:canChoose(i)?{key:'choose',label:'核对原值与新值'}:canRetry(i)?{key:'retry',label:'继续处理'}:undefined}
+function action(i:Issue){return canAgency(i)?{key:'agency',label:'核对代理名称'}:canMatch(i)?{key:'match',label:i.reasonCode==='KEYWORD_UNKNOWN'?'核对关键词':'确认渠道'}:canReviewRisk(i)?{key:'risk',label:'核实风险'}:canChoose(i)?{key:'choose',label:'核对原值与新值'}:canRetry(i)?{key:'retry',label:'继续处理'}:undefined}
 const rows=computed<DataGridRow[]>(()=>list.value.map(i=>{const next=i.next.split('：'),closed=i.status!=='open';return{id:i.id,title:title(i),status:{key:closed?'done':i.reasonCode,label:closed?'已处理':i.reason,tone:closed?'success':action(i)?'danger':'warning'},cells:{reason:i.reason,comparison:i.comparison?.map(row=>`${row.label}：${row.previous} → ${row.incoming}`).join('；')??'—'},next:closed?undefined:{actor:next.length>1?next[0]!:'运营',text:next.length>1?next.slice(1).join('：'):i.next,action:action(i)},viewKeys:closed?['done']:['pending']}}))
 const item=(row:DataGridRow)=>list.value.find(i=>i.id===row.id)!
 async function load(){busy.value=true;error.value='';try{const data=await props.context.http.get<{list:Issue[];total:number}>('/exceptions',{...props.context.scope,page:page.value,pageSize:25});list.value=data.list;total.value=data.total;if(selected.value)selected.value=list.value.find(i=>i.id===selected.value?.id)??null}catch(e){error.value=errorText(e)}finally{busy.value=false}}
@@ -30,7 +33,8 @@ async function answer(value:ReportAnswer){
 }
 async function handle(i:Issue){
  selected.value=null;await nextTick()
- if(canMatch(i))await inspect(i)
+ if(canAgency(i))agencyOpen.value=true
+ else if(canMatch(i))await inspect(i)
  else if(canReviewRisk(i))risk.value={factId:i.factId!,revisionId:i.expectedRevisionId!,keyword:title(i),riskAssessment:i.riskAssessment??''}
  else if(canChoose(i))selected.value=i
  else if(canRetry(i)){busy.value=true;error.value='';try{await props.context.http.post('/exceptions/'+i.id+'/retry',{...props.context.scope,requestKey:requestKey(),reason:'继续处理报表中保留的记录'});await changed()}catch(e){error.value=errorText(e)}finally{busy.value=false}}
@@ -61,6 +65,7 @@ onMounted(load)
     <button v-else-if="action(selected)" :disabled="busy" @click="handle(selected)">{{action(selected)?.label}}</button>
    </div>
   </DetailDrawer>
+  <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;changed()" />
   <RiskReview :context="context" :item="risk" @close="risk=null" @saved="risk=null;changed()" />
   <div class="engine-actions" v-if="total>25"><button :disabled="busy||page===1" @click="page--;load()">上一页</button><span>第 {{page}} 页，共 {{total}} 条</span><button :disabled="busy||page*25>=total" @click="page++;load()">下一页</button></div>
  </section>

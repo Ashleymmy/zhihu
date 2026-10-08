@@ -1,4 +1,4 @@
-export const factTodoReasons = ['BINDING_MISSING', 'PERIOD_AMBIGUOUS', 'PRICE_MISSING', 'PRICE_OVERLAP', 'REPORT_INCOMPLETE'] as const;
+export const factTodoReasons = ['BINDING_MISSING', 'PERIOD_AMBIGUOUS', 'PRICE_MISSING', 'PRICE_OVERLAP', 'REPORT_INCOMPLETE','AGENCY_NOT_CONFIGURED','AGENCY_MISMATCH'] as const;
 
 export interface ReasonContext {
   metricType?: string;
@@ -26,6 +26,8 @@ export function reasonText(code: string | null | undefined, context: ReasonConte
     case 'PERIOD_AMBIGUOUS': return { reason: '早于执行人开始日期', next: '运营：确认从哪天算' };
     case 'PRICE_MISSING':
     case 'PRICE_OVERLAP': return { reason: '单价还没设置', next: context.metricType==='activation'?'财务：设置拉活单价':'财务：设置单价' };
+    case 'AGENCY_NOT_CONFIGURED': return {reason:'尚未登记代理名称',next:'运营或财务：登记项目代理名称'};
+    case 'AGENCY_MISMATCH': return {reason:'报表代理名称不一致',next:'运营或财务：核对代理名称'};
     case 'PRICE_CONFLICT': return { reason: '单价有冲突', next: '财务：设置单价' };
     case 'REPORT_INCOMPLETE': return context.metricType==='activation'?{reason:'没有拉活量',next:'财务：补传拉活报表'}:{ reason: '只有搜索数据，没有订单', next: '财务：补传订单报表' };
     case 'RISK_REVIEW_REQUIRED': return { reason: '知乎标了风险', next: '运营：核实' };
