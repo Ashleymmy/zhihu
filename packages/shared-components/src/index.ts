@@ -27,6 +27,7 @@ export { default as OperationGuide } from "./OperationGuide.vue";
 export type { GuideCard, OperationGuideModel } from "./operation-guide";
 
 export { default as AnalysisRun } from "./AnalysisRun.vue";
+export { default as ValueComparison } from "./ValueComparison.vue";
 export { default as DataGrid } from "./DataGrid.vue";
 export { default as DetailDrawer } from "./DetailDrawer.vue";
 export type * from "./analysis-run";

@@ -15,6 +15,7 @@ import type {AttributionSnapshot} from './facts';
 import * as facts from './facts';
 import * as statements from './statements';
 import * as cutover from './cutover';
+import {reportComparison} from './report-comparison';
 export interface Period{from:string;to:string;metricType?:MetricType}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
 export function allocations(snapshot:AttributionSnapshot){
@@ -55,6 +56,8 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   const rows=await select(c,`SELECT CAST(f.id AS CHAR) id,CAST(f.current_result_id AS CHAR) result_id,CAST(f.current_revision_id AS CHAR) revision_id,
     CAST(f.keyword_id AS CHAR) keyword_id,f.metric_type,r.snapshot_json,r.reason_code,b.verification_status,b.leader_id,b.executor_id,b.id binding_id,
     executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name,
+    ${isStaffRole(user.role)?"(SELECT v.snapshot_json FROM zh_metric_revisions v WHERE v.fact_id=f.id AND v.status='pending' ORDER BY v.id DESC LIMIT 1)":'NULL'} pending_snapshot_json,
+    ${isStaffRole(user.role)?'(SELECT v.snapshot_json FROM zh_metric_revisions v WHERE v.id=f.current_revision_id)':'NULL'} current_source_json,
     ${ownershipHistorySql()} ownership_history,k.lifecycle_status,b.stop_new_use_at,b.release_status,
     (SELECT DATE_FORMAT(MIN(uf.business_date),'%Y-%m-%d') FROM zh_metric_facts uf WHERE uf.keyword_id=k.id AND ${unconfirmedFactSql('uf')}) retro_from_date,
     (EXISTS(SELECT 1 FROM zh_evidence ev WHERE ev.binding_id=b.id) OR EXISTS(SELECT 1 FROM compositions co WHERE co.plan_id=k.plan_id AND co.owner_id=b.executor_id)) evidence_count,
@@ -69,7 +72,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   const users=await select(c,`SELECT CAST(u.id AS CHAR) id,u.display_name,u.role,CAST(u.parent_id AS CHAR) parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE pm.project_id=? AND pm.left_at IS NULL AND (? IN ('developer','admin','operator') OR u.id=? OR u.parent_id=?)`,[scope.projectId,user.role,user.sub,user.sub]);
   const prior=await select(c,`SELECT CAST(e.source_id AS CHAR) source_id,CAST(e.user_id AS CHAR) user_id,CAST(SUM(e.amount) AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id WHERE src.module_id='zhihu' AND src.account_id=? AND src.project_id=? AND src.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR e.user_id=?) GROUP BY e.source_id,e.user_id`,[scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub]);
   const [route]=await select(c,'SELECT mode FROM zh_engine_routes WHERE account_id=? AND project_id=?',[scope.accountId,scope.projectId]);
-  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;priceSources?:('agreement'|'role_rate')[];canAssignRetro?:boolean;retroFromDate?:string;metricType:MetricType;quantity:string|null;activations:string|null;settlementMismatch?:AttributionSnapshot['settlementMismatch'];internal?:boolean;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
+  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;calculation?:{quantity:string;unitPrice:string;beforeRiskAmount:string};priceSources?:('agreement'|'role_rate')[];canAssignRetro?:boolean;retroFromDate?:string;metricType:MetricType;quantity:string|null;activations:string|null;settlementMismatch?:AttributionSnapshot['settlementMismatch'];internal?:boolean;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
   const team=new Map<string,{executorId:string;name:string;orders:bigint;commission:bigint;activations:bigint;activationCommission:bigint}>();
   const stats={new_user:{records:0,quantity:0n,billableQuantity:0n,pendingQuantity:0n,excludedQuantity:0n},activation:{records:0,quantity:0n,billableQuantity:0n,pendingQuantity:0n,excludedQuantity:0n}};
   let staffTotal=0n;
@@ -86,7 +89,8 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
    const priceSourcesFor=(payeeId:string)=>[...new Set(snap.obligations.filter(o=>o.payeeId===payeeId||o.payerKind==='user'&&o.payerId===payeeId).map(o=>o.priceSource??'agreement'))];
    const priceSources=priceSourcesFor(isStaffRole(user.role)?String(r.executor_id??''):user.sub);
    Object.assign(typed,{priceSources});
-   Object.assign(typed,{riskAssessment:snap.riskAssessment??null,riskReview:snap.riskReview??null});
+   Object.assign(typed,{riskAssessment:snap.riskAssessment??null,riskReview:snap.riskReview??null,...(r.pending_snapshot_json?{comparison:reportComparison(r.current_source_json?json<facts.FactSnapshot>(r.current_source_json):null,json<facts.FactSnapshot>(r.pending_snapshot_json),metricType)}:{})});
+   const calculationFor=(payeeId:string)=>{const price=snap.obligations.reduce((n,o)=>n+(o.payeeId===payeeId?money(o.unitPrice):0n)-(o.payerKind==='user'&&o.payerId===payeeId?money(o.unitPrice):0n),0n);return{quantity:quantity??'0',unitPrice:moneyText(price),beforeRiskAmount:moneyText(price*BigInt(quantity??'0'))}};
    const internal=!allocationFailed&&snap.obligations.some(o=>o.relation==='activation:staff_self');
    staffTotal+=money(targets.staffAmount);
    stats[metricType].records++;stats[metricType].quantity+=BigInt(quantity??'0');
@@ -112,7 +116,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     if(!isStaffRole(user.role)&&a.userId!==user.sub)continue;
     const payee=users.find(u=>String(u.id)===a.userId);
     const before=money(String(prior.find(p=>String(p.source_id)===String(r.source_id)&&String(p.user_id)===a.userId)?.amount??'0'),true);
-    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,priceSources:priceSourcesFor(a.userId),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':excluded&&!r.source_id?'excluded':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,...(excluded&&r.source_id&&!confirmed&&before>0n?{next:r.verification_status==='passed'?'财务：确认不计费的更正金额':r.verification_status==='disputed'?'运营：核实作品争议后确认更正金额':'团长或运营：核验作品后确认更正金额'}:{}),ready:isStaffRole(user.role)&&(!blocked||excluded&&reasonCode==='RISK_EXCLUDED'&&r.verification_status==='passed'&&!!r.source_id&&before>0n)&&!confirmed});
+    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,calculation:calculationFor(a.userId),priceSources:priceSourcesFor(a.userId),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':excluded&&!r.source_id?'excluded':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,...(excluded&&r.source_id&&!confirmed&&before>0n?{next:r.verification_status==='passed'?'财务：确认不计费的更正金额':r.verification_status==='disputed'?'运营：核实作品争议后确认更正金额':'团长或运营：核验作品后确认更正金额'}:{}),ready:isStaffRole(user.role)&&(!blocked||excluded&&reasonCode==='RISK_EXCLUDED'&&r.verification_status==='passed'&&!!r.source_id&&before>0n)&&!confirmed});
    }
   }
   // A source without a matching keyword has no fact yet. Include it for staff,

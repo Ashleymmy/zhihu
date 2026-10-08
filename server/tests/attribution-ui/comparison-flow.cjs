@@ -1,0 +1,32 @@
+const path=require('node:path'),fs=require('node:fs'),assert=require('node:assert/strict');
+module.exports=async function comparisonFlow({browser,port,out,date}){
+ const base=`http://127.0.0.1:${port}`,results=[];
+ for(const [role,username,password] of [['admin','admin','Admin123456!'],['operations','review_ops','Review123456'],['finance','review_finance','Review123456'],['leader','leader_wang','Review123456'],['creator','creator_li','Review123456']]){
+  const context=await browser.newContext({viewport:{width:1440,height:1100}}),page=await context.newPage(),errors=[];page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
+  const shot=async label=>{for(const width of [1440,375]){await page.setViewportSize({width,height:1100});if(await page.locator('.studio-app').getAttribute('data-menu-open')==='true')await page.locator('.menu-toggle').click();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));const dialog=page.locator('dialog[open]');if(await dialog.count())await dialog.screenshot({path:path.join(out,`comparison-${role}-${label}-${width}.png`),animations:'disabled',style:'.studio-header{visibility:hidden}'});else await page.screenshot({path:path.join(out,`comparison-${role}-${label}-${width}.png`),fullPage:true,animations:'disabled'});}};
+  try{
+   await page.goto(base+'/app/login');await page.locator('input[autocomplete="username"]').fill(username);await page.locator('input[type="password"]').fill(password);const logging=page.waitForResponse(r=>r.url().endsWith('/core/auth/login'));await page.locator('button[type="submit"]').click();const login=await logging;assert.equal(login.status(),200);await page.waitForURL(url=>!url.pathname.endsWith('/login'));const headers={Authorization:'Bearer '+(await login.json()).data.token,'X-Client-Id':login.request().headers()['x-client-id']};
+   const view=async()=>{const response=await context.request.get(base+`/api/v1/modules/zhihu/workbench?projectId=1&accountId=1&from=${date}&to=${date}&viewVersion=2`,{headers});assert.equal(response.status(),200);return(await response.json()).data;};
+   if(role==='operations'){
+    await page.goto(base+'/app/data-issues');await page.locator('.issues .grid-row').first().waitFor();assert.equal(await page.locator('.issues .value-comparison').count(),0);assert(!(await page.locator('.issues').innerText()).includes('¥'));await shot('private');
+   }else if(role==='admin'||role==='finance'){
+    await page.goto(base+'/app/finance');await page.getByText('上传知乎报表，自动计算每个人的金额',{exact:true}).waitFor();
+    if(role==='admin'){
+     await page.locator('input[type="file"]').setInputFiles({name:'并列核对.csv',mimeType:'text/csv',buffer:Buffer.from(`日期,渠道名称,关键词,订单量\n${date},知乎故事一代渠道,重生千金,21`)});await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();await page.locator('.analysis-run .value-comparison').getByRole('cell',{name:/^21(?:\s|$)/}).waitFor();await shot('analysis');await page.locator('.analysis-run').getByRole('button',{name:'暂时跳过',exact:true}).click();await page.getByText('已暂时跳过，这项记录仍保留在待处理中。',{exact:true}).waitFor();
+    }else{
+     await page.getByText('报表问题与更正',{exact:true}).click();await page.locator('.issues .grid-row').filter({hasText:'重生千金'}).locator('.value-comparison').getByText('20',{exact:true}).waitFor();await shot('inline');
+     await page.setViewportSize({width:1440,height:1100});await page.locator('.bill-details').getByRole('button',{name:'核对原值与新值',exact:true}).first().click();const drawer=page.getByRole('dialog',{name:'重生千金',exact:true});await drawer.locator('.value-comparison').waitFor();assert.equal(await drawer.getByRole('button',{name:/采用这份报表|保留原来的数字|暂时跳过/}).count(),3);await shot('choose');
+     const saving=page.waitForResponse(r=>r.url().endsWith('/answers')&&r.request().method()==='POST');await drawer.getByRole('button',{name:'采用这份报表',exact:true}).click();assert.equal((await saving).status(),200);await drawer.waitFor({state:'hidden'});await page.getByText('拉新：可计费 38 单 ¥321.50',{exact:true}).waitFor();assert((await view()).entries.filter(e=>e.keyword==='重生千金').every(e=>e.quantity==='21'));await shot('updated');
+     await page.locator('input[type="file"]').setInputFiles({name:'保留原值.csv',mimeType:'text/csv',buffer:Buffer.from(`日期,渠道名称,关键词,订单量\n${date},知乎故事一代渠道,重生千金,22`)});await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();await page.locator('.analysis-run .value-comparison').getByRole('cell',{name:/^22(?:\s|$)/}).waitFor();await page.locator('.bill-details').getByRole('button',{name:'核对原值与新值',exact:true}).first().click();await drawer.locator('.value-comparison').getByRole('cell',{name:/^21(?:\s|$)/}).waitFor();await shot('keep');const keeping=page.waitForResponse(r=>r.url().endsWith('/answers'));await drawer.getByRole('button',{name:'保留原来的数字',exact:true}).click();assert.equal((await keeping).status(),200);await drawer.waitFor({state:'hidden'});assert((await view()).entries.filter(e=>e.keyword==='重生千金').every(e=>e.quantity==='21'));
+    }
+   }else{
+    await page.goto(base+'/app/income');await page.getByText('我的收入明细',{exact:true}).waitFor();const entries=(await view()).entries.filter(e=>e.keyword==='重生千金');assert.equal(entries.length,1);assert.equal(entries[0].calculation.unitPrice,role==='leader'?'0.5000':'8.0000');assert.equal(entries[0].comparison,undefined);await shot('grid');
+    await page.setViewportSize({width:1440,height:1100});await page.locator('.bill-details .grid-row').filter({hasText:'重生千金'}).getByRole('button',{name:'重生千金',exact:true}).click();const drawer=page.getByRole('dialog',{name:'重生千金',exact:true});await drawer.getByText('计算过程',{exact:true}).waitFor();assert((await drawer.innerText()).includes(role==='leader'?'21单 × ¥0.5000 = ¥10.50':'21单 × ¥8.0000 = ¥168.00'));if(role==='leader')assert(!(await drawer.innerText()).includes('168.00'));await shot('calculation');
+   }
+   assert.deepEqual(errors,[]);results.push({role,widths:[1440,375],errors});console.log(role+' 原值新值与金额表格验收通过');
+  }catch(error){await page.screenshot({path:path.join(out,'failed-comparison-'+role+'.png'),fullPage:true});fs.writeFileSync(path.join(out,'failed-comparison-'+role+'.txt'),await page.locator('body').innerText());throw error;}
+  finally{await context.close();}
+ }
+ fs.writeFileSync(path.join(out,'comparison-result.json'),JSON.stringify(results,null,2));
+};
