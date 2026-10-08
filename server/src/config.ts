@@ -17,11 +17,14 @@ const schema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().max(90).default(14),
   REDIS_URL: z.string().default('redis://127.0.0.1:6379'),
   QUEUE_DRIVER: z.enum(['bull', 'memory']).default('memory'),
+  RUN_BACKGROUND_JOBS: z.enum(['true', 'false']).default('true'),
   OPC_MODULES: z.string().default(''),
   TZ: z.string().default('Asia/Shanghai'),
 });
 export function parseEnvironment(input: NodeJS.ProcessEnv) {
   const parsed = schema.parse(input);
+  if (parsed.RUN_BACKGROUND_JOBS === 'false' && parsed.QUEUE_DRIVER !== 'bull')
+    throw new Error('关闭后台任务时必须使用 Redis 持久队列');
   if (parsed.NODE_ENV === 'production' && unsafeProductionJwtSecret(parsed.JWT_SECRET))
     throw new Error('生产环境缺少安全配置');
   const modules = parsed.OPC_MODULES.split(',')
@@ -43,6 +46,7 @@ export const config = {
     .filter(Boolean),
   redisUrl: env.REDIS_URL,
   queueDriver: env.QUEUE_DRIVER,
+  runBackgroundJobs: env.RUN_BACKGROUND_JOBS === 'true',
   timezone: env.TZ,
 } as const;
 export type AppConfig = typeof config;
