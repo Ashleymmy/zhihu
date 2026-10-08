@@ -98,7 +98,7 @@ const progress = computed(() =>
                 :key="option.key"
                 type="button"
                 :class="{ primary: option.tone === 'primary' }"
-                :disabled="Boolean(busyAskId) || option.disabled"
+                :disabled="Boolean(busyAskId || busyAction) || option.disabled"
                 @click="emit('answer', { askId: ask.id, option: option.key })"
               >
                 {{ option.label }}

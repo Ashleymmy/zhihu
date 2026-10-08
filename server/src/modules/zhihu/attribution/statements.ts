@@ -256,6 +256,8 @@ async function confirmEntry(
   )
     fail('来源已修订，请刷新草稿', 409);
   const previous = await lastConfirmed(c, fact.id, String(entry.relation_type));
+  const [currentResult]=await select(c,'SELECT reason_code FROM zh_attribution_results WHERE id=?',[fact.current_result_id]);
+  if(currentResult?.reason_code&&!(currentResult.reason_code==='RISK_EXCLUDED'&&previous&&entry.entry_kind==='adjustment'&&money(String(entry.target_text))===0n))fail('请先处理报表待办，再确认这笔金额',409);
   if (String(previous?.id ?? '') !== String(entry.previous_entry_id ?? '')) fail('应付基数已变化，请刷新草稿', 409);
   const [binding] = await select(c, 'SELECT * FROM zh_keyword_bindings WHERE id=? FOR SHARE', [entry.binding_id]);
   if (binding.verification_status !== 'passed') fail('首次作品尚未通过核验或绑定存在争议', 409);
@@ -362,10 +364,11 @@ export async function confirmFinancialFact(
   if (!fact || String(fact.current_result_id) !== resultId || String(fact.current_revision_id) !== revisionId)
     fail('报表已更新，请重新核对', 409);
   const [r] = await select(c, 'SELECT * FROM zh_attribution_results WHERE id=?', [resultId]);
-  if (!r || r.reason_code) fail('请先处理报表待办', 409);
+  if (!r || r.reason_code&&r.reason_code!=='RISK_EXCLUDED') fail('请先处理报表待办', 409);
   const snapshot = json<AttributionSnapshot>(r.snapshot_json);
+  if(r.reason_code==='RISK_EXCLUDED'&&snapshot.obligations.some(o=>money(o.amount)!==0n))fail('不计费金额需要重新核对',409);
   for (const o of snapshot.obligations) {
-    const entry = await buildEntry(c, scope, fact, resultId, snapshot, o, false);
+    const entry = await buildEntry(c, scope, fact, resultId, snapshot, o, r.reason_code==='RISK_EXCLUDED');
     if (entry) {
       const [e] = await select(c, 'SELECT input_hash FROM zh_statement_entries WHERE id=?', [entry.id]);
       await confirmEntry(c, user, scope, entry.id, String(e.input_hash), true);

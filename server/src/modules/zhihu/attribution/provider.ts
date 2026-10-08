@@ -13,10 +13,11 @@ export const attributionDataProvider: ModuleDataProvider = {
       select(
         c,
         `SELECT COUNT(*) total,MAX(v.created_at) updated_at,
-      CAST(SUM(CASE WHEN COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(v.snapshot_json,'$.riskAssessment')),'null'),'')=''
+      CAST(SUM(CASE WHEN COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(v.snapshot_json,'$.riskAssessment')),'null'),'')='' OR risk.decision='accepted'
         THEN CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(v.snapshot_json,'$.orders')),'null') AS DECIMAL(30,0)) END) AS CHAR) orders,
       CAST(SUM(CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(v.snapshot_json,'$.search')),'null') AS DECIMAL(30,0))) AS CHAR) searches
       FROM zh_metric_facts f JOIN zh_metric_revisions v ON v.id=f.current_revision_id JOIN zh_keywords k ON k.id=f.keyword_id
+      LEFT JOIN zh_risk_reviews risk ON risk.fact_id=f.id AND risk.revision_id=f.current_revision_id
       LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ?
       AND (?=1 OR b.executor_id=? OR b.leader_id=?)`,
         [scope.accountId, scope.projectId, scope.from, scope.to, Number(isStaffRole(user.role)), user.sub, user.sub],
