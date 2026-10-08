@@ -814,6 +814,9 @@ describe('队列恢复、公共摘要和切换保护', () => {
   });
   it('旧报表在 MySQL 8 可重复预览、按原始行分页并确认历史日期', async () => {
     const legacyImport = await import('../../src/modules/zhihu/services/data-import.service');
+    const cutover = await import('../../src/modules/zhihu/attribution/cutover');
+    const { businessDay } = await import('../../src/modules/zhihu/attribution/domain');
+    await cutover.configureRoute(admin, scope, {from:businessDay(),mode:'trial',reason:'恢复隔离测试',sampleVerified:false});
     const file = reportFile('历史分页回归.xlsx', [
       ['日期', '渠道名称', '关键词', '搜索量', '订单', '收益'],
       ['2020-01-02', '渠道甲', '历史分页甲', 200, 20, 400],
@@ -831,11 +834,19 @@ describe('队列恢复、公共摘要和切换保护', () => {
     }
     const confirmed = await legacyImport.confirmDataImport(admin, batch.id);
     expect(confirmed.imported).toBe(2);
-    expect(confirmed.taskIds).toHaveLength(2);
+    expect(confirmed.taskIds).toHaveLength(0);
+    expect(confirmed.attribution?.attributionBatchId).toBeTruthy();
+    const facts = await import('../../src/modules/zhihu/attribution/facts');
+    const detail = await facts.importDetail(admin, scope, confirmed.attribution!.attributionBatchId, 1, 25);
+    expect(detail.rows.map(row=>row.processing_status)).toEqual(['exception','exception']);
+    expect((await cutover.getRoute(admin,scope))?.exclusive_from).toBe('2020-01-02');
+    const [legacyTasks] = await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) n FROM attribution_tasks');
+    expect(Number(legacyTasks[0].n)).toBe(0);
     const repeated = await legacyImport.confirmDataImport(admin, batch.id);
     expect(repeated.taskIds).toEqual(confirmed.taskIds);
     const [historicalMoney] = await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) n FROM earnings');
     expect(Number(historicalMoney[0].n)).toBe(0);
+    await cutover.configureRoute(admin, scope, {from:'2020-01-02',mode:'stopped',reason:'继续测试停止状态保护',sampleVerified:false});
   });
   it('旧导入确认、手动审批、自动结算和旧计划修改不能绕过边界', async () => {
     const { businessDay } = await import('../../src/modules/zhihu/attribution/domain'),
@@ -851,7 +862,7 @@ describe('队列恢复、公共摘要和切换保护', () => {
       ]),
       'manual_excel',
     );
-    await expect(legacyImport.confirmDataImport(admin, String(batch.id))).rejects.toThrow('新引擎已停止写入');
+    await expect(legacyImport.confirmDataImport(admin, String(batch.id))).rejects.toThrow('业务已暂停');
     const [created] = await c.query<mysql.ResultSetHeader>(
       "INSERT INTO settlement_batches(title,period_start,period_end,created_by) VALUES('旧手动批次',?,?,1)",
       [businessDay(), businessDay()],
@@ -1048,7 +1059,7 @@ describe('关键词与推广作品使用同一计划关联', () => {
     expect((await listWorks(direct,linkedScope,1,25)).total).toBe(0);
     await expect(listWorks(outsider,linkedScope,1,25)).rejects.toThrow();
   });
-  it('同一作品关联两种审核但不重复，知乎通过不会自动通过平台审核', async () => {
+  it('同一作品只显示一次，直接记录上游状态不能绕过核验流程', async () => {
     const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
     const {submitEvidence,reviewEvidence}=await import('../../src/modules/zhihu/attribution/statements');
     const created=await resource.createKeyword(admin,linkedScope,key(),{keyword:'双审核关联词',taskId:'992',channelId:'992',landingUrl:'https://example.com/join',popularizeType:0});
@@ -1059,13 +1070,13 @@ describe('关键词与推广作品使用同一计划关联', () => {
     await resource.changeBinding(creator,linkedScope,binding.id,key(),{action:'activate'});
     const evidence=await submitEvidence(creator,linkedScope,key(),{bindingId:binding.id,url:'https://example.com/joined-work',description:'联动核验'});
     await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,sync_status,zhihu_status_json) VALUES(?,3,'KOC抖音','linked-user',1,1,'https://example.com/joined-work','synced',?)",[created.planId,JSON.stringify({auditStatus:'approved'})]);
-    const result=await listWorks(creator,linkedScope,1,100);
+    const result=await listWorks(creator,linkedScope,1,200);
     const joined=result.list.filter(w=>w.plan_id===created.planId);
     expect(result.total).toBe(131);expect(joined).toHaveLength(1);
     expect(joined[0]).toMatchObject({id:evidence.id,source:'evidence',status:'pending',verification_status:'pending'});
     expect(joined[0].composition_id).not.toBeNull();
     await reviewEvidence(admin,linkedScope,evidence.id,key(),true,'已核对');
-    expect((await listWorks(creator,linkedScope,1,100)).list.find(w=>w.id===evidence.id)?.status).toBe('passed');
+    expect((await listWorks(creator,linkedScope,1,1,{id:evidence.id})).list[0]?.status).toBe('passed');
     expect((await listWorks(direct,linkedScope,1,25)).total).toBe(0);
   });
   it('渠道任务资料与旧表一致，旧同步写入后新接口立即更新', async () => {

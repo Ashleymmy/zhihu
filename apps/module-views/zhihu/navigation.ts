@@ -12,7 +12,7 @@ export const dailyPages = [
   "tasks",
 ];
 export const retiredFinancePages = ['settlements', 'earnings', 'withdrawals', 'appeals'];
-export const hiddenBusinessPages = ['orders', 'knowledge', 'creative-tools', ...retiredFinancePages];
+export const hiddenBusinessPages = ['orders', 'knowledge', 'creative-tools', 'data-import', ...retiredFinancePages];
 export function businessPages<T extends BusinessPage>(
   pages: T[],
   role: string,
@@ -29,12 +29,12 @@ export function businessPages<T extends BusinessPage>(
       return [
         "dashboard",
         "finance",
-        "data-import",
         "settlements",
         "earnings",
         "withdrawals",
         "appeals",
         "orders",
+        "data-import",
       ].includes(page.path);
     if (duty === "operations")
       return ![

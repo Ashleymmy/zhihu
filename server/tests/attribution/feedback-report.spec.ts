@@ -140,7 +140,7 @@ describe('真实反馈表头契约', () => {
       conversionRateRaw: 0.1,
       conversionRateDisplay: '10.00%',
     });
-    expect(missing.error).toContain('缺少有效订单');
+    expect(missing.error).toContain('没有订单量');
     expect(missing.value.orders).toBeNull();
   });
   it('非空风险原文保留，缺列与空风险不同，转化率不改变订单', async () => {

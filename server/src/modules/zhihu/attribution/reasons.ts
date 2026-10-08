@@ -1,0 +1,39 @@
+export const factTodoReasons = ['BINDING_MISSING', 'PERIOD_AMBIGUOUS', 'PRICE_MISSING', 'PRICE_OVERLAP', 'REPORT_INCOMPLETE'] as const;
+
+export interface ReasonContext {
+  bindingId?: unknown;
+  executorId?: unknown;
+  executorName?: unknown;
+  executorRole?: unknown;
+  leaderName?: unknown;
+  evidenceCount?: unknown;
+}
+
+// Shared by the bill and the data inbox so the same blocker has one next step.
+export function reasonText(code: string | null | undefined, context: ReasonContext = {}) {
+  const executorRole = context.executorRole==='leader'?'团长':'达人';
+  const executor = context.executorName ? `${executorRole} ${context.executorName}` : executorRole;
+  const leader = context.leaderName ? `团长 ${context.leaderName}` : '团长';
+  switch (code) {
+    case 'CHANNEL_UNMAPPED':
+    case 'CHANNEL_AMBIGUOUS': return { reason: '渠道没对上', next: '运营：确认渠道' };
+    case 'KEYWORD_UNKNOWN': return { reason: '系统里没有这个关键词', next: '运营：登记并指定执行人' };
+    case 'BINDING_MISSING':
+      if (!context.bindingId) return { reason: '没有执行人', next: '运营：指定执行人' };
+      if (!context.executorId) return { reason: '待分配', next: `${leader}：分配执行人` };
+      return { reason: '执行人还没开始', next: `${executor}：提交作品` };
+    case 'PERIOD_AMBIGUOUS': return { reason: '早于执行人开始日期', next: '运营：确认从哪天算' };
+    case 'PRICE_MISSING':
+    case 'PRICE_OVERLAP': return { reason: '单价还没设置', next: '财务：设置单价' };
+    case 'REPORT_INCOMPLETE': return { reason: '只有搜索数据，没有订单', next: '财务：补传订单报表' };
+    case 'RISK_REVIEW_REQUIRED': return { reason: '知乎标了风险', next: '运营：核实' };
+    case 'SOURCE_REVISION_PENDING': return { reason: '两份报表数字不同', next: '财务：选用哪个数' };
+    case 'WORK_MISSING': return { reason: '还没有登记作品', next: `${executor}：补登记作品` };
+    case 'WORK_UNVERIFIED': return { reason: '作品待核验', next: `${context.leaderName ? leader + ' 或管理员' : '管理员'}：核验作品` };
+    case 'WORK_DISPUTED': return { reason: '作品有争议', next: '运营：核实作品归属' };
+    case 'BUSINESS_STOPPED': return { reason: '业务已暂停', next: '运营：恢复项目' };
+    case 'PROJECT_MISMATCH': return { reason: '报表与当前项目不一致', next: '财务：选择报表所属项目' };
+    case 'LEGACY_SHARED': return { reason: '历史关键词多人共用', next: '运营：核对原执行人' };
+    default: return { reason: '需要核对来源数据', next: '运营：核对报表内容' };
+  }
+}

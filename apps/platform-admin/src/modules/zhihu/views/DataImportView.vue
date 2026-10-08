@@ -329,9 +329,8 @@ onMounted(() => loadBatches());
     </header>
 
     <div class="notice">
-      导入后分三步：保存报表 → 归因并处理待办 → 核对账单。常规报表可直接在
-      <router-link to="/modules/zhihu/finance">财务做账</router-link>
-      上传；这里也可以查看历史文件与处理进度。
+      报表上传已经合并到“财务做账”，任何日期的报表都可以在那里上传。
+      <router-link to="/modules/zhihu/finance">去财务做账</router-link>
     </div>
 
     <div v-if="error" class="notice error-notice">{{ error }}</div>

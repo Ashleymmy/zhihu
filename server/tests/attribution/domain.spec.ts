@@ -38,7 +38,7 @@ describe('金额及日期边界', () => {
     expect(rows[0].value).toMatchObject({ search: null, orders: '0', revenue: '0.0000' });
     expect(rows[0].error).toBeNull();
     expect(rows[1].value.orders).toBeNull();
-    expect(rows[1].error).toContain('缺少');
+    expect(rows[1].error).toContain('没有订单量');
     await expect(
       parseReport(
         file([

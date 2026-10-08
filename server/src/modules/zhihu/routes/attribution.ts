@@ -429,7 +429,7 @@ attributionRouter.post(
 );
 
 const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date()});
-attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{const q=periodSchema.parse(req.query);ok(res,await workbench.overview(req.user,q,q));}));
+attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{if(isStaffRole(req.user.role))assertDuty(req.user,'finance');const q=periodSchema.parse(req.query);ok(res,await workbench.overview(req.user,q,q));}));
 attributionRouter.post('/workbench/import',upload,asyncHandler(async(req,res)=>{const q=scopeSchema.parse(req.body);if(!req.file)fail('请选择知乎 Excel 报表');ok(res,await workbench.uploadReport(req.user,q,req.file),202);}));
 attributionRouter.post('/workbench/confirm',asyncHandler(async(req,res)=>{
  const q=periodSchema.extend({reviewHash:z.string().length(64),acknowledged:z.literal(true),requestKey:z.string().regex(/^[\w.-]{8,110}$/)}).parse(req.body);
