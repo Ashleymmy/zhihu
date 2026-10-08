@@ -19,7 +19,7 @@ function commit(view, userId) {
 async function load(force = false, projectId, accountId) {
   const user = getApp().globalData.user;
   if (!user) return null;
-  if (!force && snapshot && same(snapshot.userId, user.id)) return snapshot;
+  if (!force && snapshot && snapshot.scope.accountId && same(snapshot.userId, user.id)) return snapshot;
   if (!force && pending) return pending;
   const version = ++revision;
   const saved = wx.getStorageSync("zk_scope");

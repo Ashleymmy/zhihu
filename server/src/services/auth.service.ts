@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { openMemberProjects } from './member-onboarding.service';
 import { ResultSetHeader, RowDataPacket, type PoolConnection } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import { AppError } from '../middleware/errors';
@@ -78,7 +79,7 @@ async function issueAccessToken(user: UserRow, role: Role, sessionId: string) {
   });
 }
 
-/** 公开注册固定创建未入团达人；与审计写入保持同一事务。 */
+/** 注册、邀请归属与项目开通保持同一事务。 */
 export async function register(
   input: { username: string; password: string; displayName?: string; phone?: string; invitationToken?: string },
   ip?: string,
@@ -107,6 +108,7 @@ export async function register(
       );
       const id = String(result.insertId);
       if (invitation) await consumeInvitation(connection, invitation, id);
+      await openMemberProjects(connection, id, 'creator', invitation?.team_leader_id ? String(invitation.team_leader_id) : null);
       if (onCreated) await onCreated(connection, id);
       await writeAudit({ userId: id, action: 'auth.register', resourceType: 'user', resourceId: id, ip }, connection);
       return id;

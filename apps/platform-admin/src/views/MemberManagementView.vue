@@ -260,7 +260,7 @@ async function reset() {
 }
 async function createInvite() {
   const result = await apis.team.createInvitation(invite);
-  const url = new URL(import.meta.env.BASE_URL + "register", location.origin);
+  const url = new URL(import.meta.env.BASE_URL + "invite", location.origin);
   url.hash = new URLSearchParams({ invite: result.token }).toString();
   invitationLink.value = url.href;
   await load();
@@ -269,7 +269,7 @@ async function copyLink() {
   try {
     if (!navigator.clipboard) throw new Error();
     await navigator.clipboard.writeText(invitationLink.value);
-    notice.value = "邀请链接已复制。";
+    notice.value = "邀请链接已复制，请发给对方并在浏览器中打开。";
   } catch {
     const input = document.getElementById(
       "invitation-link",
@@ -843,7 +843,7 @@ onMounted(() => run(load));
             auth.user?.role === "leader"
               ? "，自动加入你的团队"
               : "，由运营人员后续分配团队"
-          }}。业务项目仍需单独授权。
+          }}。自动开通知乎；入团时同时开通团长已有项目。
         </p>
         <label
           >邀请名称<input v-model.trim="invite.label" required maxlength="100"
@@ -857,7 +857,7 @@ onMounted(() => run(load));
               max="30"
               required /></label
           ><label
-            >最多注册人数<input
+            >最多邀请人数<input
               v-model.number="invite.maxUses"
               type="number"
               min="1"
@@ -874,7 +874,7 @@ onMounted(() => run(load));
               @focus="($event.target as HTMLInputElement).select()"
           /></label>
           <p>可在“邀请链接”页面再次复制、编辑或删除此链接。</p>
-          <button type="button" @click="copyLink">复制邀请链接</button>
+          <button type="button" @click="copyLink">复制邀请链接</button> <a :href="invitationLink" target="_blank" rel="noopener noreferrer">打开邀请页</a><p>把完整链接发给达人。新用户注册后入团；已有达人账号可登录后直接确认加入。</p>
         </div>
         <div class="dialog-actions">
           <button type="button" :disabled="busy" @click="dialog = null">

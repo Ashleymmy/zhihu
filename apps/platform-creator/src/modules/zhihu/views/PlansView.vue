@@ -57,9 +57,10 @@ onMounted(load);
         <h1>我的计划</h1>
         <p>仅展示归属本人、已领取或已有本人作品记录的计划。</p>
       </div>
-      <router-link class="primary-action" to="/modules/zhihu/operations"
-        >查看 / 领取关键词</router-link
-      >
+      <div class="plan-search">
+        <router-link class="primary-action" to="/modules/zhihu/operations?create=1">创建关键词</router-link>
+        <router-link to="/modules/zhihu/operations">查看 / 领取关键词</router-link>
+      </div>
     </header>
     <form
       class="plan-search"
@@ -87,7 +88,7 @@ onMounted(load);
         {{
           search
             ? "没有匹配的本人计划。"
-            : "暂时没有与你相关的计划。可前往关键词页面领取，或等待团长分配。"
+            : "还没有关键词。可以自行创建、领取可用关键词，或由团长分配。"
         }}
       </p>
       <div v-else class="plan-table">

@@ -54,7 +54,7 @@ export function zhihuOperationGuide(
           ? "团长分发后，在“我的关键词”中确认分给你的词，再开始创作。"
           : leader
             ? "领取就绪的关键词，分发给团队达人，也可以分配给自己使用。"
-            : "在可领取的词中选择合适的关键词，领取后归属到本人。",
+            : "可以自行创建关键词，也可以领取可用关键词；创建或领取后归属本人。",
         instructions: assigned
           ? [
               "进入“我的关键词”，查看团长已分发给你的关键词。",
@@ -69,7 +69,7 @@ export function zhihuOperationGuide(
               leader ? "也可以自主创建关键词，创建后归本人保留，再分配给团队达人或自己。" : "也可以自主创建关键词，创建后自动绑定本人；看不到项目时请团长或运营分配项目。",
             ],
         action: {
-          label: assigned ? "查看已分配关键词" : "去领取关键词",
+          label: assigned ? "查看已分配关键词" : "创建 / 领取关键词",
           to: businessPath("operations"),
         },
       };

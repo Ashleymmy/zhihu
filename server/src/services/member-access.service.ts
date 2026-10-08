@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errors';
 import { config } from '../config';
 import { writeAudit } from './audit.service';
 import { assignMemberProjects, canAssignMemberProjects } from './member-projects.service';
+import { openMemberProjects } from './member-onboarding.service';
 import { memberClientInfo } from './member-clients.service';
 
 const roles: Role[] = ['developer', 'admin', 'operator', 'leader', 'creator'];
@@ -147,6 +148,8 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
         id,
       ],
     );
+    if (active && (role !== member.role || changesTeam))
+      await openMemberProjects(c, id, role, parentId, auth.sub);
     const projectsChanged = patch.projectIds !== undefined ? await assignMemberProjects(c,current,id,role,patch.projectIds) : false;
     if (role !== member.role || duty !== member.admin_duty || active !== Boolean(member.is_active) || changesTeam || projectsChanged) {
       await c.query(

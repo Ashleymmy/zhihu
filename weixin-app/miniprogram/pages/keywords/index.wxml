@@ -7,7 +7,7 @@
       </view>
       <view class="kw-header-actions">
         <button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button>
-        <button size="mini" class="btn-primary-mini" bindtap="openCreate" disabled="{{busy}}">+ 新建</button>
+        <button size="mini" class="btn-primary-mini" bindtap="openCreate" disabled="{{busy || loading || !scopeReady}}">+ 新建</button>
       </view>
     </view>
     <view class="kw-search-bar">

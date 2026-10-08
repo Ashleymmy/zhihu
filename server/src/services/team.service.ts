@@ -10,6 +10,7 @@ import { normalizeRole, canManageRole } from '../auth/roles';
 import { writeAudit } from './audit.service';
 import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser, isDevDemoEnabled } from '../core/demo';
 import { listManagedMembers } from './member-access.service';
+import { openMemberProjects } from './member-onboarding.service';
 
 interface MemberRow extends RowDataPacket {
   id: string;
@@ -114,6 +115,7 @@ export async function createMember(
       [input.username, hash, role, parentId, input.displayName, input.phone ?? null, user.sub],
     );
     const memberId = String(result.insertId);
+    await openMemberProjects(connection, memberId, role, parentId, user.sub);
     await writeAudit(
       {
         userId: user.sub,
@@ -433,6 +435,7 @@ export async function reviewApplication(user: AuthUser, applicationId: string, a
         [application.leader_id, application.creator_id],
       );
       if (update.affectedRows === 0) throw new AppError(422, 42211, '该达人已在团队内，无法重复入团');
+      await openMemberProjects(connection, String(application.creator_id), 'creator', String(application.leader_id), user.sub);
     }
     await connection.query(
       'UPDATE team_applications SET status = ?, handled_by = ?, handled_at = NOW() WHERE id = ?',

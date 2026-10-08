@@ -6,6 +6,7 @@ import { effectiveDuty, isStaffRole, normalizeRole } from '../auth/roles';
 import type { AuthUser } from '../types';
 import { writeAudit } from './audit.service';
 import { openInvitationToken, sealInvitationToken } from '../utils/invitationToken';
+import { openMemberProjects } from './member-onboarding.service';
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 const unavailable = () => new AppError(422, 42220, '邀请链接已失效、已用完或已停用，请联系邀请人');
@@ -46,15 +47,15 @@ export async function invitationPreview(token: string) {
   return { inviterName: r.display_name, teamName: r.team_name ?? null, role: 'creator', expiresAt: r.expires_at };
 }
 /** Actor rows are locked before the invitation row, matching create/revoke/member changes. */
-export async function lockInvitation(c: PoolConnection, token: string) {
+export async function lockInvitation(c: PoolConnection, token: string, acceptingUserId?: string) {
   const [[lookup]] = await c.query<RowDataPacket[]>(
     'SELECT i.owner_user_id,i.team_leader_id,u.parent_id FROM member_invitations i JOIN users u ON u.id=i.owner_user_id WHERE i.token_hash=?',
     [hash(token)],
   );
   if (!lookup) throw unavailable();
   const [users] = await c.query<RowDataPacket[]>(
-    'SELECT id,role,is_active,admin_duty,parent_id FROM users WHERE id IN (?,?,?) ORDER BY id FOR UPDATE',
-    [lookup.owner_user_id, lookup.team_leader_id, lookup.parent_id],
+    'SELECT id,role,is_active,admin_duty,parent_id FROM users WHERE id IN (?,?,?,?) ORDER BY id FOR UPDATE',
+    [lookup.owner_user_id, lookup.team_leader_id, lookup.parent_id, acceptingUserId ?? null],
   );
   const owner = users.find((u) => String(u.id) === String(lookup.owner_user_id));
   const parent = users.find((u) => String(u.id) === String(lookup.parent_id));
@@ -72,11 +73,31 @@ export async function lockInvitation(c: PoolConnection, token: string) {
     invite.deleted_at ||
     invite.revoked_at ||
     Number(invite.unexpired) !== 1 ||
-    invite.used_count >= invite.max_uses ||
+    (!acceptingUserId && invite.used_count >= invite.max_uses) ||
     (invite.team_leader_id && (!leader?.is_active || leader.role !== 'leader'))
   )
     throw unavailable();
   return invite;
+}
+/** Existing creators join by explicit invitation acceptance; registration provenance is unchanged. */
+export async function acceptInvitation(auth: AuthUser, token: string) {
+  return withTransaction(async c => {
+    const invite = await lockInvitation(c, token, auth.sub);
+    const [[user]] = await c.query<RowDataPacket[]>('SELECT role,parent_id,is_active FROM users WHERE id=? FOR UPDATE', [auth.sub]);
+    if (!user?.is_active || user.role !== 'creator') throw new AppError(403, 40301, '此邀请供达人加入团队，请使用达人账号');
+    if (!invite.team_leader_id) throw new AppError(422, 42220, '这是注册邀请，未指定团队；你已有账号，可以直接进入工作台');
+    const leaderId = String(invite.team_leader_id);
+    if (String(user.parent_id) === leaderId) return { joined: true };
+    if (invite.used_count >= invite.max_uses) throw unavailable();
+    if (user.parent_id) throw new AppError(409, 40900, '你已加入其他团队，如需更换请联系管理员');
+    await c.query('UPDATE users SET parent_id=? WHERE id=?', [leaderId, auth.sub]);
+    await c.query('UPDATE member_invitations SET used_count=used_count+1 WHERE id=?', [invite.id]);
+    await c.query("UPDATE team_applications SET status='cancelled',handled_at=NOW() WHERE creator_id=? AND status='pending'", [auth.sub]);
+    await openMemberProjects(c, auth.sub, 'creator', leaderId);
+    await writeAudit({ userId: auth.sub, action: 'team.invitation_accepted', resourceType: 'user', resourceId: auth.sub,
+      detail: { invitationId: String(invite.id), leaderId } }, c);
+    return { joined: true };
+  });
 }
 export async function consumeInvitation(c: PoolConnection, invite: RowDataPacket, userId: string) {
   await c.query('UPDATE member_invitations SET used_count=used_count+1 WHERE id=?', [invite.id]);

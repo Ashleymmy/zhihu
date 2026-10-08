@@ -113,6 +113,7 @@ onMounted(load)
         <h1>加入一个团队</h1>
         <p>入团后你的推广数据将与团长共享，由团长协助你成长。</p>
       </div>
+      <button type="button" class="row-action" :disabled="loading" @click="load">刷新团队与团长列表</button>
     </header>
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
@@ -144,7 +145,7 @@ onMounted(load)
         </article>
         <div v-if="!loading && affiliation" class="affiliation-detail">
           <p v-if="affiliation.inviter">邀请人：{{ affiliation.inviter.name }}{{ affiliation.inviter.role ? '（' + ROLE_LABELS[affiliation.inviter.role] + '）' : '' }} · 邀请注册已绑定</p>
-          <p>{{ team ? '需要开通项目时，请联系团长或运营，在成员编辑中分配项目。' : '需要开通项目时，请联系邀请人或平台运营分配项目；也可以申请加入团长团队。' }}</p>
+          <p>{{ team ? '入团时自动开通团长已有项目，可以前往“我的关键词”创建关键词。' : '独立达人也可自行创建关键词。入团后自动开通团长已有项目。' }}</p>
         </div>
 
         <!-- 申请记录 -->
@@ -182,11 +183,12 @@ onMounted(load)
             />
             <div v-if="pickerOpen" class="leader-options">
               <button
-                v-for="l in filteredLeaders.slice(0, 6)"
+                v-for="l in filteredLeaders"
                 :key="l.id"
                 type="button"
                 class="leader-option"
                 @mousedown.prevent="pickLeader(l)"
+                @click="pickLeader(l)"
               >
                 <strong>{{ l.displayName }}</strong>
                 <span class="leader-meta">{{ l.username }} · {{ l.memberCount }} 位成员</span>
@@ -260,7 +262,8 @@ onMounted(load)
   border-radius: 2px;
   background: var(--white);
   box-shadow: var(--shadow-float);
-  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .leader-option {

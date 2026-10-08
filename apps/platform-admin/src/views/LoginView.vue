@@ -81,7 +81,7 @@ async function submit() {
       })
     } else {
       await auth.login(username.value, password.value)
-      await router.replace(safeRedirect(route.query.redirect))
+      await router.replace(invitationToken.value ? {name:'invitation',hash:route.hash} : safeRedirect(route.query.redirect))
     }
   } catch (error) {
     errorMessage.value = isApiError(error)
@@ -150,7 +150,7 @@ async function submit() {
         <div v-if="registering && invitationToken" class="invitation-note" role="status">
           <p v-if="invitationLoading">正在核验邀请链接…</p>
           <p v-else-if="invitationError" role="alert">{{ invitationError }}</p>
-          <template v-else-if="invitation"><strong>{{ invitation.inviterName }} 邀请你注册</strong><p>角色：达人 · {{ invitation.teamName ? '加入团队：' + invitation.teamName : '独立达人' }}</p><small>注册后，业务项目由团长或运营在成员编辑中分配。</small></template>
+          <template v-else-if="invitation"><strong>{{ invitation.inviterName }} 邀请你注册</strong><p>角色：达人 · {{ invitation.teamName ? '加入团队：' + invitation.teamName : '独立达人' }}</p><small>注册后自动开通知乎；加入团队后同时开通团长已有项目。</small></template>
         </div>
         <form @submit.prevent="submit">
           <div

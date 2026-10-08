@@ -12,7 +12,7 @@ import WorkActivity from './WorkActivity.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
 import {errorText,type EngineOptions,type Option} from './context'
-const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string;initialFrom?:string;initialTo?:string}>()
+const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string;initialCreate?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
@@ -61,7 +61,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
  <WorkActivity v-if="section==='activity'" :key="scope.projectId+'-'+scope.accountId+'-'+userId" :context="context" />
  <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-from="initialFrom" :initial-to="initialTo" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
  <template v-else><nav class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
- <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
+ <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" :initial-create="initialCreate" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
  <Works v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Prices v-if="tab==='prices'&&role!=='creator'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Channels v-if="tab==='channels'&&admin" :context="context" @refresh="refreshOptions" @projects="emit('navigate','/projects')" />

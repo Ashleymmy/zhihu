@@ -6,7 +6,7 @@ import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { createMember, deleteMember, disableMember, listMembers, resetPassword, updateMember, listLeaders, myTeam, applyToTeam, listMyApplications, listApplications, reviewApplication, cancelMyApplication } from '../services/team.service';
 import { ok } from '../utils/response';
-import { createInvitation, listInvitations, revokeInvitation, invitationLink, updateInvitation, regenerateInvitation, deleteInvitation } from '../services/invitations.service';
+import { createInvitation, listInvitations, revokeInvitation, invitationLink, updateInvitation, regenerateInvitation, deleteInvitation, acceptInvitation } from '../services/invitations.service';
 import { updateMemberAccess } from '../services/member-access.service';
 import { myAffiliation } from '../services/team.service';
 
@@ -37,6 +37,7 @@ const review = z.object({
 });
 export const teamRouter = Router();
 teamRouter.use(requireAuth);
+teamRouter.post('/invitations/accept', requirePermission('team.apply'), validateBody(z.object({token:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict()), asyncHandler(async(req,res)=>ok(res,await acceptInvitation(req.user,req.body.token))));
 teamRouter.get('/affiliation', requirePermission('team.apply'), asyncHandler(async (req, res) => ok(res, await myAffiliation(req.user))));
 teamRouter.get('/invitations',requirePermission('team.create_member'),asyncHandler(async(req,res)=>ok(res,await listInvitations(req.user))));
 teamRouter.get('/invitations/:id/link',requirePermission('team.create_member'),asyncHandler(async(req,res)=>{res.set('Cache-Control','no-store');ok(res,await invitationLink(req.user,id.parse(req.params.id)))}));

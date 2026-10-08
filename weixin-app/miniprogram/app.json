@@ -18,6 +18,7 @@
     "pages/withdrawals/index",
     "pages/admin/index",
     "pages/team/index",
+    "pages/join-team/index",
     "pages/projects/index",
     "pages/prices/index",
     "pages/password/index",

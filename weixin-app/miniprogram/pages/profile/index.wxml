@@ -36,7 +36,7 @@
     </view>
     <view class="card cell-card">
       <view class="cell"><text class="cell-label">邀请归属</text><text class="cell-value">{{inviteUsed ? '已绑定' : '自主注册'}}</text></view>
-      <view class="cell" wx:if="{{affiliation}}"><text class="cell-label">团队</text><text class="cell-value">{{affiliation.team ? affiliation.team.leaderName : '平台管理 · 独立达人'}}</text></view>
+      <view class="cell" wx:if="{{affiliation}}" data-path="/pages/join-team/index" bindtap="open"><text class="cell-label">团队</text><text class="cell-value">{{affiliation.team ? affiliation.team.leaderName : '独立达人 · 申请入团' }}</text></view>
       <view class="cell" data-path="/pages/password/index" bindtap="open">
         <text class="cell-label">登录密码</text>
         <text class="cell-arrow">›</text>

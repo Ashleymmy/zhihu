@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import {computed,onMounted,reactive,ref,watch,onUnmounted} from 'vue'
+import {computed,onMounted,reactive,ref,watch,onUnmounted,nextTick} from 'vue'
 import {fetchAllPages} from '@zhihu-koc/shared-services'
 import {ActionDialog} from '@zhihu-koc/shared-components'
 import {errorText,requestKey,type EngineContext} from './context'
 import {keywordProgress,type KeywordSummary} from './keyword-progress'
-const props=defineProps<{context:EngineContext;initialSearch?:string}>(),emit=defineEmits<{refresh:[];navigate:[path:string]}>()
+const props=defineProps<{context:EngineContext;initialSearch?:string;initialCreate?:boolean}>(),emit=defineEmits<{refresh:[];navigate:[path:string]}>()
 interface Word{mappingId?:string;landingUrl?:string;popularizeType?:number;ownershipConflict?:number;canEditFailed?:number;canCopyFailed?:number;canDeleteFailed?:number;allocationReady:number;usageReady?:number;hasUsageHistory?:number;planStatus?:string;hasUpstreamPlan?:number;readOnly?:number;planId:string;taskName?:string;compositionCount?:number;ownerName?:string;id:string;keyword:string;taskId:string;lifecycleStatus:string;upstreamStatus:string;syncStatus:string;syncError:string|null;priorityEnded:number;bindingId:string|null;executorId:string|null;leaderId:string|null;releaseStatus:string;usedEverAt:string|null;verificationStatus:string;executorName?:string}
-const list=ref<Word[]>([]),total=ref(0),page=ref(1),search=ref(props.initialSearch??''),busy=ref(false),error=ref(''),notice=ref(''),createOpen=ref(false)
+const list=ref<Word[]>([]),total=ref(0),page=ref(1),search=ref(props.initialSearch??''),busy=ref(false),error=ref(''),notice=ref(''),createOpen=ref(!!props.initialCreate)
 const editForm=reactive({taskId:'',mappingId:'',landingUrl:''})
 const selected=ref<Word|null>(null),action=ref(''),target=ref(''),reason=ref(''),editKeyword=ref(''),operationKey=ref(requestKey())
 const form=reactive({keyword:'',taskId:props.context.options.tasks[0]?.id||'',mappingId:props.context.options.mappings[0]?.id||'',channelId:props.context.options.channels[0]?.id||'',landingUrl:'',popularizeType:0})
@@ -15,6 +15,10 @@ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(n
 const admin=computed(()=>props.context.role==='admin')
 const hasTeamLeader=computed(()=>props.context.options.hasTeamLeader??!!props.context.parentId)
 const createKey=ref(requestKey())
+const createForm=ref<HTMLElement|null>(null)
+function revealCreate(){if(createOpen.value)void nextTick(()=>createForm.value?.scrollIntoView({block:'center',behavior:'smooth'}))}
+watch(createOpen,revealCreate)
+onMounted(revealCreate)
 function openCreate(){createOpen.value=!createOpen.value;if(createOpen.value)createKey.value=requestKey()}
 async function createWord(){await post('/keywords',{...form,mappingId:form.mappingId||undefined,channelId:form.channelId||undefined},createKey.value);createOpen.value=false;form.keyword='';notice.value=admin.value?'关键词已进入公共词库，等待同步就绪后领取或分发。':props.context.role==='leader'?'关键词已归属你的团队，等待知乎创建成功后分配或使用。':'关键词已绑定本人，等待同步就绪后登记作品。'}
 const summary=ref<KeywordSummary|null>(null),readAt=ref('')
@@ -24,6 +28,7 @@ watch(()=>[props.context.options.tasks,props.context.options.mappings],()=>{
  if(!form.mappingId) form.mappingId=props.context.options.mappings[0]?.id||''
  if(!form.channelId) form.channelId=props.context.options.channels[0]?.id||''
 },{deep:true})
+watch(()=>props.initialCreate,value=>{if(value&&!createOpen.value)openCreate()})
 watch(()=>props.initialSearch,value=>{search.value=value??'';page.value=1;void run(async()=>{})})
 function price(w:Word){const p=prices.value.find(p=>p.taskId===w.taskId&&p.payeeId===props.context.userId&&p.priceStatus==='published'&&p.startDay<=today&&(!p.endDay||p.endDay>today));return p?'¥'+Number(p.price)+' / 单':'等待设置单价'}
 async function load(){const r=await props.context.http.get<{list:Word[];total:number;summary?:KeywordSummary;readAt?:string}>('/keywords',{...props.context.scope,page:page.value,pageSize:25,search:search.value});list.value=r.list;total.value=r.total;summary.value=r.summary??null;readAt.value=r.readAt??''}
@@ -49,7 +54,7 @@ onMounted(()=>run(async()=>{prices.value=await fetchAllPages(params=>props.conte
 </script>
 <template><section class="work-card"><div class="section-heading"><div><h2>{{admin?'本地关键词管理':context.role==='leader'?'团队关键词':'我的关键词'}}</h2><p>{{admin?'创建的关键词先进入词库：前 30 分钟团长优先领取，之后独立达人也可以领取。':context.role==='leader'?'创建或领取关键词后分发给团队成员，也可以分配给自己使用。':'可自主创建关键词，创建后自动归属本人；关键词一经使用不可转给他人。'}}</p></div><button class="primary" :disabled="busy" @click="openCreate">创建关键词</button></div>
 <p v-if="context.options.integrationMode==='simulation'" class="engine-note">当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。</p>
-<form v-if="createOpen" class="confirm-box" @submit.prevent="run(createWord)"><label>推广任务<select v-model="form.taskId" required><option v-for="t in context.options.tasks" :key="t.id" :value="t.id">{{t.name}}</option></select></label><label v-if="context.options.mappings.length">渠道<select v-model="form.mappingId" required :disabled="!context.options.mappings.length"><option value="" disabled>请选择渠道</option><option v-for="m in context.options.mappings" :key="m.id" :value="m.id">{{m.channelName}}</option></select></label><label v-else>渠道<select v-model="form.channelId" required><option value="" disabled>请选择渠道</option><option v-for="c in context.options.channels" :key="c.id" :value="c.id">{{c.name}}</option></select></label><p v-if="!context.options.channels.length" class="engine-note">当前项目还没有接入渠道，请在“渠道与任务”中完成接入。</p><label>关键词<input v-model="form.keyword" required maxlength="128" /></label><label>推广内容链接<input v-model="form.landingUrl" type="url" required maxlength="1024" /></label><button class="primary" :disabled="busy||!form.taskId||(!form.mappingId&&!form.channelId)">创建</button><button type="button" @click="createOpen=false">取消</button></form>
+<form ref="createForm" v-if="createOpen" class="confirm-box" @submit.prevent="run(createWord)"><label>推广任务<select v-model="form.taskId" required><option v-for="t in context.options.tasks" :key="t.id" :value="t.id">{{t.name}}</option></select></label><label v-if="context.options.mappings.length">渠道<select v-model="form.mappingId" required :disabled="!context.options.mappings.length"><option value="" disabled>请选择渠道</option><option v-for="m in context.options.mappings" :key="m.id" :value="m.id">{{m.channelName}}</option></select></label><label v-else>渠道<select v-model="form.channelId" required><option value="" disabled>请选择渠道</option><option v-for="c in context.options.channels" :key="c.id" :value="c.id">{{c.name}}</option></select></label><p v-if="!context.options.channels.length" class="engine-note">当前项目还没有接入渠道，请在“渠道与任务”中完成接入。</p><label>关键词<input v-model="form.keyword" required maxlength="128" /></label><label>推广内容链接<input v-model="form.landingUrl" type="url" required maxlength="1024" /></label><button class="primary" :disabled="busy||!form.taskId||(!form.mappingId&&!form.channelId)">创建</button><button type="button" @click="createOpen=false">取消</button></form>
 <div v-if="admin" class="keyword-source" role="note">
 <strong>{{context.options.integrationMode==='simulation'?'本地联测词库':'本地业务词库'}}</strong>
 <p>汇总当前项目与账号下的新旧推广计划，并关联已有作品。历史计划保留原归属，每个计划只显示一次。</p>

@@ -83,7 +83,7 @@ function open(kind: typeof dialog.value, item: MemberInvitation | null = null) {
   });
 }
 function showLink(token: string) {
-  const url = new URL(import.meta.env.BASE_URL + "register", location.origin);
+  const url = new URL(import.meta.env.BASE_URL + "invite", location.origin);
   url.hash = new URLSearchParams({ invite: token }).toString();
   link.value = url.href;
   dialog.value = "link";
@@ -122,7 +122,7 @@ async function copy() {
   try {
     if (!navigator.clipboard) throw new Error();
     await navigator.clipboard.writeText(link.value);
-    notice.value = "邀请链接已复制。";
+    notice.value = "邀请链接已复制，请发给对方并在浏览器中打开。";
   } catch {
     await nextTick();
     linkInput.value?.focus();
@@ -157,7 +157,7 @@ onMounted(() => run(load));
               ? "通过你的链接注册的达人，自动加入你的团队。"
               : "通过你的链接注册的成员成为平台管理的独立达人。"
           }}
-          注册时无需填写邀请码，业务项目可由团长或运营在成员编辑中分配。
+          无需填写邀请码。新用户自动开通知乎，入团时同时开通团长已有项目。已有达人账号也可以打开链接直接加入。
         </p>
       </div>
       <button class="primary-action" :disabled="busy" @click="open('create')">
@@ -183,7 +183,7 @@ onMounted(() => run(load));
             <tr>
               <th>邀请名称</th>
               <th>注册归属</th>
-              <th>已注册 / 上限</th>
+              <th>已使用 / 上限</th>
               <th>有效期至</th>
               <th>状态</th>
               <th>操作</th>
@@ -258,7 +258,7 @@ onMounted(() => run(load));
           /><small>修改有效期时，可设置为未来 30 天以内。</small></label
         >
         <label
-          >最多注册人数<input
+          >最多邀请人数<input
             v-model.number="form.maxUses"
             type="number"
             :min="Math.max(1, selected?.usedCount ?? 0)"
@@ -291,10 +291,10 @@ onMounted(() => run(load));
             readonly
             @focus="($event.target as HTMLInputElement).select()"
         /></label>
-        <p>把链接发给对方，对方打开注册即可自动绑定；无需提供或填写邀请码。</p>
+        <p>把完整链接发给达人，在浏览器中打开。新用户注册后入团，已有账号登录后确认加入。</p>
         <div class="dialog-actions">
           <button @click="dialog = null">关闭</button
-          ><button class="primary" @click="copy">复制链接</button>
+          ><button class="primary" @click="copy">复制链接</button><a :href="link" target="_blank" rel="noopener noreferrer">打开邀请页</a>
         </div>
       </div>
       <div v-else-if="dialog === 'delete'">

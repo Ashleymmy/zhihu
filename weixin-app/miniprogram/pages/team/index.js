@@ -88,7 +88,7 @@ Page(
               formOpen: false,
               form: { username: "", displayName: "", phone: "" },
             });
-        }, "成员已创建；可在成员编辑中分配业务项目")
+        }, "成员已创建，并自动开通可用项目")
       )
         await this.load();
     },

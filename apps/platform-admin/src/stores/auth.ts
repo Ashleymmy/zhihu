@@ -7,7 +7,7 @@ import { isValidAccount } from '../access'
 export const http = createHttpClient({
   baseURL: '/api/v1/core',
   onUnauthorized: () => {
-    if (globalThis.location && !/\/(login|register)$/.test(globalThis.location.pathname)) {
+    if (globalThis.location && !/\/(login|register|invite)$/.test(globalThis.location.pathname)) {
       globalThis.location.href = import.meta.env.BASE_URL + 'login'
     }
   },

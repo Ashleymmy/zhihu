@@ -23,6 +23,7 @@ function allowed(user, page) {
   )
     return true;
   if (page === "invite") return canOperate(user);
+  if (page === "join-team") return user.role === "creator";
   if (["keywords", "keywords-create"].includes(page)) return canOperate(user);
   if (["wallet", "withdrawals"].includes(page)) return canFinance(user);
   if (page === "reports") return duty(user, "finance");
@@ -39,6 +40,7 @@ function menus(user) {
     wallet: isAdmin(user) ? "财务账单" : "收入与提现",
     reports: "报表与异常",
     team: "团队成员",
+    "join-team": "我的团队 / 申请入团",
     prices: "定价规则",
     admin: "运营管理",
   };

@@ -81,6 +81,7 @@ export function createProjectsApi(http: HttpClient) {
 
 export function createTeamApi(http: HttpClient) {
   return {
+    acceptInvitation: (token: string) => http.post<{joined:boolean}>('/team/invitations/accept', {token}),
     listMembers: () => http.get<TeamMember[]>('/team/members'),
     manageMember: (id: string, data: MemberAccessPatch) => http.patch<void>(`/team/members/${id}/access`, data),
     invitations: () => http.get<MemberInvitation[]>('/team/invitations'),

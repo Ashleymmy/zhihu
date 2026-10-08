@@ -68,6 +68,7 @@ beforeAll(async () => {
         i === 6 ? 'finance' : role === 'operator' ? 'operations' : 'all',
       ],
     );
+  await c.query("INSERT INTO project_members(project_id,user_id) SELECT p.id,u.id FROM projects p CROSS JOIN (SELECT 4 id UNION SELECT 6 id) u WHERE p.slug='zhihu'");
   pool = (await import('../../src/db')).db;
   const { authRouter } = await import('../../src/routes/auth');
   const { teamRouter } = await import('../../src/routes/team');
@@ -103,7 +104,7 @@ it('only authorized roles create invitations; malformed and privilege-bearing re
     ).status,
   ).toBe(422);
 });
-it('leader invitation records provenance and joins only the correct team, without granting project access', async () => {
+it('leader invitation records provenance and joins only the correct team, with default project access', async () => {
   const i = await invite();
   expect((await preview(i.token)).body.data).toMatchObject({
     inviterName: '邀请团长',
@@ -117,7 +118,7 @@ it('leader invitation records provenance and joins only the correct team, withou
   expect(String(u.parent_id)).toBe('4');
   expect(String(u.created_by)).toBe('4');
   const [[p]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM project_members WHERE user_id=?', [u.id]);
-  expect(p.n).toBe(0);
+  expect(p.n).toBe(1);
   const list = (await call('leader', 'get', '/team/members')).body.data;
   expect(list.find((m: any) => m.id === String(u.id))).toMatchObject({
     registrationSource: 'invitation',
@@ -456,4 +457,74 @@ it('scoped managers cannot strip project administration and legacy staff parents
   await c.query("UPDATE users SET parent_id=3 WHERE username='platform_creator'");
   expect((await call('platform_creator','get','/team/my')).body.data).toBeNull();
   expect((await call('platform_creator','get','/team/affiliation')).body.data.team).toBeNull();
+});
+
+it('independent registration and managed leader creation open the default project without granting management', async () => {
+  const created = await request(app).post('/auth/register').set(headers()).send({username:'onboarding_solo',password});
+  expect(created.status,JSON.stringify(created.body)).toBe(201);
+  await login('onboarding_solo');
+  const projects=(await call('onboarding_solo','get','/projects')).body.data;
+  expect(projects.map((p:any)=>p.slug)).toEqual(['zhihu']);
+  expect((await call('onboarding_solo','post','/projects').send({name:'denied',slug:'no'})).status).toBe(403);
+  const leader=await call('operator','post','/team/members').send({username:'onboarding_leader',displayName:'新团长',role:'leader'});
+  expect(leader.status,JSON.stringify(leader.body)).toBe(201);
+  const [[m]]=await c.query<RowDataPacket[]>('SELECT pm.member_role FROM project_members pm JOIN projects p ON p.id=pm.project_id WHERE pm.user_id=? AND p.slug=?',[leader.body.data.id,'zhihu']);
+  expect(m.member_role).toBe('member');
+});
+
+it('invited registration inherits enabled team projects only',async()=>{
+  const i=await invite();const r=await register(i.token,'onboarding_invited');
+  expect(r.status).toBe(201);await login('onboarding_invited');
+  const slugs=(await call('onboarding_invited','get','/projects')).body.data.map((p:any)=>p.slug).sort();
+  expect(slugs).toEqual(['leader-scope','zhihu']);
+  const [[m]]=await c.query<RowDataPacket[]>('SELECT role,parent_id FROM users WHERE id=?',[r.body.data.id]);
+  expect(m.role).toBe('creator');expect(String(m.parent_id)).toBe('4');
+});
+
+it('an existing creator accepts an invitation once, keeps registration provenance and immediately gains team projects',async()=>{
+  const i=await invite('leader',1);
+  const application=await call('onboarding_solo','post','/team/applications').send({leaderUsername:'other_leader'});
+  expect(application.status).toBe(201);
+  for(let n=0;n<2;n++) {
+    const accepted=await call('onboarding_solo','post','/team/invitations/accept').send({token:i.token});
+    expect(accepted.status,JSON.stringify(accepted.body)).toBe(200);
+  }
+  const [[count]]=await c.query<RowDataPacket[]>('SELECT used_count FROM member_invitations WHERE id=?',[i.id]);
+  expect(count.used_count).toBe(1);
+  expect((await call('onboarding_solo','get','/team/my')).body.data.leaderName).toBe('邀请团长');
+  expect((await call('onboarding_solo','get','/projects')).body.data.map((p:any)=>p.slug).sort()).toEqual(['leader-scope','zhihu']);
+  const [[u]]=await c.query<RowDataPacket[]>('SELECT u.created_by,iu.invitation_id FROM users u LEFT JOIN member_invitation_uses iu ON iu.user_id=u.id WHERE u.username=?',['onboarding_solo']);
+  expect(u.created_by).toBeNull();expect(u.invitation_id).toBeNull();
+  expect((await call('onboarding_solo','get','/team/applications/mine')).body.data[0].status).toBe('cancelled');
+});
+
+it('existing-account invitations cannot replace a team, elevate roles or ignore expiry',async()=>{
+  const other=await invite('other_leader');
+  expect((await call('onboarding_solo','post','/team/invitations/accept').send({token:other.token})).status).toBe(409);
+  expect((await call('leader','post','/team/invitations/accept').send({token:other.token})).status).toBe(403);
+  await c.query('UPDATE member_invitations SET expires_at=TIMESTAMPADD(SECOND,-1,NOW(3)) WHERE id=?',[other.id]);
+  expect((await call('onboarding_solo','post','/team/invitations/accept').send({token:other.token})).status).toBe(422);
+});
+
+it('approval grants team projects while preserving an explicit project removal',async()=>{
+  const r=await request(app).post('/auth/register').set(headers()).send({username:'onboarding_apply',password});
+  expect(r.status).toBe(201);await login('onboarding_apply');
+  await c.query("UPDATE project_members SET left_at=NOW() WHERE user_id=?",[r.body.data.id]);
+  const a=await call('onboarding_apply','post','/team/applications').send({leaderUsername:'leader'});
+  expect(a.status).toBe(201);
+  const approved=await call('leader','post',`/team/applications/${a.body.data.id}/review`).send({action:'approve'});
+  expect(approved.status,JSON.stringify(approved.body)).toBe(200);
+  expect((await call('onboarding_apply','get','/projects')).body.data.map((p:any)=>p.slug)).toEqual(['leader-scope']);
+});
+
+it('two existing creators cannot consume the same final invitation slot',async()=>{
+  for(const username of ['slot_creator_a','slot_creator_b']) {
+    expect((await request(app).post('/auth/register').set(headers()).send({username,password})).status).toBe(201);
+    await login(username);
+  }
+  const i=await invite('leader',1);
+  const results=await Promise.all(['slot_creator_a','slot_creator_b'].map(name=>call(name,'post','/team/invitations/accept').send({token:i.token})));
+  expect(results.map(r=>r.status).sort()).toEqual([200,422]);
+  const [[row]]=await c.query<RowDataPacket[]>('SELECT used_count FROM member_invitations WHERE id=?',[i.id]);
+  expect(row.used_count).toBe(1);
 });

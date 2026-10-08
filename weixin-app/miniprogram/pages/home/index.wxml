@@ -126,7 +126,7 @@
           >{{item.icon}}</view
         >
         <text class="tag {{item.open ? '' : 'tag-sun'}}"
-          >{{item.open ? '已开通' : '敬请期待'}}</text
+          >{{item.open ? '进入业务' : '敬请期待'}}</text
         >
       </view>
       <view class="channel-name">{{item.name}}</view>

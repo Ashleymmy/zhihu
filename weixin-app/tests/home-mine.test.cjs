@@ -26,7 +26,7 @@ const keys = list => Array.from(list, item => item.key)
 
 // 角色 → 我的页菜单。与 README 的角色能力表一一对应；「邀请好友」对全部角色开放。
 const MINE_MENUS = [
-  ['creator', null, ['invite', 'withdrawals', 'password']],
+  ['creator', null, ['join-team', 'invite', 'withdrawals', 'password']],
   ['leader', null, ['team', 'prices', 'invite', 'withdrawals', 'password']],
   ['admin', 'operations', ['team', 'prices', 'admin', 'invite', 'password']],
   ['admin', 'finance', ['reports', 'invite', 'withdrawals', 'password']],
@@ -46,7 +46,7 @@ for (const [role, duty, expected] of MINE_MENUS) {
       assert.ok(item.icon || item.iconImg, item.key + ' 缺少图标')
       assert.match(item.tint, /^#[0-9a-f]{6}$/i, item.key + ' 缺少底色')
       assert.match(item.fg, /^#[0-9a-f]{6}$/i, item.key + ' 缺少前景色')
-      assert.match(item.path, /^\/pages\/[a-z]+\/index$/)
+      assert.match(item.path, /^\/pages\/[a-z-]+\/index$/)
     }
   })
 }

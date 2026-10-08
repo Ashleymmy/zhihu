@@ -16,6 +16,7 @@ export function createAppRouter(
   const router = createRouter({
     history,
     routes: [
+      { path: '/invite', name: 'invitation', component: () => import('./views/InvitationView.vue'), meta: { requiresAuth: false, title: '团队邀请' } },
       {
         path: '/login',
         name: 'login',
@@ -93,6 +94,10 @@ export function createAppRouter(
       return to.fullPath
     }
     if(auth.user.mustChangePwd && to.path !== '/account/security')return '/account/security'
+    if (to.name === 'invitation') return true
+    // Older shared links remain valid for members who have already logged in.
+    if (['register', 'login'].includes(String(to.name)) && new URLSearchParams(to.hash.slice(1)).has('invite'))
+      return { name: 'invitation', hash: to.hash }
     if (
       to.meta.requiresAuth === false ||
       to.name === 'not-found' ||

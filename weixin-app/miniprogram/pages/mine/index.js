@@ -2,6 +2,7 @@ const screen = require("../../utils/screen");
 const auth = require("../../utils/auth");
 const permissions = require("../../utils/permissions");
 const ICONS = {
+  "join-team": { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
   team: { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
   prices: { iconImg: "/images/icons/prices.png", tint: "#faf3e1", fg: "#c98f1b" },
   admin: { iconImg: "/images/icons/admin.png", tint: "#fbeeea", fg: "#d05a43" },
