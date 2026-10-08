@@ -88,6 +88,7 @@ function inspect(row: DataGridRow) {
   if (!props.externalDetails) selectedId.value = row.id;
   emit("inspect", row);
 }
+defineExpose({inspect});
 function keyboard(event: KeyboardEvent, row: DataGridRow) {
   if (
     event.target === event.currentTarget &&

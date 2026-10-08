@@ -3,8 +3,9 @@ import {computed,ref,watch} from 'vue'
 import {AnalysisRun,DetailDrawer} from '@zhihu-koc/shared-components'
 import {errorText,type EngineContext,type Option} from './context'
 import type {NameSelection,ReportAnswer,ReportRun} from './report-analysis'
+import HistoricalWorks from './HistoricalWorks.vue'
 const props=defineProps<{context:EngineContext;run:ReportRun;busyAskId?:string;errors?:Record<string,string>;busyAction?:string}>()
-const emit=defineEmits<{answer:[answer:ReportAnswer];action:[key:string]}>()
+const emit=defineEmits<{answer:[answer:ReportAnswer];action:[key:string];refresh:[]}>()
 const channelAsk=ref(''),channelId=ref(''),upstreamId=ref(''),generation=ref<1|2>(1),channels=ref<Option[]>([]),mappings=ref<Option[]>([]),loading=ref(false),error=ref('')
 const keywordAsk=ref(''),keywordId=ref('new'),taskId=ref(''),executorId=ref(''),fromDate=ref(''),tasks=ref<Option[]>([]),members=ref<Option[]>([])
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
@@ -32,6 +33,7 @@ function saveKeyword(){
 </script>
 <template>
  <AnalysisRun :run="run" :busy-ask-id="busyAskId" :errors="errors" :busy-action="busyAction" @answer="answer" @action="emit('action',$event)" />
+ <HistoricalWorks v-if="context.adminDuty!=='finance'&&run.steps.some(step=>step.key==='work'&&step.status==='ask')" :key="run.id" :context="context" :batch-id="run.id" @changed="emit('refresh')" />
  <DetailDrawer :open="!!channelAsk" title="确认报表中的渠道" @close="channelAsk=''">
   <form class="channel-choice" @submit.prevent="save">
    <p>{{run.steps.flatMap(step=>step.asks??[]).find(ask=>ask.id===channelAsk)?.text}}</p>

@@ -11,6 +11,7 @@ const finance=props.context.adminDuty==='finance',operations=props.context.admin
 const analysis=ref<AnalysisRunModel|null>(null),analysisHost=ref<HTMLElement|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
 const canMatch=(i:Issue)=>i.status==='open'&&!!i.batchId&&!finance&&['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH','KEYWORD_UNKNOWN'].includes(i.reasonCode)
 async function inspect(i:Issue){error.value='';try{analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+i.batchId+'/analysis',props.context.scope);await nextTick();analysisHost.value?.scrollIntoView({block:'start',behavior:'smooth'})}catch(e){error.value=errorText(e)}}
+async function refreshAnalysis(){if(analysis.value)analysis.value=await props.context.http.get<AnalysisRunModel>("/imports/"+analysis.value.id+"/analysis",props.context.scope);await load()}
 async function answer(value:ReportAnswer){
  if(!analysis.value||busyAskId.value)return;busyAskId.value=value.askId;askErrors[value.askId]=''
  try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});await load()}
@@ -26,7 +27,7 @@ onMounted(load)
  <section class="work-card issues">
   <div class="section-heading"><div><h2>数据待办</h2><p>按下一步补齐资料，金额已算出的记录可以继续核对。</p></div><button @click="load">刷新</button></div>
   <p class="engine-error" v-if="error" role="alert">{{error}}</p>
-  <div v-if="analysis" ref="analysisHost" class="issue-analysis"><ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" @answer="answer" @action="load" /><button @click="analysis=null">收起分析</button></div>
+  <div v-if="analysis" ref="analysisHost" class="issue-analysis"><ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" @answer="answer" @action="load" @refresh="refreshAnalysis" /><button @click="analysis=null">收起分析</button></div>
   <div class="engine-table"><table><thead><tr><th>关键词</th><th>需要处理什么</th><th>状态</th><th>下一步</th></tr></thead><tbody><tr v-for="i in list" :key="i.id"><td>{{i.normalizedJson?.keyword||i.keyword||'报表记录'}}</td><td class="cell-note">{{i.reason}}</td><td>{{i.status==='open'?'待处理':'已处理'}}</td><td><span v-if="i.status==='open'">{{i.next}}</span><button v-if="canMatch(i)" @click="inspect(i)">{{i.reasonCode==='KEYWORD_UNKNOWN'?'核对关键词':'确认渠道'}}</button><button v-if="canRetry(i)" @click="selected=i;reason=''">{{i.revisionId?'核对更正':'资料已补齐，重新计算'}}</button></td></tr></tbody></table></div>
   <ul class="issue-cards"><li v-for="i in list" :key="i.id"><strong>{{i.normalizedJson?.keyword||i.keyword||'报表记录'}}</strong><span>{{i.reason}} · {{i.status==='open'?'待处理':'已处理'}}</span><span v-if="i.status==='open'">下一步：{{i.next}}</span><button v-if="canMatch(i)" @click="inspect(i)">{{i.reasonCode==='KEYWORD_UNKNOWN'?'核对关键词':'确认渠道'}}</button><button v-if="canRetry(i)" @click="selected=i;reason=''">{{i.revisionId?'核对更正':'资料已补齐，重新计算'}}</button></li></ul>
   <p class="empty-state" v-if="!list.length">没有需要处理的报表问题，可以继续核对账单。</p>

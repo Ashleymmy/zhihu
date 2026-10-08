@@ -2,7 +2,8 @@
 import {onMounted,onUnmounted,ref,watch} from 'vue'
 import {errorText,type EngineContext} from './context'
 import WorkDetail from './WorkDetail.vue'
-import {upstreamReview,type WorkStatus} from './work-status'
+import HistoricalWorks from './HistoricalWorks.vue'
+import {upstreamReview,evidenceReview,type WorkStatus} from './work-status'
 const props=defineProps<{context:EngineContext;filters?:Record<string,string>;heading?:string}>()
 interface Work extends WorkStatus{id:string;bindingId:string|null;planId:string;keyword:string;workUrl:string;description:string;verificationStatus:string;executorId:string;executorName:string;reason:string;compositionId:string|null;canEdit?:boolean}
 const selected=ref<Work|null>(null)
@@ -17,14 +18,15 @@ onUnmounted(()=>{generation++;if(poll)clearInterval(poll)})
 </script>
 <template>
   <section class="work-card">
-    <div class="section-heading"><div><h2>{{heading || '作品记录'}}</h2><p>登记后自动提交知乎，无需管理员逐条审核。需要修改时可直接打开原表单。</p></div><div class="engine-actions"><router-link v-if="canOperate()" class="engine-action-link" to="/modules/zhihu/works">登记推广作品</router-link><button :disabled="busy" @click="refresh">刷新</button></div></div>
+    <HistoricalWorks v-if="canOperate()" :context="context" @changed="refresh" />
+    <div class="section-heading"><div><h2>{{heading || '作品记录'}}</h2><p>查看已提交的作品及核验结果。</p></div><div class="engine-actions"><router-link v-if="canOperate()" class="engine-action-link" to="/modules/zhihu/works">登记推广作品</router-link><button :disabled="busy" @click="refresh">刷新</button></div></div>
     <p v-if="error" role="alert" class="engine-error">{{error}}</p>
     <div class="engine-table"><table>
       <thead><tr><th>关键词</th><th v-if="context.role!=='creator'">提交人</th><th>作品</th><th>提交与审核结果</th><th>操作</th></tr></thead>
       <tbody><tr v-for="w in list" :key="w.id">
         <td>{{w.keyword}}</td><td v-if="context.role!=='creator'">{{w.executorName||context.options.users.find(u=>u.id===w.executorId)?.displayName||'项目成员'}}</td>
         <td><a :href="w.workUrl" target="_blank" rel="noopener noreferrer">打开作品</a><p class="cell-note">{{w.description}}</p><small>{{w.source==='evidence'?'平台提交':'推广作品'}}</small></td>
-        <td><template v-if="w.compositionId">{{upstreamReview(w).label}}<p class="cell-note">{{upstreamReview(w).reason}}</p></template><span v-else>尚未登记知乎推广作品</span></td>
+        <td>{{(w.compositionId?upstreamReview(w):evidenceReview(w)).label}}<p class="cell-note">{{(w.compositionId?upstreamReview(w):evidenceReview(w)).reason}}</p></td>
         <td><button @click="selected=w">查看详情</button> <router-link v-if="canOperate() && w.canEdit && w.compositionId" :to="{path:'/modules/zhihu/works',query:{planId:w.planId,keyword:w.keyword,edit:w.compositionId}}">修改并重新提交</router-link><router-link v-else-if="canOperate() && w.planSyncStatus==='failed'" :to="{path:'/modules/zhihu/operations',query:{...context.scope,keyword:w.keyword,tab:'keywords'}}">修改关键词</router-link><p v-if="w.verificationStatus==='disputed'" class="cell-note">该作品存在归属争议，等待处理。</p></td>
       </tr></tbody>
     </table></div>

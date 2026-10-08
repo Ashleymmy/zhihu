@@ -1,0 +1,121 @@
+import {beforeAll,afterAll,it,expect,vi} from 'vitest';
+import {MySqlContainer,type StartedMySqlContainer} from '@testcontainers/mysql';
+import mysql,{type Connection} from 'mysql2/promise';
+import request from 'supertest';
+import type {Express} from 'express';
+import type {AuthUser} from '../../src/types';
+import {runOpcMigrations} from '../../scripts/opcMigrations';
+import {readFile} from 'node:fs/promises';
+vi.mock('../../src/modules/zhihu/queue',async original=>({...await original<typeof import('../../src/modules/zhihu/queue')>(),enqueue:vi.fn(async()=>({id:'isolated'}))}));
+let container:StartedMySqlContainer,c:Connection,pool:typeof import('../../src/db').db,app:Express;
+let workbench:typeof import('../../src/modules/zhihu/attribution/workbench'),facts:typeof import('../../src/modules/zhihu/attribution/facts');
+const date='2026-09-14',key=()=>crypto.randomUUID(),scope={projectId:'1',accountId:''};
+const user=(sub:string,role:AuthUser['role'],duty:AuthUser['adminDuty']='all'):AuthUser=>({sub,role,adminDuty:duty,parentId:null,displayName:'人员'+sub,username:'analysis'+sub,jti:key()});
+const admin=user('1','admin'),creator=user('2','creator'),ops=user('3','admin','operations'),finance=user('4','admin','finance'),leader=user('5','leader');
+const headers:Record<string,Record<string,string>>={};
+const q=async(sql:string,args:unknown[]=[])=> (await c.query<mysql.RowDataPacket[]>(sql,args))[0];
+const file=(text:string)=>{const buffer=Buffer.from(text);return{originalname:'分析验收.csv',mimetype:'text/csv',buffer,size:buffer.length}};
+let mappingId='',wordId='';
+const endpoint=(id:string)=>'/api/v1/modules/zhihu/imports/'+id;
+const get=(id:string,u=finance)=>request(app).get(endpoint(id)+'/analysis').set(headers[u.sub]).query(scope);
+const answer=(id:string,askId:string,option:string,u=ops,selection?:unknown,requestKey:string=key())=>request(app).post(endpoint(id)+'/answers').set(headers[u.sub]).send({...scope,askId,option,selection,requestKey});
+beforeAll(async()=>{
+ container=await new MySqlContainer('mysql:8.0').withCommand(['--log-bin-trust-function-creators=1']).withDatabase('automatic_repair_test').withUsername('test').withUserPassword('isolated').start();
+ const target={host:container.getHost(),port:container.getPort(),database:container.getDatabase(),user:container.getUsername(),password:container.getUserPassword()};
+ Object.assign(process.env,{DB_HOST:target.host,DB_PORT:String(target.port),DB_NAME:target.database,DB_USER:target.user,DB_PASS:target.password,OPC_MODULES:'zhihu',DEV_DEMO_AUTH:'0'});
+ await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
+ for(const actor of [admin,creator,ops,finance,leader])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.adminDuty]);
+ await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5)');
+ scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
+ await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'analysis-channel',1,'分析渠道')");
+ await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'analysis-task','分析活动',NOW())");
+ const resources=await import('../../src/modules/zhihu/attribution/resources');workbench=await import('../../src/modules/zhihu/attribution/workbench');facts=await import('../../src/modules/zhihu/attribution/facts');pool=(await import('../../src/db')).db;
+ const mapping=await resources.createMapping(admin,scope,key(),{channelId:'1',name:'分析渠道',from:date});
+ mappingId=mapping.id; const word=await resources.createKeyword(admin,scope,key(),{keyword:'分析关键词',taskId:'1',mappingId:mapping.id,landingUrl:'https://example.com/analysis',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id='analysis-plan' WHERE id=?",[word.planId]);await resources.synchronizeKeywords(scope);
+ wordId=word.id; const binding=await resources.distribute(admin,scope,word.id,key(),'2');await resources.changeBinding(creator,scope,binding.id,key(),{action:'activate'});
+ await c.query("UPDATE zh_keyword_bindings SET activated_on=?,verification_status='passed' WHERE id=?",[date,binding.id]);
+ const {ModuleRuntime}=await import('../../src/core/module-runtime'),{zhihuManifest}=await import('../../src/modules/zhihu/manifest'),{createZhihuModule}=await import('../../src/modules/zhihu/module'),{createCoreApp}=await import('../../src/core/app');
+ const runtime=new ModuleRuntime([zhihuManifest]);runtime.register(createZhihuModule());app=createCoreApp(runtime);
+ const {signToken}=await import('../../src/auth/jwt'),{issueRefreshSession}=await import('../../src/auth/tokenSessions');
+ for(const actor of [admin,creator,ops,finance,leader]){const client='analysis-client-'+actor.sub,session=await issueRefreshSession(actor.sub,{type:'web',id:client});headers[actor.sub]={'X-Client-Id':client,Authorization:'Bearer '+await signToken({...actor,id:actor.sub,sessionId:session.familyId})};}
+},90000);
+const previousActivation=process.env.ZHIHU_ACTIVATION_ENABLED;
+afterAll(async()=>{if(previousActivation===undefined)delete process.env.ZHIHU_ACTIVATION_ENABLED;else process.env.ZHIHU_ACTIVATION_ENABLED=previousActivation;if(pool)await pool.end();if(c)await c.end();if(container)await container.stop();});
+const upload=async(keyword:string,quantity='4',day=date)=>(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n${day},分析渠道,${keyword},${quantity}`))).id;
+const question=async(id:string)=>(await get(id,ops)).body.data.steps[2].asks[0];
+const selection={taskId:'1',executorId:'2'};
+let serial=0;
+const tasks=(actor=ops,batchId?:string)=>request(app).get('/api/v1/modules/zhihu/evidence/historical-tasks').set(headers[actor.sub]).query({...scope,...(batchId?{batchId}:{})});
+const todos=async(actor:AuthUser)=>{const response=await request(app).get('/api/v1/core/dashboard').set(headers[actor.sub]);expect(response.status,response.text).toBe(200);return response.body.data.groups.flatMap((group:any)=>group.services.flatMap((service:any)=>service.todos));};
+const submit=(bindingId:string,actor=creator)=>request(app).post('/api/v1/modules/zhihu/evidence').set(headers[actor.sub]).send({...scope,bindingId,url:'https://example.com/old/'+ ++serial,description:'已发布的历史作品',requestKey:key()});
+const review=(id:string,actor=ops,accept=true,requestKey:string=key())=>request(app).post('/api/v1/modules/zhihu/evidence/'+id+'/review').set(headers[actor.sub]).send({...scope,accept,reason:accept?'已核对作品和执行人':'链接需要补充',requestKey});
+async function history(word='自动更新历史词'+ ++serial,executorId='2'){
+ const id=await upload(word),ask=await question(id),saved=await answer(id,ask.id,'other-keyword',ops,{...selection,executorId});expect(saved.status,saved.text).toBe(200);
+ const [binding]=await q('SELECT b.*,k.id word_id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.current_binding_id=b.id WHERE k.keyword=?',[word]);
+ return {id,bindingId:String(binding.id),wordId:String(binding.word_id),keyword:word};
+}
+it('在渠道设置补齐名称后，已有报表直接继续处理',async()=>{
+ const id=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n${date},新的渠道名称,分析关键词,4`))).id;
+ expect((await get(id)).body.data.steps[1].status).toBe('ask');
+ const resources=await import('../../src/modules/zhihu/attribution/resources');
+ await resources.createMapping(ops,scope,key(),{channelId:'1',name:'新的渠道名称',canonicalId:mappingId,from:date});
+ expect((await get(id)).body.data.steps[1].status).toBe('done');expect((await get(id)).body.data.totals.billableAmount).toBe('32.0000');
+ expect((await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=?',[id]))[0].processing_status).toBe('processed');
+});
+let current:Awaited<ReturnType<typeof history>>,evidenceId='';
+it('历史作品待办按项目和实际执行人隔离，财务不能读取运营入口',async()=>{
+ current=await history();await history('团长本人旧作品','5');
+ expect((await tasks(finance)).status).toBe(403);
+ const mine=await tasks(creator);expect(mine.status).toBe(200);expect(mine.body.data.list).toHaveLength(1);expect(mine.body.data.list[0]).toMatchObject({bindingId:current.bindingId,canSubmit:true,canReview:false});
+ expect(JSON.stringify((await tasks()).body.data)).not.toMatch(/amount|price|settlement|revenue/i);
+ expect((await tasks(leader,current.id)).body.data.list).toHaveLength(0);
+ const inaccessible=await request(app).get('/api/v1/modules/zhihu/evidence/historical-tasks').set(headers[creator.sub]).query({...scope,projectId:'999'});expect(inaccessible.status).toBe(403);
+ expect((await submit(current.bindingId,leader)).status).toBe(403);expect((await submit(current.bindingId,finance)).status).toBe(403);
+ expect(await todos(creator)).toContainEqual(expect.objectContaining({kind:'work.historical.submit',count:1,path:expect.stringContaining('/works?')}));
+ expect((await todos(finance)).some((todo:any)=>todo.kind.startsWith('work.historical.'))).toBe(false);
+});
+it('提交历史作品不触发推送，核验同一事务更新拉新、拉活且拒绝越权核验',async()=>{
+ process.env.ZHIHU_ACTIVATION_ENABLED='true';
+ const activation=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,拉活量,结算金额\n${date},分析渠道,${current.keyword},5,10`),'activation')).id;
+ const before=await q('SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[current.wordId]);
+ const {enqueue}=await import('../../src/modules/zhihu/queue');vi.mocked(enqueue).mockClear();
+ const submitted=await submit(current.bindingId);expect(submitted.status,submitted.text).toBe(201);evidenceId=submitted.body.data.id;
+ expect(await todos(ops)).toContainEqual(expect.objectContaining({kind:'work.historical.review',count:1}));
+ expect((await todos(creator)).some((todo:any)=>todo.kind.startsWith('work.historical.'))).toBe(false);
+ expect((await get(current.id)).body.data.totals.confirmableAmount).toBe('0.0000');
+ for(const actor of [finance,creator,leader])expect((await review(evidenceId,actor)).status).toBe(403);
+ const accepted=await review(evidenceId);expect(accepted.status,accepted.text).toBe(200);
+ const after=await q('SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[current.wordId]);expect(after.map(row=>row.id)).toEqual(before.map(row=>row.id));expect(after.every((row,index)=>row.current_result_id!==before[index].current_result_id)).toBe(true);
+ expect((await get(current.id)).body.data.totals.confirmableAmount).toBe('32.0000');expect((await get(activation)).body.data.totals.confirmableAmount).toBe('6.0000');
+ expect((await tasks(creator,current.id)).body.data.list).toHaveLength(0);
+ expect((await todos(ops)).some((todo:any)=>todo.kind==='work.historical.review')).toBe(false);
+ expect(vi.mocked(enqueue).mock.calls.some(call=>['push-plan','push-composition'].includes(call[0]))).toBe(false);
+});
+it('核验后的新作品不改写已经确认的报表结果、账单和资金',async()=>{
+ await c.query("UPDATE zh_engine_routes SET mode='enabled' WHERE account_id=? AND project_id=?",[scope.accountId,scope.projectId]);
+ const view=await workbench.overview(finance,scope,{from:date,to:date});await workbench.confirmBills(finance,scope,{from:date,to:date},key(),view.reviewHash);
+ const snapshot=async()=>Promise.all(['zh_metric_facts','zh_attribution_results','zh_statement_entries','opc_income_sources','opc_income_entries'].map(table=>q('SELECT * FROM '+table+' ORDER BY id')));
+ const before=await snapshot(),added=await submit(current.bindingId);expect(added.status).toBe(201);
+ expect((await review(added.body.data.id)).status).toBe(200);expect(await snapshot()).toEqual(before);
+});
+it('自动更新失败会撤回核验结果，重试和并发核验只成功一次',async()=>{
+ const work=await history(),added=await submit(work.bindingId),id=added.body.data.id;
+ const before=await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId]);
+ await c.query("CREATE TRIGGER fail_work_repair BEFORE INSERT ON zh_attribution_results FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated work repair rollback'");
+ try{expect((await review(id)).status).toBe(500);}finally{await c.query('DROP TRIGGER fail_work_repair');}
+ expect((await q('SELECT status FROM zh_evidence WHERE id=?',[id]))[0].status).toBe('pending');expect(await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId])).toEqual(before);
+ const savedKey=key(),responses=await Promise.all([review(id,ops,true,savedKey),review(id)]);expect(responses.map(response=>response.status).sort()).toEqual([200,409]);
+ const winner=responses[0].status===200?savedKey:null;if(winner)expect((await review(id,ops,true,winner)).status).toBe(200);
+});
+it('收到真实知乎回执后自动核验作品并更新未确认金额，重复回执保持不变',async()=>{
+ const resources=await import('../../src/modules/zhihu/attribution/resources');
+ const word=await resources.createKeyword(admin,scope,key(),{keyword:'回执自动更新词',taskId:'1',mappingId,landingUrl:'https://example.com/auto',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id='real-plan-auto' WHERE id=?",[word.planId]);await resources.synchronizeKeywords(scope);
+ const binding=await resources.distribute(admin,scope,word.id,key(),'2');await resources.changeBinding(creator,scope,binding.id,key(),{action:'activate'});await c.query('UPDATE zh_keyword_bindings SET activated_on=? WHERE id=?',[date,binding.id]);
+ const report=await upload('回执自动更新词');expect((await get(report)).body.data.totals.confirmableAmount).toBe('0.0000');
+ const [result]=await c.query<mysql.ResultSetHeader>("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,sync_status,zhihu_composition_id) VALUES(?,2,'KOC抖音','test',2,1,'https://v.douyin.com/real-work/','synced','12345678')",[word.planId]);
+ const {confirmSubmittedWorks}=await import('../../src/modules/zhihu/services/automatic-work-check');await confirmSubmittedWorks(String(result.insertId));
+ expect((await get(report)).body.data.totals.confirmableAmount).toBe('32.0000');
+ const before=await q('SELECT * FROM zh_metric_facts WHERE keyword_id=?',[word.id]);await confirmSubmittedWorks(String(result.insertId));expect(await q('SELECT * FROM zh_metric_facts WHERE keyword_id=?',[word.id])).toEqual(before);
+});

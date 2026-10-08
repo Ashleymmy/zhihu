@@ -3,7 +3,7 @@ import { ref, watch, onBeforeUnmount, computed } from "vue";
 import { ActionDialog } from "@zhihu-koc/shared-components";
 import type { HttpClient } from "@zhihu-koc/shared-services/core";
 import { errorText, type Scope } from "./context";
-import { upstreamReview, type WorkStatus } from "./work-status";
+import { upstreamReview, evidenceReview, type WorkStatus } from "./work-status";
 export interface WorkDetailRecord extends WorkStatus {
   id: string;
   keyword?: string;
@@ -67,7 +67,7 @@ onBeforeUnmount(() => generation++);
 const review = computed(() =>
   item.value?.compositionId
     ? upstreamReview(item.value)
-    : { label: "尚未登记知乎推广作品", reason: "" },
+    : item.value ? evidenceReview(item.value) : {label:'正在读取作品',reason:''},
 );
 const types = ["其他", "图文", "视频"],
   subs = [

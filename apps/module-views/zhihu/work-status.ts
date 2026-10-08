@@ -5,6 +5,13 @@ export interface WorkStatus {
   zhihuStatusJson?: unknown
   planSyncStatus?: string | null
   failureReason?: string | null
+  reason?: string | null
+  verificationStatus?: string | null
+}
+
+export function evidenceReview(work:WorkStatus){
+  return {label:work.verificationStatus==='disputed'?'作品归属有争议':work.status==='passed'?'作品已核验':work.status==='rejected'?'作品已退回':'作品待核验',
+    reason:work.reason|| (work.status==='pending'?'下一步：团长或运营核验作品。':'')}
 }
 
 export function upstreamReview(work: WorkStatus): { label: string; reason: string } {
