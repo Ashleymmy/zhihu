@@ -26,6 +26,7 @@ import { attributionDataProvider } from './attribution/provider';
 import { registerAttributionJobs, startAttributionWorker, stopAttributionWorker } from './attribution/worker';
 import { zhihuAccountLifecycle } from './services/account-lifecycle';
 import { zhihuRateProvider } from './attribution/rate-provider';
+import { resetAllianceQuotaManager } from './zhihu/allianceQuota';
 export function createZhihuModule(): BusinessModule {
   const router = Router();
   router.use(miniBusinessRouter);
@@ -80,5 +81,6 @@ export function createZhihuModule(): BusinessModule {
       stopScheduler();
       stopAttributionWorker();
     },
+    dispose: resetAllianceQuotaManager,
   };
 }

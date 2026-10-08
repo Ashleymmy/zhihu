@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
+import { closeRedis } from '../../../utils/closeRedis';
 import type { AllianceOperationKey } from './allianceContracts';
 
 export const ALLIANCE_QUOTA_KEY_PREFIX = 'alliance:quota:v1' as const;
@@ -690,12 +691,7 @@ export class RedisAllianceQuotaStore implements AllianceQuotaStore {
   async close(): Promise<void> {
     this.reservations.clear();
     if (!this.ownsClient) return;
-    try {
-      if (this.client.quit) await this.client.quit();
-      else this.client.disconnect?.();
-    } catch {
-      this.client.disconnect?.();
-    }
+    await closeRedis(this.client);
   }
 }
 

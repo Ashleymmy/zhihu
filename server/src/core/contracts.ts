@@ -52,6 +52,8 @@ export interface BusinessModule {
   mountLegacy?: (app: Express) => void;
   start?: () => void;
   stop?: () => void;
+  // Close module-owned connections only after HTTP requests and queued jobs drain.
+  dispose?: () => Promise<void>;
   dataProvider?: ModuleDataProvider;
   financeProvider?: FinanceProvider;
   accountLifecycle?: ModuleAccountLifecycle;
