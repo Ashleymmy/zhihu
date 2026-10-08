@@ -16,6 +16,7 @@ import { dutyAllows } from '../../../core/duties';
 import { unconfirmedFactSql } from './keyword-usability';
 import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
+import { bindingStartDay, recomputeStartDateFacts } from './activation-date';
 export { synchronizeKeywords } from './keyword-readiness';
 
 async function simulationScope(c: PoolConnection, scope: Scope) {
@@ -551,13 +552,14 @@ export async function changeBinding(
         fail('团队关系已变化，请使用新团队分配的关键词', 409);
       if (binding.release_status === 'requested') fail('释放申请中不可使用', 409);
       await c.query('UPDATE zh_keyword_bindings SET used_at=NOW(3),activated_on=?,version=version+1 WHERE id=?', [
-        businessDay(),
+        await bindingStartDay(c,id),
         id,
       ]);
       await c.query(
         "UPDATE zh_keywords SET used_ever_at=NOW(3),lifecycle_status='active',version=version+1 WHERE id=?",
         [word.id],
       );
+      await recomputeStartDateFacts(c,scope,String(word.id));
     } else if (input.action === 'stop') {
       await c.query('UPDATE zh_keyword_bindings SET stop_new_use_at=NOW(3),version=version+1 WHERE id=?', [id]);
       await c.query("UPDATE zh_keywords SET lifecycle_status='retired',version=version+1 WHERE id=?", [word.id]);

@@ -24,7 +24,7 @@ async function main(){
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
   const results=[];
   const roles=process.env.OPC_REVIEW_REPAIR_ONLY==='1'?[]:[['admin','admin','Admin123456!'],['finance','review_finance','Review123456'],['operations','review_ops','Review123456'],['leader','leader_wang','Review123456'],['creator','creator_li','Review123456'],['independent','creator_chen','Review123456']];
-  for(const [role,username,password] of roles){
+  for(const [role,username,password] of roles.filter(([role])=>!process.env.OPC_REVIEW_ROLES||process.env.OPC_REVIEW_ROLES.split(',').includes(role))){
    const roleStarted=Date.now();activeRole=role;
    const context=await browser.newContext({viewport:{width:1440,height:1100}});
    const page=await context.newPage();activePage=page;page.setDefaultTimeout(15000);
@@ -135,6 +135,17 @@ async function main(){
     await page.getByRole('button',{name:'按拉新订单处理',exact:true}).click();
     await page.getByText('切回拉新.csv · 读取结果',{exact:true}).waitFor();
     assert(await page.locator('input[name="reportType"][value="new_user"]').isChecked());
+   }
+   if(role!=='finance'){
+    await page.goto(`http://127.0.0.1:${port}/app/modules/zhihu/operations`);
+    await page.getByRole('heading',{name:role==='admin'||role==='operations'?'关键词管理':role==='leader'?'团队关键词':'我的关键词',level:2,exact:true}).waitFor();
+    if(role!=='independent')await page.getByText('已登记 1 个作品',{exact:true}).waitFor();
+    assert(!(await page.locator('body').innerText()).includes('已登记作品，查看提交结果'));
+    for(const width of [1440,375]){
+     await page.setViewportSize({width,height:1100});await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+     await page.screenshot({path:path.join(out,`${role}-keyword-count-${width}.png`),fullPage:true,animations:'disabled'});
+     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    }
    }
    assert.deepEqual(errors,[]);
    results.push({role,status:response.status(),widths:[1440,375]});
