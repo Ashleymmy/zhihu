@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { validateAllianceXlsx, AllianceXlsxValidationError, type AllianceUploadFile } from '../zhihu/allianceXlsx';
+import { validateAllianceXlsx, AllianceXlsxValidationError, XLSX_MAX_BYTES, type AllianceUploadFile } from '../zhihu/allianceXlsx';
 import { businessDay, count, day, fail, money, moneyText } from './domain';
 export type ReportKind = 'search' | 'order' | 'combined';
 export const REPORT_TEMPLATE_VERSION = 'zhihu-v3';
@@ -20,6 +20,7 @@ export interface ParsedRow {
   value: SourceRow;
   raw: unknown[];
   error: string | null;
+  skipped?: boolean;
 }
 const headers = {
   date: ['日期', '统计日期', '日期时间', 'date'],
@@ -38,17 +39,65 @@ const headerText = (value: unknown) =>
     .replace(/\s/g, '')
     .replace(/（/g, '(')
     .replace(/）/g, ')');
+export function reportDate(value: unknown, date1904 = false): string {
+  if (typeof value === 'number') {
+    const d = XLSX.SSF.parse_date_code(value, { date1904 });
+    if (!d) fail('日期无法识别');
+    return day(`${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`);
+  }
+  const text = String(value ?? '').trim().replace(/[—–－]/g, '-');
+  const match = text.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})(?:日)?(?:[ T].*)?$/)
+    ?? text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!match) fail('日期无法识别');
+  return day(`${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`);
+}
+const numericText = (value: unknown) => String(value ?? '').replace(/[,，\s¥￥元个单]/g, '');
+const summaryText = (value: unknown) => ['合计', '总计', '小计', '汇总', '总和'].includes(headerText(value));
 export async function parseReport(file: AllianceUploadFile, kind: ReportKind): Promise<ParsedRow[]> {
+  const filename = String(file.originalname ?? '').toLowerCase();
+  if (filename.endsWith('.xls')) fail('这是旧版 Excel（.xls）。请在 Excel 或 WPS 里点“另存为”，选择 .xlsx 格式后再上传。');
+  const buffer = file.buffer;
+  if (!Buffer.isBuffer(buffer)) fail('缺少上传文件内容');
+  let workbook: XLSX.WorkBook;
+  if (filename.endsWith('.csv')) {
+    if (!buffer.length || buffer.length > XLSX_MAX_BYTES) fail('文件大小不能超过 10 MB');
+    if (buffer.includes(0)) fail('这份文件不是可读取的 CSV，请另存为 .xlsx 或 CSV 后再上传。');
+    let text: string;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buffer); }
+    catch {
+      try { text = new TextDecoder('gbk', { fatal: true }).decode(buffer); }
+      catch { fail('这份 CSV 的文字无法读取，请另存为 UTF-8 CSV 后再上传。'); }
+    }
+    workbook = XLSX.read(text.replace(/^\uFEFF/, ''), { type: 'string', raw: true });
+  } else {
   try {
     await validateAllianceXlsx(file, { allowFormulas: true });
   } catch (e) {
     if (e instanceof AllianceXlsxValidationError) fail(e.message);
     throw e;
   }
-  const buffer = file.buffer;
-  if (!Buffer.isBuffer(buffer)) fail('缺少上传文件内容');
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false, cellFormula: true });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false, cellFormula: true });
+  }
+  const matchesSheet = (name: string, requireMetrics: boolean) => {
+    const candidate = workbook.Sheets[name];
+    if (!candidate) return false;
+    const start = XLSX.utils.decode_range(candidate['!ref'] ?? 'A1').s;
+    for (let r = start.r; r < start.r + 10; r++) {
+      const names: string[] = [];
+      // Inspect stored cells rather than expanding a potentially huge declared range.
+      for (const address of Object.keys(candidate)) {
+        if (address.startsWith('!')) continue;
+        const cell = XLSX.utils.decode_cell(address);
+        if (cell.r === r) names.push(headerText(candidate[address]?.v));
+      }
+      const required = ['date', 'channel', 'keyword', ...(requireMetrics ? kind === 'search' ? ['search'] : kind === 'order' ? ['orders'] : ['search', 'orders'] : [])];
+      if (required.every(k => headers[k as keyof typeof headers].some(alias => names.includes(alias)))) return true;
+    }
+    return false;
+  };
+  const sheetName = workbook.SheetNames.find(name => matchesSheet(name, true))
+    ?? workbook.SheetNames.find(name => matchesSheet(name, false));
+  const sheet = workbook.Sheets[sheetName ?? workbook.SheetNames[0]];
   if (!sheet) fail('没有工作表');
   const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
   const rangeRows = range.e.r - range.s.r + 1;
@@ -108,6 +157,11 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
       conversionRateDisplay: null,
     };
     let error: string | null = null;
+    if ([row[columns.date], row[columns.channel], row[columns.keyword]].some(summaryText)) {
+      rows.push({ rowNumber: range.s.r + i + 1, value, raw: row, error: '汇总行，已跳过', skipped: true });
+      continue;
+    }
+    const number = range.s.r + i + 1;
     try {
       if (columns.conversionRate >= 0) {
         const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r + i, c: range.s.c + columns.conversionRate })];
@@ -119,29 +173,22 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
         }
       }
       const rawDate = row[columns.date];
-      if (typeof rawDate === 'number') {
-        const d = XLSX.SSF.parse_date_code(rawDate, { date1904 });
-        if (!d) fail('Excel 日期不合法');
-        value.date = day(`${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`);
-      } else
-        value.date = day(
-          String(rawDate ?? '')
-            .trim()
-            .replace(/[—–－]/g, '-')
-            .slice(0, 10),
-        );
-      if (value.date > businessDay()) fail('不能导入未来日期');
-      if (!value.channel || !value.keyword || value.keyword.length > 128) fail('渠道或关键词为空或过长');
+      try { value.date = reportDate(rawDate, date1904); }
+      catch { fail(`第 ${number} 行日期写成了“${String(rawDate ?? '')}”，请改成 2026-09-14 这样的格式`); }
+      if (value.date > businessDay()) fail(`第 ${number} 行日期是 ${value.date}，还没到这一天`);
+      if (!value.channel || !value.keyword) fail(`第 ${number} 行缺少渠道名称或关键词`);
+      if (value.keyword.length > 128) fail(`第 ${number} 行关键词超过 128 个字`);
       for (const name of ['search', 'orders', 'revenue'] as const) {
         const cell = row[columns[name]];
         if (cell === null || cell === undefined || String(cell).trim() === '') continue;
         if (typeof cell === 'number' && (!Number.isFinite(cell) || Math.abs(cell) > Number.MAX_SAFE_INTEGER))
           fail('数值精度不足，请以文本导出大数');
-        const text = String(cell).trim();
-        value[name] = name === 'revenue' ? moneyText(money(text)) : String(count(text));
+        const text = numericText(cell);
+        try { value[name] = name === 'revenue' ? moneyText(money(text)) : String(count(text)); }
+        catch { fail(`第 ${number} 行${name === 'revenue' ? '收益金额格式不正确' : name === 'orders' ? '订单量不是整数' : '搜索量不是整数'}`); }
       }
       if (kind === 'search' && value.search === null) fail('搜索报告缺少搜索量');
-      if (kind !== 'search' && value.orders === null) fail('订单报告缺少有效订单');
+      if (kind !== 'search' && value.orders === null) fail(`第 ${number} 行没有订单量`);
       if (kind === 'combined' && value.search === null) fail('综合报告缺少搜索量');
     } catch (e) {
       error = e instanceof Error ? e.message : '行数据无效';

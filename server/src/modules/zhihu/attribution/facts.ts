@@ -92,7 +92,7 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
           JSON.stringify(row.value),
           JSON.stringify(row.raw),
           row.error,
-          row.error ? 'invalid' : 'pending',
+          row.skipped ? 'skipped' : row.error ? 'invalid' : 'pending',
         ],
       );
     await audit(c, user, 'report.preview', id, { ...scope, hash, kind });
@@ -189,10 +189,9 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
     if (batch.preview_hash !== previewHash) fail('预览已变化，请重新核对', 409);
     const dates = await select(
       c,
-      "SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(normalized_json,'$.date')) day FROM zh_import_rows WHERE batch_id=? AND processing_status<>'invalid'",
+      "SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(normalized_json,'$.date')) day FROM zh_import_rows WHERE batch_id=? AND processing_status IN ('pending','processed','duplicate','exception')",
       [id],
     );
-    if (!dates.length) fail('批次没有有效行');
     for (const date of dates) await assertNewRoute(c, scope, String(date.day));
     await c.query(
       "UPDATE zh_import_batches SET status='committed',committed_by=?,committed_at=COALESCE(committed_at,NOW(3)) WHERE id=? AND status='preview'",

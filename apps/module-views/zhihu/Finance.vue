@@ -9,11 +9,16 @@ interface Entry {id:string;keyword:string;date:string;orders:string|null;payerNa
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
 interface View {summary:{records:number;orders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
 interface Batch {id:string;fileName:string;status:string;lastError?:string}
+interface ImportDetail {fileName:string;counts:{processingStatus:string;total:number}[];rows:{id:string;lineNumber:number;processingStatus:string;errorText:string|null}[]}
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
 const requestedPeriod = /^\d{4}-\d{2}-\d{2}$/.test(props.initialFrom||'') && /^\d{4}-\d{2}-\d{2}$/.test(props.initialTo||'') && props.initialFrom! <= props.initialTo!
 const period=reactive({from:requestedPeriod?props.initialFrom!:today.slice(0,7)+'-01',to:requestedPeriod?props.initialTo!:today})
 const view=ref<View|null>(null),busy=ref(false),error=ref(''),errorHelp=ref(''),errorAction=ref('none'),notice=ref(''),file=ref<File|null>(null),progress=ref(''),history=ref<Batch[]>([])
 const walletVersion=ref(0)
+const importResult=ref<ImportDetail|null>(null),importId=ref(''),importPage=ref(1),uploadInput=ref<HTMLInputElement|null>(null)
+const importTotal=computed(()=>importResult.value?.counts.reduce((sum,c)=>sum+c.total,0)??0)
+const rowStatus=(status:string)=>({invalid:'需要修正',skipped:'已跳过',pending:'正在处理',processed:'已计算',duplicate:'已读取，不重复计算',exception:'需要处理',legacy_settled:'旧系统已结算'}[status]??'已读取')
+async function inspectImport(id:string,page=1){importId.value=id;importPage.value=page;importResult.value=await props.context.http.get<ImportDetail>('/imports/'+id,{...props.context.scope,page,pageSize:25})}
 const confirming=ref(false),checked=ref(false),selected=ref(''),detailPage=ref(1),detailsOpen=ref(false),detailPanel=ref<HTMLDetailsElement|null>(null)
 const money=(v:string|undefined)=>Number(v||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:4})
 const admin=computed(()=>props.context.role==='admin'&&props.context.adminDuty!=='operations'),creator=computed(()=>props.context.role==='creator')
@@ -27,7 +32,7 @@ async function load(){await refresh();if(admin.value)history.value=(await props.
 function showError(e:unknown){
  const message=errorText(e);error.value=message;errorHelp.value='';errorAction.value='none';
  if(message.includes('历史数据')||message.includes('旧引擎')||message.includes('切换边界')){error.value='这份报表属于历史周期';errorHelp.value='当前财务做账只接收新归因规则生效后的数据，请到历史邮件 / Excel 导入页面处理。';errorAction.value='legacy';}
- else if(message.includes('上传文件不符合')||message.includes('Excel')){error.value='Excel 文件暂时无法读取';errorHelp.value='请确认文件后缀为 .xlsx，并保留日期、渠道名称、关键词、搜索量或订单量等表头；如果文件来自 WPS，请先另存为 Excel 工作簿后再上传。';}
+ else if(message.includes('上传文件不符合')){error.value='报表文件暂时无法读取';errorHelp.value='请在 Excel 或 WPS 中另存为 .xlsx 或 CSV 后再上传。';}
  else if(message.includes('无法识别')){errorHelp.value='请按行号检查日期、渠道名称、关键词和订单量；空白行可以保留，修正后重新上传。';}
 }
 function openLegacy(){window.location.href='/admin/modules/zhihu/data-import'}
@@ -38,7 +43,7 @@ async function track(id:string){
  try{
   const b=await props.context.http.get<{status:string;counts:{processingStatus:string;total:number}[]}>('/imports/'+id,{...props.context.scope,page:1,pageSize:1})
   const pending=b.counts.filter(c=>c.processingStatus==='pending').reduce((n,c)=>n+c.total,0)
-  if(pending===0){progress.value='';notice.value='报表已分析完成，人员归属和金额已更新。';await load()}
+  if(pending===0){progress.value='';notice.value='报表已分析完成，人员归属和金额已更新。';await load();await inspectImport(id)}
   else{progress.value='正在分析报表，剩余 '+pending+' 条…';timer=setTimeout(()=>{void track(id)},2000)}
  }catch(e){progress.value='';showError(new Error('分析进度暂时无法读取，请刷新查看：'+errorText(e)))}
  finally{polling=false}
@@ -82,11 +87,17 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
  <section class="work-section">
   <div v-if="admin && !wallet" class="upload-box">
    <div><h2>上传知乎报表，自动计算每个人的金额</h2><p>系统会读取报表中的日期、渠道、关键词、搜索量和订单量，再按已生效的单价计算金额。</p></div>
-   <ol class="upload-steps"><li>选择知乎导出的 .xlsx 文件</li><li>点击“上传并自动分析”</li><li>查看识别结果和待处理原因，确认无误后再核对账单</li></ol>
+   <ol class="upload-steps"><li>选择知乎导出的 .xlsx 或 CSV 文件</li><li>点击“上传并自动分析”</li><li>查看识别结果和待处理原因，确认无误后再核对账单</li></ol>
    <p class="upload-tip">支持含有“日期 / 渠道名称 / 关键词”以及“搜索量”或“订单量”表头的报表。历史周期请使用“历史邮件 / Excel 导入”。</p>
-   <form @submit.prevent="run(upload)"><label>选择 Excel 文件<input type="file" accept=".xlsx" required :disabled="busy||!!progress" @change="file=($event.target as HTMLInputElement).files?.[0]??null" /></label><button class="primary" :disabled="busy||!!progress||!file">{{progress?'正在分析…':'上传并自动分析'}}</button></form>
+   <form @submit.prevent="run(upload)"><label>选择报表文件<input ref="uploadInput" type="file" accept=".xlsx,.csv,.xls" required :disabled="busy||!!progress" @change="file=($event.target as HTMLInputElement).files?.[0]??null" /></label><button class="primary" :disabled="busy||!!progress||!file">{{progress?'正在分析…':'上传并自动分析'}}</button></form>
   </div>
   <div v-if="error" role="alert" class="engine-error"><strong>{{error}}</strong><span v-if="errorHelp">{{errorHelp}}</span><button v-if="errorAction==='legacy'" type="button" @click="openLegacy">打开历史邮件 / Excel 导入</button></div><p v-if="notice" role="status">{{notice}}</p><p v-if="progress" role="status">{{progress}}</p>
+  <section v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果">
+   <h2>{{importResult.fileName}} · 读取结果</h2>
+   <p>共读取 {{importTotal}} 行，每行的处理结果都已保留。</p>
+   <ul class="report-rows"><li v-for="row in importResult.rows" :key="row.id"><strong>第 {{row.lineNumber}} 行 · {{rowStatus(row.processingStatus)}}</strong><span>{{row.errorText||'这行已读取，金额和待处理事项见下方账单。'}}</span><span v-if="row.processingStatus==='invalid'">下一步：财务：修正这行后补传报表 <button :disabled="busy" @click="uploadInput?.click()">选择修正后的报表</button></span></li></ul>
+   <div v-if="importTotal>25" class="engine-actions"><button :disabled="busy||importPage===1" @click="run(()=>inspectImport(importId,importPage-1))">上一页</button><span>第 {{importPage}} 页</span><button :disabled="busy||importPage*25>=importTotal" @click="run(()=>inspectImport(importId,importPage+1))">下一页</button></div>
+  </section>
   <form class="period-filter" @submit.prevent="run(refresh)"><label>开始日期<input type="date" v-model="period.from" required /></label><label>结束日期<input type="date" v-model="period.to" required /></label><button :disabled="busy">查看账单</button></form>
   <div v-if="view" class="metric-grid">
    <article><span>{{wallet?'已确认收入':'应付合计'}}</span><strong>¥{{money(wallet?view.summary.confirmedReceivable:view.summary.payable)}}</strong></article>
@@ -111,13 +122,14 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   <div v-if="wallet&&context.role==='leader'&&view" class="work-card"><h2>团队业绩与分成</h2><div class="engine-table"><table><thead><tr><th>达人</th><th>订单量</th><th>给我的团队分成（元）</th></tr></thead><tbody><tr v-for="g in view.teamPerformance" :key="g.executorId"><td>{{g.name}}</td><td>{{g.orders}}单</td><td>{{money(g.commission)}}</td></tr></tbody></table></div></div>
   <details v-if="admin&&!wallet" class="work-card"><summary>报表问题与更正</summary><Issues :context="context" /></details>
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
-  <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><span>{{b.fileName}}</span><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
+  <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
  </section>
 </template>
 
 
 
 <style scoped>
+.report-rows{list-style:none;padding:0;display:grid;gap:10px}.report-rows li{display:grid;gap:6px;padding:12px;border:1px solid var(--color-border,#ddd);border-radius:8px;overflow-wrap:anywhere}
 .upload-steps{display:flex;gap:24px;flex-wrap:wrap;margin:18px 0 10px;padding:0 0 0 20px;color:#31575c}
 .upload-steps li{padding-right:12px}
 .upload-tip{font-size:13px;margin:8px 0 18px;color:#637078}

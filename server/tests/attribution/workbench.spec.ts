@@ -88,6 +88,21 @@ describe('简化工作台完整资金流程',()=>{
   expect(v.summary.orders).toBe('65');expect(v.summary.payable).toBe('965.0000');expect(v.entries.every(e=>!e.ready)).toBe(true);
   expect((await finance.financeOverview(a,common())).balance?.confirmed).toBe('0.0000');
  });
+ it('部分错误与汇总行不影响正常订单，全部错误也保留读取结果',async()=>{
+  const book=XLSX.read(report().buffer,{type:'buffer'}),sheet=book.Sheets[book.SheetNames[0]];
+  XLSX.utils.sheet_add_aoa(sheet,[['错日期','联测渠道','错误词',100,1,20],['合计',null,null,500,65,1300]],{origin:-1});
+  const buffer=XLSX.write(book,{type:'buffer',bookType:'xlsx'}) as Buffer;
+  const imported=await workbench.uploadReport(fin,scope,{...report(),buffer,size:buffer.length,originalname:'有问题的报表.xlsx'});
+  const detail=await facts.importDetail(fin,scope,imported.id,1,25);
+  expect(detail.rows).toHaveLength(7);
+  expect(detail.counts.find(r=>r.processing_status==='invalid')?.total).toBe(1);
+  expect(detail.counts.find(r=>r.processing_status==='skipped')?.total).toBe(1);
+  expect(detail.rows.find(r=>r.processing_status==='invalid')?.error_text).toContain('第 7 行日期写成了');
+  expect((await workbench.overview(fin,scope,{from:day,to:day})).summary.orders).toBe('65');
+  const allInvalid=Buffer.from('日期,渠道名称,关键词,订单量\n错日期,联测渠道,错误词,1');
+  const invalidImport=await workbench.uploadReport(fin,scope,{originalname:'全部错误.csv',mimetype:'text/csv',buffer:allInvalid,size:allInvalid.length});
+  expect((await facts.importDetail(fin,scope,invalidImport.id,1,25)).counts).toEqual([{processing_status:'invalid',total:1}]);
+ });
  it('一次财务确认生成四人净收入，重复报表与确认不重复入账',async()=>{
   for(const e of (await statements.listEvidence(admin,scope,1,100)).list)await statements.reviewEvidence(ops,scope,String(e.id),key(),true,'测试审核通过');
   const response=await get(fin,path('/workbench'),{...scope,from:day,to:day});expect(response.status,response.text).toBe(200);

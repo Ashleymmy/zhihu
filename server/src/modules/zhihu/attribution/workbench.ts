@@ -4,7 +4,7 @@ import {gate} from './routing';
 import type {AuthUser} from '../../../types';
 import {withTransaction} from '../../../db';
 import {authorize,select,json,audit} from './store';
-import {day,digest,fail,money,moneyText,type Scope} from './domain';
+import {businessDay,day,digest,fail,money,moneyText,type Scope} from './domain';
 import {assertDuty} from '../../../core/duties';
 import {lockFinance,syncIncome} from '../../../core/finance';
 import {parseReport,type ReportKind} from './report';
@@ -35,20 +35,14 @@ export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUpload
    kind='search';parsed=await parseReport(file,kind);
   }
  }
- const bad=parsed.filter(r=>r.error);
- if(bad.length){
-  const examples=bad.slice(0,3).map(r=>r.rowNumber+'行：'+r.error).join('；');
-  const more=bad.length>3?'；另有 '+(bad.length-3)+' 行需要检查':'';
-  fail('有 '+bad.length+' 行无法识别：'+examples+more+'。请按提示修正后重新上传');
- }
- const dates=parsed.map(r=>r.value.date).sort();if(!dates.length)fail('报表中没有可读取的数据');
+ const dates=parsed.filter(r=>!r.error&&!r.skipped).map(r=>r.value.date).sort();
  const route=await cutover.getRoute(user,scope);
  if(route&&dates.some(date=>date<String(route.exclusive_from)))fail('这份报表包含 '+dates[0]+' 至 '+dates[dates.length-1]+' 的历史数据，早于新归因规则 '+String(route.exclusive_from)+' 的生效日期。请到“历史邮件 / Excel 导入”页面处理，当前财务做账只接收新规则生效后的报表');
- if(!route)await cutover.configureRoute(user,scope,{from:dates[0],mode:'trial',sampleVerified:false,reason:'首次上传后自动计算，等待财务核对金额'});
+ if(!route&&dates.length)await cutover.configureRoute(user,scope,{from:dates[0],mode:'trial',sampleVerified:false,reason:'首次上传后自动计算，等待财务核对金额'});
  const b=await facts.previewImport(user,scope,file,kind),detail=await facts.importDetail(user,scope,b.id,1,1);
  await facts.commitImport(user,scope,b.id,'workbench-import-'+b.id,detail.preview_hash);
  await facts.processBatch(user,scope,b.id);
- return {...b,from:dates[0],to:dates[dates.length-1]};
+ return {...b,from:dates[0]??businessDay(),to:dates[dates.length-1]??businessDay()};
 }
 export async function overview(user:AuthUser,scope:Scope,period:Period,connection?:PoolConnection){
  if(isStaffRole(user.role))assertDuty(user,'finance');
