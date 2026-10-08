@@ -7,6 +7,7 @@ import { ok } from '../utils/response';
 import { ModuleRuntime } from './module-runtime';
 import { financeRouter } from './finance-routes';
 import { staffRouter } from './staff';
+import { createRateRouter } from './rate-routes';
 import {
   listAccounts,
   createAccount,
@@ -30,6 +31,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   );
   r.use('/finance',financeRouter);
   r.use('/staff',staffRouter);
+  r.use('/rates',createRateRouter(runtime));
   r.get(
     '/integrations',
     asyncHandler(async (req, res) => ok(res, await listAccounts(req.user))),

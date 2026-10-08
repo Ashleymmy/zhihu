@@ -1,0 +1,56 @@
+[
+  {
+    "role": "admin",
+    "allowed": true,
+    "widths": [
+      1440,
+      375
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "role": "finance",
+    "allowed": true,
+    "widths": [
+      1440,
+      375
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "role": "operations",
+    "allowed": false,
+    "widths": [
+      1440,
+      375
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "role": "leader",
+    "allowed": false,
+    "widths": [
+      1440,
+      375
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "role": "creator",
+    "allowed": false,
+    "widths": [
+      1440,
+      375
+    ],
+    "consoleErrors": 0
+  },
+  {
+    "role": "independent",
+    "allowed": false,
+    "widths": [
+      1440,
+      375
+    ],
+    "consoleErrors": 0
+  }
+]
