@@ -11,6 +11,7 @@ import { quote } from './pricing';
 import { quoteActivation } from './activation-pricing';
 import * as resources from './resources';
 import { assignRetro } from './retro-assignment';
+import { submitEvidence, reviewEvidence, disputeBinding } from './statements';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { submissionFailure } from '../services/submission-feedback';
 
@@ -50,6 +51,53 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
   const result: TaskAction[] = [],
     id = String(word.id),
     staff = isStaffRole(user.role);
+  if (
+    word.legacy_mode === 'historical_registered' &&
+    word.binding_id &&
+    word.used_ever_at &&
+    word.verification_status !== 'passed' &&
+    !word.released_at &&
+    !word.stop_new_use_at &&
+    word.release_status !== 'requested'
+  ) {
+    if (word.verification_status === 'disputed') {
+      if (staff)
+        result.push({
+          key: 'history-resolve',
+          label: '核实作品争议',
+          fields: [{ key: 'reason', label: '核实结果', type: 'textarea', required: true }],
+        });
+    } else if (word.evidence_status === 'pending') {
+      if (
+        staff ||
+        (user.role === 'leader' && String(word.leader_id) === user.sub && String(word.executor_id) !== user.sub)
+      ) {
+        result.push({ key: 'history-accept', label: '历史作品核验通过' });
+        result.push({
+          key: 'history-return',
+          label: '退回补充历史作品',
+          fields: [{ key: 'reason', label: '哪里需要补充', type: 'textarea', required: true }],
+        });
+      }
+    } else if (
+      word.plan_status === 'active' &&
+      (staff || String(word.executor_id) === user.sub || String(word.leader_id) === user.sub)
+    )
+      result.push({
+        key: 'history-submit',
+        label: '补登记历史作品',
+        fields: [
+          { key: 'url', label: '作品链接', type: 'url', required: true, value: String(word.evidence_url || '') },
+          {
+            key: 'description',
+            label: '作品说明',
+            type: 'textarea',
+            required: true,
+            value: String(word.evidence_description || ''),
+          },
+        ],
+      });
+  }
   if (Number(word.can_edit_failed))
     result.push({ key: 'edit-retry', label: '修改并重试', fields: editableFields(word, options) });
   if (Number(word.can_copy_failed))
@@ -212,6 +260,29 @@ function taskItem(word: RecordRow, user: AuthUser, scope: TaskScope, options: Op
     status = { key: 'reserved', label: '待分配', tone: 'leader' };
     actor = person(user, options, word.leader_id);
     text = '分配执行人';
+  } else if (
+    word.legacy_mode === 'historical_registered' &&
+    word.executor_id &&
+    word.verification_status !== 'passed'
+  ) {
+    const pending = word.evidence_status === 'pending';
+    status = {
+      key: 'historical-work',
+      label: word.verification_status === 'disputed' ? '历史作品有争议' : pending ? '历史作品待核验' : '历史作品待补充',
+      tone: 'warning',
+    };
+    actor =
+      word.verification_status === 'disputed'
+        ? '运营'
+        : pending
+          ? '团长或运营'
+          : String(word.executor_name || '执行人');
+    text =
+      word.verification_status === 'disputed'
+        ? '核实历史作品归属'
+        : pending
+          ? '核验已登记的历史作品'
+          : String(word.evidence_reason || '补登记已发布的作品链接');
   } else if (word.verification_status === 'disputed') {
     status = { key: 'disputed', label: '作品待核对', tone: 'danger' };
     actor = '运营';
@@ -240,7 +311,10 @@ function taskItem(word: RecordRow, user: AuthUser, scope: TaskScope, options: Op
       : word.executor_id
         ? ['edit-retry', 'copy-retry', 'submit-work', 'works', 'release']
         : ['edit-retry', 'copy-retry', 'resolve-owner', 'claim', 'distribute', 'assign', 'release'];
-  const primary = preferred.map((key) => available.find((a) => a.key === key)).find(Boolean);
+  const primary =
+    ['history-resolve', 'history-submit', 'history-accept']
+      .map((key) => available.find((a) => a.key === key))
+      .find(Boolean) ?? preferred.map((key) => available.find((a) => a.key === key)).find(Boolean);
   return {
     id: String(word.id),
     title: String(word.keyword),
@@ -270,17 +344,23 @@ async function enrichWorks(user: AuthUser, words: RecordRow[]) {
   const rows = await withTransaction((c) =>
     select(
       c,
-      `SELECT CAST(p.id AS CHAR) plan_id,ex.display_name executor_name,ld.display_name leader_name,
+      `SELECT CAST(p.id AS CHAR) plan_id,k.legacy_mode,ex.display_name executor_name,ld.display_name leader_name,
+    CAST(e.id AS CHAR) evidence_id,e.status evidence_status,e.work_url evidence_url,e.description evidence_description,e.reason evidence_reason,
     (SELECT COUNT(*) FROM compositions cw WHERE cw.plan_id=p.id AND cw.sync_status='failed' AND ${visible.clause}) failed_work_count,
     (SELECT cw.sync_error FROM compositions cw WHERE cw.plan_id=p.id AND cw.sync_status='failed' AND ${visible.clause} ORDER BY cw.id DESC LIMIT 1) work_failure,
     (SELECT COUNT(*) FROM zh_evidence ev JOIN zh_keyword_bindings eb ON eb.id=ev.binding_id
       WHERE eb.keyword_id=k.id AND (?=1 OR eb.executor_id=? OR eb.leader_id=?)
       AND NOT EXISTS(SELECT 1 FROM compositions linked WHERE linked.plan_id=p.id AND linked.owner_id=eb.executor_id AND BINARY linked.promo_url=BINARY ev.work_url)) evidence_only_count
     FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
-    LEFT JOIN users ex ON ex.id=b.executor_id LEFT JOIN users ld ON ld.id=b.leader_id WHERE p.id IN (?)`,
+    LEFT JOIN users ex ON ex.id=b.executor_id LEFT JOIN users ld ON ld.id=b.leader_id
+    LEFT JOIN zh_evidence e ON e.id=(SELECT MAX(ev.id) FROM zh_evidence ev WHERE ev.binding_id=b.id)
+      AND (?=1 OR b.leader_id=? OR b.executor_id=?) WHERE p.id IN (?)`,
       [
         ...visible.bindings,
         ...visible.bindings,
+        Number(isStaffRole(user.role)),
+        user.sub,
+        user.sub,
         Number(isStaffRole(user.role)),
         user.sub,
         user.sub,
@@ -459,7 +539,8 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
     const done = [
       !!word.binding_id || state.reported > 0,
       !!word.executor_id,
-      Number(word.composition_count) > 0,
+      Number(word.composition_count) > 0 &&
+        !(word.legacy_mode === 'historical_registered' && word.evidence_status === 'rejected'),
       word.verification_status === 'passed' && !Number(word.failed_work_count),
       state.reported > 0,
       state.reported > 0 && state.calculated === state.reported,
@@ -471,7 +552,7 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
         '本人',
         word.leader_id ? person(user, config, word.leader_id) : '运营',
         word.executor_id ? person(user, config, word.executor_id) : '执行人',
-        '系统',
+        word.legacy_mode === 'historical_registered' ? '团长或运营' : '系统',
         '系统',
         '系统',
         '财务',
@@ -482,7 +563,11 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
       item.status.key === 'failed' ? item.next.text : '领取任务后开始创作',
       '选择实际执行人',
       '发布作品后提交链接',
-      Number(word.failed_work_count) ? String(word.work_failure) : '登记后自动检查并提交知乎，无需逐条人工审批',
+      Number(word.failed_work_count)
+        ? String(word.work_failure)
+        : word.legacy_mode === 'historical_registered'
+          ? '核验补登记的历史作品'
+          : '登记后自动检查并提交知乎，无需逐条人工审批',
       '等待平台同步或导入业绩报表',
       '按当前计费规则计算',
       '核对业绩后确认账单',
@@ -495,16 +580,16 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
         { label: '原文', value: '查看小说原文', url: String(word.novel_url || word.landing_url || '') },
         { label: '推广活动', value: String(word.task_name || '尚未填写') },
       ],
-      progress: steps
-        .slice(0, financial ? 8 : 5)
-        .map((label, index) => ({
-          label,
-          status: done[index] ? 'done' : index === current ? 'current' : 'waiting',
-          actor: owners[index],
-          description: descriptions[index],
-        })),
+      progress: steps.slice(0, financial ? 8 : 5).map((label, index) => ({
+        label,
+        status: done[index] ? 'done' : index === current ? 'current' : 'waiting',
+        actor: owners[index],
+        description: descriptions[index],
+      })),
       actions: actions(word, user, scope, config),
     };
+    if (word.evidence_url)
+      detail.fields.push({ label: '已登记作品', value: '打开历史作品', url: String(word.evidence_url) });
     if (state.reported && financial)
       detail.actions.push({
         key: 'financial-progress',
@@ -524,7 +609,33 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
       config = await resources.options(user, scope);
     if (!actions(word, user, scope, config).some((a) => a.key === action && !a.path))
       throw new AppError(403, 40301, '当前任务不能执行此操作，请刷新查看');
-    if (action === 'resolve-owner')
+    if (action === 'history-submit')
+      await submitEvidence(user, scope, key, {
+        ...z
+          .object({ url: z.string().url().max(1024), description: z.string().trim().min(1).max(500) })
+          .strict()
+          .parse(input),
+        bindingId: String(word.binding_id),
+      });
+    else if (action === 'history-accept' || action === 'history-return')
+      await reviewEvidence(
+        user,
+        scope,
+        String(word.evidence_id),
+        key,
+        action === 'history-accept',
+        action === 'history-accept' ? '已核对历史作品和执行人' : z.string().trim().min(1).max(500).parse(input.reason),
+      );
+    else if (action === 'history-resolve')
+      await disputeBinding(
+        user,
+        scope,
+        String(word.binding_id),
+        key,
+        true,
+        z.string().trim().min(1).max(500).parse(input.reason),
+      );
+    else if (action === 'resolve-owner')
       await assignRetro(
         user,
         scope,
