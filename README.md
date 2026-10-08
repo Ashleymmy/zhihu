@@ -36,6 +36,10 @@ Web 与后端先完成角色、金额和旧小程序接口回归，再发布；�
 
 后台开关回归：`cd server && npx vitest run tests/unit/background-runtime.spec.ts`。
 
+拉活写入由 `ZHIHU_ACTIVATION_ENABLED` 控制，默认关闭。只有拉活计价、隔离迁移与角色验收全部通过、旧版后台消费者停止并换成兼容版本后，才可在新 API 和后台实例中设为 `true`。迁移 `029_metric_types.sql` 保留旧插入的 `new_user` 默认值，并原子替换同日同词的唯一键；它可重复执行。产生拉活数据后，不能把处理这些数据的后台实例退回不识别类型的版本。
+
+新版财务 Web 请求和确认 `/workbench` 时携带 `viewVersion=2`。未传版本的客户端继续使用拉新账单，`entries` 只含已算出金额的行，不能确认隐藏的拉活记录；未计价行保留在 `pendingEntries`，避免旧小程序把空金额显示成零。小程序完成分类型和空金额展示改造后再升级到版本 2。
+
 入口切换工具为 `deploy/switch_timo_upstream.py`（ECS 的 Python 3，无额外依赖）。先执行预览，完成上面的迁移、队列和角色验证后再加 `--apply`：
 
 ```bash

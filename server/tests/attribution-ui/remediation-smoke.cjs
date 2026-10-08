@@ -13,7 +13,7 @@ async function main(){
   cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc'],env:{...process.env,REMEDIATION_REVIEW:'1'},
  });
  host.stdout.pipe(log);host.stderr.pipe(log);
- let browser;
+ let browser,activePage,activeRole='';
  try{
   const port=await new Promise((resolve,reject)=>{
    const timer=setTimeout(()=>reject(Error('隔离演示环境启动超时，查看 host.log')),120000);
@@ -25,8 +25,10 @@ async function main(){
   const results=[];
   const roles=[['admin','admin','Admin123456!'],['finance','review_finance','Review123456'],['operations','review_ops','Review123456'],['leader','leader_wang','Review123456'],['creator','creator_li','Review123456'],['independent','creator_chen','Review123456']];
   for(const [role,username,password] of roles){
+   const roleStarted=Date.now();activeRole=role;
    const context=await browser.newContext({viewport:{width:1440,height:1100}});
-   const page=await context.newPage();page.setDefaultTimeout(15000);
+   const page=await context.newPage();activePage=page;page.setDefaultTimeout(15000);
+   page.on('response',response=>{if(response.status()===429)console.log(role+' 请求达到频率限制：'+new URL(response.url()).pathname)});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
    await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
    await page.goto(`http://127.0.0.1:${port}/app/login`);
@@ -38,7 +40,7 @@ async function main(){
    const token=(await login.json()).data.token;
    const client=login.request().headers()['x-client-id'];
    await page.waitForURL(url=>!url.pathname.endsWith('/login'));
-   const endpoint=`http://127.0.0.1:${port}/api/v1/modules/zhihu/workbench?projectId=1&accountId=1&from=${date}&to=${date}`;
+   const endpoint=`http://127.0.0.1:${port}/api/v1/modules/zhihu/workbench?projectId=1&accountId=1&from=${date}&to=${date}&viewVersion=2`;
    const response=await context.request.get(endpoint,{headers:{Authorization:'Bearer '+token,'X-Client-Id':client}});
    assert.equal(response.status(),role==='operations'?403:200,await response.text());
    const body=await response.json();
@@ -88,13 +90,52 @@ async function main(){
     await page.getByText('汇总行，已跳过',{exact:true}).waitFor();
     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await page.screenshot({path:path.join(out,'finance-upload-375.png'),fullPage:true,animations:'disabled'});
+    const activation=Buffer.from(`日期,渠道名称,关键词,拉活量,结算金额\n${date},知乎故事一代渠道,重生千金,1,2.00`);
+    await page.locator('input[type="file"]').setInputFiles({name:'拉活验收.csv',mimeType:'text/csv',buffer:activation});
+    await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();
+    await page.getByText('这份文件有“拉活量”列，看起来是拉活表。',{exact:true}).waitFor();
+    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    await page.screenshot({path:path.join(out,'finance-type-mismatch-375.png'),fullPage:true,animations:'disabled'});
+    const switched=page.waitForResponse(r=>r.url().endsWith('/workbench/import')&&r.request().method()==='POST');
+    await page.getByRole('button',{name:'按拉活处理',exact:true}).click();
+    const uploaded=await switched;assert.equal(uploaded.status(),202,await uploaded.text());
+    await page.getByText('拉活验收.csv · 读取结果',{exact:true}).waitFor();
+    const after=await context.request.get(endpoint,{headers:{Authorization:'Bearer '+token,'X-Client-Id':client}});
+    const afterData=(await after.json()).data;
+    assert.equal(afterData.summary.orders,'42');
+    assert(afterData.entries.some(e=>e.keyword==='重生千金'&&e.metricType==='activation'));
+    const legacyResponse=await context.request.get(endpoint.replace('&viewVersion=2',''),{headers:{Authorization:'Bearer '+token,'X-Client-Id':client}});
+    assert.equal(legacyResponse.status(),200);
+    const legacyData=(await legacyResponse.json()).data;
+    assert(legacyData.entries.every(e=>e.amount!==null&&e.metricType==='new_user'));
+    assert(legacyData.pendingEntries.some(e=>e.amount===null));
+    assert.notEqual(legacyData.reviewHash,afterData.reviewHash);
+    await page.reload();await page.locator('input[name="reportType"][value="activation"]').waitFor();
+    assert(await page.locator('input[name="reportType"][value="activation"]').isChecked());
+    const orders=Buffer.from(`日期,渠道名称,关键词,订单量\n${date},知乎故事一代渠道,重生千金,20`);
+    await page.locator('input[type="file"]').setInputFiles({name:'切回拉新.csv',mimeType:'text/csv',buffer:orders});
+    await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();
+    await page.getByRole('button',{name:'按拉新订单处理',exact:true}).click();
+    await page.getByText('切回拉新.csv · 读取结果',{exact:true}).waitFor();
+    assert(await page.locator('input[name="reportType"][value="new_user"]').isChecked());
    }
    assert.deepEqual(errors,[]);
    results.push({role,status:response.status(),widths:[1440,375]});
    await context.close();
+   activePage=null;
+   console.log(role+' 页面验收通过');
+   // Keep the six real logins and uploads within the application's normal rate
+   // limit. This harness must not weaken or bypass the production limiter.
+   await new Promise(resolve=>setTimeout(resolve,Math.max(0,20000-(Date.now()-roleStarted))));
   }
   fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({date,results},null,2));
   console.log('角色验收通过：'+JSON.stringify(results));
+ }catch(error){
+  if(activePage&&!activePage.isClosed()){
+   await activePage.screenshot({path:path.join(out,'failed-'+activeRole+'.png'),fullPage:true,animations:'disabled'});
+   fs.writeFileSync(path.join(out,'failed-'+activeRole+'.txt'),await activePage.locator('body').innerText());
+  }
+  throw error;
  }finally{
   await browser?.close();
   if(host.connected)host.send('stop');

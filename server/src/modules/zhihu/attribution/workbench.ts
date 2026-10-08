@@ -7,14 +7,14 @@ import {authorize,select,json,audit} from './store';
 import {businessDay,day,digest,fail,money,moneyText,type Scope} from './domain';
 import {assertDuty} from '../../../core/duties';
 import {lockFinance,syncIncome} from '../../../core/finance';
-import {parseReport,type ReportKind,type SourceRow} from './report';
+import {parseReport,assertReportWriteEnabled,type MetricType,type ReportKind,type SourceRow} from './report';
 import {reasonText} from './reasons';
 import type {AllianceUploadFile} from '../zhihu/allianceXlsx';
 import type {AttributionSnapshot} from './facts';
 import * as facts from './facts';
 import * as statements from './statements';
 import * as cutover from './cutover';
-export interface Period{from:string;to:string}
+export interface Period{from:string;to:string;metricType?:MetricType}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
 export function allocations(snapshot:AttributionSnapshot){
  const values=new Map<string,bigint>();let total=0n;
@@ -26,9 +26,10 @@ export function allocations(snapshot:AttributionSnapshot){
  if([...values.values()].some(v=>v<0n))fail('团队分配超过平台应付，请核对定价规则',409);
  return{total:moneyText(total),list:[...values].map(([userId,amount])=>({userId,amount:moneyText(amount)}))};
 }
-export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUploadFile){
+export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUploadFile,reportType:MetricType='new_user'){
  assertDuty(user,'finance');await authorize(user,scope);
- let kind:ReportKind='combined',parsed;
+ scope={projectId:scope.projectId,accountId:scope.accountId};
+ let kind:ReportKind=reportType==='activation'?'activation':'combined',parsed;
  try{parsed=await parseReport(file,kind)}catch(e){
   if(!(e instanceof Error)||e.message!=='报告类型与指标列不一致')throw e;
   try{kind='order';parsed=await parseReport(file,kind)}catch(e2){
@@ -36,6 +37,7 @@ export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUpload
    kind='search';parsed=await parseReport(file,kind);
   }
  }
+ assertReportWriteEnabled(kind);
  const dates=parsed.filter(r=>!r.error&&!r.skipped).map(r=>r.value.date).sort();
  if(dates.length)await withTransaction(c=>cutover.extendRouteIfClean(c,scope,dates[0],user));
  const b=await facts.previewImport(user,scope,file,kind),detail=await facts.importDetail(user,scope,b.id,1,1);
@@ -45,11 +47,11 @@ export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUpload
 }
 export async function overview(user:AuthUser,scope:Scope,period:Period,connection?:PoolConnection){
  if(isStaffRole(user.role))assertDuty(user,'finance');
- scope={projectId:scope.projectId,accountId:scope.accountId};period={from:period.from,to:period.to};
+ scope={projectId:scope.projectId,accountId:scope.accountId};period={from:period.from,to:period.to,...(period.metricType?{metricType:period.metricType}:{})};
  valid(period);if(!connection)await authorize(user,scope);
  const read=async(c:PoolConnection)=>{
   const rows=await select(c,`SELECT CAST(f.id AS CHAR) id,CAST(f.current_result_id AS CHAR) result_id,CAST(f.current_revision_id AS CHAR) revision_id,
-    CAST(f.keyword_id AS CHAR) keyword_id,r.snapshot_json,r.reason_code,b.verification_status,b.leader_id,b.executor_id,b.id binding_id,
+    CAST(f.keyword_id AS CHAR) keyword_id,f.metric_type,r.snapshot_json,r.reason_code,b.verification_status,b.leader_id,b.executor_id,b.id binding_id,
     executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name,
     (EXISTS(SELECT 1 FROM zh_evidence ev WHERE ev.binding_id=b.id) OR EXISTS(SELECT 1 FROM compositions co WHERE co.plan_id=k.plan_id AND co.owner_id=b.executor_id)) evidence_count,
     src.id source_id,src.source_version,src.blocked_reason,
@@ -58,17 +60,18 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id LEFT JOIN zh_attribution_results r ON r.id=f.current_result_id
     LEFT JOIN users executor ON executor.id=b.executor_id LEFT JOIN users leader ON leader.id=b.leader_id
     LEFT JOIN opc_income_sources src ON src.module_id='zhihu' AND src.account_id=f.account_id AND src.source_key=CONCAT('fact:',f.id)
-    WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR b.leader_id=? OR b.executor_id=?) ORDER BY f.id`,
-    [scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub,user.sub]);
+    WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ? AND (? IS NULL OR f.metric_type=?) AND (? IN ('developer','admin','operator') OR b.leader_id=? OR b.executor_id=?) ORDER BY f.id`,
+    [scope.accountId,scope.projectId,period.from,period.to,period.metricType??null,period.metricType??null,user.role,user.sub,user.sub]);
   const users=await select(c,`SELECT CAST(u.id AS CHAR) id,u.display_name,u.role,CAST(u.parent_id AS CHAR) parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE pm.project_id=? AND pm.left_at IS NULL AND (? IN ('developer','admin','operator') OR u.id=? OR u.parent_id=?)`,[scope.projectId,user.role,user.sub,user.sub]);
   const prior=await select(c,`SELECT CAST(e.source_id AS CHAR) source_id,CAST(e.user_id AS CHAR) user_id,CAST(SUM(e.amount) AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id WHERE src.module_id='zhihu' AND src.account_id=? AND src.project_id=? AND src.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR e.user_id=?) GROUP BY e.source_id,e.user_id`,[scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub]);
   const [route]=await select(c,'SELECT mode FROM zh_engine_routes WHERE account_id=? AND project_id=?',[scope.accountId,scope.projectId]);
-  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
+  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;metricType:MetricType;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
   const team=new Map<string,{executorId:string;name:string;orders:bigint;commission:bigint}>();
   let orderTotal=0n,billableOrders=0n,pendingOrders=0n;const tokens:unknown[]=[];
   for(const r of rows){
    if(!r.snapshot_json)continue;
    const snap=json<AttributionSnapshot>(r.snapshot_json);orderTotal+=BigInt(snap.orders??'0');
+   const metricType:MetricType=r.metric_type==='activation'?'activation':'new_user';
    const targets=allocations(snap);
    if(targets.list.length)billableOrders+=BigInt(snap.orders??'0');else pendingOrders+=BigInt(snap.orders??'0');
    const reasonCode=route?.mode==='stopped'?'BUSINESS_STOPPED':Number(r.pending_revision)>0?'SOURCE_REVISION_PENDING':String(r.reason_code??'')||(r.verification_status==='passed'?'':r.verification_status==='disputed'?'WORK_DISPUTED':Number(r.evidence_count)?'WORK_UNVERIFIED':'WORK_MISSING');
@@ -85,35 +88,37 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
    tokens.push([r.id,r.result_id,r.revision_id,r.verification_status,r.pending_revision,r.source_version,r.blocked_reason,targets]);
    if(!targets.list.length){
     const payeeId=isStaffRole(user.role)?String(r.executor_id??''):user.sub;
-    entries.push({id:r.id+'-pending',factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId,payeeName:isStaffRole(user.role)?String(r.executor_name??'待确定'):'本人',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:isStaffRole(user.role),ownReceivable:!isStaffRole(user.role),blocked,reasonCode,...text,ready:false});
+    entries.push({id:r.id+'-pending',factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),metricType,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId,payeeName:isStaffRole(user.role)?String(r.executor_name??'待确定'):'本人',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:isStaffRole(user.role),ownReceivable:!isStaffRole(user.role),blocked,reasonCode,...text,ready:false});
    }
    for(const a of targets.list){
     if(!isStaffRole(user.role)&&a.userId!==user.sub)continue;
     const payee=users.find(u=>String(u.id)===a.userId);
     const before=money(String(prior.find(p=>String(p.source_id)===String(r.source_id)&&String(p.user_id)===a.userId)?.amount??'0'),true);
-    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,ready:isStaffRole(user.role)&&!blocked&&!confirmed});
+    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),metricType,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,ready:isStaffRole(user.role)&&!blocked&&!confirmed});
    }
   }
   // A source without a matching keyword has no fact yet. Include it for staff,
   // deduplicate repeat uploads by business dimensions, and never expose unowned
   // rows to members. Every original line remains in its import result.
-  const unresolved=isStaffRole(user.role)?await select(c,`SELECT CAST(r.id AS CHAR) id,r.normalized_json,r.error_text
+  const unresolved=isStaffRole(user.role)?await select(c,`SELECT CAST(r.id AS CHAR) id,r.normalized_json,r.error_text,IF(b.report_kind='activation','activation','new_user') metric_type
     FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id
     WHERE b.account_id=? AND b.project_id=? AND r.fact_id IS NULL AND r.processing_status='exception'
       AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?
+      AND (? IS NULL OR IF(b.report_kind='activation','activation','new_user')=?)
       AND EXISTS(SELECT 1 FROM zh_exceptions x WHERE x.source_row_id=r.id AND x.status='open')
       AND NOT EXISTS(SELECT 1 FROM zh_import_rows matched JOIN zh_import_batches mb ON mb.id=matched.batch_id
         WHERE mb.account_id=b.account_id AND mb.project_id=b.project_id AND matched.fact_id IS NOT NULL
+          AND (mb.report_kind='activation')=(b.report_kind='activation')
           AND JSON_EXTRACT(matched.normalized_json,'$.date')=JSON_EXTRACT(r.normalized_json,'$.date')
           AND JSON_EXTRACT(matched.normalized_json,'$.channel')=JSON_EXTRACT(r.normalized_json,'$.channel')
           AND JSON_EXTRACT(matched.normalized_json,'$.keyword')=JSON_EXTRACT(r.normalized_json,'$.keyword'))
-    ORDER BY r.id`,[scope.accountId,scope.projectId,period.from,period.to]):[];
-  const missing=new Map<string,{id:string;raw:SourceRow;code:string}>();
-  for(const r of unresolved){const raw=json<SourceRow>(r.normalized_json),key=JSON.stringify([raw.date,raw.channel,raw.keyword]);const previous=missing.get(key);missing.set(key,{id:String(r.id),raw:{...raw,orders:raw.orders??previous?.raw.orders??null},code:String(r.error_text)});}
+    ORDER BY r.id`,[scope.accountId,scope.projectId,period.from,period.to,period.metricType??null,period.metricType??null]):[];
+  const missing=new Map<string,{id:string;raw:SourceRow;code:string;metricType:MetricType}>();
+  for(const r of unresolved){const raw=json<SourceRow>(r.normalized_json),metricType:MetricType=r.metric_type==='activation'?'activation':'new_user',key=JSON.stringify([raw.date,raw.channel,raw.keyword,metricType]);const previous=missing.get(key);missing.set(key,{id:String(r.id),raw:{...raw,orders:raw.orders??previous?.raw.orders??null},code:String(r.error_text),metricType});}
   let unmatchedOrders=0n;
-  for(const {id,raw,code} of missing.values()){
+  for(const {id,raw,code,metricType} of missing.values()){
    const text=reasonText(code);unmatchedOrders+=BigInt(raw.orders??'0');
-   entries.push({id:'source-'+id,factId:'',keywordId:'',resultId:'',revisionId:'',keyword:raw.keyword,date:raw.date,orders:raw.orders,payeeId:'',payeeName:'待确定',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:true,ownReceivable:false,blocked:text.reason,reasonCode:code,...text,ready:false});
+   entries.push({id:'source-'+id,factId:'',keywordId:'',resultId:'',revisionId:'',metricType,keyword:raw.keyword,date:raw.date,orders:raw.orders,payeeId:'',payeeName:'待确定',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:true,ownReceivable:false,blocked:text.reason,reasonCode:code,...text,ready:false});
    tokens.push(['source',id,raw,code]);
   }
   pendingOrders+=unmatchedOrders;
@@ -134,7 +139,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
  return connection?read(connection):withTransaction(read);
 }
 export async function confirmBills(user:AuthUser,scope:Scope,period:Period,key:string,reviewHash:string){
- scope={projectId:scope.projectId,accountId:scope.accountId};period={from:period.from,to:period.to};
+ scope={projectId:scope.projectId,accountId:scope.accountId};period={from:period.from,to:period.to,...(period.metricType?{metricType:period.metricType}:{})};
  assertDuty(user,'finance');valid(period);await authorize(user,scope);
  return withTransaction(async c=>{
   await gate(c,false);

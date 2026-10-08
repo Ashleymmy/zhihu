@@ -7,7 +7,7 @@ import type { AllianceUploadFile } from '../zhihu/allianceXlsx';
 import { normalizeUploadFilename } from '../services/data-import.service';
 import { audit, authorize, insert, json, mutate, scopeLock, select, type RecordRow } from './store';
 import { digest, fail, money, moneyText, type Scope } from './domain';
-import { parseReport, REPORT_TEMPLATE_VERSION, type ReportKind, type SourceRow } from './report';
+import { parseReport, reportTemplate, assertReportWriteEnabled, type MetricType, type ReportKind, type SourceRow } from './report';
 import { quote, type Obligation } from './pricing';
 import { refreshAdjustments } from './statements';
 import { blockIncome } from '../../../core/finance';
@@ -15,13 +15,21 @@ import { scheduleImport } from './outbox';
 import { assertNewRoute, assertEngineWritable } from './routing';
 import { factTodoReasons, reasonText } from './reasons';
 export interface FactSnapshot {
+  metricType?: MetricType;
+  activations?: string | null;
+  settlement?: string | null;
+  agency?: string | null;
   search: string | null;
   orders: string | null;
   revenue: string | null;
   riskAssessment?: string | null;
-  sources: Partial<Record<'search' | 'orders' | 'revenue' | 'riskAssessment', { kind: ReportKind; rowId: string }>>;
+  sources: Partial<Record<'search' | 'orders' | 'revenue' | 'riskAssessment' | 'activations' | 'settlement' | 'agency', { kind: ReportKind; rowId: string }>>;
 }
 export interface AttributionSnapshot {
+  metricType?: MetricType;
+  activations?: string | null;
+  settlement?: string | null;
+  agency?: string | null;
   date: string;
   keyword: string;
   orders: string | null;
@@ -30,20 +38,27 @@ export interface AttributionSnapshot {
   binding: Record<string, unknown> | null;
   obligations: Obligation[];
 }
-const empty = (): FactSnapshot => ({ search: null, orders: null, revenue: null, sources: {} });
+const empty = (metricType:MetricType='new_user'): FactSnapshot => ({ metricType, search: null, orders: null, revenue: null, ...(metricType==='activation'?{activations:null,settlement:null,agency:null}:{}), sources: {} });
 function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKind, rowId: string) {
   const next: FactSnapshot = JSON.parse(JSON.stringify(before));
-  const owned: ('search' | 'orders' | 'revenue')[] =
-    kind === 'search' ? ['search'] : kind === 'order' ? ['orders', 'revenue'] : ['search', 'orders', 'revenue'];
+  const owned: ('search' | 'orders' | 'revenue' | 'activations' | 'settlement')[] =
+    kind==='activation'?['activations','settlement']:kind === 'search' ? ['search'] : kind === 'order' ? ['orders', 'revenue'] : ['search', 'orders', 'revenue'];
   let changed = false,
     conflict = false;
   for (const metric of owned) {
     // 订单和收益属于同一报告口径；本次未提供收益时不能继承旧订单的收益。
-    if (raw[metric] === null && metric !== 'revenue') continue;
-    if (before[metric] !== null && before[metric] !== raw[metric]) conflict = true;
-    if (before[metric] !== raw[metric]) changed = true;
-    next[metric] = raw[metric];
+    const value=raw[metric]??null;
+    if (value === null && metric !== 'revenue' && metric!=='settlement') continue;
+    if ((before[metric]??null) !== null && before[metric] !== value) conflict = true;
+    if ((before[metric]??null) !== value) changed = true;
+    next[metric] = value;
     next.sources[metric] = { kind, rowId };
+  }
+  if(kind==='activation'){
+    next.metricType='activation';
+    if((before.agency??null)!==(raw.agency??null))changed=true;
+    next.agency=raw.agency??null;
+    next.sources.agency={kind,rowId};
   }
   // 缺少风险列不解除已有风险；搜索分报的空值也不能替订单报告解除风险。
   if (raw.riskAssessment !== undefined && (kind !== 'search' || raw.riskAssessment !== null)) {
@@ -61,12 +76,14 @@ function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKind, row
 export async function previewImport(user: AuthUser, scope: Scope, file: AllianceUploadFile, kind: ReportKind) {
   if (!isStaffRole(user.role)) fail('仅管理员可导入来源报告', 403);
   await authorize(user, scope);
+  assertReportWriteEnabled(kind);
   const name = normalizeUploadFilename(file.originalname);
   const parsed = await parseReport({ ...file, originalname: name }, kind);
   const hash = createHash('sha256')
     .update(file.buffer as Buffer)
     .digest('hex');
-  const previewHash = digest({ scope, kind, hash, rows: parsed, template: REPORT_TEMPLATE_VERSION });
+  const template=reportTemplate(kind);
+  const previewHash = digest({ scope, kind, hash, rows: parsed, template });
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
     await assertEngineWritable(c, scope);
@@ -78,12 +95,12 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
       [scope.accountId, hash, kind],
     );
     if (existing.some((batch) => String(batch.project_id) !== scope.projectId)) fail('相同来源已属于其他项目', 409);
-    const duplicate = existing.find((batch) => batch.template_version === REPORT_TEMPLATE_VERSION);
+    const duplicate = existing.find((batch) => batch.template_version === template);
     if (duplicate) return { id: String(duplicate.id), duplicate: true };
     const id = await insert(
       c,
       'INSERT INTO zh_import_batches(account_id,project_id,file_name,file_sha256,file_bytes,report_kind,template_version,preview_hash,created_by) VALUES(?,?,?,?,?,?,?,?,?)',
-      [scope.accountId, scope.projectId, name, hash, file.buffer, kind, REPORT_TEMPLATE_VERSION, previewHash, user.sub],
+      [scope.accountId, scope.projectId, name, hash, file.buffer, kind, template, previewHash, user.sub],
     );
     for (const row of parsed)
       await insert(
@@ -187,7 +204,7 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
       [id, scope.accountId, scope.projectId],
     );
     if (!batch) fail('批次不存在', 404);
-    if (batch.status === 'preview' && batch.template_version !== REPORT_TEMPLATE_VERSION)
+    if (batch.status === 'preview' && batch.template_version !== reportTemplate(batch.report_kind as ReportKind))
       fail('报告解析规则已更新，请重新上传并核对预览', 409);
     if (batch.preview_hash !== previewHash) fail('预览已变化，请重新核对', 409);
     const dates = await select(
@@ -224,6 +241,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   const [revision] = await select(c, 'SELECT * FROM zh_metric_revisions WHERE id=?', [fact.current_revision_id]);
   if (!revision) return;
   const source = json<FactSnapshot>(revision.snapshot_json);
+  const metricType:MetricType=fact.metric_type==='activation'?'activation':'new_user';
   const [word] = await select(c, 'SELECT * FROM zh_keywords WHERE id=?', [fact.keyword_id]);
   const [binding] = await select(
     c,
@@ -233,6 +251,8 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   const date = String(fact.business_day);
   let code: string | null = null;
   const snapshot: AttributionSnapshot = {
+    metricType,
+    ...(metricType==='activation'?{activations:source.activations??null,settlement:source.settlement??null,agency:source.agency??null}:{}),
     date,
     keyword: String(word.keyword),
     orders: source.orders,
@@ -255,6 +275,9 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   else if (!binding) code = 'BINDING_MISSING';
   else if (!binding.activated_day || String(binding.activated_day) > date) code = 'PERIOD_AMBIGUOUS';
   else if (source.riskAssessment) code = 'RISK_REVIEW_REQUIRED';
+  // The storage rollout precedes activation pricing. Its write flag stays off
+  // in production until pricing and the compatible workers have been deployed.
+  else if (metricType==='activation') code = source.activations===null?'REPORT_INCOMPLETE':'PRICE_MISSING';
   else if (source.orders === null) code = 'REPORT_INCOMPLETE';
   else {
     await select(c, 'SELECT id FROM tasks WHERE id=? FOR SHARE', [word.task_id]);
@@ -306,10 +329,11 @@ export async function processBatch(user: AuthUser, scope: Scope, id: string, lim
     await scopeLock(c, scope, user);
     const [batch] = await select(
       c,
-      "SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status IN ('committed','processed')",
+      "SELECT id,report_kind FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status IN ('committed','processed')",
       [id, scope.accountId, scope.projectId],
     );
     if (!batch) fail('批次尚未确认', 409);
+    assertReportWriteEnabled(batch.report_kind as ReportKind);
     return select(
       c,
       "SELECT id FROM zh_import_rows WHERE batch_id=? AND processing_status='pending' ORDER BY id LIMIT ?",
@@ -360,8 +384,8 @@ export async function processBatch(user: AuthUser, scope: Scope, id: string, lim
       }
       const factId = await insert(
         c,
-        'INSERT INTO zh_metric_facts(account_id,project_id,channel_mapping_id,keyword_id,business_date) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
-        [scope.accountId, scope.projectId, mappings[0].stable_id, words[0].id, raw.date],
+        'INSERT INTO zh_metric_facts(account_id,project_id,channel_mapping_id,keyword_id,business_date,metric_type) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
+        [scope.accountId, scope.projectId, mappings[0].stable_id, words[0].id, raw.date,kind==='activation'?'activation':'new_user'],
       );
       const [fact] = await select(
         c,
@@ -371,7 +395,7 @@ export async function processBatch(user: AuthUser, scope: Scope, id: string, lim
       const [current] = fact.current_revision_id
         ? await select(c, 'SELECT snapshot_json FROM zh_metric_revisions WHERE id=?', [fact.current_revision_id])
         : [];
-      const before = current ? json<FactSnapshot>(current.snapshot_json) : empty();
+      const before = current ? json<FactSnapshot>(current.snapshot_json) : empty(kind==='activation'?'activation':'new_user');
       const { next, changed, conflict } = mergeSource(before, raw, kind, String(row.id));
       if (!changed && !conflict) {
         await c.query("UPDATE zh_import_rows SET processing_status='duplicate',fact_id=? WHERE id=?", [factId, row.id]);
@@ -620,6 +644,8 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
     (o) => isStaffRole(user.role) || o.payeeId === user.sub || (o.payerKind === 'user' && o.payerId === user.sub),
   );
   const result: Record<string, unknown> = {
+    metricType:snapshot.metricType??'new_user',
+    activations:snapshot.activations??null,
     date: snapshot.date,
     keyword: snapshot.keyword,
     orders: snapshot.orders,
