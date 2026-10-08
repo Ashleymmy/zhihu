@@ -61,6 +61,10 @@ async function main() {
         const [ratesAfter]=await db.query("SELECT id,project_id,rule_code,unit_price FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");
         if(JSON.stringify(ratesBefore)!==JSON.stringify(ratesAfter))throw Error('重复迁移改变了初始单价');
         console.log('REVIEW_RATE_REPLAY_VERIFIED',JSON.stringify(ratesAfter));
+        if(process.env.OPC_REVIEW_RATES_ONLY==='1'){
+          // Only this disposable database: expose a missing-price row without changing production rules.
+          await db.query("UPDATE opc_rate_rules SET effective_to=CURDATE() WHERE module_id='zhihu' AND metric_type='activation' AND rule_code='creator'");
+        }
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         if(process.env.OPC_REVIEW_FINANCE_HISTORY==='1') await (await import('./finance-history-fixture')).seedFinanceHistory(db);

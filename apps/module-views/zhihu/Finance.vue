@@ -7,7 +7,7 @@ import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
 import RiskReview from './RiskReview.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
-import {CashWallet,type AnalysisRunModel} from '@zhihu-koc/shared-components'
+import {CashWallet,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[]}>()
@@ -29,6 +29,9 @@ type ReportType='new_user'|'activation'
 function savedReportType():ReportType{try{return localStorage.getItem('zhihu.reportType')==='activation'?'activation':'new_user'}catch{return 'new_user'}}
 const reportType=ref<ReportType>(savedReportType()),suggestedType=ref<ReportType|null>(null)
 const typeFilter=ref<ReportType|''>('')
+const ratesOpen=ref(false),ratesType=ref<ReportType>('new_user')
+function openRates(type:ReportType){ratesType.value=type;ratesOpen.value=true}
+async function ratesPublished(result:{effectiveFrom:string;recalculated:number}){notice.value='已发布单价，'+result.effectiveFrom+' 起生效。';await run(async()=>{await refresh();if(importId.value)await inspectImport(importId.value)})}
 const types:ReportType[]=['new_user','activation']
 const typeName=(type:ReportType)=>type==='activation'?'拉活':'拉新'
 const typeKey=(type:ReportType)=>type==='new_user'?'newUser':'activation'
@@ -147,7 +150,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <ul class="report-rows"><li v-for="row in importResult.rows" :key="row.id"><strong>第 {{row.lineNumber}} 行 · {{rowStatus(row.processingStatus)}}</strong><span>{{row.errorText||'这行已读取，金额和待处理事项见下方账单。'}}</span><span v-if="row.next">下一步：{{row.next}}</span><span v-if="row.processingStatus==='invalid'">下一步：财务：修正这行后补传报表 <button :disabled="busy" @click="uploadInput?.click()">选择修正后的报表</button></span></li></ul>
    <div v-if="importTotal>25" class="engine-actions"><button :disabled="busy||importPage===1" @click="run(()=>inspectImport(importId,importPage-1))">上一页</button><span>第 {{importPage}} 页</span><button :disabled="busy||importPage*25>=importTotal" @click="run(()=>inspectImport(importId,importPage+1))">下一页</button></div>
   </section>
-  <form class="period-filter" @submit.prevent="run(refresh)"><label>开始日期<input type="date" v-model="period.from" required /></label><label>结束日期<input type="date" v-model="period.to" required /></label><button :disabled="busy">查看账单</button></form>
+  <form class="period-filter" @submit.prevent="run(refresh)"><label>开始日期<input type="date" v-model="period.from" required /></label><label>结束日期<input type="date" v-model="period.to" required /></label><button :disabled="busy">查看账单</button><button v-if="admin&&!wallet" type="button" :disabled="busy" @click="openRates(typeFilter||reportType)">查看与设置单价</button></form>
   <div v-if="view" class="metric-grid">
    <article><span>{{wallet?'已确认收入':'应付合计'}}</span><strong>¥{{money(total(wallet?'confirmedReceivable':'payable'))}}</strong></article>
    <article><span>{{wallet?'待确认收入':'已确认应付'}}</span><strong>¥{{money(total(wallet?'pendingReceivable':'confirmedPayable'))}}</strong></article>
@@ -167,11 +170,12 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   <div v-if="admin && confirming && view" class="confirm-box" role="region" aria-label="核对账单"><h2>确认本期账单</h2><p>{{period.from}} 至 {{period.to}}，本期应付合计 <strong>¥{{money(total('payable'))}}</strong>。</p><p>审核完成的账单会被确认；有待办的账单继续等待处理。此操作不会发起银行转账。</p><label class="check-label"><input type="checkbox" v-model="checked" />我已核对报表、人员和计算金额</label><div class="engine-actions"><button class="primary" :disabled="!checked||busy" @click="run(confirm)">确认核对结果</button><button :disabled="busy" @click="confirming=false">返回检查</button></div></div>
   <details ref="detailPanel" class="work-card bill-details" :open="wallet||detailsOpen" @toggle="detailsOpen=($event.currentTarget as HTMLDetailsElement).open"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected" @click="selected='';detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
    <label class="type-filter">业绩类型<select v-model="typeFilter" @change="detailPage=1"><option value="">全部</option><option value="new_user">拉新</option><option value="activation">拉活</option></select></label>
-   <BillDetails :entries="details" :wallet="wallet" :admin-duty="context.adminDuty" :busy="busy" @assign="assignment=$event" @risk="riskEntry" @changes="inspectConflict" />
+   <BillDetails :entries="details" :wallet="wallet" :admin-duty="context.adminDuty" :can-set-rates="admin&&!wallet" :busy="busy" @assign="assignment=$event" @risk="riskEntry" @changes="inspectConflict" @rates="openRates($event.metricType)" />
   </details>
   <div v-if="wallet&&context.role==='leader'&&view" class="work-card team-performance"><h2>团队业绩与分成</h2><div class="engine-table"><table><thead><tr><th>达人</th><th>订单量</th><th>拉新分成（元）</th><th>拉活量</th><th>拉活分成（元）</th></tr></thead><tbody><tr v-for="g in view.teamPerformance" :key="g.executorId"><td>{{g.name}}</td><td>{{g.orders}}单</td><td>{{money(g.commission)}}</td><td>{{g.activations}}个</td><td>{{money(g.activationCommission)}}</td></tr></tbody></table></div><ul class="team-cards"><li v-for="g in view.teamPerformance" :key="g.executorId"><strong>{{g.name}}</strong><span>拉新 {{g.orders}}单 · 给我的分成 ¥{{money(g.commission)}}</span><span>拉活 {{g.activations}}个 · 给我的分成 ¥{{money(g.activationCommission)}}</span></li></ul></div>
   <details ref="issuePanel" v-if="admin&&!wallet" class="work-card"><summary>报表问题与更正</summary><Issues ref="issues" :context="context" @changed="run(async()=>{await refresh();if(importId)await inspectImport(importId)})" /></details>
   <RiskReview :context="context" :item="risk" @close="risk=null" @saved="risk=null;run(async()=>{await refresh();if(importId)await inspectImport(importId)})" />
+  <RateSettings v-if="admin&&!wallet" :open="ratesOpen" :project-id="context.scope.projectId" module-id="zhihu" :http="context.coreHttp" :initial-metric-type="ratesType" @close="ratesOpen=false" @published="ratesPublished" />
   <AssignExecutor v-if="assignment" :context="context" :keyword-id="assignment.keywordId" :keyword="assignment.keyword" :from-date="assignment.retroFromDate" @close="assignment=null" @saved="assigned" />
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
   <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>

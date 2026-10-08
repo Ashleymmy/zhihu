@@ -169,7 +169,10 @@ afterAll(async () => {
   if (container) await container.stop({ remove: true, removeVolumes: true });
 });
 it('仅财务和完整管理员可读取和发布；服务层也拒绝越权', async () => {
-  expect((await get()).status).toBe(200);
+  const rates = await get();
+  expect(rates.status).toBe(200);
+  expect(rates.body.data.metrics.find((m: {code:string}) => m.code === 'new_user').earliestFrom).toBe(future(1));
+  expect(rates.body.data.metrics.find((m: {code:string}) => m.code === 'activation').earliestFrom).toBe(future(1));
   expect((await get(finance)).status).toBe(200);
   for (const user of [creator, leader, operations]) {
     expect((await get(user)).status).toBe(403);

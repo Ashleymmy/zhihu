@@ -66,13 +66,7 @@ export async function listRateVersions(runtime: ModuleRuntime, user: AuthUser, r
     await authorize(c, user, scope);
     const versions = await rows(c, scope),
       businessDate = today();
-    return {
-      ...scope,
-      metrics: provider.metrics,
-      versions,
-      baseVersion: checksum(versions),
-      businessDate,
-      earliestFrom: Object.fromEntries(
+    const earliestFrom = Object.fromEntries(
         provider.metrics.map((metric) => [
           metric.code,
           nextDay(
@@ -85,7 +79,16 @@ export async function listRateVersions(runtime: ModuleRuntime, user: AuthUser, r
               .reduce((d, r) => (r.effectiveFrom > d ? String(r.effectiveFrom) : d), businessDate),
           ),
         ]),
-      ),
+      );
+    return {
+      ...scope,
+      // Keep the date next to its opaque type code; response key conversion must
+      // not change how clients look up types such as new_user.
+      metrics: provider.metrics.map(metric => ({...metric, earliestFrom: earliestFrom[metric.code]})),
+      versions,
+      baseVersion: checksum(versions),
+      businessDate,
+      earliestFrom,
     };
   });
 }
