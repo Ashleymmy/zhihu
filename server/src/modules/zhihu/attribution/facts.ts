@@ -13,6 +13,7 @@ import { refreshAdjustments } from './statements';
 import { blockIncome } from '../../../core/finance';
 import { scheduleImport } from './outbox';
 import { assertNewRoute, assertEngineWritable } from './routing';
+import { factTodoReasons, reasonText } from './reasons';
 export interface FactSnapshot {
   search: string | null;
   orders: string | null;
@@ -127,7 +128,7 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
       template_version: String(batch.template_version),
       preview_hash: String(batch.preview_hash),
       counts: counts.map((r) => ({ processing_status: String(r.processing_status), total: Number(r.total) })),
-      rows,
+      rows: rows.map(row=>row.processing_status==='exception'?{...row,error_text:reasonText(String(row.error_text)).reason,...reasonText(String(row.error_text))}:row),
       page,
       pageSize,
     };
@@ -276,6 +277,10 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
     [fact.id, revision.id, binding?.id ?? null, hash, state, code, JSON.stringify(snapshot)],
   );
   await c.query('UPDATE zh_metric_facts SET current_result_id=? WHERE id=?', [id, fact.id]);
+  // These todos follow the current fact, not one upload. Close stale causes when
+  // a repair changes the blocker and keep a single open todo for the remaining one.
+  await c.query("UPDATE zh_exceptions SET status='resolved',resolution='资料已更新，已重新计算',resolved_at=NOW(3) WHERE fact_id=? AND source_row_id IS NULL AND status='open' AND reason_code IN (?) AND NOT(reason_code<=>?)", [fact.id, [...factTodoReasons], code]);
+  if (code && factTodoReasons.some(reason=>reason===code)) await exception(c, scope, null, String(fact.id), code);
   if (source.riskAssessment) {
     await exception(
       c,
@@ -515,8 +520,11 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
     const list = await select(
       c,
       `SELECT CAST(e.id AS CHAR) id,e.reason_code,e.status,e.resolution,CAST(e.source_row_id AS CHAR) source_row_id,
-      CAST(e.fact_id AS CHAR) fact_id,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,v.snapshot_json,r.normalized_json
+      CAST(e.fact_id AS CHAR) fact_id,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,v.snapshot_json,r.normalized_json,k.keyword,
+      b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name
       FROM zh_exceptions e LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
+      LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
+      LEFT JOIN users executor ON executor.id=b.executor_id LEFT JOIN users leader ON leader.id=b.leader_id
       LEFT JOIN zh_metric_revisions v ON v.source_row_id=e.source_row_id AND v.status='pending'
       WHERE e.account_id=? AND e.project_id=? ORDER BY e.id DESC LIMIT ? OFFSET ?`,
       [scope.accountId, scope.projectId, pageSize, (page - 1) * pageSize],
@@ -525,7 +533,7 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       scope.accountId,
       scope.projectId,
     ]);
-    return { list, total: Number(total.total), page, pageSize };
+    return { list: list.map(row=>Object.assign(row,reasonText(String(row.reason_code),{bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}))), total: Number(total.total), page, pageSize };
   });
 }
 export async function retryException(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {
@@ -537,6 +545,7 @@ export async function retryException(user: AuthUser, scope: Scope, id: string, k
       [id, scope.accountId, scope.projectId],
     );
     if (!e || e.reason_code === 'SOURCE_REVISION_PENDING') fail('请通过来源修订处理此异常');
+    if (!e.source_row_id && e.fact_id) fail('这条数据会在补齐资料后自动更新，请按下一步处理', 409);
     if (e.reason_code === 'RISK_REVIEW_REQUIRED') fail('风险判定含义待核实；需提供上游更正报告，不能通过重试解除');
     await c.query(
       "UPDATE zh_import_rows SET processing_status='pending',error_text=NULL WHERE id=? AND processing_status='exception'",

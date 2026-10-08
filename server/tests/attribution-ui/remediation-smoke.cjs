@@ -43,6 +43,15 @@ async function main(){
    assert.equal(response.status(),role==='operations'?403:200,await response.text());
    const body=await response.json();
    if(role==='operations')assert.equal(body.message,'这里需要财务权限');
+   if(role==='admin'||role==='finance'){
+    assert.equal(body.data.summary.orders,'42');
+    assert.equal(body.data.summary.totalOrders,'44');
+    assert.equal(body.data.summary.billableOrders,'37');
+    assert.equal(body.data.summary.pendingOrders,'7');
+    assert.equal(body.data.summary.payable,'313.0000');
+    assert.equal(body.data.entries[0].status,'pending');
+    assert.equal(body.data.entries.find(e=>e.keyword==='悬疑短篇').amount,null);
+   }
    if(role==='leader'){
     assert(body.data.entries.every(entry=>entry.payeeId==='2'));
     assert(body.data.groups.every(group=>group.payeeId==='2'));
@@ -52,13 +61,22 @@ async function main(){
    const destination=role==='operations'?'dashboard':role==='admin'||role==='finance'?'modules/zhihu/finance':'modules/zhihu/wallet';
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
    if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).waitFor();
+   if(role==='admin'||role==='finance'){
+    await page.getByText('读取 6 行、44 单。可计费 37 单 ¥313.00；还有 7 单在等处理。',{exact:true}).waitFor();
+    await page.getByText('报表问题与更正',{exact:true}).click();
+    const missing=page.locator('.issues tbody tr').filter({hasText:'悬疑短篇'});
+    assert.equal(await missing.getByRole('button').count(),0);
+    assert((await missing.innerText()).includes('运营：指定执行人'));
+   }
    for(const width of [1440,375]){
     await page.setViewportSize({width,height:1100});
+    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     if(width===375){
      if(await page.locator('.studio-app').getAttribute('data-menu-open')==='true')await page.locator('.menu-toggle').click();
      await page.waitForFunction(()=>getComputedStyle(document.querySelector('.studio-backdrop')).opacity==='0');
     }
     await page.screenshot({path:path.join(out,`${role}-${width}.png`),fullPage:true,animations:'disabled'});
+    if(role==='finance')await page.locator('.bill-details').screenshot({path:path.join(out,`finance-details-${width}.png`),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
     const dimensions=await page.evaluate(()=>({viewport:innerWidth,body:document.documentElement.scrollWidth}));
     assert(dimensions.body<=dimensions.viewport+1,`${role} ${width}: 横向溢出 ${dimensions.body}`);
    }
@@ -68,7 +86,8 @@ async function main(){
     await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();
     await page.getByText('第 3 行日期写成了“错日期”，请改成 2026-09-14 这样的格式',{exact:true}).waitFor();
     await page.getByText('汇总行，已跳过',{exact:true}).waitFor();
-    await page.screenshot({path:path.join(out,'finance-upload-375.png'),fullPage:true});
+    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    await page.screenshot({path:path.join(out,'finance-upload-375.png'),fullPage:true,animations:'disabled'});
    }
    assert.deepEqual(errors,[]);
    results.push({role,status:response.status(),widths:[1440,375]});
