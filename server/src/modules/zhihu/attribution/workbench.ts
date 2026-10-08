@@ -17,14 +17,15 @@ import * as cutover from './cutover';
 export interface Period{from:string;to:string;metricType?:MetricType}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
 export function allocations(snapshot:AttributionSnapshot){
- const values=new Map<string,bigint>();let total=0n;
+ const values=new Map<string,bigint>();let total=0n,staffAmount=0n;
  for(const o of snapshot.obligations){
   const amount=money(o.amount);
-  if(o.relation==='agency_leader'||o.relation==='agency_creator'){values.set(o.payeeId,(values.get(o.payeeId)??0n)+amount);total+=amount;}
+  if(o.relation==='activation:staff_self'){staffAmount+=amount;continue;}
+  if(o.relation==='agency_leader'||o.relation==='agency_creator'||o.relation.startsWith('activation:')){values.set(o.payeeId,(values.get(o.payeeId)??0n)+amount);total+=amount;}
   else if(o.relation==='leader_creator'){values.set(o.payeeId,(values.get(o.payeeId)??0n)+amount);values.set(o.payerId,(values.get(o.payerId)??0n)-amount);}
  }
  if([...values.values()].some(v=>v<0n))fail('团队分配超过平台应付，请核对定价规则',409);
- return{total:moneyText(total),list:[...values].map(([userId,amount])=>({userId,amount:moneyText(amount)}))};
+ return{total:moneyText(total),staffAmount:moneyText(staffAmount),list:[...values].map(([userId,amount])=>({userId,amount:moneyText(amount)}))};
 }
 export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUploadFile,reportType:MetricType='new_user'){
  assertDuty(user,'finance');await authorize(user,scope);
@@ -65,36 +66,44 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   const users=await select(c,`SELECT CAST(u.id AS CHAR) id,u.display_name,u.role,CAST(u.parent_id AS CHAR) parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE pm.project_id=? AND pm.left_at IS NULL AND (? IN ('developer','admin','operator') OR u.id=? OR u.parent_id=?)`,[scope.projectId,user.role,user.sub,user.sub]);
   const prior=await select(c,`SELECT CAST(e.source_id AS CHAR) source_id,CAST(e.user_id AS CHAR) user_id,CAST(SUM(e.amount) AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id WHERE src.module_id='zhihu' AND src.account_id=? AND src.project_id=? AND src.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR e.user_id=?) GROUP BY e.source_id,e.user_id`,[scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub]);
   const [route]=await select(c,'SELECT mode FROM zh_engine_routes WHERE account_id=? AND project_id=?',[scope.accountId,scope.projectId]);
-  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;metricType:MetricType;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
-  const team=new Map<string,{executorId:string;name:string;orders:bigint;commission:bigint}>();
+  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;metricType:MetricType;quantity:string|null;activations:string|null;settlementMismatch?:AttributionSnapshot['settlementMismatch'];internal?:boolean;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
+  const team=new Map<string,{executorId:string;name:string;orders:bigint;commission:bigint;activations:bigint;activationCommission:bigint}>();
+  const stats={new_user:{records:0,quantity:0n,billableQuantity:0n,pendingQuantity:0n},activation:{records:0,quantity:0n,billableQuantity:0n,pendingQuantity:0n}};
+  let staffTotal=0n;
   let orderTotal=0n,billableOrders=0n,pendingOrders=0n;const tokens:unknown[]=[];
   for(const r of rows){
    if(!r.snapshot_json)continue;
-   const snap=json<AttributionSnapshot>(r.snapshot_json);orderTotal+=BigInt(snap.orders??'0');
+   const snap=json<AttributionSnapshot>(r.snapshot_json);
    const metricType:MetricType=r.metric_type==='activation'?'activation':'new_user';
+   const quantity=metricType==='activation'?snap.activations??null:snap.orders;
+   const typed={metricType,quantity,activations:snap.activations??null,...(isStaffRole(user.role)?{settlementMismatch:snap.settlementMismatch??null}:{})};
    const targets=allocations(snap);
-   if(targets.list.length)billableOrders+=BigInt(snap.orders??'0');else pendingOrders+=BigInt(snap.orders??'0');
+   const internal=snap.obligations.some(o=>o.relation==='activation:staff_self');
+   staffTotal+=money(targets.staffAmount);
+   stats[metricType].records++;stats[metricType].quantity+=BigInt(quantity??'0');
+   stats[metricType][targets.list.length||internal?'billableQuantity':'pendingQuantity']+=BigInt(quantity??'0');
+   if(metricType==='new_user'){orderTotal+=BigInt(snap.orders??'0');if(targets.list.length)billableOrders+=BigInt(snap.orders??'0');else pendingOrders+=BigInt(snap.orders??'0');}
    const reasonCode=route?.mode==='stopped'?'BUSINESS_STOPPED':Number(r.pending_revision)>0?'SOURCE_REVISION_PENDING':String(r.reason_code??'')||(r.verification_status==='passed'?'':r.verification_status==='disputed'?'WORK_DISPUTED':Number(r.evidence_count)?'WORK_UNVERIFIED':'WORK_MISSING');
-   const text=reasonCode?reasonText(reasonCode,{bindingId:r.binding_id,executorId:r.executor_id,executorName:r.executor_name,executorRole:r.executor_role,leaderName:r.leader_name}):{reason:'',next:'财务：核对并确认账单'};
+   const text=reasonCode?reasonText(reasonCode,{metricType,bindingId:r.binding_id,executorId:r.executor_id,executorName:r.executor_name,executorRole:r.executor_role,leaderName:r.leader_name}):{reason:'',next:'财务：核对并确认账单'};
    const blocked=text.reason;
    if(user.role==='leader'&&String(r.leader_id)===user.sub&&r.executor_id&&String(r.executor_id)!==user.sub){
     const executorId=String(r.executor_id),member=users.find(u=>String(u.id)===executorId);
-    const item=team.get(executorId)??{executorId,name:String(member?.display_name??'团队成员'),orders:0n,commission:0n};
-    item.orders+=BigInt(snap.orders??'0');
-    item.commission+=money(targets.list.find(a=>a.userId===user.sub)?.amount??'0');team.set(executorId,item);
+    const item=team.get(executorId)??{executorId,name:String(member?.display_name??'团队成员'),orders:0n,commission:0n,activations:0n,activationCommission:0n};
+    item[metricType==='activation'?'activations':'orders']+=BigInt(quantity??'0');
+    item[metricType==='activation'?'activationCommission':'commission']+=money(targets.list.find(a=>a.userId===user.sub)?.amount??'0');team.set(executorId,item);
    }
    const confirmed=String(r.source_version??'')===String(r.result_id)&&!r.blocked_reason&&!blocked;
    if(confirmed)text.next='';
    tokens.push([r.id,r.result_id,r.revision_id,r.verification_status,r.pending_revision,r.source_version,r.blocked_reason,targets]);
    if(!targets.list.length){
     const payeeId=isStaffRole(user.role)?String(r.executor_id??''):user.sub;
-    entries.push({id:r.id+'-pending',factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),metricType,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId,payeeName:isStaffRole(user.role)?String(r.executor_name??'待确定'):'本人',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:isStaffRole(user.role),ownReceivable:!isStaffRole(user.role),blocked,reasonCode,...text,ready:false});
+    entries.push({id:r.id+'-pending',factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,internal,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId,payeeName:isStaffRole(user.role)?String(r.executor_name??'待确定'):'本人',parentId:null,role:'',payerName:'平台',amount:internal?targets.staffAmount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:internal?'internal':'pending',ownPayable:isStaffRole(user.role),ownReceivable:!isStaffRole(user.role)&&!internal,blocked,reasonCode,...text,...(internal?{next:'',reason:'管理员业绩，不计入应付'}:{}),ready:false});
    }
    for(const a of targets.list){
     if(!isStaffRole(user.role)&&a.userId!==user.sub)continue;
     const payee=users.find(u=>String(u.id)===a.userId);
     const before=money(String(prior.find(p=>String(p.source_id)===String(r.source_id)&&String(p.user_id)===a.userId)?.amount??'0'),true);
-    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),metricType,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,ready:isStaffRole(user.role)&&!blocked&&!confirmed});
+    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,ready:isStaffRole(user.role)&&!blocked&&!confirmed});
    }
   }
   // A source without a matching keyword has no fact yet. Include it for staff,
@@ -117,24 +126,28 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   for(const r of unresolved){const raw=json<SourceRow>(r.normalized_json),metricType:MetricType=r.metric_type==='activation'?'activation':'new_user',key=JSON.stringify([raw.date,raw.channel,raw.keyword,metricType]);const previous=missing.get(key);missing.set(key,{id:String(r.id),raw:{...raw,orders:raw.orders??previous?.raw.orders??null},code:String(r.error_text),metricType});}
   let unmatchedOrders=0n;
   for(const {id,raw,code,metricType} of missing.values()){
-   const text=reasonText(code);unmatchedOrders+=BigInt(raw.orders??'0');
-   entries.push({id:'source-'+id,factId:'',keywordId:'',resultId:'',revisionId:'',metricType,keyword:raw.keyword,date:raw.date,orders:raw.orders,payeeId:'',payeeName:'待确定',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:true,ownReceivable:false,blocked:text.reason,reasonCode:code,...text,ready:false});
+   const text=reasonText(code,{metricType}),quantity=metricType==='activation'?raw.activations??null:raw.orders;
+   if(metricType==='new_user')unmatchedOrders+=BigInt(raw.orders??'0');
+   stats[metricType].records++;stats[metricType].quantity+=BigInt(quantity??'0');stats[metricType].pendingQuantity+=BigInt(quantity??'0');
+   entries.push({id:'source-'+id,factId:'',keywordId:'',resultId:'',revisionId:'',metricType,quantity,activations:raw.activations??null,keyword:raw.keyword,date:raw.date,orders:raw.orders,payeeId:'',payeeName:'待确定',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:true,ownReceivable:false,blocked:text.reason,reasonCode:code,...text,ready:false});
    tokens.push(['source',id,raw,code]);
   }
   pendingOrders+=unmatchedOrders;
   entries.sort((a,b)=>Number(b.status==='pending')-Number(a.status==='pending'));
   const sum=(predicate:(e:typeof entries[number])=>boolean,field:'amount'|'confirmedAmount'|'pendingAmount'='amount')=>moneyText(entries.filter(predicate).reduce((n,e)=>n+money(e[field]??'0',true),0n));
-  const teamPerformance=[...team.values()].map(t=>({...t,orders:String(t.orders),commission:moneyText(t.commission)}));
+  const teamPerformance=[...team.values()].map(t=>({...t,orders:String(t.orders),commission:moneyText(t.commission),activations:String(t.activations),activationCommission:moneyText(t.activationCommission)}));
   // 管理员按实际结算对象汇总：团队达人的金额归入所属团长，点击明细仍保留达人原始收款人。
-  const pricedEntries=entries.filter(e=>e.amount!==null);
+  const pricedEntries=entries.filter(e=>e.amount!==null&&!e.internal);
   const groupEntries=isStaffRole(user.role)?pricedEntries.map(e=>{
-    if(e.role==='creator'&&e.parentId){const leader=users.find(u=>String(u.id)===e.parentId);return {...e,payeeId:e.parentId,payeeName:String(leader?.display_name??'团长')};}
+    if(e.role==='creator'&&e.parentId){const leader=users.find(u=>String(u.id)===e.parentId);if(leader?.role==='leader')return {...e,payeeId:e.parentId,payeeName:String(leader.display_name)};}
     return e;
   }):pricedEntries;
   const groupSum=(predicate:(e:typeof groupEntries[number])=>boolean,field:'amount'|'confirmedAmount'|'pendingAmount'='amount')=>moneyText(groupEntries.filter(predicate).reduce((n,e)=>n+money(e[field]??'0',true),0n));
   const groups=[...new Set(groupEntries.map(e=>e.payeeId))].map(payeeId=>{const list=groupEntries.filter(e=>e.payeeId===payeeId);return{payeeId,name:list[0].payeeName,confirmed:groupSum(e=>e.payeeId===payeeId,'confirmedAmount'),pending:groupSum(e=>e.payeeId===payeeId,'pendingAmount'),total:groupSum(e=>e.payeeId===payeeId),blockers:[...new Set(list.map(e=>e.blocked).filter(Boolean))],ready:list.filter(e=>e.ready).length};});
   const [issues]=await select(c,`SELECT COUNT(*) total FROM zh_exceptions x LEFT JOIN zh_import_rows r ON r.id=x.source_row_id LEFT JOIN zh_metric_facts f ON f.id=x.fact_id WHERE x.account_id=? AND x.project_id=? AND x.status='open' AND (? IN ('developer','admin','operator')) AND COALESCE(DATE_FORMAT(f.business_date,'%Y-%m-%d'),JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date'))) BETWEEN ? AND ?`,[scope.accountId,scope.projectId,user.role,period.from,period.to]);
-  return{period,entries,groups,teamPerformance,reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:rows.length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:sum(e=>e.ownReceivable),confirmedReceivable:sum(e=>e.ownReceivable,'confirmedAmount'),pendingReceivable:sum(e=>e.ownReceivable,'pendingAmount'),payable:sum(()=>true),confirmedPayable:sum(()=>true,'confirmedAmount'),pendingPayable:sum(()=>true,'pendingAmount'),retained:sum(e=>e.ownReceivable)},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
+  const typedSummary=(type:MetricType)=>({records:stats[type].records,quantity:String(stats[type].quantity),orders:String(type==='new_user'?stats[type].quantity:0n),billableQuantity:String(stats[type].billableQuantity),pendingQuantity:String(stats[type].pendingQuantity),payable:sum(e=>e.metricType===type&&!e.internal),confirmedPayable:sum(e=>e.metricType===type&&!e.internal,'confirmedAmount'),pendingPayable:sum(e=>e.metricType===type&&!e.internal,'pendingAmount'),receivable:sum(e=>e.metricType===type&&e.ownReceivable),confirmedReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'confirmedAmount'),pendingReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'pendingAmount')});
+  const byType={new_user:typedSummary('new_user'),activation:typedSummary('activation')};
+  return{period,entries,groups,teamPerformance,reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:stats.new_user.records,totalRecords:rows.length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:byType.new_user.receivable,confirmedReceivable:byType.new_user.confirmedReceivable,pendingReceivable:byType.new_user.pendingReceivable,payable:byType.new_user.payable,confirmedPayable:byType.new_user.confirmedPayable,pendingPayable:byType.new_user.pendingPayable,retained:byType.new_user.receivable,byType,staffAmount:isStaffRole(user.role)?moneyText(staffTotal):'0.0000'},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
  };
  return connection?read(connection):withTransaction(read);
 }

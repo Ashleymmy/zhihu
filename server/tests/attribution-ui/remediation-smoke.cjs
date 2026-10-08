@@ -64,7 +64,7 @@ async function main(){
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
    if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).waitFor();
    if(role==='admin'||role==='finance'){
-    await page.getByText('读取 6 行、44 单。可计费 37 单 ¥313.00；还有 7 单在等处理。',{exact:true}).waitFor();
+    await page.getByText('拉新：可计费 37 单 ¥313.00',{exact:true}).waitFor();
     await page.getByText('报表问题与更正',{exact:true}).click();
     const missing=page.locator('.issues tbody tr').filter({hasText:'悬疑短篇'});
     assert.equal(await missing.getByRole('button').count(),0);
@@ -90,7 +90,7 @@ async function main(){
     await page.getByText('汇总行，已跳过',{exact:true}).waitFor();
     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await page.screenshot({path:path.join(out,'finance-upload-375.png'),fullPage:true,animations:'disabled'});
-    const activation=Buffer.from(`日期,渠道名称,关键词,拉活量,结算金额\n${date},知乎故事一代渠道,重生千金,1,2.00`);
+    const activation=Buffer.from(`日期,渠道名称,关键词,拉活量,结算金额\n${date},知乎故事一代渠道,重生千金,1,3.00\n${date},知乎故事一代渠道,都市逆袭小说,2,4.00\n${date},知乎故事一代渠道,古言虐恋,3,6.00`);
     await page.locator('input[type="file"]').setInputFiles({name:'拉活验收.csv',mimeType:'text/csv',buffer:activation});
     await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();
     await page.getByText('这份文件有“拉活量”列，看起来是拉活表。',{exact:true}).waitFor();
@@ -104,12 +104,29 @@ async function main(){
     const afterData=(await after.json()).data;
     assert.equal(afterData.summary.orders,'42');
     assert(afterData.entries.some(e=>e.keyword==='重生千金'&&e.metricType==='activation'));
+    assert(afterData.entries.some(e=>e.keyword==='重生千金'&&e.amount==='1.2000'&&e.settlementMismatch?.actual==='3.0000'));
+    await page.getByText('拉活：可计费 6 个 ¥8.40',{exact:true}).waitFor();
+    await page.locator('.type-filter select').selectOption('activation');
+    assert((await page.locator('.bill-details .bill-cards').innerText()).includes('结算金额对不上：报表 ¥3.00，按拉活量应为 ¥2.00'));
+    for(const width of [1440,375]){
+     await page.setViewportSize({width,height:1100});
+     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+     await page.screenshot({path:path.join(out,`finance-activation-${width}.png`),fullPage:true,animations:'disabled'});
+     await page.locator('.bill-details').screenshot({path:path.join(out,`finance-activation-details-${width}.png`),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
+     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    }
     const legacyResponse=await context.request.get(endpoint.replace('&viewVersion=2',''),{headers:{Authorization:'Bearer '+token,'X-Client-Id':client}});
     assert.equal(legacyResponse.status(),200);
     const legacyData=(await legacyResponse.json()).data;
     assert(legacyData.entries.every(e=>e.amount!==null&&e.metricType==='new_user'));
     assert(legacyData.pendingEntries.some(e=>e.amount===null));
     assert.notEqual(legacyData.reviewHash,afterData.reviewHash);
+    const legacyConfirm=await context.request.post(`http://127.0.0.1:${port}/api/v1/modules/zhihu/workbench/confirm`,{headers:{Authorization:'Bearer '+token,'X-Client-Id':client},data:{projectId:'1',accountId:'1',from:date,to:date,reviewHash:legacyData.reviewHash,acknowledged:true,requestKey:crypto.randomUUID()}});
+    assert.equal(legacyConfirm.status(),200,await legacyConfirm.text());
+    const refreshed=await context.request.get(endpoint,{headers:{Authorization:'Bearer '+token,'X-Client-Id':client}});
+    const refreshedData=(await refreshed.json()).data;
+    assert.equal(refreshedData.summary.byType.activation.confirmedPayable,'0.0000');
+    assert(refreshedData.entries.some(e=>e.keyword==='重生千金'&&e.metricType==='new_user'&&e.status==='confirmed'));
     await page.reload();await page.locator('input[name="reportType"][value="activation"]').waitFor();
     assert(await page.locator('input[name="reportType"][value="activation"]').isChecked());
     const orders=Buffer.from(`日期,渠道名称,关键词,订单量\n${date},知乎故事一代渠道,重生千金,20`);

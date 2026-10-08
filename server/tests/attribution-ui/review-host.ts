@@ -53,6 +53,12 @@ async function main() {
         const [after]=await db.query('SELECT metric_type,COUNT(*) total FROM zh_metric_facts GROUP BY metric_type ORDER BY metric_type');
         if(JSON.stringify(before)!==JSON.stringify(after))throw Error('重复迁移改变了演示业绩');
         console.log('REVIEW_MIGRATION_REPLAY_VERIFIED',JSON.stringify(after));
+        const [ratesBefore]=await db.query("SELECT id,project_id,rule_code,unit_price FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");
+        const rateMigration=await readFile(path.resolve('schema/zhihu/030_activation_rates.sql'),'utf8');
+        await db.query(rateMigration);await db.query(rateMigration);
+        const [ratesAfter]=await db.query("SELECT id,project_id,rule_code,unit_price FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");
+        if(JSON.stringify(ratesBefore)!==JSON.stringify(ratesAfter))throw Error('重复迁移改变了初始单价');
+        console.log('REVIEW_RATE_REPLAY_VERIFIED',JSON.stringify(ratesAfter));
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         await db.end();

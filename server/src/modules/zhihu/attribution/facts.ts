@@ -9,6 +9,7 @@ import { audit, authorize, insert, json, mutate, scopeLock, select, type RecordR
 import { digest, fail, money, moneyText, type Scope } from './domain';
 import { parseReport, reportTemplate, assertReportWriteEnabled, type MetricType, type ReportKind, type SourceRow } from './report';
 import { quote, type Obligation } from './pricing';
+import { quoteActivation } from './activation-pricing';
 import { refreshAdjustments } from './statements';
 import { blockIncome } from '../../../core/finance';
 import { scheduleImport } from './outbox';
@@ -26,6 +27,7 @@ export interface FactSnapshot {
   sources: Partial<Record<'search' | 'orders' | 'revenue' | 'riskAssessment' | 'activations' | 'settlement' | 'agency', { kind: ReportKind; rowId: string }>>;
 }
 export interface AttributionSnapshot {
+  settlementMismatch?: {expected:string;actual:string} | null;
   metricType?: MetricType;
   activations?: string | null;
   settlement?: string | null;
@@ -275,9 +277,15 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   else if (!binding) code = 'BINDING_MISSING';
   else if (!binding.activated_day || String(binding.activated_day) > date) code = 'PERIOD_AMBIGUOUS';
   else if (source.riskAssessment) code = 'RISK_REVIEW_REQUIRED';
-  // The storage rollout precedes activation pricing. Its write flag stays off
-  // in production until pricing and the compatible workers have been deployed.
-  else if (metricType==='activation') code = source.activations===null?'REPORT_INCOMPLETE':'PRICE_MISSING';
+  else if (metricType==='activation') {
+    if(source.activations==null)code='REPORT_INCOMPLETE';
+    else try {
+      Object.assign(snapshot,await quoteActivation(c,scope,binding,date,source.activations,source.settlement??null));
+    } catch(e) {
+      if(e instanceof Error&&['PRICE_MISSING','PRICE_OVERLAP'].includes(e.message))code=e.message;
+      else throw e;
+    }
+  }
   else if (source.orders === null) code = 'REPORT_INCOMPLETE';
   else {
     await select(c, 'SELECT id FROM tasks WHERE id=? FOR SHARE', [word.task_id]);
@@ -544,7 +552,7 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
     const list = await select(
       c,
       `SELECT CAST(e.id AS CHAR) id,e.reason_code,e.status,e.resolution,CAST(e.source_row_id AS CHAR) source_row_id,
-      CAST(e.fact_id AS CHAR) fact_id,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,v.snapshot_json,r.normalized_json,k.keyword,
+      CAST(e.fact_id AS CHAR) fact_id,f.metric_type,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,v.snapshot_json,r.normalized_json,k.keyword,
       b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name
       FROM zh_exceptions e LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
@@ -557,7 +565,7 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       scope.accountId,
       scope.projectId,
     ]);
-    return { list: list.map(row=>Object.assign(row,reasonText(String(row.reason_code),{bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}))), total: Number(total.total), page, pageSize };
+    return { list: list.map(row=>Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}))), total: Number(total.total), page, pageSize };
   });
 }
 export async function retryException(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {
@@ -653,6 +661,9 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
     obligations,
   };
   if (isStaffRole(user.role)) {
+    result.settlement=snapshot.settlement??null;
+    result.settlementMismatch=snapshot.settlementMismatch??null;
+    result.agency=snapshot.agency??null;
     result.revenue = snapshot.revenue;
     result.agencyMargin =
       snapshot.revenue === null || !snapshot.obligations.length
