@@ -65,6 +65,9 @@ describe('简化工作台完整资金流程',()=>{
   expect((await post(fin,path('/price-agreements'),{...scope})).status).toBe(403);
   expect((await post(ops,path('/workbench/import'),{...scope})).status).toBe(403);
   expect((await post(ops,path('/workbench/confirm'),{...scope})).status).toBe(403);
+  const denied=await get(ops,path('/workbench'),{...scope,from:day,to:day});
+  expect(denied.status).toBe(403);expect(denied.body.message).toBe('这里需要财务权限');
+  await expect(workbench.overview(ops,scope,{from:day,to:day})).rejects.toThrow('这里需要财务权限');
   expect((await post(ops,'/api/v1/core/finance/funding',{...common(),hash:'0'.repeat(64),reference:'test'})).status).toBe(403);
   expect((await get(fin,path('/attribution-options'),scope)).status).toBe(200);
   expect((await get(ops,'/api/v1/core/team/members',{page:1,pageSize:20})).status).toBe(200);
@@ -98,6 +101,18 @@ describe('简化工作台完整资金流程',()=>{
   const v=await workbench.overview(fin,scope,{from:day,to:day});await workbench.confirmBills(fin,scope,{from:day,to:day},key(),v.reviewHash);
   expect((await q('SELECT COUNT(*) n FROM opc_income_entries'))[0].n).toBe(before);
   const l=await workbench.overview(leader,scope,{from:day,to:day});expect(l.groups.some(g=>g.payeeId===solo.sub)).toBe(false);
+  expect(l.entries.length).toBeGreaterThan(0);
+  expect(l.entries.every(e=>e.payeeId===leader.sub)).toBe(true);
+  expect(l.groups.map(g=>g.payeeId)).toEqual([leader.sub]);
+  expect(l.summary.payable).toBe(l.summary.receivable);
+  expect(l.teamPerformance).toEqual([
+   {executorId:a.sub,name:a.displayName,orders:'30',commission:'60.0000'},
+   {executorId:b.sub,name:b.displayName,orders:'20',commission:'60.0000'},
+  ]);
+  expect((await workbench.overview(a,scope,{from:day,to:day})).teamPerformance).toEqual([]);
+  const leaderResponse=await get(leader,path('/workbench'),{...scope,from:day,to:day});
+  expect(leaderResponse.status).toBe(200);
+  expect(leaderResponse.body.data.entries.every((e:{payeeId:string})=>e.payeeId===leader.sub)).toBe(true);
   expect((await workbench.overview(other,scope,{from:day,to:day})).groups).toHaveLength(0);
   expect((await workbench.overview(a,scope,{from:day,to:day})).groups.map(g=>g.payeeId)).toEqual([a.sub]);
  });
