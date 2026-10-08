@@ -347,7 +347,7 @@ export async function updateKeywordNovel(user: AuthUser, scope: Scope, id: strin
     return {id};
   });
 }
-export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'ongoing' | 'registered' | 'retired' = 'all') {
+export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'owned' | 'ongoing' | 'registered' | 'retired' = 'all') {
   await authorize(user, scope);
   await synchronizeKeywords(scope);
   return withTransaction(async (c) => {
@@ -362,11 +362,11 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
     const running = `NOT EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.account_id=k.account_id AND er.project_id=k.project_id AND er.mode='stopped')`;
     const allocation = `(k.id IS NOT NULL AND k.current_binding_id IS NULL AND k.lifecycle_status='available' AND ${readiness} AND ${unused} AND ${noLiveBinding} AND ${running})`;
     const claimAccess = user.role === 'creator' ? `AND k.priority_until<=NOW(3) AND NOT EXISTS(SELECT 1 FROM users cu JOIN users parent ON parent.id=cu.parent_id AND parent.role='leader' WHERE cu.id=? )` : '';
-    const filter = view === 'available' ? `${allocation} ${claimAccess}`
+    const filter = view === 'owned' ? '(b.executor_id=? OR b.leader_id=?)' : view === 'available' ? `${allocation} ${claimAccess}`
       : view === 'ongoing' ? `k.lifecycle_status IN ('reserved','assigned','active') AND b.released_at IS NULL AND b.stop_new_use_at IS NULL AND b.release_status<>'requested' AND ${readiness} AND NOT ${ownershipConflictSql()}`
       : view === 'registered' ? `${compositionCount}>0`
       : view === 'retired' ? `k.lifecycle_status='retired'` : '1=1';
-    const filterArgs = view === 'registered' ? workScope.bindings : view === 'available' && user.role === 'creator' ? [user.sub] : [];
+    const filterArgs = view === 'owned' ? [user.sub, user.sub] : view === 'registered' ? workScope.bindings : view === 'available' && user.role === 'creator' ? [user.sub] : [];
     const args = [scope.projectId, scope.accountId, `%${search}%`, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs];
     const where = `p.project_id=? AND ${planAccountSql()}=? AND (p.keyword LIKE ? OR p.novel_title LIKE ?)
       AND (k.id IS NULL OR (k.project_id=p.project_id AND k.lifecycle_status<>'archived'))

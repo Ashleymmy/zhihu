@@ -1,0 +1,10 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { RateSettings } from '@zhihu-koc/shared-components'
+import { http } from '../stores/auth'
+const groups = ref<{ id: string; name: string; modules: { id: string; name: string }[] }[]>([]), error = ref(''), selected = ref<{ projectId: string; moduleId: string } | null>(null)
+async function load() { error.value = ''; try { const modules = await http.get<{ id: string; name: string; status: string; capabilities: string[] }[]>('/modules'); groups.value = await Promise.all((await http.get<{ id: string; name: string; isEnabled: boolean }[]>('/projects')).filter(p => p.isEnabled).map(async p => { const accounts = await http.get<{ moduleId: string; status: string }[]>('/projects/' + p.id + '/integrations'); return { id: p.id, name: p.name, modules: modules.filter(m => m.status === 'enabled' && m.capabilities.includes('role-rates') && accounts.some(a => a.status === 'active' && a.moduleId === m.id)) } })) } catch { error.value = '计费规则暂时没加载出来，请重试。' } }
+onMounted(load)
+</script>
+<template><section class="page-stack"><header class="page-header"><div><h1>计费规则</h1><p>查看各项目现行单价，或设置未来生效的单价。</p></div></header><div v-if="error" role="alert"><p>{{ error }}</p><button @click="load">重试</button></div><article v-for="project in groups" :key="project.id" class="panel rate-project"><h2>{{ project.name }}</h2><div v-for="module in project.modules" :key="module.id"><span>{{ module.name }}</span><button @click="selected = { projectId: project.id, moduleId: module.id }">查看与设置单价</button></div></article><p v-if="!error && !groups.length">暂无可以设置单价的项目。</p><RateSettings v-if="selected" :open="true" :project-id="selected.projectId" :module-id="selected.moduleId" :http="http" @close="selected = null" /></section></template>
+<style scoped>.rate-project{padding:22px}.rate-project h2{font-size:18px}.rate-project>div{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between}.rate-project button{padding:11px 16px;background:#195e62;color:#fff;border:0;border-radius:8px;cursor:pointer}</style>

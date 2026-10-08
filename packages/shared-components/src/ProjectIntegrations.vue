@@ -29,6 +29,7 @@ async function link() {
   }
 }
 async function unlink(id: string) {
+  if (!confirm('停止此项目的数据接入后，新任务和报表处理会暂停，已有记录保留。确定停止接入？')) return
   try {
     await w.http.del('/projects/' + props.projectId + '/integrations/' + id)
     await load()
@@ -40,23 +41,20 @@ watch(() => props.projectId, load, { immediate: true })
 </script>
 <template>
   <article class="panel" style="padding: 24px">
-    <h2>业务接入</h2>
+    <h2>接入状态</h2>
     <p v-if="error" role="alert">{{ error }}</p>
-    <p v-if="!linked.length">此项目尚未关联接入账号。</p>
+    <p v-if="!linked.length">此项目还没有接通业务服务。</p>
     <div v-for="a in linked" :key="a.id" style="display: flex; gap: 16px; margin: 12px 0; align-items: center">
-      <span>{{ a.name }} · {{ a.moduleId }} · {{ a.accountKey }} <small style="color: var(--ink-soft)">{{ a.status === 'active' ? '启用' : '已停用' }}</small></span
-      ><button v-if="['developer','admin'].includes(w.role.value)" class="row-action" @click="unlink(a.id)">解除关联</button>
+      <span>{{ w.modules.value.find(m=>m.id===a.moduleId)?.name ?? '业务服务' }} <small style="color: var(--ink-soft)">{{ a.status === 'active' ? '已接通' : '已停用' }}</small></span>
     </div>
-    <form v-if="['developer','admin'].includes(w.role.value)" @submit.prevent="link">
+    <form v-if="['developer','admin'].includes(w.role.value) && available.length" @submit.prevent="link">
       <select v-model="selected" required>
-        <option value="">选择接入账号</option>
+        <option value="">选择业务服务</option>
         <option v-for="a in available" :key="a.id" :value="a.id">
-          {{ a.name }} · {{ a.moduleId }} · {{ a.accountKey }}
+          {{ w.modules.value.find(m=>m.id===a.moduleId)?.name ?? a.name }}
         </option></select
-      ><button class="row-action" :disabled="!available.length">关联账号</button>
+      ><button class="row-action" :disabled="!selected">接通服务</button>
     </form>
-    <p v-if="['developer','admin'].includes(w.role.value) && !error && !available.length" style="color: var(--ink-soft); font-size: 12px; margin: 10px 0 0">
-      暂无可关联的接入账号；当前项目已关联全部可用账号，或该模块的账号由部署配置管理。
-    </p>
+    <details v-if="['developer','admin'].includes(w.role.value) && linked.length"><summary>管理连接</summary><p>停止接入会暂停该项目的新任务和报表处理。</p><button v-for="a in linked" :key="a.id" class="row-action" @click="unlink(a.id)">停止{{ w.modules.value.find(m=>m.id===a.moduleId)?.name ?? '业务服务' }}接入</button></details>
   </article>
 </template>

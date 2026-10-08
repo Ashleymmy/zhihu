@@ -6,7 +6,7 @@ import {errorText,requestKey,type EngineContext} from './context'
 import {keywordProgress,type KeywordSummary} from './keyword-progress'
 import NovelInfo from './NovelInfo.vue'
 import AssignExecutor from './AssignExecutor.vue'
-const props=defineProps<{context:EngineContext;initialSearch?:string;initialCreate?:boolean}>(),emit=defineEmits<{refresh:[];navigate:[path:string]}>()
+const props=defineProps<{context:EngineContext;initialView?:'all'|'available'|'owned';initialSearch?:string;initialCreate?:boolean}>(),emit=defineEmits<{refresh:[];navigate:[path:string]}>()
 interface Word{canAssignRetro?:number;retroFromDate?:string;novelTitle?:string;novelUrl?:string;novelUrlOverride?:string;canEditNovel?:number;mappingId?:string;landingUrl?:string;popularizeType?:number;ownershipConflict?:number;canEditFailed?:number;canCopyFailed?:number;canDeleteFailed?:number;allocationReady:number;usageReady?:number;hasUsageHistory?:number;planStatus?:string;hasUpstreamPlan?:number;readOnly?:number;planId:string;taskName?:string;compositionCount?:number;ownerName?:string;id:string;keyword:string;taskId:string;lifecycleStatus:string;upstreamStatus:string;syncStatus:string;syncError:string|null;priorityEnded:number;bindingId:string|null;executorId:string|null;leaderId:string|null;releaseStatus:string;usedEverAt:string|null;verificationStatus:string;executorName?:string}
 const list=ref<Word[]>([]),total=ref(0),page=ref(1),search=ref(props.initialSearch??''),busy=ref(false),error=ref(''),notice=ref(''),createOpen=ref(!!props.initialCreate)
 const assignment=ref<Word|null>(null)
@@ -39,7 +39,7 @@ function canApproveRelease(w:Word){return admin.value&&!Number(w.hasUsageHistory
 function canStop(w:Word){return !!w.usedEverAt&&w.lifecycleStatus!=='retired'}
 function hasMoreActions(w:Word){return !!w.bindingId&&(canRequestRelease(w)||canApproveRelease(w)||canStop(w))}
 function price(w:Word){const p=prices.value.find(p=>p.taskId===w.taskId&&p.payeeId===props.context.userId&&p.priceStatus==='published'&&p.startDay<=today&&(!p.endDay||p.endDay>today));return p?'¥'+Number(p.price)+' / 单':'等待设置单价'}
-async function load(){const r=await props.context.http.get<{list:Word[];total:number;summary?:KeywordSummary;readAt?:string}>('/keywords',{...props.context.scope,page:page.value,pageSize:25,search:search.value});list.value=r.list;total.value=r.total;summary.value=r.summary??null}
+async function load(){const r=await props.context.http.get<{list:Word[];total:number;summary?:KeywordSummary;readAt?:string}>('/keywords',{...props.context.scope,page:page.value,pageSize:25,search:search.value,view:props.initialView??'all'});list.value=r.list;total.value=r.total;summary.value=r.summary??null}
 async function run(fn:()=>Promise<unknown>){if(busy.value)return;busy.value=true;error.value='';try{await fn();await load()}catch(e){error.value=errorText(e)}finally{busy.value=false}}
 function post(path:string,data:object={},key:string=requestKey()){return props.context.http.post(path,{...props.context.scope,...data,requestKey:key})}
 function choose(w:Word,a:string){
@@ -48,7 +48,7 @@ function choose(w:Word,a:string){
 }
 async function openFailed(){
  for(let candidatePage=1;candidatePage<=Math.ceil(total.value/25);candidatePage++){
-  const result=await props.context.http.get<{list:Word[];total:number}>('/keywords',{...props.context.scope,page:candidatePage,pageSize:25,search:search.value});
+  const result=await props.context.http.get<{list:Word[];total:number}>('/keywords',{...props.context.scope,page:candidatePage,pageSize:25,search:search.value,view:props.initialView??'all'});
   const failed=result.list.find(w=>w.syncStatus==='failed'&&(w.canEditFailed||w.canCopyFailed));
   if(failed){page.value=candidatePage;list.value=result.list;choose(failed,failed.canEditFailed?'edit-retry':'copy-retry');return}
  }
@@ -67,7 +67,7 @@ async function perform(){const w=selected.value;if(!w)return;
 let poll:ReturnType<typeof setInterval>|undefined
 onMounted(()=>{poll=setInterval(()=>{if(!document.hidden&&!busy.value&&!selected.value)void run(async()=>{})},15000)})
 onUnmounted(()=>{if(poll)clearInterval(poll)})
-onMounted(()=>run(async()=>{prices.value=await fetchAllPages(params=>props.context.http.get<{list:typeof prices.value;total:number}>('/price-agreements',{...props.context.scope,...params}),100,row=>row.versionId)}))
+onMounted(()=>run(async()=>{if(props.context.adminDuty!=='operations')prices.value=await fetchAllPages(params=>props.context.http.get<{list:typeof prices.value;total:number}>('/price-agreements',{...props.context.scope,...params}),100,row=>row.versionId)}))
 </script>
 <template><section class="work-card"><div class="section-heading"><div><h2>{{admin?'关键词管理':context.role==='leader'?'团队关键词':'我的关键词'}}</h2><p>{{admin?'创建的关键词先进入词库：前 30 分钟团长优先领取，之后独立达人也可以领取。':context.role==='leader'?'创建或领取关键词后分发给团队成员，也可以分配给自己使用。':'可自主创建关键词，创建后自动归属本人；关键词一经使用不可转给他人。'}}</p></div><button class="primary" :disabled="busy" @click="openCreate">创建关键词</button></div>
 <p v-if="context.options.integrationMode==='simulation'" class="engine-note">当前是本地联测账号，关键词和作品用于测试，不会提交到真实知乎。</p>

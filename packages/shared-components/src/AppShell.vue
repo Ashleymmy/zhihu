@@ -11,6 +11,7 @@ export interface NavItem {
 export interface NavGroup {
   label: string
   items: NavItem[]
+  collapsed?: boolean
 }
 
 export interface ShellAnnouncement {
@@ -35,7 +36,7 @@ const emit = defineEmits<{
 const mobileOpen = ref(false)
 const searchOpen = ref(false)
 const searchQuery = ref('')
-const openGroups = ref<Set<number>>(new Set(props.groups.map((_, i) => i)))
+const openGroups = ref<Set<number>>(new Set(props.groups.flatMap((group, i) => group.collapsed ? [] : [i])))
 const openItems = ref(new Set<string>())
 watch(() => props.currentPath, path => {
   for (const group of props.groups) for (const item of group.items)
@@ -49,7 +50,7 @@ function toggleItem(key: string) {
 watch(
   () => props.groups.map((group) => group.label).join('|'),
   () => {
-    openGroups.value = new Set(props.groups.map((_, i) => i))
+    openGroups.value = new Set(props.groups.flatMap((group, i) => group.collapsed ? [] : [i]))
   },
 )
 
@@ -127,9 +128,9 @@ const initials = computed(() => props.userName.slice(0, 2).toUpperCase())
   <div class="studio-app" :data-menu-open="mobileOpen">
     <aside class="studio-nav">
       <div class="studio-brand">
-        <span class="studio-mark">O</span>
+        <span class="studio-mark">T</span>
         <div>
-          <strong>OPC</strong><span>Desk / {{ roleLabel }}</span>
+          <strong>TIMO</strong><span>{{ roleLabel }}</span>
         </div>
       </div>
       <nav class="studio-nav-scroll">

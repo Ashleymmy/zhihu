@@ -8,6 +8,7 @@ import { ModuleRuntime } from './module-runtime';
 import { financeRouter } from './finance-routes';
 import { staffRouter } from './staff';
 import { createRateRouter } from './rate-routes';
+import { dashboard } from './dashboard';
 import {
   listAccounts,
   createAccount,
@@ -32,6 +33,12 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   r.use('/finance',financeRouter);
   r.use('/staff',staffRouter);
   r.use('/rates',createRateRouter(runtime));
+  r.get('/dashboard', asyncHandler(async (req, res) => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+    const query = z.object({ projectId: id.optional(), from: date.default(today.slice(0, 8) + '01'), to: date.default(today) }).parse(req.query);
+    if (query.from > query.to) throw new AppError(422, 42200, '起始日期不能晚于结束日期');
+    ok(res, await dashboard(runtime, req.user, { from: query.from, to: query.to }, query.projectId));
+  }));
   r.get(
     '/integrations',
     asyncHandler(async (req, res) => ok(res, await listAccounts(req.user))),

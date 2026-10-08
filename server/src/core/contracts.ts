@@ -58,6 +58,20 @@ export interface BusinessModule {
   financeProvider?: FinanceProvider;
   accountLifecycle?: ModuleAccountLifecycle;
   rateProvider?: ModuleRateProvider;
+  todoProvider?: ModuleTodoProvider;
+}
+
+export interface TodoItem {
+  kind: string;
+  count: number;
+  label: string;
+  actor: string;
+  actionLabel: string;
+  path: string;
+}
+export interface DashboardMetric extends MetricSummary { path: string }
+export interface ModuleTodoProvider {
+  overview(scope: DataScope, user: AuthUser): Promise<{ todos: TodoItem[]; metrics: DashboardMetric[] }>;
 }
 
 export interface RateMetricDefinition {
