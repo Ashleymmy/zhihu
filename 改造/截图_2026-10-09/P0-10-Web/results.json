@@ -1,0 +1,42 @@
+[
+  {
+    "account": "admin",
+    "width": 1440,
+    "passed": true
+  },
+  {
+    "account": "admin",
+    "width": 375,
+    "passed": true
+  },
+  {
+    "account": "leader_wang",
+    "width": 1440,
+    "passed": true
+  },
+  {
+    "account": "leader_wang",
+    "width": 375,
+    "passed": true
+  },
+  {
+    "account": "creator_li",
+    "width": 1440,
+    "passed": true
+  },
+  {
+    "account": "creator_li",
+    "width": 375,
+    "passed": true
+  },
+  {
+    "account": "creator_chen",
+    "width": 1440,
+    "passed": true
+  },
+  {
+    "account": "creator_chen",
+    "width": 375,
+    "passed": true
+  }
+]
