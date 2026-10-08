@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
 
 async function main() {
@@ -38,7 +39,7 @@ async function main() {
       cwd:process.cwd(),windowsHide:true,stdio:['ignore','pipe','pipe'],
       env:{...process.env,NODE_ENV:'test',DB_HOST:target.host,DB_PORT:String(target.port),DB_NAME:target.database,DB_USER:target.user,DB_PASS:target.password,
         OPC_MODULES:'zhihu',QUEUE_DRIVER:'memory',RUN_BACKGROUND_JOBS:'true',PORT:String(port),JWT_SECRET:'isolated_review_test_secret_32_characters',LOG_LEVEL:'silent',
-        ZHIHU_API_BASE:'https://open.zhihu.com',ZHIHU_ACCESS_TOKEN:'mock_access_token',ZHIHU_SECRET_KEY:'mock_secret_key',DEV_DEMO_AUTH:'0'},
+        ZHIHU_API_BASE:'https://open.zhihu.com',ZHIHU_ACCESS_TOKEN:'mock_access_token',ZHIHU_SECRET_KEY:'mock_secret_key',DEV_DEMO_AUTH:'0',ZHIHU_ACTIVATION_ENABLED:'true'},
     });
     let output='';
     child.stdout?.on('data',async chunk=>{
@@ -46,6 +47,12 @@ async function main() {
       if(output.includes('演示数据已写入')&&!output.includes('READY_SENT')){
         output+='READY_SENT';
         const db=await mysql.createConnection(target);
+        const [before]=await db.query('SELECT metric_type,COUNT(*) total FROM zh_metric_facts GROUP BY metric_type ORDER BY metric_type');
+        const migration=await readFile(path.resolve('schema/zhihu/029_metric_types.sql'),'utf8');
+        for(const statement of migration.split(/;\s*(?:\r?\n|$)/).map(part=>part.trim()).filter(Boolean))await db.query(statement);
+        const [after]=await db.query('SELECT metric_type,COUNT(*) total FROM zh_metric_facts GROUP BY metric_type ORDER BY metric_type');
+        if(JSON.stringify(before)!==JSON.stringify(after))throw Error('重复迁移改变了演示业绩');
+        console.log('REVIEW_MIGRATION_REPLAY_VERIFIED',JSON.stringify(after));
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         await db.end();

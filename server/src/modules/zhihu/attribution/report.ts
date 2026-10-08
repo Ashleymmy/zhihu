@@ -1,8 +1,15 @@
 import * as XLSX from 'xlsx';
 import { validateAllianceXlsx, AllianceXlsxValidationError, XLSX_MAX_BYTES, type AllianceUploadFile } from '../zhihu/allianceXlsx';
 import { businessDay, count, day, fail, money, moneyText } from './domain';
-export type ReportKind = 'search' | 'order' | 'combined';
+import { AppError } from '../../../middleware/errors';
+export type MetricType = 'new_user' | 'activation';
+export type ReportKind = 'search' | 'order' | 'combined' | 'activation';
 export const REPORT_TEMPLATE_VERSION = 'zhihu-v3';
+export const REPORT_TEMPLATE_VERSION_ACTIVATION = 'zhihu-activation-v1';
+export const reportTemplate = (kind: ReportKind) => kind==='activation'?REPORT_TEMPLATE_VERSION_ACTIVATION:REPORT_TEMPLATE_VERSION;
+export function assertReportWriteEnabled(kind: ReportKind) {
+  if (kind==='activation' && process.env.ZHIHU_ACTIVATION_ENABLED!=='true') fail('拉活报表尚未开放，财务：待项目开放拉活后再上传', 503);
+}
 export interface SourceRow {
   date: string;
   channel: string;
@@ -10,6 +17,9 @@ export interface SourceRow {
   search: string | null;
   orders: string | null;
   revenue: string | null;
+  activations?: string | null;
+  settlement?: string | null;
+  agency?: string | null;
   promotionTask?: string | null;
   riskAssessment?: string | null;
   conversionRateRaw?: string | number | null;
@@ -33,6 +43,19 @@ const headers = {
   riskAssessment: ['风险判定'],
   conversionRate: ['搜索转化率(单位%)', '搜索转化率'],
 };
+const activationHeaders = {
+  ...headers,
+  date: ['日期', '日期时间', '统计日期', '结算日期', '业务日期'],
+  keyword: ['关键词', '关键字', '搜索词'],
+  activations: ['拉活量', '拉活数', '拉活数量', '拉活人数', '拉活个数', '有效拉活', '激活量'],
+  settlement: ['结算金额', '结算', '补贴金额', '拉活金额', '结算收入', '金额'],
+  agency: ['代理名称', '代理', '代理商', '代理商名称', '机构名称'],
+};
+function typeMismatch(suggestedType: MetricType): never {
+  throw new AppError(422, 42200, suggestedType==='activation'
+    ? '这份文件有“拉活量”列，看起来是拉活表。'
+    : '这份文件有“订单量”列，看起来是拉新订单表。', {extras:{suggestedType}});
+}
 const headerText = (value: unknown) =>
   String(value ?? '')
     .trim()
@@ -54,6 +77,7 @@ export function reportDate(value: unknown, date1904 = false): string {
 const numericText = (value: unknown) => String(value ?? '').replace(/[,，\s¥￥元个单]/g, '');
 const summaryText = (value: unknown) => ['合计', '总计', '小计', '汇总', '总和'].includes(headerText(value));
 export async function parseReport(file: AllianceUploadFile, kind: ReportKind): Promise<ParsedRow[]> {
+  const templateHeaders: Record<keyof typeof activationHeaders, string[]> = kind==='activation'?activationHeaders:{...headers,activations:[],settlement:[],agency:[]};
   const filename = String(file.originalname ?? '').toLowerCase();
   if (filename.endsWith('.xls')) fail('这是旧版 Excel（.xls）。请在 Excel 或 WPS 里点“另存为”，选择 .xlsx 格式后再上传。');
   const buffer = file.buffer;
@@ -90,8 +114,8 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
         const cell = XLSX.utils.decode_cell(address);
         if (cell.r === r) names.push(headerText(candidate[address]?.v));
       }
-      const required = ['date', 'channel', 'keyword', ...(requireMetrics ? kind === 'search' ? ['search'] : kind === 'order' ? ['orders'] : ['search', 'orders'] : [])];
-      if (required.every(k => headers[k as keyof typeof headers].some(alias => names.includes(alias)))) return true;
+      const required = ['date', 'channel', 'keyword', ...(requireMetrics ? kind==='activation'?['activations']:kind === 'search' ? ['search'] : kind === 'order' ? ['orders'] : ['search', 'orders'] : [])];
+      if (required.every(k => (requireMetrics?templateHeaders[k as keyof typeof activationHeaders]:[...templateHeaders[k as keyof typeof activationHeaders],...activationHeaders[k as keyof typeof activationHeaders]]).some(alias => names.includes(alias)))) return true;
     }
     return false;
   };
@@ -108,7 +132,7 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
   const date1904 = workbook.Workbook?.WBProps?.date1904 === true;
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
   let index = -1,
-    columns: Record<keyof typeof headers, number> = {
+    columns: Record<keyof typeof activationHeaders, number> = {
       date: -1,
       channel: -1,
       keyword: -1,
@@ -118,14 +142,23 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
       promotionTask: -1,
       riskAssessment: -1,
       conversionRate: -1,
+      activations: -1,
+      settlement: -1,
+      agency: -1,
     };
   for (let i = 0; i < Math.min(matrix.length, 10); i++) {
     const row = matrix[i].map(headerText);
+    if ((['date','channel','keyword'] as const).every(k=>[...headers[k],...activationHeaders[k]].some(alias=>row.includes(alias)))) {
+      const hasOrders=headers.orders.some(alias=>row.includes(alias)),hasActivations=activationHeaders.activations.some(alias=>row.includes(alias));
+      if (kind==='activation' && hasOrders && !hasActivations) typeMismatch('new_user');
+      if (kind!=='activation' && hasActivations && !hasOrders) typeMismatch('activation');
+      if (!hasOrders && !hasActivations && !headers.search.some(alias=>row.includes(alias))) fail('没找到“订单量”或“拉活量”这一列，请确认上传的是知乎的订单报表或拉活补贴表。');
+    }
     const mapped = Object.fromEntries(
-      Object.entries(headers).map(([k, aliases]) => [k, row.findIndex((x) => aliases.includes(x))]),
+      Object.entries(templateHeaders).map(([k, aliases]) => [k, kind==='activation'?(aliases.map(alias=>row.indexOf(alias)).find(index=>index>=0)??-1):row.findIndex((x) => aliases.includes(x))]),
     ) as typeof columns;
     if (mapped.date >= 0 && mapped.channel >= 0 && mapped.keyword >= 0) {
-      for (const aliases of Object.values(headers)) {
+      for (const aliases of kind==='activation'?[]:Object.values(headers)) {
         const matches = row.flatMap((name, column) =>
           aliases.includes(name) ? [XLSX.utils.encode_col(range.s.c + column)] : [],
         );
@@ -137,7 +170,7 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
     }
   }
   if (index < 0) fail('缺少日期、渠道名称或关键词表头');
-  if ((kind !== 'order' && columns.search < 0) || (kind !== 'search' && columns.orders < 0))
+  if (kind==='activation'?columns.activations<0:(kind !== 'order' && columns.search < 0) || (kind !== 'search' && columns.orders < 0))
     fail('报告类型与指标列不一致');
   if (matrix.length - index - 1 > 10000) fail('每批最多 10000 行');
   const rows: ParsedRow[] = [];
@@ -151,6 +184,7 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
       search: null,
       orders: null,
       revenue: null,
+      ...(kind==='activation'?{activations:null,settlement:null,agency:columns.agency<0?null:String(row[columns.agency]??'').trim()||null}:{}),
       promotionTask: columns.promotionTask < 0 ? undefined : String(row[columns.promotionTask] ?? '').trim() || null,
       riskAssessment: columns.riskAssessment < 0 ? undefined : String(row[columns.riskAssessment] ?? '').trim() || null,
       conversionRateRaw: null,
@@ -178,17 +212,19 @@ export async function parseReport(file: AllianceUploadFile, kind: ReportKind): P
       if (value.date > businessDay()) fail(`第 ${number} 行日期是 ${value.date}，还没到这一天`);
       if (!value.channel || !value.keyword) fail(`第 ${number} 行缺少渠道名称或关键词`);
       if (value.keyword.length > 128) fail(`第 ${number} 行关键词超过 128 个字`);
-      for (const name of ['search', 'orders', 'revenue'] as const) {
+      const metrics: ('search'|'orders'|'revenue'|'activations'|'settlement')[]=kind==='activation'?['activations','settlement']:['search','orders','revenue'];
+      for (const name of metrics) {
         const cell = row[columns[name]];
         if (cell === null || cell === undefined || String(cell).trim() === '') continue;
         if (typeof cell === 'number' && (!Number.isFinite(cell) || Math.abs(cell) > Number.MAX_SAFE_INTEGER))
           fail('数值精度不足，请以文本导出大数');
         const text = numericText(cell);
-        try { value[name] = name === 'revenue' ? moneyText(money(text)) : String(count(text)); }
-        catch { fail(`第 ${number} 行${name === 'revenue' ? '收益金额格式不正确' : name === 'orders' ? '订单量不是整数' : '搜索量不是整数'}`); }
+        try { value[name] = name === 'revenue'||name==='settlement' ? moneyText(money(text)) : String(count(text)); }
+        catch { fail(`第 ${number} 行${name==='activations'?'拉活量不是整数':name==='settlement'?'结算金额格式不正确':name === 'revenue' ? '收益金额格式不正确' : name === 'orders' ? '订单量不是整数' : '搜索量不是整数'}`); }
       }
       if (kind === 'search' && value.search === null) fail('搜索报告缺少搜索量');
-      if (kind !== 'search' && value.orders === null) fail(`第 ${number} 行没有订单量`);
+      if (kind==='activation'&&value.activations===null) fail(`第 ${number} 行没有拉活量`);
+      if (kind !== 'search' && kind!=='activation' && value.orders === null) fail(`第 ${number} 行没有订单量`);
       if (kind === 'combined' && value.search === null) fail('综合报告缺少搜索量');
     } catch (e) {
       error = e instanceof Error ? e.message : '行数据无效';

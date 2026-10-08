@@ -241,7 +241,7 @@ attributionRouter.post(
   '/imports',
   upload,
   asyncHandler(async (req, res) => {
-    const q = scopeSchema.extend({ reportKind: z.enum(['search', 'order', 'combined']) }).parse(req.body);
+    const q = scopeSchema.extend({ reportKind: z.enum(['search', 'order', 'combined', 'activation']) }).parse(req.body);
     if (!req.file) fail('缺少报告文件');
     ok(res, await facts.previewImport(req.user, q, req.file, q.reportKind), 201);
   }),
@@ -428,12 +428,19 @@ attributionRouter.post(
   }),
 );
 
-const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date()});
-attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{if(isStaffRole(req.user.role))assertDuty(req.user,'finance');const q=periodSchema.parse(req.query);ok(res,await workbench.overview(req.user,q,q));}));
-attributionRouter.post('/workbench/import',upload,asyncHandler(async(req,res)=>{const q=scopeSchema.parse(req.body);if(!req.file)fail('请选择知乎 Excel 报表');ok(res,await workbench.uploadReport(req.user,q,req.file),202);}));
+const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date(),viewVersion:z.enum(['1','2']).default('1')});
+const billPeriod=(q:z.infer<typeof periodSchema>):workbench.Period=>({from:q.from,to:q.to,...(q.viewVersion==='1'?{metricType:'new_user' as const}:{})});
+attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{
+ if(isStaffRole(req.user.role))assertDuty(req.user,'finance');const q=periodSchema.parse(req.query);
+ const view=await workbench.overview(req.user,q,billPeriod(q));
+ // Old clients format null as zero and cannot label activation. Keep their bill
+ // and confirmation scope on new-user money; preserve unresolved data separately.
+ ok(res,q.viewVersion==='1'?{...view,entries:view.entries.filter(e=>e.amount!==null),pendingEntries:view.entries.filter(e=>e.amount===null)}:view);
+}));
+attributionRouter.post('/workbench/import',upload,asyncHandler(async(req,res)=>{const q=scopeSchema.extend({reportType:z.enum(['new_user','activation']).default('new_user')}).parse(req.body);if(!req.file)fail('请选择知乎 Excel 报表');ok(res,await workbench.uploadReport(req.user,q,req.file,q.reportType),202);}));
 attributionRouter.post('/workbench/confirm',asyncHandler(async(req,res)=>{
  const q=periodSchema.extend({reviewHash:z.string().length(64),acknowledged:z.literal(true),requestKey:z.string().regex(/^[\w.-]{8,110}$/)}).parse(req.body);
- ok(res,await workbench.confirmBills(req.user,q,q,q.requestKey,q.reviewHash));
+ ok(res,await workbench.confirmBills(req.user,q,billPeriod(q),q.requestKey,q.reviewHash));
 }));
 attributionRouter.post('/keywords/:id/distribute',asyncHandler(async(req,res)=>{
  const q=scopeSchema.extend({targetId:idSchema}).parse(req.body);ok(res,await resource.distribute(req.user,q,idSchema.parse(req.params.id),key(req),q.targetId));

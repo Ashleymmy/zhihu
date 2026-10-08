@@ -10,6 +10,7 @@ export interface ApiError {
   requestId?: string
   /** 财务门禁拒绝（50310）时列出的未通过 Gate。 */
   failedGates?: string[]
+  extras?: Record<string, unknown>
 }
 
 export function isApiError(value: unknown): value is ApiError {
@@ -45,6 +46,7 @@ interface RawEnvelope<T> {
   message: string
   requestId?: string
   failedGates?: string[]
+  extras?: Record<string, unknown>
 }
 
 const REFRESH_PATH = '/auth/refresh'
@@ -104,6 +106,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
       status,
       requestId: body?.requestId,
       failedGates: Array.isArray(body?.failedGates) ? body.failedGates : undefined,
+      extras: body?.extras && typeof body.extras==='object' && !Array.isArray(body.extras) ? body.extras : undefined,
     }
   }
 
@@ -118,6 +121,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
           status: response.status,
           requestId: envelope.requestId,
           failedGates: envelope.failedGates,
+          extras: envelope.extras,
         } satisfies ApiError
       }
       return envelope.data

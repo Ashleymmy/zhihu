@@ -214,4 +214,12 @@ describe('简化工作台完整资金流程',()=>{
   })).rejects.toThrow('已有旧系统数据');
   expect((await cutover.getRoute(admin,scope))?.exclusive_from).toBe(earlier);
  });
+ it('上传类型建议保留到 HTTP 错误响应，运营和达人不能绕过财务上传权限',async()=>{
+  const buffer=Buffer.from(`日期,渠道名称,关键词,拉活量\n${day},联测渠道,联测词0,1`);
+  const upload=(actor:AuthUser,reportType:string)=>request(app).post(path('/workbench/import')).set('X-Client-Id','workbench-client-'+actor.sub).set('Authorization','Bearer '+tokens[actor.sub]).field('projectId',scope.projectId).field('accountId',scope.accountId).field('reportType',reportType).attach('file',buffer,'拉活.csv');
+  const wrong=await upload(fin,'new_user');expect(wrong.status,wrong.text).toBe(422);expect(wrong.body.extras).toEqual({suggestedType:'activation'});
+  expect((await upload(ops,'activation')).status).toBe(403);
+  expect((await upload(a,'activation')).status).toBe(403);
+  const gated=await upload(fin,'activation');expect(gated.status,gated.text).toBe(503);expect(gated.body.message).toContain('拉活报表尚未开放');
+ });
 });
