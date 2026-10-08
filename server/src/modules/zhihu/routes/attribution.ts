@@ -14,6 +14,7 @@ import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
 import { assignRetro } from '../attribution/retro-assignment';
 import { historicalWorks } from '../attribution/historical-works';
+import { reviewRisk } from '../attribution/risk-review';
 import { importAnalysis, answerImportAnalysis } from '../attribution/analysis';
 import { listWorks, workActivity, workDetail } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
@@ -373,6 +374,10 @@ attributionRouter.post(
 attributionRouter.get('/evidence/historical-tasks',asyncHandler(async(req,res)=>{
  const q=scopeSchema.merge(pagingSchema).extend({batchId:idSchema.optional(),search:z.string().trim().max(128).optional()}).parse(req.query);
  ok(res,await historicalWorks(req.user,q,q));
+}));
+attributionRouter.post('/attributions/:id/risk-review',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({expectedRevisionId:idSchema,decision:z.enum(['accepted','excluded']),reason:z.string().trim().min(1).max(500)}).parse(req.body);
+ ok(res,await reviewRisk(req.user,q,idSchema.parse(req.params.id),key(req),q));
 }));
 attributionRouter.get(
   '/evidence',

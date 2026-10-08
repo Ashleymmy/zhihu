@@ -36,10 +36,11 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  if(!batch)fail('这份报表不存在或不属于当前项目',404);
  const finance=dutyAllows(user,'finance'),answers=await analysisAnswers(c,platformScope(scope,id));
  const rows=await select(c,`SELECT source.id,source.processing_status,source.error_text,${finance?'source.normalized_json':"JSON_OBJECT('date',JSON_EXTRACT(source.normalized_json,'$.date'),'channel',JSON_EXTRACT(source.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(source.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(source.normalized_json,'$.orders'),'activations',JSON_EXTRACT(source.normalized_json,'$.activations')) normalized_json"},source.fact_id,
-   f.current_result_id,${finance?'r.snapshot_json':'NULL snapshot_json'},r.reason_code,b.executor_id,b.verification_status,
+   f.current_result_id,CAST(f.current_revision_id AS CHAR) revision_id,JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,${finance?'r.snapshot_json':'NULL snapshot_json'},r.reason_code,b.executor_id,b.verification_status,
    EXISTS(SELECT 1 FROM zh_metric_revisions v WHERE v.fact_id=f.id AND v.status='pending') pending_revision,
    ${finance?"src.source_version,src.blocked_reason,(SELECT CAST(COALESCE(SUM(e.amount),0) AS CHAR) FROM opc_income_entries e WHERE e.source_id=src.id) credited":"NULL source_version,NULL blocked_reason,'0' credited"}
    FROM zh_import_rows source LEFT JOIN zh_metric_facts f ON f.id=source.fact_id AND f.account_id=? AND f.project_id=?
+   LEFT JOIN zh_metric_revisions currentRevision ON currentRevision.id=f.current_revision_id
    LEFT JOIN zh_attribution_results r ON r.id=f.current_result_id LEFT JOIN zh_keywords k ON k.id=f.keyword_id
    LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
    ${finance?"LEFT JOIN opc_income_sources src ON src.module_id='zhihu' AND src.account_id=f.account_id AND src.project_id=f.project_id AND src.source_key=CONCAT('fact:',f.id)":""}
@@ -55,7 +56,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    const previous=unique.get(key),before=previous?json<Record<string,string|null>>(previous.normalized_json):null;
    unique.set(key,{...row,normalized_json:{...raw,orders:raw.orders??before?.orders??null,activations:raw.activations??before?.activations??null}} as RecordRow);
  }
- let billable=0n,pendingQuantity=0n,billableAmount=0n,confirmableAmount=0n,unassigned=0,work=0,price=0,conflicts=0;
+ let billable=0n,pendingQuantity=0n,excludedQuantity=0n,billableAmount=0n,confirmableAmount=0n,unassigned=0,work=0,price=0,conflicts=0,risk=0;
  const problems=new Set<string>();
  for(const [key,row] of unique){
    const source=json<Record<string,string|null>>(row.normalized_json),snapshot=row.snapshot_json?json<AttributionSnapshot>(row.snapshot_json):null;
@@ -63,14 +64,17 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    let target:ReturnType<typeof allocations>|null=null;
    if(snapshot){try{target=allocations(snapshot);}catch{price++;problems.add(key);}}
    const paid=target&&target.list.length>0,internal=!!target&&money(target.staffAmount)>0n;
-   if(paid&&target){billable+=quantity;billableAmount+=money(target.total);}else if(!internal)pendingQuantity+=quantity;
+   const excluded=snapshot?.riskReview?.decision==='excluded'||row.reason_code==='RISK_EXCLUDED';
+   if(excluded)excludedQuantity+=quantity;
+   else if(paid&&target){billable+=quantity;billableAmount+=money(target.total);}else if(!internal)pendingQuantity+=quantity;
    const code=String(row.reason_code??row.error_text??'');
    if(['BINDING_MISSING','PERIOD_AMBIGUOUS'].includes(code)){unassigned++;problems.add(key);}
    if(code.startsWith('PRICE_')||code==='REPORT_INCOMPLETE'){price++;problems.add(key);}
-   if(row.fact_id&&row.executor_id&&row.verification_status!=='passed'){work++;problems.add(key);}
+   if(row.fact_id&&row.executor_id&&row.verification_status!=='passed'&&!excluded){work++;problems.add(key);}
+   if(code==='RISK_REVIEW_REQUIRED')risk++;
    if(Number(row.pending_revision)){conflicts++;problems.add(key);}
-   if(code||!row.fact_id)problems.add(key);
-   if(paid&&target&&route?.mode!=='stopped'&&!code&&!Number(row.pending_revision)&&row.verification_status==='passed'&&String(row.source_version??'')!==String(row.current_result_id))confirmableAmount+=money(target.total)-money(String(row.credited??'0'),true);
+   if(code&&code!=='RISK_EXCLUDED'||!row.fact_id)problems.add(key);
+   if(paid&&target&&route?.mode!=='stopped'&&(!code||code==='RISK_EXCLUDED')&&!Number(row.pending_revision)&&row.verification_status==='passed'&&String(row.source_version??'')!==String(row.current_result_id))confirmableAmount+=money(target.total)-money(String(row.credited??'0'),true);
  }
  const channel=usable.filter(r=>['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH'].includes(String(r.error_text))).length;
  const keywords=usable.filter(r=>r.error_text==='KEYWORD_UNKNOWN').length;
@@ -84,9 +88,10 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    stage('work','核对作品',work,'相关作品已核验',`${work} 条记录等待补登记或核验作品，金额已算出的部分会保留`),
    stage('amount','计算金额',price+conflicts,finance?`${type}可计费 ${billable} ${unit}，共 ¥${cash(billableAmount)}`:'金额由财务核对',`${price?price+' 条记录需要财务核对单价或数量':''}${price&&conflicts?'；':''}${conflicts?conflicts+' 条记录的报表数字不同，等待财务选择':''}`),
  ];
+ if(risk){steps[5].status='ask';steps[5].summary+=`${price||conflicts?'；':'，'}${risk} 条风险记录的金额已保留，等待运营核实后才能确认`;}
  if(choices.length){
    steps[5].asks=choices.map(({ask})=>({...ask,text:ask.text+(answers.get(ask.id)==='skip'?'（已暂时跳过，仍可在这里处理）':'')}));
-   if(choices.every(({ask})=>answers.get(ask.id)==='skip')&&!price)steps[5].status='skipped';
+   if(choices.every(({ask})=>answers.get(ask.id)==='skip')&&!price&&!risk)steps[5].status='skipped';
  }
  for(const [kind,index] of [['channel',1],['keyword',2]] as const){
    const matching=names.filter(choice=>choice.kind===kind);
@@ -106,12 +111,12 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  const run:AnalysisRun={id,fileName:String(batch.file_name),source:'知乎'+type+'报表',createdAt:String(batch.created_at),
    status:failed?'failed':running?'running':need?'needs_input':'done',progress:{done:rows.length-pending,total:rows.length},steps,
    conclusion:{title:finance?'本次报表可计费':'报表处理结果',value:finance?'¥'+cash(billableAmount):rows.length+' 行',
-     summary:finance?`${billable} ${unit}可计费 · 可确认金额 ¥${cash(confirmableAmount)}`:`${rows.length} 行已保留，金额由财务核对`,
+     summary:finance?`${billable} ${unit}可计费${excludedQuantity?' · '+excludedQuantity+' '+unit+'已核实不计费':''} · 可确认金额 ¥${cash(confirmableAmount)}`:`${rows.length} 行已保留，金额由财务核对`,
      pendingText:need?`${need} 条记录仍需处理${finance&&pendingQuantity?'，涉及 '+pendingQuantity+' '+unit:''}，其他记录可以继续核对。`:'没有待处理的数据问题。',
      actions:[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary'},...(invalid&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
- return {...run,nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
+ return {...run,riskCases:[...unique.values()].filter(row=>row.reason_code==='RISK_REVIEW_REQUIRED').map(row=>({factId:String(row.fact_id),revisionId:String(row.revision_id),keyword:json<Record<string,string>>(row.normalized_json).keyword,riskAssessment:String(row.risk_assessment??'')})),nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
    candidates:choice.candidates.map(item=>({id:String(item.id),name:String(item.keyword??item.channel_name)}))})),
-   ...(finance?{totals:{billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity)}}:{})};
+   ...(finance?{totals:{billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity),excludedQuantity:String(excludedQuantity)}}:{})};
 }
 export async function importAnalysis(user:AuthUser,scope:Scope,id:string){
  if(!isStaffRole(user.role))fail('报表分析仅管理人员可见',403);

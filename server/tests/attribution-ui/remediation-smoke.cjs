@@ -22,6 +22,10 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_RISK_ONLY==='1'){
+   await require('./risk-review-flow.cjs')({browser,port,out,date});
+   console.log('风险核实与不计费更正全流程通过');return;
+  }
   if(process.env.OPC_REVIEW_HISTORY_ONLY==='1'){
    await require('./name-matching-flow.cjs')({browser,port,out,date});
    await require('./historical-work-flow.cjs')({browser,port,out,date});

@@ -29,6 +29,8 @@ export interface FactSnapshot {
   sources: Partial<Record<'search' | 'orders' | 'revenue' | 'riskAssessment' | 'activations' | 'settlement' | 'agency', { kind: ReportKind; rowId: string }>>;
 }
 export interface AttributionSnapshot {
+  riskAssessment?: string | null;
+  riskReview?: {decision:'accepted'|'excluded';reason:string;reviewedBy:string} | null;
   settlementMismatch?: {expected:string;actual:string} | null;
   metricType?: MetricType;
   activations?: string | null;
@@ -246,6 +248,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   const [revision] = await select(c, 'SELECT * FROM zh_metric_revisions WHERE id=?', [fact.current_revision_id]);
   if (!revision) return;
   const source = json<FactSnapshot>(revision.snapshot_json);
+  const [riskReview]=source.riskAssessment?await select(c,'SELECT decision,reason,reviewed_by FROM zh_risk_reviews WHERE fact_id=? AND revision_id=?',[fact.id,revision.id]):[];
   const metricType:MetricType=fact.metric_type==='activation'?'activation':'new_user';
   const [word] = await select(c, 'SELECT * FROM zh_keywords WHERE id=?', [fact.keyword_id]);
   const [binding] = await select(
@@ -257,6 +260,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   let code: string | null = null;
   const snapshot: AttributionSnapshot = {
     metricType,
+    ...(source.riskAssessment?{riskAssessment:source.riskAssessment,riskReview:riskReview?{decision:riskReview.decision as 'accepted'|'excluded',reason:String(riskReview.reason),reviewedBy:String(riskReview.reviewed_by)}:null}:{}),
     ...(metricType==='activation'?{activations:source.activations??null,settlement:source.settlement??null,agency:source.agency??null}:{}),
     date,
     keyword: String(word.keyword),
@@ -279,7 +283,6 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   if (word.legacy_mode === 'shared_unresolved') code = 'LEGACY_SHARED';
   else if (!binding) code = 'BINDING_MISSING';
   else if (!binding.activated_day || String(binding.activated_day) > date) code = 'PERIOD_AMBIGUOUS';
-  else if (source.riskAssessment) code = 'RISK_REVIEW_REQUIRED';
   else if (metricType==='activation') {
     if(source.activations==null)code='REPORT_INCOMPLETE';
     else try {
@@ -299,8 +302,11 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       else throw e;
     }
   }
+  if(riskReview?.decision==='excluded')code='RISK_EXCLUDED';
+  else if(source.riskAssessment&&!code&&!riskReview)code='RISK_REVIEW_REQUIRED';
+  if(riskReview?.decision==='excluded')snapshot.obligations=snapshot.obligations.map(obligation=>({...obligation,amount:'0.0000'}));
   const state = code
-    ? code === 'REPORT_INCOMPLETE' || code.startsWith('PRICE_')
+    ? code === 'REPORT_INCOMPLETE' || code.startsWith('PRICE_') || code.startsWith('RISK_')
       ? 'matched'
       : 'unmatched'
     : 'matched';
@@ -315,7 +321,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   // a repair changes the blocker and keep a single open todo for the remaining one.
   await c.query("UPDATE zh_exceptions SET status='resolved',resolution='资料已更新，已重新计算',resolved_at=NOW(3) WHERE fact_id=? AND source_row_id IS NULL AND status='open' AND reason_code IN (?) AND NOT(reason_code<=>?)", [fact.id, [...factTodoReasons], code]);
   if (code && factTodoReasons.some(reason=>reason===code)) await exception(c, scope, null, String(fact.id), code);
-  if (source.riskAssessment) {
+  if (source.riskAssessment&&!riskReview) {
     await exception(
       c,
       scope,
@@ -323,10 +329,10 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       String(fact.id),
       'RISK_REVIEW_REQUIRED',
     );
-  } else if (source.riskAssessment === null) {
+  } else if (source.riskAssessment === null||riskReview) {
     await c.query(
-      "UPDATE zh_exceptions SET status='resolved',resolution='已接受的订单来源风险判定为空',resolved_at=NOW(3) WHERE fact_id=? AND reason_code='RISK_REVIEW_REQUIRED' AND status='open'",
-      [fact.id],
+      "UPDATE zh_exceptions SET status='resolved',resolution=?,resolved_at=NOW(3) WHERE fact_id=? AND reason_code='RISK_REVIEW_REQUIRED' AND status='open'",
+      [riskReview?'运营已核实：'+String(riskReview.reason):'已接受的订单来源风险判定为空',fact.id],
     );
   }
   await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+fact.id,'账单更新，待财务核对');
@@ -545,8 +551,10 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       `SELECT CAST(e.id AS CHAR) id,e.reason_code,e.status,e.resolution,CAST(e.source_row_id AS CHAR) source_row_id,
       CAST(e.fact_id AS CHAR) fact_id,CAST(r.batch_id AS CHAR) batch_id,f.metric_type,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,
       ${finance?'v.snapshot_json,r.normalized_json':"NULL snapshot_json,JSON_OBJECT('date',JSON_EXTRACT(r.normalized_json,'$.date'),'channel',JSON_EXTRACT(r.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(r.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(r.normalized_json,'$.orders'),'activations',JSON_EXTRACT(r.normalized_json,'$.activations')) normalized_json"},k.keyword,
+      JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,
       b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name
       FROM zh_exceptions e LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
+      LEFT JOIN zh_metric_revisions currentRevision ON currentRevision.id=f.current_revision_id
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
       LEFT JOIN users executor ON executor.id=b.executor_id LEFT JOIN users leader ON leader.id=b.leader_id
       LEFT JOIN zh_metric_revisions v ON v.source_row_id=e.source_row_id AND v.status='pending'

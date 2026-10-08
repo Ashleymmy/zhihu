@@ -261,7 +261,7 @@ describe('真实表头的归因、修订与对账', () => {
     expect((await entries('draft')).map((e) => e.amount).sort()).toEqual(['-130.0000', '-150.0000']);
     expect((await entries('confirmed')).map((e) => e.amount).sort()).toEqual(['1300.0000', '1500.0000']);
   });
-  it('非空风险即使订单同值也形成修订；接受风险来源后不能生成应付或冒充有效订单', async () => {
+  it('非空风险即使订单同值也形成修订；照常计价但不能确认或冒充已核实订单', async () => {
     const low = (await entries('draft')).find((e) => e.relation_type === 'leader_creator')!;
     const risk = await upload(feedback(90, '平台待核实', 1001));
     await expect(
@@ -271,9 +271,9 @@ describe('真实表头的归因、修订与对账', () => {
     expect(await current()).toMatchObject({
       orders: '90',
       reason_code: 'RISK_REVIEW_REQUIRED',
-      obligations: [],
       agencyMargin: null,
     });
+    expect(((await current()).obligations as {amount:string}[]).map(item=>item.amount).sort()).toEqual(['1170.0000','1350.0000']);
     await expect(statements.previewStatement(admin, scope, key(), factId)).rejects.toThrow('来源未完成');
     await expect(
       statements.confirmStatement(leader, scope, String(low.id), key(), String(low.input_hash)),
