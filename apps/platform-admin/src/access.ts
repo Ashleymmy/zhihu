@@ -16,12 +16,17 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
   const has = (permission: string) =>
     user.permissions?.includes(permission) ?? false
   const duty = user.role === 'operator' ? 'operations' : user.role === 'admin' ? (user.adminDuty ?? 'all') : 'all'
+  if (path === '/me') return true
+  if (path === '/rates') return isStaffRole(user.role) && duty !== 'operations'
+  if (path === '/income' || path === '/academy' || path === '/task-hall') return !isStaffRole(user.role)
+  if (path === '/tasks' || path === '/works') return duty !== 'finance'
+  if (path === '/data-issues') return isStaffRole(user.role) && duty !== 'finance'
   if (path === '/system/monitor') return isStaffRole(user.role) && duty !== 'finance' && has('team.view')
   if (path === '/account/security') return true
   if (user.role === 'creator' && ['/projects', '/modules', '/finance'].some(p => path === p || path.startsWith(p + '/') && p !== '/modules')) return false
   if (
     duty === 'finance' &&
-    !['/dashboard', '/finance', '/modules'].includes(path) &&
+    !['/dashboard', '/finance', '/modules', '/rates', '/me'].includes(path) &&
     !path.startsWith('/modules/')
   )
     return false

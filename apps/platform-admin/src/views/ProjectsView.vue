@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import ProjectTools from '../composition/ProjectTools.vue'
 import { ProjectIntegrations } from '@zhihu-koc/shared-components'
 import type { Project } from '@zhihu-koc/shared-contracts/core'
 import { useAuthStore, apis } from '../stores/auth'
@@ -92,7 +93,7 @@ async function createProject() {
 }
 
 async function deleteProject(id: string) {
-  if (!confirm('确定要禁用此项目？')) return
+  if (!confirm('停用后，成员将不能继续领取任务和提交作品，已有记录仍会保留。确定停用此项目？')) return
   try {
     await apis.projects.disable(id)
     selected.value = null
@@ -109,8 +110,8 @@ onMounted(load)
   <div class="page-stack">
     <header class="page-header">
       <div>
-        <p class="eyebrow">PROJECTS / MANAGEMENT</p>
-        <h1>业务项目</h1>
+
+        <h1>项目设置</h1>
       </div>
       <button v-if="useAuthStore().user?.permissions?.includes('project.manage')" class="primary-action" @click="showCreate = true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -135,7 +136,7 @@ onMounted(load)
       {{ error }}
     </div>
 
-    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: start">
+    <div class="project-settings-layout">
       <aside style="display: flex; flex-direction: column; gap: 10px">
         <div
           v-if="!loading && !projects.length"
@@ -166,7 +167,7 @@ onMounted(load)
       </aside>
 
       <div v-if="selected" style="display: flex; flex-direction: column; gap: 20px">
-        <ProjectIntegrations :project-id="selected.id" />
+        <ProjectIntegrations :project-id="selected.id" /><ProjectTools :key="selected.id" :project-id="selected.id" />
         <article class="panel" style="padding: 20px">
           <div
             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px"
@@ -183,19 +184,13 @@ onMounted(load)
                 >{{ selected.slug }}</small
               >
             </h2>
-            <button
-              v-if="useAuthStore().user?.permissions?.includes('project.manage')"
-              class="row-action danger"
-              @click="deleteProject(selected.id)"
-            >
-              禁用项目
-            </button>
           </div>
           <div style="font-size: 13px; color: var(--ink-soft)">
             状态：<span :class="['status-badge', selected.isEnabled ? 'active' : 'ended']">{{
               selected.isEnabled ? '启用' : '已禁用'
             }}</span>
           </div>
+          <details v-if="useAuthStore().user?.permissions?.includes('project.manage')" style="margin-top:16px"><summary>停用项目</summary><p>停用后暂停新任务和作品提交，已有记录保留。</p><button class="row-action danger" @click="deleteProject(selected.id)">停用此项目</button></details>
         </article>
 
         <article class="panel" style="padding: 20px">
@@ -232,7 +227,7 @@ onMounted(load)
           >
             <span>{{ m.displayName ?? m.username ?? m.userId }}</span>
             <span style="display: flex; align-items: center; gap: 8px">
-              <span class="status-badge draft">{{ m.memberRole }}</span>
+              <span class="status-badge draft">{{ ({owner:'负责人',admin:'管理员',member:'成员',viewer:'观察员'} as Record<string,string>)[m.memberRole] ?? '成员' }}</span>
               <button v-if="useAuthStore().user?.permissions?.includes('project.manage')" class="row-action danger" @click="removeProjectMember(m.userId, m.displayName ?? m.username ?? m.userId)">移出</button>
             </span>
           </div>
@@ -314,3 +309,7 @@ onMounted(load)
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.project-settings-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;align-items:start}.project-settings-layout>div{min-width:0}@media(max-width:760px){.project-settings-layout{grid-template-columns:minmax(0,1fr)}.project-settings-layout form{flex-wrap:wrap}.project-settings-layout :deep(input),.project-settings-layout :deep(select){max-width:100%;min-width:0}}
+</style>

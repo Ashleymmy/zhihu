@@ -30,7 +30,7 @@ export class ModuleRuntime {
         name: m.name,
         version: m.version,
         entryPath: m.entryPath,
-        capabilities: m.capabilities,
+        capabilities: [...m.capabilities, ...(this.entries.get(m.id)?.rateProvider ? ['role-rates'] : [])],
         accountCreation: m.accountCreation ?? 'self_service',
         accountMessage: m.accountMessage ?? null,
         status: this.entries.has(m.id) ? 'enabled' : this.failures.has(m.id) ? 'unavailable' : 'disabled',

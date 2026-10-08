@@ -11,14 +11,14 @@ import WorkActivity from './WorkActivity.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
 import {errorText,type EngineOptions,type Option} from './context'
-const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string;initialCreate?:boolean;initialFrom?:string;initialTo?:string}>()
+const props=defineProps<{http:HttpClient;coreHttp:HttpClient;role:string;userId:string;parentId?:string|null;adminDuty?:string;permissions?:string[];section?:string;pageKind?:string;workFilters?:Record<string,string>;activeTab?:string;initialProjectId?:string;initialAccountId?:string;initialKeyword?:string;initialCreate?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{navigate:[path:string]}>()
 const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loading=ref(false),ready=ref(false),tab=ref('keywords')
 const scope=reactive({projectId:'',accountId:''})
 const options=ref<EngineOptions>({tasks:[],channels:[],mappings:[],users:[]})
 const section=computed(()=>props.section||'operations'),admin=computed(()=>isStaffRole(props.role))
-const title=computed(()=>section.value==='activity'?'数据看板':section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'关键词与团队':props.role==='leader'?'团队业务':'我的关键词')
-const intro=computed(()=>section.value==='activity'?'查看自己和成员登记了多少作品，跟进提交结果。':section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与作品。':props.role==='leader'?'分发关键词、管理团队单价和查看作品。':'选择关键词，提交作品，查看审核结果。')
+const title=computed(()=>props.pageKind==='tasks'?(admin.value?'任务管理':props.role==='leader'?'团队任务':'我的任务'):props.pageKind==='task-hall'?'任务大厅':props.pageKind==='works'?'作品记录':props.pageKind==='issues'?'数据待办':props.pageKind==='income'?'我的收益':props.pageKind==='finance'?'财务':section.value==='activity'?'数据看板':section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'关键词与团队':props.role==='leader'?'团队业务':'我的关键词')
+const intro=computed(()=>props.pageKind==='tasks'?'查看任务进展，领取或分配后提交作品。':props.pageKind==='task-hall'?'挑选可以领取的任务，查看原文后开始创作。':props.pageKind==='works'?'查看作品提交结果，失败的作品可以直接修改重试。':props.pageKind==='issues'?'处理数据问题，补齐后系统自动继续核对。':section.value==='activity'?'查看自己和成员登记了多少作品，跟进提交结果。':section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与作品。':props.role==='leader'?'分发关键词、管理团队单价和查看作品。':'选择关键词，提交作品，查看审核结果。')
 const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...scope},role:isStaffRole(props.role)?'admin':props.role,userId:props.userId,parentId:props.parentId??null,adminDuty:props.adminDuty??'all',options:options.value}))
 const tabs=computed(()=>[{key:'keywords',label:'关键词'}, {key:'works',label:'作品记录'},...(props.role==='creator'?[]:[{key:'prices',label:'定价规则'},{key:'people',label:'人员与权限'}]),...(admin.value?[{key:'channels',label:'渠道与任务'},{key:'issues',label:'数据待办'}]:[])])
 watch([()=>props.activeTab,tabs],()=>{tab.value=tabs.value.some(t=>t.key===props.activeTab)?props.activeTab!:'keywords'},{immediate:true})
@@ -51,15 +51,15 @@ watch(()=>scope.accountId,id=>{if(id){try{localStorage.setItem('zhihu-account-'+
 onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/projects');let saved='';try{saved=localStorage.getItem('zhihu-project-'+props.userId)||''}catch{}scope.projectId=projects.value.find(p=>p.id===props.initialProjectId)?.id??projects.value.find(p=>p.id===saved)?.id??projects.value[projects.value.length-1]?.id??''}catch(e){error.value=errorText(e)}})
 </script>
 <template><section class="engine page-stack">
-<header class="business-heading"><div><p class="business-eyebrow">知乎业务</p><h1>{{title}}</h1><p>{{intro}}</p></div><div class="project-picker"><label v-if="projects.length>1">业务项目<select v-model="scope.projectId"><option v-for="p in projects" :key="p.id" :value="p.id">{{p.name}}</option></select></label><span v-else>{{projects[0]?.name}}</span><label v-if="accounts.length>1">接入账号<select v-model="scope.accountId"><option v-for="a in accounts" :key="a.id" :value="a.id">{{a.name}}</option></select></label></div></header>
+<header class="business-heading"><div><p v-if="!pageKind" class="business-eyebrow">知乎业务</p><h1>{{title}}</h1><p>{{intro}}</p></div><div class="project-picker"><label v-if="projects.length>1">业务项目<select v-model="scope.projectId"><option v-for="p in projects" :key="p.id" :value="p.id">{{p.name}}</option></select></label><span v-else>{{projects[0]?.name}}</span><label v-if="accounts.length>1">数据来源<select v-model="scope.accountId"><option v-for="a in accounts" :key="a.id" :value="a.id">{{a.name}}</option></select></label></div></header>
 <p v-if="error" role="alert" class="engine-error">{{error}}</p><p v-if="loading" role="status">正在加载业务资料…</p>
-<div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先关联知乎接入账号并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">管理项目接入</button></div>
+<div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先在项目设置中接通业务服务并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">设置项目</button></div>
 <template v-if="ready">
  <WorkActivity v-if="section==='activity'" :key="scope.projectId+'-'+scope.accountId+'-'+userId" :context="context" />
  <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-from="initialFrom" :initial-to="initialTo" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
- <template v-else><nav class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
- <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId" :context="context" :initial-search="initialKeyword" :initial-create="initialCreate" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
- <Works v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
+ <template v-else><nav v-if="!pageKind" class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
+ <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId+'-'+pageKind" :context="context" :initial-view="pageKind==='task-hall'?'available':pageKind==='tasks'&&!admin?'owned':'all'" :initial-search="initialKeyword" :initial-create="initialCreate" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
+ <Works :filters="workFilters" v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Prices v-if="tab==='prices'&&role!=='creator'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Channels v-if="tab==='channels'&&admin" :context="context" @refresh="refreshOptions" @projects="emit('navigate','/projects')" />
  <Issues v-if="tab==='issues'&&admin" :context="context" />

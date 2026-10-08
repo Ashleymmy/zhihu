@@ -138,7 +138,7 @@ attributionRouter.get(
   asyncHandler(async (req, res) => {
     const query = scopeSchema
       .merge(pagingSchema)
-      .extend({ search: z.string().max(128).default(''), view: z.enum(['all','available','ongoing','registered','retired']).default('all') })
+      .extend({ search: z.string().max(128).default(''), view: z.enum(['all','available','owned','ongoing','registered','retired']).default('all') })
       .parse(req.query);
     ok(res, await resource.listKeywords(req.user, query, query.page, query.pageSize, query.search, query.view));
   }),

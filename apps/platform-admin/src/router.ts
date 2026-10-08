@@ -3,6 +3,7 @@ import { useAuthStore } from './stores/auth'
 import { workspace } from './stores/platform'
 import { installBusinessRoutes } from './composition/modules'
 import { canAccessPath } from './access'
+import { platformPages } from './platform-pages'
 import { businessRole } from '@zhihu-koc/shared-contracts/core'
 
 const workspaceLoaders = {
@@ -34,7 +35,7 @@ export function createAppRouter(
         name: 'shell',
         component: () => import('./layouts/ShellLayout.vue'),
         meta: { requiresAuth: true },
-        children: [{path:'account/security',name:'account-security',component:()=>import('./views/AccountSecurityView.vue'),meta:{title:'账号安全'}}],
+        children: [...platformPages, {path:'account/security',name:'account-security',component:()=>import('./views/AccountSecurityView.vue'),meta:{title:'账号安全'}}],
       },
       {
         path: '/:pathMatch(.*)*',
@@ -111,16 +112,6 @@ export function createAppRouter(
       )
     )
       return auth.user.role === 'creator' ? '/dashboard' : '/modules'
-    if (
-      auth.user.role === 'admin' &&
-      auth.user.adminDuty === 'finance' &&
-      to.name === 'dashboard'
-    ) {
-      const enabled = workspace.modules.value.filter(
-        (m) => m.status === 'enabled',
-      )
-      if (enabled.length === 1) return enabled[0]!.entryPath
-    }
     return true
   })
   return router

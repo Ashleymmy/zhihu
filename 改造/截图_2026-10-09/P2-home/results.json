@@ -1,0 +1,141 @@
+[
+  {
+    "role": "admin",
+    "destinations": [
+      "dashboard",
+      "tasks",
+      "works",
+      "projects",
+      "rates",
+      "me"
+    ],
+    "widths": [
+      1440,
+      375
+    ],
+    "projectScopeDenied": false,
+    "todoNavigation": true,
+    "metrics": [
+      "works.self",
+      "works.team",
+      "income.new_user",
+      "income.activation"
+    ],
+    "errors": []
+  },
+  {
+    "role": "operations",
+    "destinations": [
+      "dashboard",
+      "tasks",
+      "works",
+      "projects",
+      "data-issues",
+      "me"
+    ],
+    "widths": [
+      1440,
+      375
+    ],
+    "projectScopeDenied": false,
+    "todoNavigation": true,
+    "metrics": [
+      "works.self",
+      "works.team"
+    ],
+    "errors": []
+  },
+  {
+    "role": "finance",
+    "destinations": [
+      "dashboard",
+      "finance",
+      "rates",
+      "me"
+    ],
+    "widths": [
+      1440,
+      375
+    ],
+    "projectScopeDenied": false,
+    "todoNavigation": true,
+    "metrics": [
+      "income.new_user",
+      "income.activation"
+    ],
+    "errors": []
+  },
+  {
+    "role": "leader",
+    "destinations": [
+      "dashboard",
+      "task-hall",
+      "tasks",
+      "income",
+      "academy",
+      "me"
+    ],
+    "widths": [
+      1440,
+      375
+    ],
+    "projectScopeDenied": true,
+    "todoNavigation": true,
+    "metrics": [
+      "works.self",
+      "works.team",
+      "income.new_user",
+      "income.activation",
+      "wallet.available"
+    ],
+    "errors": []
+  },
+  {
+    "role": "creator",
+    "destinations": [
+      "dashboard",
+      "task-hall",
+      "tasks",
+      "income",
+      "academy",
+      "me"
+    ],
+    "widths": [
+      1440,
+      375
+    ],
+    "projectScopeDenied": true,
+    "todoNavigation": true,
+    "metrics": [
+      "works.self",
+      "income.new_user",
+      "income.activation",
+      "wallet.available"
+    ],
+    "errors": []
+  },
+  {
+    "role": "independent",
+    "destinations": [
+      "dashboard",
+      "task-hall",
+      "tasks",
+      "income",
+      "academy",
+      "me"
+    ],
+    "widths": [
+      1440,
+      375
+    ],
+    "projectScopeDenied": true,
+    "todoNavigation": true,
+    "metrics": [
+      "works.self",
+      "income.new_user",
+      "income.activation",
+      "wallet.available"
+    ],
+    "errors": []
+  }
+]
