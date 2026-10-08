@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { closeRedis } from './closeRedis';
 import { config } from '../config';
 
 const memory = new Map<string, number>();
@@ -100,6 +101,6 @@ export async function deleteRateLimit(key: string): Promise<void> {
 }
 
 export async function closeRateLimiter() {
-  if (redis) await redis.quit().catch(() => undefined);
+  if (redis) await closeRedis(redis);
   redis = null;
 }

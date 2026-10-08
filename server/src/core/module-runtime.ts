@@ -59,4 +59,22 @@ export class ModuleRuntime {
       }
     }
   }
+  async dispose() {
+    const results = await Promise.allSettled(
+      this.all().map(async (module) => {
+        try {
+          await module.dispose?.();
+        } catch (error) {
+          this.failures.set(module.manifest.id, 'dispose_failed');
+          throw error;
+        }
+      }),
+    );
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length)
+      throw new AggregateError(
+        failures.map((result) => result.reason),
+        'Module shutdown failed',
+      );
+  }
 }

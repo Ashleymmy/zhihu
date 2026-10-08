@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { closeRedis } from '../utils/closeRedis';
 import { config } from '../config';
 
 interface RevocationStore {
@@ -88,7 +89,7 @@ class RedisRevocationStore implements RevocationStore {
   }
 
   async close() {
-    await this.redis.quit().catch(() => undefined);
+    await closeRedis(this.redis);
   }
 }
 
