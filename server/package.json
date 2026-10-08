@@ -35,7 +35,8 @@
     "test:boundaries": "vitest run --config vitest.opc.config.ts tests/opc/boundaries.spec.ts",
     "bootstrap:admin": "tsx scripts/bootstrap.ts",
     "bootstrap:prod": "node dist/scripts/bootstrap.js",
-    "test:opc:ui": "node tests/opc-ui/smoke.cjs"
+    "test:opc:ui": "node tests/opc-ui/smoke.cjs",
+    "demo:review": "tsx scripts/review-demo.ts"
   },
   "dependencies": {
     "@alicloud/credentials": "2.4.7",
