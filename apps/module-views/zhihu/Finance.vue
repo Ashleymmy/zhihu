@@ -5,9 +5,10 @@ import {CashWallet} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[]}>()
-interface Entry {id:string;keyword:string;date:string;orders:string|null;payerName:string;payeeName:string;payeeId:string;parentId:string|null;role:string;amount:string|null;status:string;kind:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reason:string;next:string;ready:boolean}
+interface Entry {id:string;metricType:ReportType;quantity:string|null;settlementMismatch?:{expected:string;actual:string}|null;keyword:string;date:string;orders:string|null;payerName:string;payeeName:string;payeeId:string;parentId:string|null;role:string;amount:string|null;status:string;kind:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reason:string;next:string;ready:boolean}
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
-interface View {summary:{records:number;orders:string;totalOrders:string;billableOrders:string;pendingOrders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
+interface TypeSummary {records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
+interface View {summary:{records:number;totalRecords:number;orders:string;totalOrders:string;billableOrders:string;pendingOrders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string;byType:Record<'newUser'|'activation',TypeSummary>;staffAmount:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string;activations:string;activationCommission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
 interface Batch {id:string;fileName:string;status:string;lastError?:string}
 interface ImportDetail {fileName:string;counts:{processingStatus:string;total:number}[];rows:{id:string;lineNumber:number;processingStatus:string;errorText:string|null;next?:string}[]}
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
@@ -18,6 +19,11 @@ const walletVersion=ref(0)
 type ReportType='new_user'|'activation'
 function savedReportType():ReportType{try{return localStorage.getItem('zhihu.reportType')==='activation'?'activation':'new_user'}catch{return 'new_user'}}
 const reportType=ref<ReportType>(savedReportType()),suggestedType=ref<ReportType|null>(null)
+const typeFilter=ref<ReportType|''>('')
+const types:ReportType[]=['new_user','activation']
+const typeName=(type:ReportType)=>type==='activation'?'拉活':'拉新'
+const typeKey=(type:ReportType)=>type==='new_user'?'newUser':'activation'
+const unit=(type:ReportType)=>type==='activation'?'个':'单'
 function chooseReportType(value:ReportType){reportType.value=value;suggestedType.value=null;try{localStorage.setItem('zhihu.reportType',value)}catch{}}
 const importResult=ref<ImportDetail|null>(null),importId=ref(''),importPage=ref(1),uploadInput=ref<HTMLInputElement|null>(null)
 const importTotal=computed(()=>importResult.value?.counts.reduce((sum,c)=>sum+c.total,0)??0)
@@ -33,8 +39,13 @@ const money=(v:string|null|undefined)=>{
 const entryStatus=(e:Entry)=>e.status==='confirmed'?'已确认':e.reason||e.blocked||'待财务确认'
 const admin=computed(()=>props.context.role==='admin'&&props.context.adminDuty!=='operations'),creator=computed(()=>props.context.role==='creator')
 const visible=computed(()=>view.value?.entries.filter(e=>props.wallet?e.ownReceivable:e.ownPayable)??[])
-const details=computed(()=>visible.value.filter(e=>!selected.value||e.payeeId===selected.value||(props.context.role==='admin'&&e.parentId===selected.value)))
+const details=computed(()=>visible.value.filter(e=>(!typeFilter.value||e.metricType===typeFilter.value)&&(!selected.value||e.payeeId===selected.value||(props.context.role==='admin'&&e.parentId===selected.value))))
 const detailRows=computed(()=>details.value.slice((detailPage.value-1)*20,detailPage.value*20))
+const total=(field:keyof Pick<TypeSummary,'payable'|'confirmedPayable'|'pendingPayable'|'receivable'|'confirmedReceivable'|'pendingReceivable'>)=>{
+ const value=types.reduce((sum,type)=>{const [whole='0',fraction='']=(view.value?.summary.byType[typeKey(type)][field]??'0').split('.');return sum+BigInt(whole.replace('-',''))*10000n*(whole.startsWith('-')?-1n:1n)+BigInt(fraction.padEnd(4,'0'))*(whole.startsWith('-')?-1n:1n)},0n)
+ const magnitude=value<0n?-value:value
+ return (value<0n?'-':'')+String(magnitude/10000n)+'.'+String(magnitude%10000n).padStart(4,'0')
+}
 let timer:ReturnType<typeof setTimeout>|undefined,disposed=false,polling=false
 function post(path:string,data:object={}){return props.context.http.post(path,{...props.context.scope,...data,requestKey:requestKey()})}
 async function refresh(){view.value=await props.context.http.get<View>('/workbench',{...props.context.scope,...period,viewVersion:'2'});detailPage.value=1;if(view.value.entries.some(e=>e.status==='pending'))detailsOpen.value=true}
@@ -85,7 +96,7 @@ function openDetails(payeeId:string){
 function exportBill(){
  if(!view.value)return
  const cell=(s:unknown)=>'"'+String(s??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"'
- const rows=props.wallet?[['日期','关键词','付款方','收入（元）','状态'],...visible.value.map(e=>[e.date,e.keyword,e.payerName,e.amount,e.status==='confirmed'?'已确认':'待确认'])]
+ const rows=props.wallet?[['日期','类型','关键词','数量','单位','付款方','收入（元）','状态'],...details.value.map(e=>[e.date,typeName(e.metricType),e.keyword,e.quantity,unit(e.metricType),e.payerName,e.amount,entryStatus(e)])]
  :[['收款人','已确认应付（元）','待确认应付（元）','合计（元）','待办'],...view.value.groups.map(g=>[g.name,g.confirmed,g.pending,g.total,g.blockers.join('；')])]
  const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'})
  const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download=(props.wallet?'收入明细':'财务对账单')+'_'+period.from+'_'+period.to+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
@@ -111,11 +122,11 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   </section>
   <form class="period-filter" @submit.prevent="run(refresh)"><label>开始日期<input type="date" v-model="period.from" required /></label><label>结束日期<input type="date" v-model="period.to" required /></label><button :disabled="busy">查看账单</button></form>
   <div v-if="view" class="metric-grid">
-   <article><span>{{wallet?'已确认收入':'应付合计'}}</span><strong>¥{{money(wallet?view.summary.confirmedReceivable:view.summary.payable)}}</strong></article>
-   <article><span>{{wallet?'待确认收入':'已确认应付'}}</span><strong>¥{{money(wallet?view.summary.pendingReceivable:view.summary.confirmedPayable)}}</strong></article>
-   <article><span>{{wallet&&!creator?'本人应得收入':'订单数'}}</span><strong>{{wallet&&!creator?'¥'+money(view.summary.retained):(view.summary.totalOrders??view.summary.orders)}}</strong></article>
+   <article><span>{{wallet?'已确认收入':'应付合计'}}</span><strong>¥{{money(total(wallet?'confirmedReceivable':'payable'))}}</strong></article>
+   <article><span>{{wallet?'待确认收入':'已确认应付'}}</span><strong>¥{{money(total(wallet?'pendingReceivable':'confirmedPayable'))}}</strong></article>
+   <article><span>{{wallet&&!creator?'本人应得收入':'拉新订单'}}</span><strong>{{wallet&&!creator?'¥'+money(total('receivable')):view.summary.totalOrders+' 单'}}</strong><span v-if="!wallet||creator">拉活 {{view.summary.byType.activation.quantity}} 个</span></article>
   </div>
-   <div v-if="view && !wallet" class="analysis-result"><strong>读取 {{view.summary.records}} 行、{{view.summary.totalOrders}} 单。可计费 {{view.summary.billableOrders}} 单 ¥{{money(view.summary.payable)}}；还有 {{view.summary.pendingOrders}} 单在等处理。</strong></div>
+   <div v-if="view" class="analysis-result type-totals"><div v-for="type in types" :key="type"><strong>{{typeName(type)}}：{{wallet?'本人收益':'可计费 '+view.summary.byType[typeKey(type)].billableQuantity+' '+unit(type)}} ¥{{money(view.summary.byType[typeKey(type)][wallet?'receivable':'payable'])}}</strong><span v-if="wallet">已确认 ¥{{money(view.summary.byType[typeKey(type)].confirmedReceivable)}} · 待确认 ¥{{money(view.summary.byType[typeKey(type)].pendingReceivable)}}</span><span v-else>读取 {{view.summary.byType[typeKey(type)].records}} 行 · 共 {{view.summary.byType[typeKey(type)].quantity}} {{unit(type)}} · {{view.summary.byType[typeKey(type)].pendingQuantity}} {{unit(type)}}在等处理</span></div><div v-if="admin&&!wallet"><strong>管理员业绩 ¥{{money(view.summary.staffAmount)}}（不计入应付）</strong></div></div>
 
    <div v-if="view?.summary.issues && admin" class="attention"><strong>{{view.summary.issues}} 项数据需要处理</strong><span>明细已列出原因和下一步，金额已算出的记录可以继续核对。</span></div>
   <div v-if="view && !wallet" class="work-card bill-groups">
@@ -126,13 +137,14 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <ul class="bill-cards"><li v-for="g in view.groups" :key="g.payeeId"><strong>{{g.name}} · ¥{{money(g.total)}}</strong><span>已确认 ¥{{money(g.confirmed)}} · 待确认 ¥{{money(g.pending)}}</span><span>{{g.blockers.join('；')||(g.ready?'可以确认':'已核对完成')}}</span><button @click="openDetails(g.payeeId)">看明细</button></li></ul>
    <p class="empty-state" v-if="!view.groups.length">{{admin?'还没有账单，请先上传报表。':'财务上传报表后，这里会自动显示团队账单。'}}</p>
   </div>
-  <div v-if="admin && confirming && view" class="confirm-box" role="region" aria-label="核对账单"><h2>确认本期账单</h2><p>{{period.from}} 至 {{period.to}}，本期应付合计 <strong>¥{{money(view.summary.payable)}}</strong>。</p><p>审核完成的账单会被确认；有待办的账单继续等待处理。此操作不会发起银行转账。</p><label class="check-label"><input type="checkbox" v-model="checked" />我已核对报表、人员和计算金额</label><div class="engine-actions"><button class="primary" :disabled="!checked||busy" @click="run(confirm)">确认核对结果</button><button :disabled="busy" @click="confirming=false">返回检查</button></div></div>
+  <div v-if="admin && confirming && view" class="confirm-box" role="region" aria-label="核对账单"><h2>确认本期账单</h2><p>{{period.from}} 至 {{period.to}}，本期应付合计 <strong>¥{{money(total('payable'))}}</strong>。</p><p>审核完成的账单会被确认；有待办的账单继续等待处理。此操作不会发起银行转账。</p><label class="check-label"><input type="checkbox" v-model="checked" />我已核对报表、人员和计算金额</label><div class="engine-actions"><button class="primary" :disabled="!checked||busy" @click="run(confirm)">确认核对结果</button><button :disabled="busy" @click="confirming=false">返回检查</button></div></div>
   <details ref="detailPanel" class="work-card bill-details" :open="wallet||detailsOpen" @toggle="detailsOpen=($event.currentTarget as HTMLDetailsElement).open"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected" @click="selected='';detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
-   <div class="engine-table"><table><thead><tr><th>日期</th><th>关键词</th><th>{{wallet?'付款方':'收款人'}}</th><th>订单</th><th>金额（元）</th><th>状态</th><th>下一步</th></tr></thead><tbody><tr v-for="e in detailRows" :key="e.id" :class="{pending:e.status==='pending'}"><td>{{e.date}}</td><td>{{e.keyword}}<small v-if="e.kind==='adjustment'">金额更正</small></td><td>{{wallet?e.payerName:e.payeeName}}</td><td>{{e.orders??'—'}}单</td><td>{{money(e.amount)}}</td><td>{{entryStatus(e)}}</td><td>{{e.next||'已核对完成'}}</td></tr></tbody></table></div>
-   <ul class="bill-cards"><li v-for="e in detailRows" :key="e.id" :class="{pending:e.status==='pending'}"><strong>{{e.keyword}}</strong><span>{{e.date}} · {{e.orders??'—'}}单</span><span>{{wallet?'付款方':'收款人'}}：{{wallet?e.payerName:e.payeeName}}</span><strong>{{e.amount===null?'金额待计算':'¥'+money(e.amount)}}</strong><span>{{entryStatus(e)}}</span><span v-if="e.next">下一步：{{e.next}}</span></li></ul>
+   <label class="type-filter">业绩类型<select v-model="typeFilter" @change="detailPage=1"><option value="">全部</option><option value="new_user">拉新</option><option value="activation">拉活</option></select></label>
+   <div class="engine-table"><table><thead><tr><th>日期</th><th>类型</th><th>关键词</th><th>{{wallet?'付款方':'收款人'}}</th><th>{{typeFilter==='activation'?'拉活量':typeFilter==='new_user'?'订单':'订单 / 拉活量'}}</th><th>金额（元）</th><th>状态</th><th>下一步</th></tr></thead><tbody><tr v-for="e in detailRows" :key="e.id" :class="{pending:e.status==='pending'}"><td>{{e.date}}</td><td><span class="type-tag" :class="e.metricType">{{typeName(e.metricType)}}</span></td><td>{{e.keyword}}<small v-if="e.kind==='adjustment'">金额更正</small></td><td>{{wallet?e.payerName:e.payeeName}}</td><td>{{e.quantity??'—'}}{{unit(e.metricType)}}</td><td>{{money(e.amount)}}<small v-if="e.settlementMismatch" class="settlement-warning">结算金额对不上：报表 ¥{{money(e.settlementMismatch.actual)}}，按拉活量应为 ¥{{money(e.settlementMismatch.expected)}}</small></td><td>{{entryStatus(e)}}</td><td>{{e.next||'已核对完成'}}</td></tr></tbody></table></div>
+   <ul class="bill-cards"><li v-for="e in detailRows" :key="e.id" :class="{pending:e.status==='pending'}"><strong>{{e.keyword}} <span class="type-tag" :class="e.metricType">{{typeName(e.metricType)}}</span></strong><span>{{e.date}} · {{e.quantity??'—'}}{{unit(e.metricType)}}</span><span>{{wallet?'付款方':'收款人'}}：{{wallet?e.payerName:e.payeeName}}</span><strong>{{e.amount===null?'金额待计算':'¥'+money(e.amount)}}</strong><span v-if="e.settlementMismatch" class="settlement-warning">结算金额对不上：报表 ¥{{money(e.settlementMismatch.actual)}}，按拉活量应为 ¥{{money(e.settlementMismatch.expected)}}</span><span>{{entryStatus(e)}}</span><span v-if="e.next">下一步：{{e.next}}</span></li></ul>
    <p class="empty-state" v-if="!details.length">暂无收入记录。报表处理完成后会自动显示。</p><div class="engine-actions" v-if="details.length>20"><button :disabled="detailPage===1" @click="detailPage--">上一页</button><span>第 {{detailPage}} 页</span><button :disabled="detailPage*20>=details.length" @click="detailPage++">下一页</button></div>
   </details>
-  <div v-if="wallet&&context.role==='leader'&&view" class="work-card team-performance"><h2>团队业绩与分成</h2><div class="engine-table"><table><thead><tr><th>达人</th><th>订单量</th><th>给我的团队分成（元）</th></tr></thead><tbody><tr v-for="g in view.teamPerformance" :key="g.executorId"><td>{{g.name}}</td><td>{{g.orders}}单</td><td>{{money(g.commission)}}</td></tr></tbody></table></div><ul class="team-cards"><li v-for="g in view.teamPerformance" :key="g.executorId"><strong>{{g.name}}</strong><span>{{g.orders}}单</span><span>给我的团队分成 ¥{{money(g.commission)}}</span></li></ul></div>
+  <div v-if="wallet&&context.role==='leader'&&view" class="work-card team-performance"><h2>团队业绩与分成</h2><div class="engine-table"><table><thead><tr><th>达人</th><th>订单量</th><th>拉新分成（元）</th><th>拉活量</th><th>拉活分成（元）</th></tr></thead><tbody><tr v-for="g in view.teamPerformance" :key="g.executorId"><td>{{g.name}}</td><td>{{g.orders}}单</td><td>{{money(g.commission)}}</td><td>{{g.activations}}个</td><td>{{money(g.activationCommission)}}</td></tr></tbody></table></div><ul class="team-cards"><li v-for="g in view.teamPerformance" :key="g.executorId"><strong>{{g.name}}</strong><span>拉新 {{g.orders}}单 · 给我的分成 ¥{{money(g.commission)}}</span><span>拉活 {{g.activations}}个 · 给我的分成 ¥{{money(g.activationCommission)}}</span></li></ul></div>
   <details v-if="admin&&!wallet" class="work-card"><summary>报表问题与更正</summary><Issues :context="context" /></details>
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
   <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
@@ -142,6 +154,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
 
 
 <style scoped>
+.type-totals{display:grid;gap:14px}.type-totals>div{display:grid;gap:5px}.type-totals span{font-size:13px}.type-tag{display:inline-block;padding:3px 7px;font-size:12px;border-radius:4px;background:#e5eeee;color:#254f53;white-space:nowrap}.type-tag.activation{background:#ece8f5;color:#604b82}.type-filter{display:flex;align-items:center;gap:12px;margin:16px 0}.type-filter select{width:140px}.settlement-warning{display:block;color:#8e4a08;font-size:12px;line-height:1.5;max-width:230px;margin-top:6px}
 .report-types{border:0;padding:0;margin:18px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.report-types legend{margin-bottom:8px}.report-types label{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:14px;border:1px solid #b5c7c6;border-radius:8px;cursor:pointer}.report-types label.chosen{border-color:#25656a;background:#e6f3f1}.report-types input{grid-row:span 2;width:auto;margin:3px 0}.report-types span{font-size:13px;color:#4b6263}.report-types label:focus-within{outline:2px solid #25656a;outline-offset:3px}
 @media(max-width:600px){.report-types{grid-template-columns:1fr}}
 .team-cards{display:none;list-style:none;padding:0}.team-cards li{display:grid;gap:6px;padding:12px;border-bottom:1px solid var(--line)}

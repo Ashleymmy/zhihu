@@ -165,6 +165,7 @@ export async function listPrices(user: AuthUser, scope: Scope, page: number, pag
   });
 }
 export interface Obligation {
+  priceSource?: 'agreement' | 'role_rate';
   relation: string;
   payerKind: string;
   payerId: string;

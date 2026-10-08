@@ -40,6 +40,8 @@ Web 与后端先完成角色、金额和旧小程序接口回归，再发布；�
 
 新版财务 Web 请求和确认 `/workbench` 时携带 `viewVersion=2`。未传版本的客户端继续使用拉新账单，`entries` 只含已算出金额的行，不能确认隐藏的拉活记录；未计价行保留在 `pendingEntries`，避免旧小程序把空金额显示成零。小程序完成分类型和空金额展示改造后再升级到版本 2。
 
+拉活计价使用平台迁移 `013_rate_rules.sql` 和知乎种价迁移 `030_activation_rates.sql`。029 已可独立发布，因此不向已执行的 029 追加种价。新安装在项目关联建立后补执行同一份幂等种价 SQL；已有规则不会被覆盖。服务层 `summary.byType.new_user` 经现有响应序列化后为 HTTP 字段 `summary.byType.newUser`，`metricType` 的值仍为 `new_user`；拉活使用 `activation`。旧的 `summary.orders`、`payable`、`receivable` 及对应确认金额仍只统计拉新。管理员业绩不计入应付、收款分配和公共资金记录。
+
 入口切换工具为 `deploy/switch_timo_upstream.py`（ECS 的 Python 3，无额外依赖）。先执行预览，完成上面的迁移、队列和角色验证后再加 `--apply`：
 
 ```bash

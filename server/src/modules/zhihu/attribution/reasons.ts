@@ -1,6 +1,7 @@
 export const factTodoReasons = ['BINDING_MISSING', 'PERIOD_AMBIGUOUS', 'PRICE_MISSING', 'PRICE_OVERLAP', 'REPORT_INCOMPLETE'] as const;
 
 export interface ReasonContext {
+  metricType?: string;
   bindingId?: unknown;
   executorId?: unknown;
   executorName?: unknown;
@@ -24,8 +25,8 @@ export function reasonText(code: string | null | undefined, context: ReasonConte
       return { reason: '执行人还没开始', next: `${executor}：提交作品` };
     case 'PERIOD_AMBIGUOUS': return { reason: '早于执行人开始日期', next: '运营：确认从哪天算' };
     case 'PRICE_MISSING':
-    case 'PRICE_OVERLAP': return { reason: '单价还没设置', next: '财务：设置单价' };
-    case 'REPORT_INCOMPLETE': return { reason: '只有搜索数据，没有订单', next: '财务：补传订单报表' };
+    case 'PRICE_OVERLAP': return { reason: '单价还没设置', next: context.metricType==='activation'?'财务：设置拉活单价':'财务：设置单价' };
+    case 'REPORT_INCOMPLETE': return context.metricType==='activation'?{reason:'没有拉活量',next:'财务：补传拉活报表'}:{ reason: '只有搜索数据，没有订单', next: '财务：补传订单报表' };
     case 'RISK_REVIEW_REQUIRED': return { reason: '知乎标了风险', next: '运营：核实' };
     case 'SOURCE_REVISION_PENDING': return { reason: '两份报表数字不同', next: '财务：选用哪个数' };
     case 'WORK_MISSING': return { reason: '还没有登记作品', next: `${executor}：补登记作品` };

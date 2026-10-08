@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import mysql from 'mysql2/promise';
 import { runMigrations, type MigrationTarget } from './migrationRunner';
 export async function runOpcMigrations(
@@ -60,6 +61,9 @@ export async function runOpcMigrations(
       await conn.query(
         "INSERT IGNORE INTO zhihu_account_settings(project_id,account_id,api_base_url,sign_method,config_json) SELECT p.id,pi.account_id,p.api_base_url,p.sign_method,p.config_json FROM projects p JOIN project_integrations pi ON pi.project_id=p.id JOIN integration_accounts a ON a.id=pi.account_id WHERE a.module_id='zhihu' AND a.account_key='legacy'",
       );
+      // A fresh install creates its project after module migrations. Replay this
+      // single idempotent seed once associations exist; never replace user rates.
+      await conn.query(await readFile(path.join(schemaRoot,moduleId,'030_activation_rates.sql'),'utf8'));
     }
   } finally {
     await conn.end();

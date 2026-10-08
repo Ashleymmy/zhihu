@@ -127,8 +127,8 @@ describe('简化工作台完整资金流程',()=>{
   expect(l.groups.map(g=>g.payeeId)).toEqual([leader.sub]);
   expect(l.summary.payable).toBe(l.summary.receivable);
   expect(l.teamPerformance).toEqual([
-   {executorId:a.sub,name:a.displayName,orders:'30',commission:'60.0000'},
-   {executorId:b.sub,name:b.displayName,orders:'20',commission:'60.0000'},
+   {executorId:a.sub,name:a.displayName,orders:'30',commission:'60.0000',activations:'0',activationCommission:'0.0000'},
+   {executorId:b.sub,name:b.displayName,orders:'20',commission:'60.0000',activations:'0',activationCommission:'0.0000'},
   ]);
   expect((await workbench.overview(a,scope,{from:day,to:day})).teamPerformance).toEqual([]);
   const leaderResponse=await get(leader,path('/workbench'),{...scope,from:day,to:day});
