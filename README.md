@@ -44,7 +44,7 @@ docker build -f deploy/Dockerfile.release --build-arg CANDIDATE_IMAGE=zhihu-koc:
 
 后台开关回归：`cd server && npx vitest run tests/unit/background-runtime.spec.ts`。
 
-拉活写入由 `ZHIHU_ACTIVATION_ENABLED` 控制，默认关闭。只有拉活计价、隔离迁移与角色验收全部通过、旧版后台消费者停止并换成兼容版本后，才可在新 API 和后台实例中设为 `true`。迁移 `029_metric_types.sql` 保留旧插入的 `new_user` 默认值，并原子替换同日同词的唯一键；它可重复执行。产生拉活数据后，不能把处理这些数据的后台实例退回不识别类型的版本。
+拉活写入由 `ZHIHU_ACTIVATION_ENABLED` 控制，默认关闭。 首次启用采用两步切换：先把流量切到该开关仍为 `false` 的新版 API，停止旧应用及旧后台；新版后台就绪后，再把两处入口切到同镜像、开关为 `true` 的另一个 API 实例。两个 API 均为 `RUN_BACKGROUND_JOBS=false`，使用不同的预留端口；第二次切换前核验新后台已接管。这样启用新类型之前，旧消费者已退出，同时 API 持续可用。只有拉活计价、隔离迁移与角色验收全部通过、旧版后台消费者停止并换成兼容版本后，才可在新 API 和后台实例中设为 `true`。迁移 `029_metric_types.sql` 保留旧插入的 `new_user` 默认值，并原子替换同日同词的唯一键；它可重复执行。产生拉活数据后，不能把处理这些数据的后台实例退回不识别类型的版本。
 
 新版财务 Web 请求和确认 `/workbench` 时携带 `viewVersion=2`。未传版本的客户端继续使用拉新账单，`entries` 只含已算出金额的行，不能确认隐藏的拉活记录；未计价行保留在 `pendingEntries`，避免旧小程序把空金额显示成零。小程序完成分类型和空金额展示改造后再升级到版本 2。
 
