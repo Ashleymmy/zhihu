@@ -107,3 +107,46 @@ it('同一个未知词匹配成功后，早先重复文件的待处理记录不�
  expect(view.entries.find(e=>e.keyword==='未知词')).toMatchObject({amount:null,reason:'没有执行人'});
  expect(view.summary).toMatchObject({records:5,totalOrders:'18',billableOrders:'7',pendingOrders:'11'});
 });
+
+it('只有报表的词可补录执行人，两类未确认金额自动计算，重复请求不重建归属',async()=>{
+ const {assignRetro}=await import('../../src/modules/zhihu/attribution/retro-assignment');
+ const word=(await resources.listKeywords(admin,scope,1,25,'未分配词')).list[0];
+ expect(word).toMatchObject({read_only:0,can_assign_retro:1,retro_from_date:date});expect(word.lifecycle_status).not.toBe('historical');
+ process.env.ZHIHU_ACTIVATION_ENABLED='true';
+ try{await workbench.uploadReport(admin,scope,csv(`日期,渠道,关键词,拉活量\n${date},待处理渠道,未分配词,2`,'待补拉活.csv'),'activation');}finally{delete process.env.ZHIHU_ACTIVATION_ENABLED;}
+ const requestKey=key(),assigned=await assignRetro(admin,scope,String(word.id),requestKey,{executorId:creator.sub});
+ expect(assigned).toMatchObject({fromDate:date,recalculated:2,executorId:creator.sub});
+ expect(await assignRetro(admin,scope,String(word.id),requestKey,{executorId:creator.sub})).toEqual(assigned);
+ const view=await workbench.overview(admin,scope,{from:date,to:date});
+ expect(view.entries.find(e=>e.keyword==='未分配词'&&e.metricType==='new_user'&&e.payeeId===creator.sub)).toMatchObject({amount:'40.0000',ready:false});
+ expect(view.entries.find(e=>e.keyword==='未分配词'&&e.metricType==='activation'&&e.payeeId===creator.sub)).toMatchObject({amount:'2.4000',ready:false});
+ expect((await q("SELECT id FROM zh_exceptions WHERE fact_id=? AND status='open'",[missingFact]))).toHaveLength(0);
+ expect((await resources.listKeywords(admin,scope,1,25,'未分配词')).list[0]).toMatchObject({lifecycle_status:'active',executor_id:creator.sub,can_assign_retro:0});
+});
+it('团长预留转为本人执行时保留同一条归属，作品或现有执行人属于别人时拒绝',async()=>{
+ const {assignRetro}=await import('../../src/modules/zhihu/attribution/retro-assignment');
+ const word=(await resources.listKeywords(admin,scope,1,25,'团长预留词')).list[0];
+ expect((await assignRetro(admin,scope,String(word.id),key(),{executorId:leader.sub})).id).toBe(word.binding_id);
+ expect((await q('SELECT path_type FROM zh_keyword_bindings WHERE id=?',[word.binding_id]))[0].path_type).toBe('leader_self');
+ await expect(assignRetro(admin,scope,String(word.id),key(),{executorId:creator.sub})).rejects.toThrow('这个关键词已有执行人 人员2，不能改给别人');
+ const [mapping]=await q('SELECT id FROM zh_channel_mappings LIMIT 1');
+ const owned=await resources.createKeyword(admin,scope,key(),{keyword:'别人的历史作品',taskId:'1',mappingId:String(mapping.id),landingUrl:'https://example.com/history',popularizeType:1});
+ await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,4,'KOC抖音','history',1,1,'https://example.com/history')",[owned.planId]);
+ await expect(assignRetro(admin,scope,owned.id,key(),{executorId:creator.sub})).rejects.toThrow('这个关键词已有执行人 人员4，不能改给别人');
+});
+it('补录重算跳过已确认的两类记录，只计算未确认日期并保留全部已入账行',async()=>{
+ const {assignRetro}=await import('../../src/modules/zhihu/attribution/retro-assignment'),statements=await import('../../src/modules/zhihu/attribution/statements');
+ const word=(await resources.listKeywords(admin,scope,1,25,'未分配词')).list[0];
+ const evidence=await statements.submitEvidence(creator,scope,key(),{bindingId:String(word.binding_id),url:'https://example.com/retro-work',description:'补录作品'});
+ await statements.reviewEvidence(admin,scope,evidence.id,key(),true,'已核实');
+ const view=await workbench.overview(admin,scope,{from:date,to:date});await workbench.confirmBills(admin,scope,{from:date,to:date},key(),view.reviewHash);
+ const before=await q('SELECT id,current_result_id,current_revision_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[word.id]),ledger=await q('SELECT * FROM opc_income_entries ORDER BY id'),bills=await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id");
+ const earlier=new Date(Date.parse(date+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+ await c.query('UPDATE zh_channel_mappings SET effective_from=? WHERE account_id=? AND project_id=?',[earlier,scope.accountId,scope.projectId]);
+ await workbench.uploadReport(admin,scope,csv(`日期,渠道,关键词,订单量\n${earlier},待处理渠道,未分配词,2`,'更早的未确认报表.csv'));
+ // Simulate a restored record whose old assignment was released without losing its owner history.
+ await c.query('UPDATE zh_keyword_bindings SET released_at=NOW(3) WHERE id=?',[word.binding_id]);await c.query('UPDATE zh_keywords SET current_binding_id=NULL WHERE id=?',[word.id]);
+ const assigned=await assignRetro(admin,scope,String(word.id),key(),{executorId:creator.sub});expect(assigned).toMatchObject({fromDate:earlier,recalculated:1});
+ expect((await q('SELECT id,current_result_id,current_revision_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[word.id])).slice(0,2)).toEqual(before);
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(bills);
+});

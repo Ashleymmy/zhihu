@@ -3,6 +3,9 @@ import { fail } from './domain';
 import { select } from './store';
 import { submissionFailure } from '../services/submission-feedback';
 
+export const unconfirmedFactSql = (f='f') => `NOT EXISTS(SELECT 1 FROM zh_statement_entries se WHERE se.fact_id=${f}.id AND se.status='confirmed')
+ AND NOT EXISTS(SELECT 1 FROM opc_income_sources ins WHERE ins.module_id='zhihu' AND ins.account_id=${f}.account_id AND ins.source_key=CONCAT('fact:',${f}.id))`;
+
 // A local reservation is exclusive, but is not permission to publish or assign.
 export function readyPlanSql(p = 'p', k = 'k', lock = '') {
   return `(${p}.status='active' AND (
@@ -21,6 +24,16 @@ export function unusedKeywordSql(k = 'k', lock = '') {
     AND NOT EXISTS(SELECT 1 FROM zh_metric_facts uf WHERE uf.keyword_id=${k}.id${lock})
     AND NOT EXISTS(SELECT 1 FROM daily_metrics um WHERE um.plan_id=${k}.plan_id${lock})
     AND NOT EXISTS(SELECT 1 FROM earnings un WHERE un.plan_id=${k}.plan_id${lock}))`;
+}
+
+// Report facts alone identify performance, not an executor. They must not lock
+// an otherwise unowned keyword into the historical-owner view.
+export function ownershipHistorySql(k='k') {
+  return `(EXISTS(SELECT 1 FROM zh_keyword_bindings ob WHERE ob.keyword_id=${k}.id AND ob.executor_id IS NOT NULL)
+    OR EXISTS(SELECT 1 FROM compositions oc WHERE oc.plan_id=${k}.plan_id)
+    OR EXISTS(SELECT 1 FROM zh_evidence oe JOIN zh_keyword_bindings eb ON eb.id=oe.binding_id WHERE eb.keyword_id=${k}.id)
+    OR EXISTS(SELECT 1 FROM daily_metrics om WHERE om.plan_id=${k}.plan_id)
+    OR EXISTS(SELECT 1 FROM earnings onw WHERE onw.plan_id=${k}.plan_id))`;
 }
 
 export function ownershipConflictSql(k = 'k', b = 'b', lock = '') {
