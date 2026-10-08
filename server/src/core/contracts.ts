@@ -55,6 +55,29 @@ export interface BusinessModule {
   dataProvider?: ModuleDataProvider;
   financeProvider?: FinanceProvider;
   accountLifecycle?: ModuleAccountLifecycle;
+  rateProvider?: ModuleRateProvider;
+}
+
+export interface RateMetricDefinition {
+  code: string;
+  label: string;
+  unit: string;
+  rules: { code: string; label: string; editable: boolean }[];
+  note?: string;
+}
+export interface RatePublication {
+  projectId: string;
+  metricType: string;
+  effectiveFrom: string;
+  prices: Record<string, string>;
+}
+export interface ModuleRateProvider {
+  metrics: RateMetricDefinition[];
+  // Acquire business locks before reading/writing rates; every callback shares
+  // the publication transaction so a failed recalculation rolls back its rates.
+  lock(connection: PoolConnection, user: AuthUser, projectId: string): Promise<void>;
+  prepare(connection: PoolConnection, input: RatePublication): Promise<Record<string, string>>;
+  published(connection: PoolConnection, user: AuthUser, input: RatePublication): Promise<{ recalculated: number }>;
 }
 
 export interface ModuleAccountLifecycle {

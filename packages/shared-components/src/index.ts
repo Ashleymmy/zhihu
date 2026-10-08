@@ -31,3 +31,4 @@ export { default as DataGrid } from "./DataGrid.vue";
 export { default as DetailDrawer } from "./DetailDrawer.vue";
 export type * from "./analysis-run";
 export type * from "./data-grid";
+export { default as RateSettings } from "./RateSettings.vue";
