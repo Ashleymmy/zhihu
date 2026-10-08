@@ -1,3 +1,4 @@
+import { assertLegacyFinanceRead } from './legacy-finance-access';
 import { isStaffRole } from '../../../auth/roles';
 import fs from 'node:fs';
 import { assertLegacyRoute } from '../attribution/routing';
@@ -224,6 +225,7 @@ export async function decideWithdrawal(user: AuthUser, id: string, action: 'appr
 /* ===== 角色分流列表 ===== */
 
 export async function listWithdrawals(user: AuthUser, query: Record<string, unknown>) {
+  assertLegacyFinanceRead(user);
   if (isDevDemoAuthUser(user)) return listDevDemoWithdrawals(user, query);
 
   const page = Number(query.page ?? 1);
@@ -234,9 +236,9 @@ export async function listWithdrawals(user: AuthUser, query: Record<string, unkn
     where.push('w.user_id = ?');
     bindings.push(user.sub);
   } else if (user.role === 'leader') {
-    // 团长：自己的 + 本团队成员的
-    where.push('(w.user_id = ? OR u.parent_id = ?)');
-    bindings.push(user.sub, user.sub);
+    // 历史金额仅本人及财务可见，团长不能读取团队成员的个人金额。
+    where.push('w.user_id = ?');
+    bindings.push(user.sub);
   }
   if (query.status) {
     where.push('w.status = ?');
@@ -371,6 +373,7 @@ export async function decideAppeal(
 }
 
 export async function listAppeals(user: AuthUser, query: Record<string, unknown>) {
+  assertLegacyFinanceRead(user);
   if (isDevDemoAuthUser(user)) return listDevDemoAppeals(user, query);
 
   const page = Number(query.page ?? 1);
@@ -381,8 +384,8 @@ export async function listAppeals(user: AuthUser, query: Record<string, unknown>
     where.push('a.user_id = ?');
     bindings.push(user.sub);
   } else if (user.role === 'leader') {
-    where.push('(a.user_id = ? OR u.parent_id = ?)');
-    bindings.push(user.sub, user.sub);
+    where.push('a.user_id = ?');
+    bindings.push(user.sub);
   }
   if (query.status) {
     where.push('a.status = ?');
@@ -459,8 +462,9 @@ export async function uploadInvoice(
   return { name: originalName };
 }
 
-/** 读取发票（申请人本人 / 其团长 / 管理员） */
+/** 读取历史发票（申请人本人 / 财务） */
 export async function getInvoice(user: AuthUser, id: string) {
+  assertLegacyFinanceRead(user);
   if (isDevDemoAuthUser(user)) {
     const meta = getDevDemoInvoiceMeta(user, id);
     fs.mkdirSync(INVOICE_DIR, { recursive: true });
@@ -477,8 +481,7 @@ export async function getInvoice(user: AuthUser, id: string) {
   if (!item || !item.invoice_path) throw new AppError(404, 40401, '该申请没有上传发票');
   const allowed =
     String(item.user_id) === user.sub ||
-    isStaffRole(user.role) ||
-    (user.role === 'leader' && String(item.applicant_parent) === user.sub);
+    isStaffRole(user.role);
   if (!allowed) throw new AppError(403, 40301, '无权查看该发票');
 
   const fullPath = path.join(INVOICE_DIR, path.basename(item.invoice_path));
@@ -489,6 +492,7 @@ export async function getInvoice(user: AuthUser, id: string) {
 /* ===== 结算单 ===== */
 
 export async function getStatement(user: AuthUser, id: string) {
+  assertLegacyFinanceRead(user);
   if (isDevDemoAuthUser(user)) return getDevDemoStatement(user, id);
 
   const [item] = await rows<RowDataPacket & Record<string, unknown>>(
@@ -503,14 +507,9 @@ export async function getStatement(user: AuthUser, id: string) {
     [id],
   ) as unknown as [(RowDataPacket & Record<string, unknown>) | undefined];
   if (!item) throw new AppError(404, 40401, '提现申请不存在');
-  const [parent] = await rows<RowDataPacket & { applicant_parent: string | null }>(
-    'SELECT parent_id AS applicant_parent FROM users WHERE id = ? LIMIT 1',
-    [item.user_id],
-  ) as unknown as [{ applicant_parent: string | null } | undefined];
   const allowed =
     String(item.user_id) === user.sub ||
-    isStaffRole(user.role) ||
-    (user.role === 'leader' && String(parent?.applicant_parent) === user.sub);
+    isStaffRole(user.role);
   if (!allowed) throw new AppError(403, 40301, '无权查看该结算单');
 
   return {

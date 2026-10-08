@@ -1,3 +1,4 @@
+import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
 import { siteInfo } from '../services/site-info';
 import { requireOfficialPlanRead } from '../zhihu/planReadCapability';
 import { Router } from 'express';
@@ -14,6 +15,7 @@ const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const settleInput = z.object({ from: dateStr.optional(), to: dateStr.optional(), settleDate: dateStr.optional() });
 toolsRouter.post(
   '/settle-earnings',
+  legacyFinanceReadOnly,
   validateBody(settleInput),
   asyncHandler(async (req, res) => {
     const jobId = `settle-manual-${Date.now()}`;

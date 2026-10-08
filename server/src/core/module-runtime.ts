@@ -30,6 +30,7 @@ export class ModuleRuntime {
         name: m.name,
         version: m.version,
         entryPath: m.entryPath,
+        financeHistoryPath: m.financeHistoryPath ?? null,
         capabilities: [...m.capabilities, ...(this.entries.get(m.id)?.rateProvider ? ['role-rates'] : []), ...(this.entries.get(m.id)?.taskProvider ? ['tasks'] : [])],
         accountCreation: m.accountCreation ?? 'self_service',
         accountMessage: m.accountMessage ?? null,

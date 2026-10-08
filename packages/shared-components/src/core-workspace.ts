@@ -5,6 +5,7 @@ export interface WorkspaceModule {
   name: string
   version: string
   entryPath: string
+  financeHistoryPath?: string | null
   capabilities: string[]
   status: string
   message: string | null

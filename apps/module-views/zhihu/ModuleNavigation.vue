@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import type { HttpClient } from "@zhihu-koc/shared-services/core";
+import FinanceHistory from "./FinanceHistory.vue";
 import {
   retiredFinancePages,
   type BusinessPage,
 } from "./navigation";
 const props = defineProps<{
   pages: BusinessPage[];
+  http: HttpClient;
   role: string;
   duty?: string;
   currentPath: string;
@@ -19,9 +22,10 @@ const financeDestination = computed(() => ['admin', 'developer', 'operator'].inc
   <section class="zhihu-module page-stack">
     <section v-if="mergedFinance" class="merged-page" role="status">
       <h1>这个功能已合并到“{{ financeDestination.title }}”</h1>
-      <p>请从统一入口查看收益和收款进度。</p>
+      <p>日常操作请从统一入口继续，下方保留历史记录。</p>
       <router-link :to="financeDestination.path" class="primary-action">前往{{ financeDestination.title }}</router-link>
     </section>
+    <FinanceHistory v-if="mergedFinance" :http="http" :role="role" :current-path="currentPath" />
     <router-view v-else />
   </section>
 </template>

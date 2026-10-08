@@ -1,3 +1,4 @@
+import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
 import multer, { MulterError } from 'multer';
 import { Router, RequestHandler } from 'express';
 import { z } from 'zod';
@@ -65,7 +66,7 @@ const uploadMiddleware: RequestHandler = (req, res, next) => {
 };
 
 export const dataImportRouter = Router();
-dataImportRouter.use(requireAuth, requirePermission('data.import'));
+dataImportRouter.use(requireAuth, legacyFinanceReadOnly, requirePermission('data.import'));
 
 dataImportRouter.post(
   '/parse',

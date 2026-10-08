@@ -63,6 +63,7 @@ async function main() {
         console.log('REVIEW_RATE_REPLAY_VERIFIED',JSON.stringify(ratesAfter));
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
+        if(process.env.OPC_REVIEW_FINANCE_HISTORY==='1') await (await import('./finance-history-fixture')).seedFinanceHistory(db);
         await db.end();
         process.send?.({port});console.log('REVIEW_READY',port);
       }

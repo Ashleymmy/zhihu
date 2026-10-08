@@ -34,6 +34,7 @@ export const zhihuManifest: ModuleManifest = {
   contractVersion: 2,
   roles: ['developer', 'admin', 'operator', 'leader', 'creator'],
   entryPath: '/modules/zhihu',
+  financeHistoryPath: '/modules/zhihu/earnings',
   accountCreation: 'managed',
   accountMessage: '当前使用迁移生成的历史接入账号；新增知乎凭证接入尚未开放。',
   capabilities: [
