@@ -1,0 +1,38 @@
+[
+  {
+    "account": "release_finance",
+    "width": 1440,
+    "status": 200,
+    "passed": true
+  },
+  {
+    "account": "release_finance",
+    "width": 375,
+    "status": 200,
+    "passed": true
+  },
+  {
+    "account": "release_ops",
+    "width": 1440,
+    "status": 403,
+    "passed": true
+  },
+  {
+    "account": "release_ops",
+    "width": 375,
+    "status": 403,
+    "passed": true
+  },
+  {
+    "account": "leader_wang",
+    "width": 1440,
+    "status": 200,
+    "passed": true
+  },
+  {
+    "account": "leader_wang",
+    "width": 375,
+    "status": 200,
+    "passed": true
+  }
+]
