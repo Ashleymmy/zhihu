@@ -12,7 +12,7 @@ import { runOpcMigrations } from '../../scripts/opcMigrations';
 async function main() {
   if (process.env.REMEDIATION_REVIEW !== '1') throw Error('仅允许隔离整改验收');
   const container = await new MySqlContainer('mysql:8.0').withDatabase('remediation_review_test')
-    .withUsername('review').withUserPassword('isolated_review_only').start();
+    .withUsername('review').withUserPassword('isolated_review_only').withEnvironment({TZ:'Asia/Shanghai'}).start();
   const target = {host:container.getHost(),port:container.getPort(),database:container.getDatabase(),user:container.getUsername(),password:container.getUserPassword()};
   let child: ReturnType<typeof spawn> | undefined;
   let stopping = false;
