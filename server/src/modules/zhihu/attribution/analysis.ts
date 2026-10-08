@@ -9,6 +9,7 @@ import {fail,money,moneyText,type Scope} from './domain';
 import {allocations} from './workbench';
 import {resolveRevision,type AttributionSnapshot,type FactSnapshot} from './facts';
 import {nameChoices,applyNameChoice,type NameSelection} from './name-choices';
+import {reportComparison} from './report-comparison';
 
 const platformScope=(scope:Scope,id:string)=>({...scope,moduleId:'zhihu',runKey:'import:'+id});
 const cash=(amount:bigint)=>{const n=amount<0n?-amount:amount,cents=(n+50n)/100n;return (amount<0n?'-':'')+String(cents/100n)+'.'+String(cents%100n).padStart(2,'0');};
@@ -25,7 +26,7 @@ async function revisionChoices(c:PoolConnection,scope:Scope,id:string):Promise<R
    const unit=activation?'个':'单',expected=row.current_revision_id===null?null:String(row.current_revision_id);
    const fields=[['search','搜索量'],['orders','订单量'],['revenue','报表收益'],['activations','拉活量'],['settlement','结算金额'],['agency','代理名称'],['riskAssessment','风险标记']] as const;
    const changes=fields.filter(([field])=>field!==(activation?'activations':'orders')&&(current?.[field]??null)!==(next[field]??null)).map(([field,label])=>`${label}：原来 ${current?.[field]??'未提供'}，本次 ${next[field]??'未提供'}`);
-   return {revisionId:String(row.id),expected,ask:{id:'revision:'+row.id+':'+(expected??'0'),
+   return {revisionId:String(row.id),expected,ask:{id:'revision:'+row.id+':'+(expected??'0'),comparison:reportComparison(current,next,String(row.metric_type)),
      text:`${row.business_day}「${row.keyword}」原来 ${previous} ${unit}，这份报表是 ${incoming} ${unit}${changes.length?'；'+changes.join('；'):''}，采用哪个？`,
      options:[{key:'new',label:'采用这份报表',tone:'primary',disabled:String(row.parent_revision_id??'')!==String(expected??'')},{key:'old',label:'保留原来的数字'},{key:'skip',label:'暂时跳过'}]}};
  });

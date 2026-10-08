@@ -125,6 +125,9 @@ describe('简化工作台完整资金流程',()=>{
   const l=await workbench.overview(leader,scope,{from:day,to:day});expect(l.groups.some(g=>g.payeeId===solo.sub)).toBe(false);
   expect(l.entries.length).toBeGreaterThan(0);
   expect(l.entries.every(e=>e.payeeId===leader.sub)).toBe(true);
+  expect(new Set(l.entries.map(e=>e.calculation?.unitPrice))).toEqual(new Set(['2.0000','3.0000','15.0000']));
+  expect(l.entries.every(e=>e.calculation?.beforeRiskAmount===e.amount)).toBe(true);
+  expect((await workbench.overview(a,scope,{from:day,to:day})).entries.every(e=>e.calculation?.unitPrice==='13.0000')).toBe(true);
   expect(l.groups.map(g=>g.payeeId)).toEqual([leader.sub]);
   expect(l.summary.payable).toBe(l.summary.receivable);
   expect(l.teamPerformance).toEqual([

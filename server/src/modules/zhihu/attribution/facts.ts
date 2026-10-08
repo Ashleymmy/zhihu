@@ -17,6 +17,7 @@ import { assertNewRoute, assertEngineWritable } from './routing';
 import { factTodoReasons, reasonText } from './reasons';
 import { resolvedNames } from './matching';
 import { assertDuty, dutyAllows } from '../../../core/duties';
+import { reportComparison } from './report-comparison';
 export interface FactSnapshot {
   metricType?: MetricType;
   activations?: string | null;
@@ -541,7 +542,7 @@ export async function rebaseRevision(
     return { id: revisionId };
   });
 }
-export async function listExceptions(user: AuthUser, scope: Scope, page: number, pageSize: number) {
+export async function listExceptions(user: AuthUser, scope: Scope, page: number, pageSize: number, factId?:string) {
   if (!isStaffRole(user.role)) fail('来源异常仅管理员可处理', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
@@ -552,20 +553,23 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       CAST(e.fact_id AS CHAR) fact_id,CAST(r.batch_id AS CHAR) batch_id,f.metric_type,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,
       ${finance?'v.snapshot_json,r.normalized_json':"NULL snapshot_json,JSON_OBJECT('date',JSON_EXTRACT(r.normalized_json,'$.date'),'channel',JSON_EXTRACT(r.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(r.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(r.normalized_json,'$.orders'),'activations',JSON_EXTRACT(r.normalized_json,'$.activations')) normalized_json"},k.keyword,
       JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,
+      ${finance?'currentRevision.snapshot_json':'NULL'} current_snapshot_json,
       b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name
       FROM zh_exceptions e LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
       LEFT JOIN zh_metric_revisions currentRevision ON currentRevision.id=f.current_revision_id
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
       LEFT JOIN users executor ON executor.id=b.executor_id LEFT JOIN users leader ON leader.id=b.leader_id
       LEFT JOIN zh_metric_revisions v ON v.source_row_id=e.source_row_id AND v.status='pending'
-      WHERE e.account_id=? AND e.project_id=? ORDER BY e.id DESC LIMIT ? OFFSET ?`,
-      [scope.accountId, scope.projectId, pageSize, (page - 1) * pageSize],
+      WHERE e.account_id=? AND e.project_id=? AND (? IS NULL OR e.fact_id=?) ORDER BY e.id DESC LIMIT ? OFFSET ?`,
+      [scope.accountId, scope.projectId, factId??null, factId??null, pageSize, (page - 1) * pageSize],
     );
-    const [total] = await select(c, 'SELECT COUNT(*) total FROM zh_exceptions WHERE account_id=? AND project_id=?', [
+    const [total] = await select(c, 'SELECT COUNT(*) total FROM zh_exceptions WHERE account_id=? AND project_id=? AND (? IS NULL OR fact_id=?)', [
       scope.accountId,
       scope.projectId,
+      factId??null,
+      factId??null,
     ]);
-    return { list: list.map(row=>Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}))), total: Number(total.total), page, pageSize };
+    return { list: list.map(row=>{const current=row.current_snapshot_json;delete row.current_snapshot_json;return Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}),finance&&row.revision_id&&row.snapshot_json?{comparison:reportComparison(current?json<FactSnapshot>(current):null,json<FactSnapshot>(row.snapshot_json),String(row.metric_type))}:{})}), total: Number(total.total), page, pageSize };
   });
 }
 export async function retryException(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {

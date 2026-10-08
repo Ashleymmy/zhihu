@@ -63,6 +63,14 @@ it('两份报表不同给出三个明确选项，跳过持久保存而不修改�
  conflict=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n${date},分析渠道,分析关键词,5`))).id;
  const response=await get(conflict),choice=response.body.data.steps[5].asks[0];askId=choice.id;
  expect(choice.text).toContain('原来 3 单，这份报表是 5 单');expect(choice.options.map((option:{key:string})=>option.key)).toEqual(['new','old','skip']);
+ expect(choice.comparison).toEqual([{label:'订单量（单）',previous:'3',incoming:'5',changed:true}]);
+ const waiting=(await facts.listExceptions(finance,scope,1,25)).list.find(row=>row.revision_id);
+ expect(waiting?.comparison).toEqual(choice.comparison);
+ const filtered=await request(app).get('/api/v1/modules/zhihu/exceptions').set(headers[finance.sub]).query({...scope,factId:String(waiting?.fact_id),pageSize:25});
+ expect(filtered.status).toBe(200);expect(filtered.body.data.list.every((row:{factId:string})=>row.factId===String(waiting?.fact_id))).toBe(true);
+ expect((await request(app).get('/api/v1/modules/zhihu/exceptions').set(headers[creator.sub]).query({...scope,factId:String(waiting?.fact_id)})).status).toBe(403);
+ expect((await request(app).get('/api/v1/modules/zhihu/exceptions').set(headers[finance.sub]).query({...scope,projectId:'999',factId:String(waiting?.fact_id)})).status).toBe(403);
+ expect((await facts.listExceptions(ops,scope,1,25)).list.every(row=>!row.comparison&&!row.snapshot_json&&!row.current_snapshot_json)).toBe(true);
  const factsBefore=await q('SELECT * FROM zh_metric_facts ORDER BY id');expect((await answer(conflict,askId,'skip')).status).toBe(200);
  expect((await get(conflict)).body.data.steps[5]).toMatchObject({status:'skipped'});expect(await q('SELECT * FROM zh_metric_facts ORDER BY id')).toEqual(factsBefore);
  expect((await q('SELECT option_key FROM opc_analysis_answers'))[0].option_key).toBe('skip');
@@ -89,6 +97,7 @@ it('数量相同时仍显示变化的收益和风险内容，避免看不到差�
  const next=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量,收益,风险判定\n${date},分析渠道,分析关键词,5,50,待核验`))).id;
  const choice=(await get(next)).body.data.steps[5].asks[0];
  expect(choice.text).toContain('报表收益：原来 未提供，本次 50.0000');expect(choice.text).toContain('风险标记：原来 未提供，本次 待核验');
+ expect(choice.comparison).toEqual([{label:'订单量（单）',previous:'5',incoming:'5',changed:false},{label:'报表收益（元）',previous:'未提供',incoming:'50.0000',changed:true},{label:'风险标记',previous:'未提供',incoming:'待核验',changed:true}]);
  expect((await answer(next,choice.id,'old')).status).toBe(200);
 });
 it('后台处理失败时停止轮询并给出继续处理入口，不把技术错误直接显示给人',async()=>{
@@ -106,6 +115,7 @@ it('大额四位小数的已入账金额按字符串读取，新增一单的更�
    const before=await workbench.overview(finance,scope,{from:day,to:day});await workbench.confirmBills(finance,scope,{from:day,to:day},key(),before.reviewHash);
    const next=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n${day},分析渠道,分析关键词,1234567890124`))).id;
    const choice=(await get(next)).body.data.steps[5].asks[0],result=await answer(next,choice.id,'new');
+   expect(choice.comparison[0]).toMatchObject({previous:'1234567890123',incoming:'1234567890124'});
    expect(result.status,result.text).toBe(200);expect(result.body.data.totals.confirmableAmount).toBe('7.1234');
  }finally{await c.query("UPDATE opc_rate_rules SET unit_price=8 WHERE metric_type='new_user' AND rule_code='creator'");}
 });

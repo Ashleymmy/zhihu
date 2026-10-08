@@ -2,7 +2,8 @@ import type {PoolConnection,RowDataPacket} from 'mysql2/promise';
 
 export interface AnalysisScope {projectId:string;accountId:string;moduleId:string;runKey:string}
 export interface AnalysisOption {key:string;label:string;tone?:'primary'|'neutral';disabled?:boolean}
-export interface AnalysisAsk {id:string;text:string;options:AnalysisOption[]}
+export interface AnalysisComparison {label:string;previous:string;incoming:string;changed:boolean}
+export interface AnalysisAsk {id:string;text:string;options:AnalysisOption[];comparison?:AnalysisComparison[]}
 export interface AnalysisStep {key:string;title:string;summary:string;status:'pending'|'running'|'done'|'ask'|'failed'|'skipped';asks?:AnalysisAsk[]}
 export interface AnalysisRun {
   id:string;fileName:string;source?:string;createdAt?:string;

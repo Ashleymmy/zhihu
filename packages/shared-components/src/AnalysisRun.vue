@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import ValueComparison from './ValueComparison.vue';
 import type { AnalysisRunModel, AnalysisStepStatus } from "./analysis-run";
 const props = defineProps<{
   run: AnalysisRunModel;
@@ -92,6 +93,7 @@ const progress = computed(() =>
             :aria-busy="busyAskId === ask.id"
           >
             <p>{{ ask.text }}</p>
+            <ValueComparison v-if="ask.comparison?.length" :rows="ask.comparison" />
             <div class="actions">
               <button
                 v-for="option in ask.options"

@@ -10,7 +10,9 @@ export interface AnalysisAsk {
   id: string;
   text: string;
   options: AnalysisOption[];
+  comparison?: AnalysisComparison[];
 }
+export interface AnalysisComparison { label: string; previous: string; incoming: string; changed: boolean }
 export interface AnalysisStep {
   key: string;
   title: string;
