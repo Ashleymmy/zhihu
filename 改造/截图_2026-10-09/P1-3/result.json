@@ -1,0 +1,93 @@
+{
+  "date": "2026-10-09",
+  "results": [
+    {
+      "role": "admin",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "finance",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "operations",
+      "status": 403,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "independent",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "admin-retro-assignment",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "finance-default-rate",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader-default-rate",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator-default-rate",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "admin-finance-operations-names",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    }
+  ]
+}

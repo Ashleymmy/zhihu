@@ -323,6 +323,7 @@ export async function confirmBatch(
   });
 }
 export async function listStatements(user: AuthUser, scope: Scope, page: number, pageSize: number) {
+  if(isStaffRole(user.role))assertDuty(user,'finance');
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];

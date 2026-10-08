@@ -21,8 +21,12 @@ it('0022c82 模块库增量升级、重复迁移保留旧 ID 和金额，回退�
   const schema = await mkdtemp(path.join(tmpdir(), 'zh-schema-baseline-'));
   await cp(path.resolve('schema'), schema, { recursive: true });
   // 仅移除临时副本里的新迁移，重现 0022c82 的模块 schema。
-  for (const file of await readdir(path.join(schema, 'zhihu')))
-    if (/^0(18|19|2[0-9])_/.test(file)) await unlink(path.join(schema, 'zhihu', file));
+  for (const file of await readdir(path.join(schema, 'zhihu'))) {
+    const version=Number(file.split('_')[0]);
+    // The installer replays these two generic price seeds after linking projects.
+    // Exclude every other extension of the old module, including future versions.
+    if(version>=18&&version!==30&&version!==31)await unlink(path.join(schema,'zhihu',file));
+  }
   let c: mysql.Connection | undefined;
   try {
     await runOpcMigrations(target, ['zhihu'], schema);
@@ -44,9 +48,9 @@ it('0022c82 模块库增量升级、重复迁移保留旧 ID 和金额，回退�
     await runOpcMigrations(target, ['zhihu']);
     expect(await snapshot()).toEqual(before);
     const [newTables] = await c.query<mysql.RowDataPacket[]>(
-      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('zh_keywords','zh_statement_entries','zh_engine_routes')",
+      "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('zh_keywords','zh_statement_entries','zh_engine_routes','zh_import_row_matches')",
     );
-    expect(Number(newTables[0].n)).toBe(3);
+    expect(Number(newTables[0].n)).toBe(4);
     await runOpcMigrations(target, []);
     expect(await snapshot()).toEqual(before);
     const [original] = await c.query<mysql.RowDataPacket[]>(

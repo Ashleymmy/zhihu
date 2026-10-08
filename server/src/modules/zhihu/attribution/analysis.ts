@@ -8,6 +8,7 @@ import {authorize,audit,json,mutate,select,type RecordRow} from './store';
 import {fail,money,moneyText,type Scope} from './domain';
 import {allocations} from './workbench';
 import {resolveRevision,type AttributionSnapshot,type FactSnapshot} from './facts';
+import {nameChoices,applyNameChoice,type ChannelSelection} from './name-choices';
 
 const platformScope=(scope:Scope,id:string)=>({...scope,moduleId:'zhihu',runKey:'import:'+id});
 const cash=(amount:bigint)=>{const n=amount<0n?-amount:amount,cents=(n+50n)/100n;return (amount<0n?'-':'')+String(cents/100n)+'.'+String(cents%100n).padStart(2,'0');};
@@ -43,7 +44,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
    ${finance?"LEFT JOIN opc_income_sources src ON src.module_id='zhihu' AND src.account_id=f.account_id AND src.project_id=f.project_id AND src.source_key=CONCAT('fact:',f.id)":""}
    WHERE source.batch_id=? ORDER BY source.line_number`,[scope.accountId,scope.projectId,id]);
- const choices=finance?await revisionChoices(c,scope,id):[];
+ const choices=finance?await revisionChoices(c,scope,id):[],names=await nameChoices(c,scope,id);
  const [route]=await select(c,'SELECT mode FROM zh_engine_routes WHERE account_id=? AND project_id=?',[scope.accountId,scope.projectId]);
  const pending=rows.filter(r=>r.processing_status==='pending').length,invalid=rows.filter(r=>r.processing_status==='invalid').length;
  const skipped=rows.filter(r=>r.processing_status==='skipped').length,legacy=rows.filter(r=>r.processing_status==='legacy_settled').length;
@@ -87,6 +88,19 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    steps[5].asks=choices.map(({ask})=>({...ask,text:ask.text+(answers.get(ask.id)==='skip'?'（已暂时跳过，仍可在这里处理）':'')}));
    if(choices.every(({ask})=>answers.get(ask.id)==='skip')&&!price)steps[5].status='skipped';
  }
+ for(const [kind,index] of [['channel',1],['keyword',2]] as const){
+   const matching=names.filter(choice=>choice.kind===kind);
+   if(matching.length){
+     steps[index].asks=matching.map(({ask})=>({...ask,text:ask.text+(answers.get(ask.id)==='skip'?'（已暂时跳过）':''),
+       options:ask.options.map(option=>({...option,disabled:!dutyAllows(user,'operations')}))}));
+     if(matching.every(({ask})=>answers.get(ask.id)==='skip'))steps[index].status='skipped';
+   }
+ }
+ // Unresolved earlier steps are not proof that later names or people matched.
+ if(channel&&!keywords){steps[2].status='pending';steps[2].summary=`${channel} 行等待渠道确认后核对关键词`;}
+ if((channel||keywords)&&!unassigned){steps[3].status='pending';steps[3].summary='渠道和关键词确认后继续核对执行人';}
+ if((channel||keywords||unassigned)&&!work){steps[4].status='pending';steps[4].summary='执行人确认后继续核对作品';}
+ if((channel||keywords||unassigned)&&!billable&&!price&&!conflicts){steps[5].status='pending';steps[5].summary=finance?'相关资料补齐后自动计算金额':'金额由财务核对';}
  const need=problems.size+invalid,failed=pending>0&&batch.job_status==='failed',running=pending>0||batch.status==='preview';
  if(failed){const active=steps.find(step=>step.status==='running');if(active){active.status='failed';active.summary='处理暂时中断，已经读取的记录和结果都已保留。';}}
  const run:AnalysisRun={id,fileName:String(batch.file_name),source:'知乎'+type+'报表',createdAt:String(batch.created_at),
@@ -101,14 +115,15 @@ export async function importAnalysis(user:AuthUser,scope:Scope,id:string){
  if(!isStaffRole(user.role))fail('报表分析仅管理人员可见',403);
  await authorize(user,scope);return withTransaction(c=>readAnalysis(c,user,scope,id));
 }
-export async function answerImportAnalysis(user:AuthUser,scope:Scope,id:string,key:string,askId:string,option:string){
- assertDuty(user,'finance');
- return mutate(user,scope,'analysis.answer',key,{id,askId,option},async c=>{
+export async function answerImportAnalysis(user:AuthUser,scope:Scope,id:string,key:string,askId:string,option:string,selection?:ChannelSelection){
+ const naming=askId.startsWith('name:');assertDuty(user,naming?'operations':'finance');
+ return mutate(user,scope,'analysis.answer',key,{id,askId,option,selection},async c=>{
    const [batch]=await select(c,'SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',[id,scope.accountId,scope.projectId]);
    if(!batch)fail('这份报表不存在或不属于当前项目',404);
-   const choice=(await revisionChoices(c,scope,id)).find(choice=>choice.ask.id===askId);
+   const choice=(naming?await nameChoices(c,scope,id):await revisionChoices(c,scope,id)).find(choice=>choice.ask.id===askId);
    if(!choice||!choice.ask.options.some(candidate=>candidate.key===option&&!candidate.disabled))fail('这项数据或选项已更新，请重新查看分析结果',409);
-   if(option!=='skip')await resolveRevision(c,user,scope,choice.revisionId,choice.expected,option==='new'?'报表分析中确认采用本次数字':'报表分析中确认保留原来数字',option==='new');
+   if('kind' in choice)await applyNameChoice(c,user,scope,choice,option,selection);
+   else if(option!=='skip')await resolveRevision(c,user,scope,choice.revisionId,choice.expected,option==='new'?'报表分析中确认采用本次数字':'报表分析中确认保留原来数字',option==='new');
    await saveAnalysisAnswer(c,platformScope(scope,id),askId,option,user.sub);
    await audit(c,user,'analysis.answer',id,{askId,option});
    return readAnalysis(c,user,scope,id);

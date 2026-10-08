@@ -6,6 +6,7 @@ import { audit, authorize, insert, mutate, scopeLock, select, type RecordRow } f
 import { businessDay, count, day, fail, money, moneyText, type Scope } from './domain';
 import { rateRuleFor } from '../../../core/rates';
 import { independentCreatorSql } from './relationships';
+import { assertDuty } from '../../../core/duties';
 
 export interface PriceInput {
   taskId: string;
@@ -148,6 +149,7 @@ export async function publishPrice(user: AuthUser, scope: Scope, id: string, key
   });
 }
 export async function listPrices(user: AuthUser, scope: Scope, page: number, pageSize: number) {
+  if(isStaffRole(user.role))assertDuty(user,'finance');
   await authorize(user, scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);

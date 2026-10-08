@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-09",
+  "results": [
+    {
+      "role": "admin-retro-assignment",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "finance-default-rate",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader-default-rate",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator-default-rate",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "admin-finance-operations-names",
+      "status": 200,
+      "widths": [
+        1440,
+        375
+      ]
+    }
+  ]
+}

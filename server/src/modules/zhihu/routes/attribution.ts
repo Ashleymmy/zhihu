@@ -48,6 +48,8 @@ attributionRouter.use((req,_res,next)=>{
  if(!isStaffRole(req.user.role)||['GET','HEAD'].includes(req.method))return next();
  try {
   const group=req.path.split('/')[1];
+  // Each analysis question enforces its own duty in the service transaction.
+  if(group==='imports'&&/^\/imports\/\d+\/answers$/.test(req.path))return next();
   assertDuty(req.user,['imports','metric-revisions','statements'].includes(group)||group==='workbench'&&['import','confirm'].includes(req.path.split('/')[2])?'finance':'operations');
   next();
  }catch(e){next(e)}
@@ -273,8 +275,9 @@ attributionRouter.get('/imports/:id/analysis',asyncHandler(async(req,res)=>{
   ok(res,await importAnalysis(req.user,scopeSchema.parse(req.query),idSchema.parse(req.params.id)));
 }));
 attributionRouter.post('/imports/:id/answers',asyncHandler(async(req,res)=>{
-  const q=scopeSchema.extend({askId:z.string().min(1).max(160),option:z.string().min(1).max(160)}).parse(req.body);
-  ok(res,await answerImportAnalysis(req.user,q,idSchema.parse(req.params.id),key(req),q.askId,q.option));
+  const selection=z.union([z.object({channelId:idSchema}).strict(),z.object({upstreamId:z.string().trim().min(1).max(32),generation:z.union([z.literal(1),z.literal(2)])}).strict()]);
+  const q=scopeSchema.extend({askId:z.string().min(1).max(160),option:z.string().min(1).max(160),selection:selection.optional()}).parse(req.body);
+  ok(res,await answerImportAnalysis(req.user,q,idSchema.parse(req.params.id),key(req),q.askId,q.option,q.selection));
 }));
 attributionRouter.post(
   '/imports/:id/commit',

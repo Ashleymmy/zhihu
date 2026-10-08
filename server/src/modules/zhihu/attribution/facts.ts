@@ -15,6 +15,8 @@ import { blockIncome } from '../../../core/finance';
 import { scheduleImport } from './outbox';
 import { assertNewRoute, assertEngineWritable } from './routing';
 import { factTodoReasons, reasonText } from './reasons';
+import { resolvedNames } from './matching';
+import { assertDuty, dutyAllows } from '../../../core/duties';
 export interface FactSnapshot {
   metricType?: MetricType;
   activations?: string | null;
@@ -122,7 +124,7 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
   });
 }
 export async function importDetail(user: AuthUser, scope: Scope, id: string, page: number, pageSize: number) {
-  if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
+  assertDuty(user,'finance');
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const [batch] = await select(
@@ -171,6 +173,7 @@ export async function listImports(user: AuthUser, scope: Scope, page: number, pa
   });
 }
 export async function originalFile(user: AuthUser, scope: Scope, id: string) {
+  assertDuty(user,'finance');
   if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
@@ -330,58 +333,22 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   await refreshAdjustments(c, scope, fact, id, snapshot);
   return { id, snapshot, code, binding, source };
 }
-export async function processBatch(user: AuthUser, scope: Scope, id: string, limit = 200) {
-  if (!isStaffRole(user.role)) fail('仅管理员可处理报告', 403);
-  await authorize(user, scope);
-  const ids = await withTransaction(async (c) => {
-    await scopeLock(c, scope, user);
-    const [batch] = await select(
-      c,
-      "SELECT id,report_kind FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status IN ('committed','processed')",
-      [id, scope.accountId, scope.projectId],
-    );
-    if (!batch) fail('批次尚未确认', 409);
-    assertReportWriteEnabled(batch.report_kind as ReportKind);
-    return select(
-      c,
-      "SELECT id FROM zh_import_rows WHERE batch_id=? AND processing_status='pending' ORDER BY id LIMIT ?",
-      [id, limit],
-    );
-  });
-  for (const selected of ids)
-    await withTransaction(async (c) => {
-      await scopeLock(c, scope, user);
+export async function processImportRow(c:PoolConnection,user:AuthUser,scope:Scope,rowId:string){
       const [row] = await select(
         c,
-        'SELECT r.*,b.report_kind FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE r.id=? FOR UPDATE',
-        [selected.id],
+        "SELECT r.*,b.report_kind FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE r.id=? AND b.account_id=? AND b.project_id=? AND b.status IN ('committed','processed') FOR UPDATE",
+        [rowId,scope.accountId,scope.projectId],
       );
+      if(!row)fail('这条报表记录不存在或尚未开始处理',404);
       if (row.processing_status !== 'pending') return;
       const raw = json<SourceRow>(row.normalized_json),
         kind = row.report_kind as ReportKind;
+      assertReportWriteEnabled(kind);
       await assertNewRoute(c, scope, raw.date);
-      const mappings = await select(
-        c,
-        `SELECT COALESCE(canonical_id,id) stable_id,project_id FROM zh_channel_mappings
-      WHERE account_id=? AND channel_name=? AND effective_from<=? AND (effective_to IS NULL OR effective_to>?)`,
-        [scope.accountId, raw.channel, raw.date, raw.date],
-      );
-      let code =
-        mappings.length === 0
-          ? 'CHANNEL_UNMAPPED'
-          : mappings.length > 1
-            ? 'CHANNEL_AMBIGUOUS'
-            : String(mappings[0].project_id) !== scope.projectId
-              ? 'PROJECT_MISMATCH'
-              : null;
-      const words = code
-        ? []
-        : await select(
-            c,
-            'SELECT id FROM zh_keywords WHERE account_id=? AND project_id=? AND channel_mapping_id=? AND keyword=?',
-            [scope.accountId, scope.projectId, mappings[0].stable_id, raw.keyword],
-          );
-      if (!code && words.length !== 1) code = 'KEYWORD_UNKNOWN';
+      const {mappings,words,code}=await resolvedNames(c,scope,rowId,raw);
+      // Close only causes actually repaired. A remaining keyword issue stays open.
+      const repaired=code==='KEYWORD_UNKNOWN'?['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH']:!code?['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH','KEYWORD_UNKNOWN']:[];
+      if(repaired.length)await c.query("UPDATE zh_exceptions SET status='resolved',resolution='名称已确认，已自动处理',resolved_at=NOW(3) WHERE source_row_id=? AND status='open' AND reason_code IN (?)",[rowId,repaired]);
       if (code) {
         await exception(c, scope, String(row.id), null, code);
         await c.query("UPDATE zh_import_rows SET processing_status='exception',error_text=? WHERE id=?", [
@@ -431,7 +398,29 @@ export async function processBatch(user: AuthUser, scope: Scope, id: string, lim
         await attribute(c, scope, fact);
       }
       await c.query("UPDATE zh_import_rows SET processing_status='processed',fact_id=? WHERE id=?", [factId, row.id]);
-    });
+}
+export async function processBatch(user: AuthUser, scope: Scope, id: string, limit = 200) {
+  if (!isStaffRole(user.role)) fail('仅管理员可处理报告', 403);
+  await authorize(user, scope);
+  const ids = await withTransaction(async (c) => {
+    await scopeLock(c, scope, user);
+    const [batch] = await select(
+      c,
+      "SELECT id,report_kind FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status IN ('committed','processed')",
+      [id, scope.accountId, scope.projectId],
+    );
+    if (!batch) fail('批次尚未确认', 409);
+    assertReportWriteEnabled(batch.report_kind as ReportKind);
+    return select(
+      c,
+      "SELECT id FROM zh_import_rows WHERE batch_id=? AND processing_status='pending' ORDER BY id LIMIT ?",
+      [id, limit],
+    );
+  });
+  for (const selected of ids) await withTransaction(async c=>{
+    await scopeLock(c,scope,user);
+    await processImportRow(c,user,scope,String(selected.id));
+  });
   const remaining = await withTransaction(async (c) => {
     const [r] = await select(
       c,
@@ -550,10 +539,12 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
   if (!isStaffRole(user.role)) fail('来源异常仅管理员可处理', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
+    const finance=dutyAllows(user,'finance');
     const list = await select(
       c,
       `SELECT CAST(e.id AS CHAR) id,e.reason_code,e.status,e.resolution,CAST(e.source_row_id AS CHAR) source_row_id,
-      CAST(e.fact_id AS CHAR) fact_id,f.metric_type,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,v.snapshot_json,r.normalized_json,k.keyword,
+      CAST(e.fact_id AS CHAR) fact_id,CAST(r.batch_id AS CHAR) batch_id,f.metric_type,CAST(f.current_revision_id AS CHAR) expected_revision_id,CAST(v.id AS CHAR) revision_id,
+      ${finance?'v.snapshot_json,r.normalized_json':"NULL snapshot_json,JSON_OBJECT('date',JSON_EXTRACT(r.normalized_json,'$.date'),'channel',JSON_EXTRACT(r.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(r.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(r.normalized_json,'$.orders'),'activations',JSON_EXTRACT(r.normalized_json,'$.activations')) normalized_json"},k.keyword,
       b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name
       FROM zh_exceptions e LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
@@ -595,6 +586,7 @@ export async function retryException(user: AuthUser, scope: Scope, id: string, k
   });
 }
 export async function trace(user: AuthUser, scope: Scope, id: string) {
+  if(isStaffRole(user.role))assertDuty(user,'finance');
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const [fact] = await select(
@@ -686,6 +678,7 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
   return result;
 }
 export async function listAttributions(user: AuthUser, scope: Scope, page: number, pageSize: number) {
+  if(isStaffRole(user.role))assertDuty(user,'finance');
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const where = `f.account_id=? AND f.project_id=? AND (?=1 OR b.executor_id=? OR b.leader_id=?)`;

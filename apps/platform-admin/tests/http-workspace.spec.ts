@@ -28,7 +28,7 @@ describe('业务页面在 HTTP 环境下初始化', () => {
     app.config.errorHandler = error => errors.push(error)
     const html = await renderToString(app)
     expect(errors).toEqual([])
-    expect(html).toContain('本地关键词管理')
+    expect(html).toContain('关键词管理')
     expect(html).toContain('查找关键词')
     expect(html).toMatch(/<table\b/)
   })

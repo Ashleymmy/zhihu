@@ -2,7 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import Issues from './Issues.vue'
 import AssignExecutor from './AssignExecutor.vue'
-import {CashWallet,AnalysisRun,type AnalysisRunModel} from '@zhihu-koc/shared-components'
+import ReportAnalysis from './ReportAnalysis.vue'
+import {CashWallet,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[]}>()
@@ -37,7 +38,7 @@ async function inspectImport(id:string,page=1){
  const [detail,run]=await Promise.all([props.context.http.get<ImportDetail>('/imports/'+id,{...props.context.scope,page,pageSize:25}),props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)])
  importResult.value=detail;analysis.value=run
 }
-async function answerAnalysis(answer:{askId:string;option:string}){
+async function answerAnalysis(answer:{askId:string;option:string;selection?:{channelId:string}|{upstreamId:string;generation:1|2}}){
  if(busy.value||busyAskId.value)return
  busy.value=true;busyAskId.value=answer.askId;askErrors[answer.askId]=''
  try{analysis.value=await post('/imports/'+importId.value+'/answers',answer) as AnalysisRunModel;await refresh();await inspectImport(importId.value);notice.value=answer.option==='skip'?'已暂时跳过，这项记录仍保留在待处理中。':'已保存选择，相关金额已自动更新。'}
@@ -133,7 +134,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <form @submit.prevent="run(upload)"><label>选择报表文件<input ref="uploadInput" type="file" accept=".xlsx,.csv,.xls" required :disabled="busy||!!progress" @change="file=($event.target as HTMLInputElement).files?.[0]??null" /></label><button class="primary" :disabled="busy||!!progress||!file">{{progress?'正在分析…':'上传并自动分析'}}</button></form>
   </div>
   <div v-if="error" role="alert" class="engine-error"><strong>{{error}}</strong><span v-if="errorHelp">{{errorHelp}}</span><button v-if="suggestedType" :disabled="busy" @click="chooseReportType(suggestedType);run(upload)">{{suggestedType==='activation'?'按拉活处理':'按拉新订单处理'}}</button></div><p v-if="notice" role="status">{{notice}}</p><p v-if="progress" role="status">{{progress}}</p>
-  <AnalysisRun v-if="admin&&!wallet&&analysis" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" />
+  <ReportAnalysis v-if="admin&&!wallet&&analysis" :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" />
   <section v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果">
    <h2>{{importResult.fileName}} · 读取结果</h2>
    <p>共读取 {{importTotal}} 行，每行的处理结果都已保留。</p>
