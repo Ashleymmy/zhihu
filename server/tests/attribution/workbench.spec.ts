@@ -76,6 +76,7 @@ describe('简化工作台完整资金流程',()=>{
   expect((await post(ops,'/api/v1/core/finance/funding',{...common(),hash:'0'.repeat(64),reference:'test'})).status).toBe(403);
   expect((await get(fin,path('/attribution-options'),scope)).status).toBe(200);
   expect((await get(ops,'/api/v1/core/team/members',{page:1,pageSize:20})).status).toBe(200);
+  for(const actor of [fin,a,leader])expect((await post(actor,path('/keywords/1/assign-retro'),{...scope,executorId:a.sub,fromDate:day,requestKey:key()})).status).toBe(403);
  });
  it('开发者创建财务岗位，管理员不能创建同级账号或降级自己',async()=>{
   expect((await post(admin,'/api/v1/core/staff',{username:'same_level',displayName:'同级财务',duty:'finance'})).status).toBe(403);

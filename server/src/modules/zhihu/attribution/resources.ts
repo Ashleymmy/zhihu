@@ -11,7 +11,9 @@ import { officialPlanReadCapability } from '../zhihu/planReadCapability';
 import { planAccountSql } from '../services/plan-account';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { synchronizeKeywords } from './keyword-readiness';
-import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql } from './keyword-usability';
+import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql, ownershipHistorySql } from './keyword-usability';
+import { dutyAllows } from '../../../core/duties';
+import { unconfirmedFactSql } from './keyword-usability';
 import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
 export { synchronizeKeywords } from './keyword-readiness';
@@ -389,6 +391,8 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       COALESCE(k.lifecycle_status,'historical') lifecycle_status,k.upstream_status,p.sync_status,p.status AS plan_status,
       (NULLIF(TRIM(p.zhihu_plan_id),'') IS NOT NULL) has_upstream_plan,p.sync_error AS sync_error,
       ${readiness} AS upstream_ready, NOT ${unused} AS has_usage_history,
+      ${ownershipHistorySql()} AS has_ownership_history,
+      (SELECT DATE_FORMAT(MIN(f.business_date),'%Y-%m-%d') FROM zh_metric_facts f WHERE f.keyword_id=k.id AND ${unconfirmedFactSql()}) retro_from_date,
       ${ownershipConflictSql()} AS ownership_conflict,
       ${allocation} AS allocation_ready,b.stop_new_use_at,b.released_at,
       (k.id IS NULL OR NOT (${visibility.clause})) read_only,
@@ -417,7 +421,8 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
         word[flag] = Number(word[flag]);
       }
       // Historical use without a current binding is not a public-pool word.
-      if (!word.binding_id && Number(word.has_usage_history)) { word.lifecycle_status = 'historical'; word.read_only = 1; }
+      if (!word.binding_id && Number(word.has_ownership_history)) { word.lifecycle_status = 'historical'; word.read_only = 1; }
+      word.can_assign_retro=Number(dutyAllows(user,'operations')&&word.keyword_id&&!Number(word.has_ownership_history)&&!word.executor_id&&!Number(word.read_only)&&!stopped.length&&!word.released_at&&!word.stop_new_use_at&&word.release_status!=='requested'&&!['archived','retired'].includes(String(word.lifecycle_status)));
       word.read_only = Number(word.read_only);
       word.can_edit_novel = Number(canEditNovel(user, word));
       word.composition_count = Number(word.composition_count);

@@ -331,7 +331,9 @@ it('historical works and order facts cannot be recycled, including stale availab
     else await c.query("INSERT INTO zh_metric_facts(account_id,project_id,channel_mapping_id,keyword_id,business_date) SELECT account_id,project_id,channel_mapping_id,id,'2026-10-03' FROM zh_keywords WHERE id=?",[word.id]);
     const pool=(await resources.listKeywords(leader,scope,1,1,prefix,'available'));expect(pool.total).toBe(0);
     const all=(await resources.listKeywords(admin,scope,1,20,prefix)).list.find(r=>r.id===word.id)!;
-    expect(all.allocation_ready).toBe(0);expect(all.read_only).toBe(1);expect(all.lifecycle_status).toBe('historical');
+    expect(all.allocation_ready).toBe(0);
+    if(history==='work'){expect(all.read_only).toBe(1);expect(all.lifecycle_status).toBe('historical');}
+    else{expect(all.read_only).toBe(0);expect(all.can_assign_retro).toBe(1);expect(all.lifecycle_status).toBe('available');}
     await expect(resources.claim(leader,scope,word.id,key())).rejects.toThrow('保留原归属');
     await expect(resources.distribute(admin,scope,word.id,key(),'4')).rejects.toThrow('保留原归属');
   }

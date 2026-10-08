@@ -12,6 +12,7 @@ import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
+import { assignRetro } from '../attribution/retro-assignment';
 import { listWorks, workActivity, workDetail } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
 import { requirePermission } from '../permissions';
@@ -444,4 +445,8 @@ attributionRouter.post('/workbench/confirm',asyncHandler(async(req,res)=>{
 }));
 attributionRouter.post('/keywords/:id/distribute',asyncHandler(async(req,res)=>{
  const q=scopeSchema.extend({targetId:idSchema}).parse(req.body);ok(res,await resource.distribute(req.user,q,idSchema.parse(req.params.id),key(req),q.targetId));
+}));
+attributionRouter.post('/keywords/:id/assign-retro',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({executorId:idSchema,fromDate:z.string().date().optional()}).parse(req.body);
+ ok(res,await assignRetro(req.user,q,idSchema.parse(req.params.id),key(req),q));
 }));

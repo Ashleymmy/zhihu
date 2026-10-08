@@ -23,7 +23,7 @@ async function main(){
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
   const results=[];
-  const roles=[['admin','admin','Admin123456!'],['finance','review_finance','Review123456'],['operations','review_ops','Review123456'],['leader','leader_wang','Review123456'],['creator','creator_li','Review123456'],['independent','creator_chen','Review123456']];
+  const roles=process.env.OPC_REVIEW_REPAIR_ONLY==='1'?[]:[['admin','admin','Admin123456!'],['finance','review_finance','Review123456'],['operations','review_ops','Review123456'],['leader','leader_wang','Review123456'],['creator','creator_li','Review123456'],['independent','creator_chen','Review123456']];
   for(const [role,username,password] of roles){
    const roleStarted=Date.now();activeRole=role;
    const context=await browser.newContext({viewport:{width:1440,height:1100}});
@@ -145,7 +145,47 @@ async function main(){
    // limit. This harness must not weaken or bypass the production limiter.
    await new Promise(resolve=>setTimeout(resolve,Math.max(0,20000-(Date.now()-roleStarted))));
   }
-  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({date,results},null,2));
+  // Repair the unowned demo keyword through the real finance page, then verify
+  // its keyword page. This runs after baseline role checks so their totals stay stable.
+  const repairContext=await browser.newContext({viewport:{width:375,height:1100}});
+  const repair=await repairContext.newPage();activePage=repair;activeRole='retro-assignment';repair.setDefaultTimeout(15000);
+  const repairErrors=[];repair.on('pageerror',e=>repairErrors.push(e.message));
+  await repair.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
+  await repair.goto(`http://127.0.0.1:${port}/app/login`);
+  await repair.locator('input[autocomplete="username"]').fill('admin');await repair.locator('input[type="password"]').fill('Admin123456!');
+  await repair.locator('button[type="submit"]').click();await repair.waitForURL(url=>!url.pathname.endsWith('/login'));
+  await repair.goto(`http://127.0.0.1:${port}/app/modules/zhihu/finance`);
+  const unowned=repair.locator('.bill-details .bill-cards li').filter({hasText:'悬疑短篇'});
+  await unowned.getByRole('button',{name:'指定执行人',exact:true}).click();
+  const dialog=repair.getByRole('dialog',{name:'指定执行人 · 悬疑短篇',exact:true});
+  await dialog.getByLabel('执行人',{exact:true}).selectOption('3');
+  assert.equal(await dialog.getByLabel('从这天起的订单算给 TA',{exact:true}).inputValue(),date);
+  for(const width of [1440,375]){
+   await repair.setViewportSize({width,height:1100});
+   await repair.screenshot({path:path.join(out,`retro-dialog-${width}.png`),fullPage:false,animations:'disabled'});
+   assert(await repair.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  }
+  await dialog.getByRole('button',{name:'确定',exact:true}).click();
+  await repair.getByText('已指定给 小李，相关金额已重新计算。',{exact:true}).waitFor();
+  const repaired=repair.locator('.bill-details .bill-cards li').filter({hasText:'悬疑短篇'}).filter({hasText:'收款人：小李'});
+  assert((await repaired.innerText()).includes('¥40.00'));
+  for(const width of [1440,375]){
+   await repair.setViewportSize({width,height:1100});await repair.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+   await repair.screenshot({path:path.join(out,`retro-finance-${width}.png`),fullPage:true,animations:'disabled'});
+  }
+  await repair.goto(`http://127.0.0.1:${port}/app/modules/zhihu/operations?keyword=悬疑短篇`);
+  await repair.getByRole('heading',{name:'关键词管理',exact:true}).waitFor();
+  await repair.getByPlaceholder('输入关键词或小说原名').fill('悬疑短篇');await repair.getByRole('button',{name:'搜索',exact:true}).click();
+  const word=repair.locator('.engine-table tbody tr').filter({hasText:'悬疑短篇'});
+  await word.waitFor();assert((await word.innerText()).includes('使用中'));assert(!(await word.innerText()).includes('历史计划'));
+  for(const width of [1440,375]){
+   await repair.setViewportSize({width,height:1100});await repair.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+   await repair.screenshot({path:path.join(out,`retro-keywords-${width}.png`),fullPage:true,animations:'disabled'});
+   assert(await repair.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  }
+  assert.deepEqual(repairErrors,[]);await repairContext.close();activePage=null;
+  results.push({role:'admin-retro-assignment',status:200,widths:[1440,375]});
+  fs.writeFileSync(path.join(out,process.env.OPC_REVIEW_REPAIR_ONLY==='1'?'repair-result.json':'result.json'),JSON.stringify({date,results},null,2));
   console.log('角色验收通过：'+JSON.stringify(results));
  }catch(error){
   if(activePage&&!activePage.isClosed()){
