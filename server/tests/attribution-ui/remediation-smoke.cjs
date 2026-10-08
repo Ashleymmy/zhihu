@@ -22,6 +22,11 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_HISTORY_ONLY==='1'){
+   await require('./name-matching-flow.cjs')({browser,port,out,date});
+   await require('./historical-work-flow.cjs')({browser,port,out,date});
+   console.log('历史登记与作品核验全流程通过');return;
+  }
   const results=[];
   const roles=process.env.OPC_REVIEW_REPAIR_ONLY==='1'?[]:[['admin','admin','Admin123456!'],['finance','review_finance','Review123456'],['operations','review_ops','Review123456'],['leader','leader_wang','Review123456'],['creator','creator_li','Review123456'],['independent','creator_chen','Review123456']];
   for(const [role,username,password] of roles.filter(([role])=>!process.env.OPC_REVIEW_ROLES||process.env.OPC_REVIEW_ROLES.split(',').includes(role))){

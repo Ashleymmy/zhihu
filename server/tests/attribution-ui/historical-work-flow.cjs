@@ -24,7 +24,12 @@ module.exports=async function historicalWorkFlow({browser,port,out}){
     await page.goto(`http://127.0.0.1:${port}/app/modules/zhihu/finance`);await page.getByText('上传知乎报表，自动计算每个人的金额',{exact:true}).waitFor();
     for(const width of [1440,375]){await page.setViewportSize({width,height:1100});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(out,`historical-work-${role}-${action}-${width}.png`),fullPage:true});}
    }else{
-    await page.goto(`http://127.0.0.1:${port}/app/modules/zhihu/operations?tab=works`);await page.getByRole('heading',{name:'作品记录',exact:true}).waitFor();
+    if(role!=='independent'){
+     await page.getByRole('heading',{name:'现在要做',exact:true}).waitFor();
+     await page.getByRole('link',{name:role==='creator'?/补登记历史作品/:/核验历史作品/}).click();
+     await page.waitForURL(url=>url.pathname.endsWith('/works'));
+    }else await page.goto(`http://127.0.0.1:${port}/app/works`);
+    await page.getByRole('heading',{name:'作品记录',level:2,exact:true}).waitFor();
     if(role==='independent'){
      const result=await api('evidence/historical-tasks?projectId=1&accountId=1');assert.equal(result.response.status(),200);assert(!result.body.data.list.some(work=>work.keyword==='外部历史词'));assert.equal(await page.locator('.historical-works').count(),0);
      for(const width of [1440,375]){await page.setViewportSize({width,height:1100});await page.screenshot({path:path.join(out,`historical-work-${role}-${action}-${width}.png`),fullPage:true});}

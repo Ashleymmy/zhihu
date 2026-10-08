@@ -47,6 +47,7 @@ const question=async(id:string)=>(await get(id,ops)).body.data.steps[2].asks[0];
 const selection={taskId:'1',executorId:'2'};
 let serial=0;
 const tasks=(actor=ops,batchId?:string)=>request(app).get('/api/v1/modules/zhihu/evidence/historical-tasks').set(headers[actor.sub]).query({...scope,...(batchId?{batchId}:{})});
+const todos=async(actor:AuthUser)=>{const response=await request(app).get('/api/v1/core/dashboard').set(headers[actor.sub]);expect(response.status,response.text).toBe(200);return response.body.data.groups.flatMap((group:any)=>group.services.flatMap((service:any)=>service.todos));};
 const submit=(bindingId:string,actor=creator)=>request(app).post('/api/v1/modules/zhihu/evidence').set(headers[actor.sub]).send({...scope,bindingId,url:'https://example.com/old/'+ ++serial,description:'已发布的历史作品',requestKey:key()});
 const review=(id:string,actor=ops,accept=true,requestKey:string=key())=>request(app).post('/api/v1/modules/zhihu/evidence/'+id+'/review').set(headers[actor.sub]).send({...scope,accept,reason:accept?'已核对作品和执行人':'链接需要补充',requestKey});
 async function history(word='自动更新历史词'+ ++serial,executorId='2'){
@@ -71,6 +72,8 @@ it('历史作品待办按项目和实际执行人隔离，财务不能读取运�
  expect((await tasks(leader,current.id)).body.data.list).toHaveLength(0);
  const inaccessible=await request(app).get('/api/v1/modules/zhihu/evidence/historical-tasks').set(headers[creator.sub]).query({...scope,projectId:'999'});expect(inaccessible.status).toBe(403);
  expect((await submit(current.bindingId,leader)).status).toBe(403);expect((await submit(current.bindingId,finance)).status).toBe(403);
+ expect(await todos(creator)).toContainEqual(expect.objectContaining({kind:'work.historical.submit',count:1,path:expect.stringContaining('/works?')}));
+ expect((await todos(finance)).some((todo:any)=>todo.kind.startsWith('work.historical.'))).toBe(false);
 });
 it('提交历史作品不触发推送，核验同一事务更新拉新、拉活且拒绝越权核验',async()=>{
  process.env.ZHIHU_ACTIVATION_ENABLED='true';
@@ -78,12 +81,15 @@ it('提交历史作品不触发推送，核验同一事务更新拉新、拉活�
  const before=await q('SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[current.wordId]);
  const {enqueue}=await import('../../src/modules/zhihu/queue');vi.mocked(enqueue).mockClear();
  const submitted=await submit(current.bindingId);expect(submitted.status,submitted.text).toBe(201);evidenceId=submitted.body.data.id;
+ expect(await todos(ops)).toContainEqual(expect.objectContaining({kind:'work.historical.review',count:1}));
+ expect((await todos(creator)).some((todo:any)=>todo.kind.startsWith('work.historical.'))).toBe(false);
  expect((await get(current.id)).body.data.totals.confirmableAmount).toBe('0.0000');
  for(const actor of [finance,creator,leader])expect((await review(evidenceId,actor)).status).toBe(403);
  const accepted=await review(evidenceId);expect(accepted.status,accepted.text).toBe(200);
  const after=await q('SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[current.wordId]);expect(after.map(row=>row.id)).toEqual(before.map(row=>row.id));expect(after.every((row,index)=>row.current_result_id!==before[index].current_result_id)).toBe(true);
  expect((await get(current.id)).body.data.totals.confirmableAmount).toBe('32.0000');expect((await get(activation)).body.data.totals.confirmableAmount).toBe('6.0000');
  expect((await tasks(creator,current.id)).body.data.list).toHaveLength(0);
+ expect((await todos(ops)).some((todo:any)=>todo.kind==='work.historical.review')).toBe(false);
  expect(vi.mocked(enqueue).mock.calls.some(call=>['push-plan','push-composition'].includes(call[0]))).toBe(false);
 });
 it('核验后的新作品不改写已经确认的报表结果、账单和资金',async()=>{
