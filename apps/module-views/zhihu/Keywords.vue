@@ -86,5 +86,8 @@ onMounted(()=>run(async()=>{prices.value=await fetchAllPages(params=>props.conte
 .novel-edit{margin-top:8px;font-size:13px;padding:5px 8px}
 .keyword-source{padding:16px;margin:16px 0;border:1px solid var(--line,#dce3e5);border-radius:8px;background:var(--paper,#fff)}
 .keyword-source p{margin:8px 0;line-height:1.6}.keyword-source button{margin-top:12px}
-.engine-table th:last-child,.engine-table td:last-child{text-align:right;width:1%;min-width:220px;padding-right:12px}.engine-table td:last-child .engine-actions{justify-content:flex-end;flex-wrap:wrap}.engine-table td:last-child> a{display:block;margin-bottom:8px}.engine-table td:last-child details{text-align:right}.engine-table table{width:100%}
+.engine-table table{width:100%;min-width:760px;table-layout:fixed}
+.engine-table th:first-child{width:38%}.engine-table th:nth-child(2){width:15%}.engine-table th:nth-child(3){width:25%}
+.engine-table th,.engine-table td{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.engine-table th:last-child,.engine-table td:last-child{text-align:right;padding-right:12px}.engine-table td:last-child .engine-actions{justify-content:flex-end;flex-wrap:wrap}.engine-table td:last-child> a{display:block;margin-bottom:8px}.engine-table td:last-child details{text-align:right}.engine-table button{max-width:100%;white-space:normal}
 </style>
