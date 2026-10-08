@@ -89,6 +89,9 @@ async function main(){
     await page.getByRole('button',{name:'上传并自动分析',exact:true}).click();
     await page.getByText('第 3 行日期写成了“错日期”，请改成 2026-09-14 这样的格式',{exact:true}).waitFor();
     await page.getByText('汇总行，已跳过',{exact:true}).waitFor();
+    await page.locator('.analysis-run').getByRole('heading',{name:'读取报表',exact:true}).waitFor();
+    assert((await page.locator('.analysis-run').innerText()).includes('1 行格式需要修正'));
+    await page.locator('.analysis-run').screenshot({path:path.join(out,'analysis-read-375.png'),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await page.screenshot({path:path.join(out,'finance-upload-375.png'),fullPage:true,animations:'disabled'});
     const activation=Buffer.from(`日期,渠道名称,关键词,拉活量,结算金额\n${date},知乎故事一代渠道,重生千金,1,3.00\n${date},知乎故事一代渠道,都市逆袭小说,2,4.00\n${date},知乎故事一代渠道,古言虐恋,3,6.00`);
@@ -197,6 +200,25 @@ async function main(){
    await repair.setViewportSize({width,height:1100});await repair.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
    await repair.screenshot({path:path.join(out,`admin-default-rate-${width}.png`),fullPage:true,animations:'disabled'});
    await repair.locator('.bill-details').screenshot({path:path.join(out,`default-rate-details-${width}.png`),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
+   assert(await repair.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  }
+  await repair.locator('input[type="file"]').setInputFiles({name:'分析选择验收.csv',mimeType:'text/csv',buffer:Buffer.from(`日期,渠道名称,关键词,订单量\n${date},知乎故事一代渠道,重生千金,21`)});
+  await repair.getByRole('button',{name:'上传并自动分析',exact:true}).click();
+  const question=repair.locator('.analysis-run').getByRole('group',{name:new RegExp('原来 20 单，这份报表是 21 单')});
+  await question.waitFor();assert.equal(await question.getByRole('button').count(),3);
+  for(const width of [1440,375]){
+   await repair.setViewportSize({width,height:1100});await repair.locator('.analysis-run').screenshot({path:path.join(out,`analysis-ask-${width}.png`),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
+   assert(await repair.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  }
+  await question.getByRole('button',{name:'暂时跳过',exact:true}).click();
+  await repair.getByText('已暂时跳过，这项记录仍保留在待处理中。',{exact:true}).waitFor();
+  assert((await question.innerText()).includes('已暂时跳过，仍可在这里处理'));
+  await question.getByRole('button',{name:'采用这份报表',exact:true}).click();
+  await repair.getByText('已保存选择，相关金额已自动更新。',{exact:true}).waitFor();
+  assert.equal(await repair.locator('.analysis-run .ask-box').count(),0);
+  await repair.locator('.analysis-run').getByText('¥178.50',{exact:true}).waitFor();
+  for(const width of [1440,375]){
+   await repair.setViewportSize({width,height:1100});await repair.locator('.analysis-run').screenshot({path:path.join(out,`analysis-done-${width}.png`),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
    assert(await repair.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   }
   await repair.goto(`http://127.0.0.1:${port}/app/modules/zhihu/operations?keyword=悬疑短篇`);

@@ -13,6 +13,7 @@ import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
 import { assignRetro } from '../attribution/retro-assignment';
+import { importAnalysis, answerImportAnalysis } from '../attribution/analysis';
 import { listWorks, workActivity, workDetail } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
 import { requirePermission } from '../permissions';
@@ -268,6 +269,13 @@ attributionRouter.get(
     res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(f.name).send(f.bytes);
   }),
 );
+attributionRouter.get('/imports/:id/analysis',asyncHandler(async(req,res)=>{
+  ok(res,await importAnalysis(req.user,scopeSchema.parse(req.query),idSchema.parse(req.params.id)));
+}));
+attributionRouter.post('/imports/:id/answers',asyncHandler(async(req,res)=>{
+  const q=scopeSchema.extend({askId:z.string().min(1).max(160),option:z.string().min(1).max(160)}).parse(req.body);
+  ok(res,await answerImportAnalysis(req.user,q,idSchema.parse(req.params.id),key(req),q.askId,q.option));
+}));
 attributionRouter.post(
   '/imports/:id/commit',
   asyncHandler(async (req, res) => {

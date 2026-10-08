@@ -453,7 +453,9 @@ export async function acceptRevision(
   accept = true,
 ) {
   if (!isStaffRole(user.role)) fail('仅管理员可确认来源修订', 403);
-  return mutate(user, scope, 'revision.resolve', key, { id, expected, reason, accept }, async (c) => {
+  return mutate(user, scope, 'revision.resolve', key, { id, expected, reason, accept }, c=>resolveRevision(c,user,scope,id,expected,reason,accept));
+}
+export async function resolveRevision(c:PoolConnection,user:AuthUser,scope:Scope,id:string,expected:string|null,reason:string,accept:boolean){
     const [ref] = await select(
       c,
       'SELECT f.id FROM zh_metric_revisions r JOIN zh_metric_facts f ON f.id=r.fact_id WHERE r.id=? AND f.account_id=? AND f.project_id=?',
@@ -490,7 +492,6 @@ export async function acceptRevision(
     );
     await audit(c, user, 'revision.resolve', id, { reason, accept });
     return { id };
-  });
 }
 export async function rebaseRevision(
   user: AuthUser,
