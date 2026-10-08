@@ -133,7 +133,7 @@ onMounted(load)
     <header class="page-header">
       <div>
         <p class="eyebrow">TEAM / MEMBERS</p>
-        <h1>用户管理</h1>
+        <h1>团队与成员</h1>
       </div>
       <button class="primary-action" @click="showCreate = true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
