@@ -314,7 +314,7 @@ onMounted(() => run(load));
     <header class="page-header">
       <div>
         <p class="eyebrow">团队与账号</p>
-        <h1>成员管理</h1>
+        <h1>团队与成员</h1>
         <p>查看成员资料、角色权限、团队归属与邀请记录。</p>
       </div>
       <div class="member-actions">

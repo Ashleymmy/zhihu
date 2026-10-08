@@ -48,7 +48,14 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [a, l, t] = await Promise.all([apis.team.myApplications(), apis.team.listLeaders(), apis.team.myAffiliation()])
+    const t = await apis.team.myAffiliation()
+    affiliation.value = t
+    if (t.team) {
+      applications.value = []
+      leaders.value = []
+      return
+    }
+    const [a, l] = await Promise.all([apis.team.myApplications(), apis.team.listLeaders()])
     applications.value = a
     leaders.value = l
     affiliation.value = t
@@ -109,17 +116,16 @@ onMounted(load)
   <div class="page-stack">
     <header class="page-header">
       <div>
-        <p class="section-index">01 / 申请入团</p>
-        <h1>加入一个团队</h1>
-        <p>入团后你的推广数据将与团长共享，由团长协助你成长。</p>
+        <h1>{{ team ? '我的团队' : '加入团队' }}</h1>
+        <p>{{ team ? '查看你的团长和当前团队。' : '选择团长，加入团队一起开展推广。' }}</p>
       </div>
-      <button type="button" class="row-action" :disabled="loading" @click="load">刷新团队与团长列表</button>
+      <button type="button" class="row-action" :disabled="loading" @click="load">{{ team ? '刷新团队' : '刷新团长列表' }}</button>
     </header>
 
     <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
     <div v-if="submitMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ submitMessage }}</div>
 
-    <section class="workspace-grid">
+    <section class="workspace-grid" :class="{ 'team-only': !!team }">
       <div class="min-w-0">
         <!-- 我的团队 -->
         <p class="section-index">02 / 我的团队</p>
@@ -132,7 +138,7 @@ onMounted(load)
           <span class="team-avatar">{{ team.leaderName.slice(0, 1) }}</span>
           <div class="team-meta">
             <strong>{{ team.leaderName }}</strong>
-            <small>{{ team.leaderUsername }} · {{ team.memberCount }} 位成员</small>
+            <small>{{ team.memberCount }} 位成员</small>
           </div>
           <span :class="['status-badge', team.leaderActive ? 'active' : 'ended']">{{ team.leaderActive ? '合作中' : '已停用' }}</span>
         </article>
@@ -144,11 +150,13 @@ onMounted(load)
           </div>
         </article>
         <div v-if="!loading && affiliation" class="affiliation-detail">
-          <p v-if="affiliation.inviter">邀请人：{{ affiliation.inviter.name }}{{ affiliation.inviter.role ? '（' + ROLE_LABELS[affiliation.inviter.role] + '）' : '' }} · 邀请注册已绑定</p>
-          <p>{{ team ? '入团时自动开通团长已有项目，可以前往“我的关键词”创建关键词。' : '独立达人也可自行创建关键词。入团后自动开通团长已有项目。' }}</p>
+          <p v-if="affiliation.inviter">邀请人：{{ affiliation.inviter.name }}{{ affiliation.inviter.role ? '（' + ROLE_LABELS[affiliation.inviter.role] + '）' : '' }}</p>
+          <p>{{ team ? '团长的项目已自动开通，可以到工作台查看。' : '独立达人也可自行开展业务。入团后自动开通团长已有项目。' }}</p>
+          <router-link v-if="team" to="/dashboard" class="primary-action">前往工作台</router-link>
         </div>
 
         <!-- 申请记录 -->
+        <template v-if="!team">
         <p class="section-index" style="margin-top: 28px;">03 / 申请记录</p>
         <h2 class="workspace-title">我的申请</h2>
         <div v-if="loading" style="padding: 24px 0; color: var(--ink-soft); font-size: 12px;">加载中...</div>
@@ -166,9 +174,10 @@ onMounted(load)
             <button v-if="a.status === 'pending'" class="row-action" :disabled="withdrawing" @click="withdraw(a.id)">撤回</button>
           </div>
         </div>
+        </template>
       </div>
 
-      <aside class="workspace-rail">
+      <aside v-if="!loading && affiliation && !team" class="workspace-rail">
         <p class="section-index quiet">04 / 新申请</p>
         <h2 class="workspace-title" style="font-size: 22px;">提交入团申请</h2>
         <form class="rail-form" @submit.prevent="submit">
@@ -223,6 +232,8 @@ onMounted(load)
 </template>
 
 <style scoped>
+.workspace-grid.team-only { grid-template-columns: minmax(0, 1fr); }
+.affiliation-detail .primary-action { display: inline-flex; text-decoration: none; }
 .campaign-row > div:first-child { display: grid; min-width: 0; flex: 1; }
 .campaign-row > div:first-child small { overflow: hidden; color: var(--ink-soft); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 

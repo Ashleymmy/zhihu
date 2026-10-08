@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AppShell, type NavGroup, type ShellAnnouncement } from '@zhihu-koc/shared-components'
 import { useAuthStore, apis } from '../stores/auth'
@@ -10,10 +10,20 @@ const auth = useAuthStore(),
   route = useRoute(),
   router = useRouter(),
   announcements = ref<ShellAnnouncement[]>([])
+const hasTeam = ref(false)
+watch(() => [auth.user?.id, auth.user?.role, auth.user?.parentId].join(':'), async (identity) => {
+  hasTeam.value = false
+  if (auth.user?.role !== 'creator') return
+  try {
+    const affiliation = await apis.team.myAffiliation()
+    if ([auth.user?.id, auth.user?.role, auth.user?.parentId].join(':') === identity)
+      hasTeam.value = !!affiliation.team
+  } catch { /* The team page offers a retry if its details cannot be loaded. */ }
+}, { immediate: true })
 const navigation = computed<NavGroup[]>(() => {
   const groups: NavGroup[] = [
     {
-      label: 'OPC',
+      label: '工作空间',
       items: [
         { key: 'dashboard', label: '工作台', path: '/dashboard' },
         { key: 'projects', label: '业务项目', path: '/projects' },
@@ -43,7 +53,7 @@ const navigation = computed<NavGroup[]>(() => {
   ]
   if (auth.user?.role === 'creator') groups.push({ label: '个人', items: [
     { key: 'profile', label: '个人资料', path: '/profile' },
-    { key: 'join-team', label: '加入团队', path: '/join-team' },
+    { key: 'join-team', label: hasTeam.value ? '我的团队' : '加入团队', path: '/join-team' },
   ] })
   const enabled = workspace.modules.value.filter((m) => m.status === 'enabled')
   if (enabled.length)

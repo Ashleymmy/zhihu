@@ -160,7 +160,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
     <header class="page-header">
       <div>
         <p class="section-index">02 / 作品管理</p>
-        <h1>{{registrationPage?'登记作品':'推广作品'}}</h1>
+        <h1>{{registrationPage?'登记作品':'作品管理'}}</h1>
         <p>登记后自动提交知乎，无需管理员逐条审核；失败时可直接修改原表单。</p>
       </div>
       <div v-if="!registrationPage" class="page-actions">

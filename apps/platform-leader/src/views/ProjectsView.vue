@@ -73,7 +73,7 @@ onMounted(load)
     <header class="page-header">
       <div>
         <p class="eyebrow">PROJECTS / MANAGEMENT</p>
-        <h1>项目管理</h1>
+        <h1>业务项目</h1>
       </div>
       <button v-if="useAuthStore().user?.role === 'admin'" class="primary-action" @click="showCreate = true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

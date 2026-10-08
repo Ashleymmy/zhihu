@@ -11,14 +11,18 @@ export const dailyPages = [
   "works",
   "tasks",
 ];
+export const retiredFinancePages = ['settlements', 'earnings', 'withdrawals', 'appeals'];
+export const hiddenBusinessPages = ['orders', 'knowledge', 'creative-tools', ...retiredFinancePages];
 export function businessPages<T extends BusinessPage>(
   pages: T[],
   role: string,
   duty = "all",
+  includeHidden = false,
 ): T[] {
   if (role === "developer") duty = "all";
   if (role === "operator") duty = "operations";
   return pages.filter((page) => {
+    if (!includeHidden && hiddenBusinessPages.includes(page.path)) return false;
     if (["keywords", "more", "works/new"].includes(page.path)) return false;
     if (!["developer", "admin", "operator"].includes(role)) return true;
     if (duty === "finance")
@@ -54,5 +58,5 @@ export const businessLabel = (page: BusinessPage, role: string) =>
   page.path === "operations"
     ? role === "creator"
       ? "我的关键词"
-      : "关键词与团队"
+      : role === 'leader' ? '团队业务' : "关键词与团队"
     : String(page.meta?.title ?? page.path);
