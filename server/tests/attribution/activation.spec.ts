@@ -167,7 +167,7 @@ describe('拉新与拉活存储隔离',()=>{
  });
  it('初始化单价重复执行不重复插入，也不改已有价格',async()=>{
   const sql=await readFile(path.resolve('schema/zhihu/030_activation_rates.sql'),'utf8');
-  const before=await q("SELECT * FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");expect(before).toHaveLength(5);
+  const before=await q("SELECT * FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");expect(before.filter(r=>r.metric_type==='activation')).toHaveLength(5);expect(before.filter(r=>r.metric_type==='new_user')).toHaveLength(4);
   await c.query(sql);await c.query(sql);expect(await q("SELECT * FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id")).toEqual(before);
  });
  it('已确认拉活数量变动只追加更正，拉新账与已确认原行均保持不变',async()=>{

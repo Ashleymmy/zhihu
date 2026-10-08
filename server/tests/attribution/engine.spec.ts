@@ -358,6 +358,7 @@ describe('任务报价与金额', () => {
     );
     expect(direct.map((o) => o.amount)).toEqual(['1300.0000']);
     expect(self.map((o) => o.amount)).toEqual(['1500.0000']);
+    await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(999,1,'fallback-task','未单独报价的活动',NOW())");
     await expect(
       withTransaction((conn) =>
         pricing.quote(
@@ -369,7 +370,7 @@ describe('任务报价与金额', () => {
           '100',
         ),
       ),
-    ).rejects.toThrow('PRICE_MISSING');
+    ).resolves.toMatchObject([{amount:'800.0000',priceSource:'role_rate'}]);
   });
 });
 describe('报告事实与独占归因', () => {

@@ -63,6 +63,7 @@ async function main(){
    const destination=role==='operations'?'dashboard':role==='admin'||role==='finance'?'modules/zhihu/finance':'modules/zhihu/wallet';
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
    if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).waitFor();
+   if(role!=='operations')await page.getByText('按成员报价',{exact:true}).first().waitFor({state:'attached'});
    if(role==='admin'||role==='finance'){
     await page.getByText('拉新：可计费 37 单 ¥313.00',{exact:true}).waitFor();
     await page.getByText('报表问题与更正',{exact:true}).click();
@@ -171,6 +172,8 @@ async function main(){
   const dialog=repair.getByRole('dialog',{name:'指定执行人 · 悬疑短篇',exact:true});
   await dialog.getByLabel('执行人',{exact:true}).selectOption('3');
   assert.equal(await dialog.getByLabel('从这天起的订单算给 TA',{exact:true}).inputValue(),date);
+  const earlier=new Date(Date.parse(date)-86400000).toISOString().slice(0,10);
+  await dialog.getByLabel('从这天起的订单算给 TA',{exact:true}).fill(earlier);
   for(const width of [1440,375]){
    await repair.setViewportSize({width,height:1100});
    await repair.screenshot({path:path.join(out,`retro-dialog-${width}.png`),fullPage:false,animations:'disabled'});
@@ -184,6 +187,18 @@ async function main(){
    await repair.setViewportSize({width,height:1100});await repair.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
    await repair.screenshot({path:path.join(out,`retro-finance-${width}.png`),fullPage:true,animations:'disabled'});
   }
+  await repair.locator('input[name="reportType"][value="new_user"]').check();
+  await repair.locator('input[type="file"]').setInputFiles({name:'默认单价验收.csv',mimeType:'text/csv',buffer:Buffer.from(`日期,渠道名称,关键词,订单量\n${earlier},知乎故事一代渠道,悬疑短篇,10`)});
+  await repair.getByRole('button',{name:'上传并自动分析',exact:true}).click();
+  await repair.getByText('拉新：可计费 10 单 ¥85.00',{exact:true}).waitFor();
+  const rateCard=repair.locator('.bill-details .bill-cards li').filter({hasText:'悬疑短篇'}).filter({hasText:'收款人：小李'});
+  assert((await rateCard.innerText()).includes('¥80.00'));assert((await rateCard.innerText()).includes('按角色单价'));
+  for(const width of [1440,375]){
+   await repair.setViewportSize({width,height:1100});await repair.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+   await repair.screenshot({path:path.join(out,`admin-default-rate-${width}.png`),fullPage:true,animations:'disabled'});
+   await repair.locator('.bill-details').screenshot({path:path.join(out,`default-rate-details-${width}.png`),animations:'disabled',style:'.studio-header { visibility: hidden; }'});
+   assert(await repair.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  }
   await repair.goto(`http://127.0.0.1:${port}/app/modules/zhihu/operations?keyword=悬疑短篇`);
   await repair.getByRole('heading',{name:'关键词管理',exact:true}).waitFor();
   await repair.getByPlaceholder('输入关键词或小说原名').fill('悬疑短篇');await repair.getByRole('button',{name:'搜索',exact:true}).click();
@@ -196,6 +211,25 @@ async function main(){
   }
   assert.deepEqual(repairErrors,[]);await repairContext.close();activePage=null;
   results.push({role:'admin-retro-assignment',status:200,widths:[1440,375]});
+  for(const [role,username,amount] of [['finance','review_finance','80.00'],['leader','leader_wang','5.00'],['creator','creator_li','80.00']]){
+   await new Promise(resolve=>setTimeout(resolve,20000));activeRole=role+'-default-rate';
+   const context=await browser.newContext({viewport:{width:1440,height:1100}}),page=await context.newPage();activePage=page;
+   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
+   await page.goto(`http://127.0.0.1:${port}/app/login`);await page.locator('input[autocomplete="username"]').fill(username);await page.locator('input[type="password"]').fill('Review123456');
+   await page.locator('button[type="submit"]').click();await page.waitForURL(url=>!url.pathname.endsWith('/login'));
+   await page.goto(`http://127.0.0.1:${port}/app/modules/zhihu/${role==='finance'?'finance':'wallet'}`);
+   await page.locator('.period-filter input[type="date"]').first().fill(earlier);await page.locator('.period-filter input[type="date"]').last().fill(earlier);await page.getByRole('button',{name:'查看账单',exact:true}).click();
+   await page.getByText('按角色单价',{exact:true}).first().waitFor({state:'attached'});
+   const card=page.locator('.bill-details .bill-cards li').filter({hasText:'悬疑短篇'}).filter({hasText:'¥'+amount});
+   await card.waitFor({state:'attached'});assert((await card.innerText()).includes('按角色单价'));
+   for(const width of [1440,375]){
+    await page.setViewportSize({width,height:1100});await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    await page.screenshot({path:path.join(out,`${role}-default-rate-${width}.png`),fullPage:true,animations:'disabled'});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+   }
+   assert.deepEqual(errors,[]);await context.close();activePage=null;results.push({role:role+'-default-rate',status:200,widths:[1440,375]});
+  }
   fs.writeFileSync(path.join(out,process.env.OPC_REVIEW_REPAIR_ONLY==='1'?'repair-result.json':'result.json'),JSON.stringify({date,results},null,2));
   console.log('角色验收通过：'+JSON.stringify(results));
  }catch(error){
