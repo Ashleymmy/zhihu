@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS zh_project_agencies (
+  project_id BIGINT NOT NULL,
+  account_id BIGINT NOT NULL,
+  agency_name VARCHAR(200) NOT NULL,
+  updated_by BIGINT NOT NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (project_id, account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

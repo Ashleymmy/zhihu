@@ -105,3 +105,7 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 - [详细说明](docs/zhihu-audit-status-sync.md) - 完整使用指南
 - [部署指南](docs/zhihu-audit-status-deployment.md) - 部署和测试
 - [快速参考](docs/QUICK-REFERENCE.md) - 常用命令和诊断
+
+### 拉活代理名称
+
+运营或财务在项目设置、报表分析或数据待办填写本项目实际代理名称。提供了代理名称的拉活报表须与项目登记一致；名称未登记或不一致的行暂停计费，保存后自动核对未确认记录。名称列仍选填，不影响无该列的旧报表或拉新。设置按项目与账户隔离，迁移 `035_project_agencies.sql` 不改写已有账目；不要直接按外部报表内容替换项目实际签约名称。

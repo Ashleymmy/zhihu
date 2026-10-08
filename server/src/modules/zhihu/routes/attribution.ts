@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { requireAuth } from '../../../auth/middleware';
 import { asyncHandler, AppError } from '../../../middleware/errors';
 import { ok } from '../../../utils/response';
+import {getAgency,setAgency} from '../attribution/agency';
 import * as resource from '../attribution/resources';
 import * as pricing from '../attribution/pricing';
 import * as facts from '../attribution/facts';
@@ -25,6 +26,7 @@ import { novelSchema } from '../attribution/novel';
 export const attributionRouter = Router();
 const engineGroups = new Set([
   'workbench',
+  'project-agency',
   'attribution-options',
   'channel-mappings',
   'keywords',
@@ -51,6 +53,7 @@ attributionRouter.use((req,_res,next)=>{
  try {
   const group=req.path.split('/')[1];
   // Each analysis question enforces its own duty in the service transaction.
+  if(group==='project-agency')return next();
   if(group==='imports'&&/^\/imports\/\d+\/answers$/.test(req.path))return next();
   assertDuty(req.user,['imports','metric-revisions','statements'].includes(group)||group==='workbench'&&['import','confirm'].includes(req.path.split('/')[2])?'finance':'operations');
   next();
@@ -89,6 +92,8 @@ export const pagingSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 const key = (req: import('express').Request) => req.header('Idempotency-Key') ?? String(req.body?.requestKey ?? '');
+attributionRouter.get('/project-agency',asyncHandler(async(req,res)=>ok(res,await getAgency(req.user,scopeSchema.parse(req.query)))));
+attributionRouter.post('/project-agency',asyncHandler(async(req,res)=>{const q=scopeSchema.extend({name:z.string().trim().min(1).max(200),expected:z.string().max(200).nullable()}).parse(req.body);ok(res,await setAgency(req.user,q,key(req),q.name,q.expected));}));
 const workFiltersSchema=scopeSchema.merge(pagingSchema).extend({
   from:z.string().date().optional(),to:z.string().date().optional(),
   view:z.enum(['self','team','all']).optional(),ownerId:idSchema.optional(),
