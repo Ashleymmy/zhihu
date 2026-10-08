@@ -263,14 +263,16 @@ OPC 是**项目聚合平台**：平台负责人员、团队、项目、任务、
 ### 8.4 本地演示环境
 
 ```bash
-# 依赖：MySQL 8、Redis 7（本机或 Docker 均可）
-cp server/.env.example server/.env    # 设置 DB_*、REDIS_URL、OPC_MODULES=zhihu、ZHIHU_API_BASE=https://open.zhihu.com
+# 依赖：MySQL 8、Redis 7（本机或 Docker 均可）。先按 .env.example 中的 DB_* 建库和用户，例如：
+#   CREATE DATABASE zhihu_koc CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+#   CREATE USER 'zhihu'@'127.0.0.1' IDENTIFIED BY 'zhihu_local_password'; GRANT ALL ON zhihu_koc.* TO 'zhihu'@'127.0.0.1';
+cp server/.env.example server/.env    # 把 OPC_MODULES 改成 zhihu，其余可保持默认
 cd server && npm ci && npm run migrate && ADMIN_PASSWORD='Admin123456!' npm run bootstrap:admin
 cd .. && corepack pnpm@9.15.0 install && corepack pnpm@9.15.0 build
 cd server && npm run demo:review      # 启动服务并写入演示数据（仅首次写入），访问 http://127.0.0.1:3000/app/
 ```
 
-演示账号：`admin / Admin123456!`；`leader_wang`、`creator_li`、`creator_zhang`、`creator_chen`，密码均为 `Review123456`。首次登录要求改密码时，可在数据库执行 `UPDATE users SET must_change_pwd=0`。演示数据只能写入本地库，脚本会拒绝在生产环境运行。
+演示账号：`admin / Admin123456!`；`leader_wang`、`creator_li`、`creator_zhang`、`creator_chen`，密码均为 `Review123456`。脚本会自动取消这些账号的首次改密码要求。演示数据只在刚初始化的空库（只有管理员一个账号）上写入；再次运行只启动服务、不重复写入。脚本拒绝在生产环境运行。
 
 ### 8.5 提交
 
