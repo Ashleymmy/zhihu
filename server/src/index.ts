@@ -9,13 +9,13 @@ import { flushMiniObservations } from './wechat/observability';
 
 const app = createApp();
 const server = app.listen(config.port, () => {
-  app.locals.moduleRuntime.start();
+  if (config.runBackgroundJobs) app.locals.moduleRuntime.start();
   logger.info({ port: config.port }, 'opc listening');
 });
 
 async function shutdown() {
   app.locals.moduleRuntime.stop();
-  await new Promise<void>(resolve => server.close(() => resolve()));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   await flushMiniObservations();
   await Promise.all([closeQueue(), revocationStore.close(), closeRateLimiter(), db.end()]);
 }

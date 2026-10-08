@@ -48,7 +48,8 @@ async function runMemoryJob(name: JobName, data: Record<string, unknown>, option
 
 export function registerJob(name: JobName, handler: JobHandler) {
   handlers.set(name, handler);
-  if (config.queueDriver === 'bull') queue().process(name, async (job: Job) => handler(job.data));
+  if (config.queueDriver === 'bull' && config.runBackgroundJobs)
+    queue().process(name, async (job: Job) => handler(job.data));
 }
 
 export async function enqueue(name: JobName, data: Record<string, unknown>, options: JobOptions = {}) {
