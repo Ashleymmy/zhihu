@@ -275,7 +275,9 @@ attributionRouter.get('/imports/:id/analysis',asyncHandler(async(req,res)=>{
   ok(res,await importAnalysis(req.user,scopeSchema.parse(req.query),idSchema.parse(req.params.id)));
 }));
 attributionRouter.post('/imports/:id/answers',asyncHandler(async(req,res)=>{
-  const selection=z.union([z.object({channelId:idSchema}).strict(),z.object({upstreamId:z.string().trim().min(1).max(32),generation:z.union([z.literal(1),z.literal(2)])}).strict()]);
+  const selection=z.union([z.object({channelId:idSchema}).strict(),z.object({mappingId:idSchema}).strict(),z.object({keywordId:idSchema}).strict(),
+    z.object({upstreamId:z.string().trim().min(1).max(32),generation:z.union([z.literal(1),z.literal(2)])}).strict(),
+    z.object({taskId:idSchema,executorId:idSchema,fromDate:z.string().date().optional()}).strict()]);
   const q=scopeSchema.extend({askId:z.string().min(1).max(160),option:z.string().min(1).max(160),selection:selection.optional()}).parse(req.body);
   ok(res,await answerImportAnalysis(req.user,q,idSchema.parse(req.params.id),key(req),q.askId,q.option,q.selection));
 }));

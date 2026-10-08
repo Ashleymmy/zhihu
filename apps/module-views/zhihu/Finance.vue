@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import Issues from './Issues.vue'
 import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
+import type {ReportAnswer} from './report-analysis'
 import {CashWallet,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
@@ -38,7 +39,7 @@ async function inspectImport(id:string,page=1){
  const [detail,run]=await Promise.all([props.context.http.get<ImportDetail>('/imports/'+id,{...props.context.scope,page,pageSize:25}),props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)])
  importResult.value=detail;analysis.value=run
 }
-async function answerAnalysis(answer:{askId:string;option:string;selection?:{channelId:string}|{upstreamId:string;generation:1|2}}){
+async function answerAnalysis(answer:ReportAnswer){
  if(busy.value||busyAskId.value)return
  busy.value=true;busyAskId.value=answer.askId;askErrors[answer.askId]=''
  try{analysis.value=await post('/imports/'+importId.value+'/answers',answer) as AnalysisRunModel;await refresh();await inspectImport(importId.value);notice.value=answer.option==='skip'?'已暂时跳过，这项记录仍保留在待处理中。':'已保存选择，相关金额已自动更新。'}

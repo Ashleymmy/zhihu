@@ -12,6 +12,7 @@ export function keywordProgress(word: KeywordProgress): string {
   if (word.lifecycleStatus === 'retired' || word.planStatus === 'ended') return '已停用'
   if (word.planStatus === 'paused') return '计划已暂停'
   if (word.planStatus === 'rejected') return '计划已拒绝，暂不可领取'
+  if (word.syncStatus === 'historical') return '历史任务，已登记'
   if (Number(word.allocationReady) === 1) return '可以领取'
   if (word.syncStatus === 'failed') return '提交失败，暂不可领取'
   if (word.syncStatus === 'local') return '待提交知乎'

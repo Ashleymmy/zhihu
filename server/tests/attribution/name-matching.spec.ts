@@ -110,7 +110,7 @@ it('选择过程失败时资料、行状态、审计和已保存的回答全部�
 });
 it('新渠道与现有渠道可在当前分析中登记，使用报表日期且不推送上游',async()=>{
  const id=await upload('2026-09-20','全新业务基地','全新历史词'),ask=(await get(id,ops)).body.data.steps[1].asks[0];
- expect(ask.options).toEqual([{key:'other-channel',label:'其他或新渠道',disabled:false}]);
+ expect(ask.options).toEqual([{key:'other-channel',label:'其他或新渠道',disabled:false},{key:'skip',label:'暂时跳过',disabled:false}]);
  const denied=await answer(id,ask.id,'other-channel',ops,{channelId:'999999'});expect(denied.status).toBe(409);
  const response=await answer(id,ask.id,'other-channel',ops,{upstreamId:'new-local-channel',generation:1});expect(response.status,response.text).toBe(200);
  expect(response.body.data.steps[1].status).toBe('done');expect(response.body.data.steps[2].status).toBe('ask');
@@ -126,8 +126,8 @@ it('名称归一化后有歧义时仍必须选择，原映射与已确认资金�
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(40,1,'ambiguous',1,'分析渠道二')");
  await c.query("INSERT INTO zh_channel_mappings(account_id,project_id,channel_id,channel_name,effective_from,created_by) VALUES(?,1,40,'分析 渠道','2026-09-01',1)",[scope.accountId]);
  const mappings=await q('SELECT * FROM zh_channel_mappings ORDER BY id'),id=await upload('2026-09-22','分析渠道','分析关键词');
- const ask=(await get(id,ops)).body.data.steps[1].asks[0];expect(ask.options.filter((o:{key:string})=>o.key.startsWith('channel:'))).toHaveLength(2);
- expect((await answer(id,ask.id,'channel:'+mappingId)).status).toBe(200);
+ const run=(await get(id,ops)).body.data,ask=run.steps[1].asks[0];expect(ask.options).toHaveLength(3);expect(run.nameMatches[0].candidates).toHaveLength(2);
+ expect((await answer(id,ask.id,'other-channel',ops,{mappingId})).status).toBe(200);
  expect(await q('SELECT * FROM zh_channel_mappings ORDER BY id')).toEqual(mappings);
  expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(bills);expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
  const [fact]=await q('SELECT keyword_id FROM zh_metric_facts WHERE business_date=?',['2026-09-22']);expect(String(fact.keyword_id)).toBe(wordId);

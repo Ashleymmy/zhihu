@@ -2,6 +2,7 @@
 import {nextTick,onMounted,reactive,ref} from 'vue'
 import type {AnalysisRunModel} from '@zhihu-koc/shared-components'
 import ReportAnalysis from './ReportAnalysis.vue'
+import type {ReportAnswer} from './report-analysis'
 import {errorText,requestKey,type EngineContext} from './context'
 const props=defineProps<{context:EngineContext}>()
 interface Issue{id:string;batchId:string|null;reasonCode:string;reason:string;next:string;status:string;factId:string|null;keyword:string|null;revisionId:string|null;expectedRevisionId:string|null;normalizedJson:{keyword:string;orders:string}|null}
@@ -10,7 +11,7 @@ const finance=props.context.adminDuty==='finance',operations=props.context.admin
 const analysis=ref<AnalysisRunModel|null>(null),analysisHost=ref<HTMLElement|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
 const canMatch=(i:Issue)=>i.status==='open'&&!!i.batchId&&!finance&&['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH','KEYWORD_UNKNOWN'].includes(i.reasonCode)
 async function inspect(i:Issue){error.value='';try{analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+i.batchId+'/analysis',props.context.scope);await nextTick();analysisHost.value?.scrollIntoView({block:'start',behavior:'smooth'})}catch(e){error.value=errorText(e)}}
-async function answer(value:{askId:string;option:string;selection?:{channelId:string}|{upstreamId:string;generation:1|2}}){
+async function answer(value:ReportAnswer){
  if(!analysis.value||busyAskId.value)return;busyAskId.value=value.askId;askErrors[value.askId]=''
  try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});await load()}
  catch(e){askErrors[value.askId]=errorText(e)}finally{busyAskId.value=''}

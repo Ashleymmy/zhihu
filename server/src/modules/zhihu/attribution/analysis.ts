@@ -8,7 +8,7 @@ import {authorize,audit,json,mutate,select,type RecordRow} from './store';
 import {fail,money,moneyText,type Scope} from './domain';
 import {allocations} from './workbench';
 import {resolveRevision,type AttributionSnapshot,type FactSnapshot} from './facts';
-import {nameChoices,applyNameChoice,type ChannelSelection} from './name-choices';
+import {nameChoices,applyNameChoice,type NameSelection} from './name-choices';
 
 const platformScope=(scope:Scope,id:string)=>({...scope,moduleId:'zhihu',runKey:'import:'+id});
 const cash=(amount:bigint)=>{const n=amount<0n?-amount:amount,cents=(n+50n)/100n;return (amount<0n?'-':'')+String(cents/100n)+'.'+String(cents%100n).padStart(2,'0');};
@@ -109,13 +109,15 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
      summary:finance?`${billable} ${unit}可计费 · 可确认金额 ¥${cash(confirmableAmount)}`:`${rows.length} 行已保留，金额由财务核对`,
      pendingText:need?`${need} 条记录仍需处理${finance&&pendingQuantity?'，涉及 '+pendingQuantity+' '+unit:''}，其他记录可以继续核对。`:'没有待处理的数据问题。',
      actions:[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary'},...(invalid&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
- return {...run,...(finance?{totals:{billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity)}}:{})};
+ return {...run,nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
+   candidates:choice.candidates.map(item=>({id:String(item.id),name:String(item.keyword??item.channel_name)}))})),
+   ...(finance?{totals:{billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity)}}:{})};
 }
 export async function importAnalysis(user:AuthUser,scope:Scope,id:string){
  if(!isStaffRole(user.role))fail('报表分析仅管理人员可见',403);
  await authorize(user,scope);return withTransaction(c=>readAnalysis(c,user,scope,id));
 }
-export async function answerImportAnalysis(user:AuthUser,scope:Scope,id:string,key:string,askId:string,option:string,selection?:ChannelSelection){
+export async function answerImportAnalysis(user:AuthUser,scope:Scope,id:string,key:string,askId:string,option:string,selection?:NameSelection){
  const naming=askId.startsWith('name:');assertDuty(user,naming?'operations':'finance');
  return mutate(user,scope,'analysis.answer',key,{id,askId,option,selection},async c=>{
    const [batch]=await select(c,'SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',[id,scope.accountId,scope.projectId]);
