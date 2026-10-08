@@ -4,6 +4,8 @@ import type { AuthUser } from '../../../types';
 import { withTransaction } from '../../../db';
 import { audit, authorize, insert, mutate, scopeLock, select, type RecordRow } from './store';
 import { businessDay, count, day, fail, money, moneyText, type Scope } from './domain';
+import { rateRuleFor } from '../../../core/rates';
+import { independentCreatorSql } from './relationships';
 
 export interface PriceInput {
   taskId: string;
@@ -27,7 +29,7 @@ export async function draftPrice(user: AuthUser, scope: Scope, key: string, inpu
     if (!task) fail('任务不属于当前项目');
     const [target] = await select(
       c,
-      `SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id
+      `SELECT u.id,u.role,u.parent_id,${independentCreatorSql('u',' FOR SHARE')} independent FROM users u JOIN project_members pm ON pm.user_id=u.id
       WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE`,
       [input.payeeId, scope.projectId],
     );
@@ -35,7 +37,7 @@ export async function draftPrice(user: AuthUser, scope: Scope, key: string, inpu
     let relation = '';
     if (isStaffRole(user.role)) {
       if (target.role === 'leader') relation = 'agency_leader';
-      else if (target.role === 'creator' && target.parent_id === null) relation = 'agency_creator';
+      else if (target.role === 'creator' && Number(target.independent)) relation = 'agency_creator';
     } else if (target.role === 'creator' && String(target.parent_id) === user.sub) relation = 'leader_creator';
     if (!relation) fail('当前付款关系不允许向此成员报价', 403);
     const payerKind = isStaffRole(user.role) ? 'agency' : 'user',
@@ -97,13 +99,13 @@ export async function publishPrice(user: AuthUser, scope: Scope, id: string, key
     if (p.price_status === 'published') return { id };
     const [target] = await select(
       c,
-      'SELECT u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE',
+      `SELECT u.role,u.parent_id,${independentCreatorSql('u',' FOR SHARE')} independent FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE`,
       [p.payee_id, scope.projectId],
     );
     if (
       !target ||
       (p.relation_type === 'leader_creator' && String(target.parent_id) !== String(p.payer_id)) ||
-      (p.relation_type === 'agency_creator' && target.parent_id !== null)
+      (p.relation_type === 'agency_creator' && !Number(target.independent))
     )
       fail('报价的上下级关系已经变化', 409);
     if (target.role !== (p.relation_type === 'agency_leader' ? 'leader' : 'creator')) fail('收款人的角色已变化', 409);
@@ -200,17 +202,25 @@ export async function quote(
       AND v.status='published' AND v.effective_from<=? AND (v.effective_to IS NULL OR v.effective_to>?)`,
       [scope.accountId, scope.projectId, taskId, payerKind, payerId, payeeId, relation, date, date],
     );
-    if (prices.length !== 1) fail(prices.length ? 'PRICE_OVERLAP' : 'PRICE_MISSING', 409);
-    const price = String(prices[0].price);
+    if (prices.length > 1) fail('PRICE_OVERLAP', 409);
+    let rule:Awaited<ReturnType<typeof rateRuleFor>>=null;
+    if(!prices.length){
+      try{rule=await rateRuleFor(c,{projectId:scope.projectId,moduleId:'zhihu',metricType:'new_user',ruleCode:relation==='agency_leader'?'leader_self':'creator',date});}
+      catch(error){if(error instanceof Error&&error.message==='RATE_OVERLAP')fail('PRICE_OVERLAP',409);throw error;}
+      if(!rule)fail('PRICE_MISSING',409);
+    }
+    const price = prices.length?String(prices[0].price):rule!.unitPrice;
     result.push({
       relation,
       payerKind,
       payerId,
       payeeId,
-      versionId: String(prices[0].version_id),
+      versionId: prices.length?String(prices[0].version_id):rule!.id,
+      priceSource: prices.length?'agreement':'role_rate',
       unitPrice: price,
       amount: moneyText(quantity * money(price)),
     });
   }
+  if(binding.path_type==='team_creator'&&result.some(o=>o.priceSource==='role_rate')&&money(result[1].unitPrice)>money(result[0].unitPrice))fail('PRICE_MISSING',409);
   return result;
 }

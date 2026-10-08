@@ -69,7 +69,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   const users=await select(c,`SELECT CAST(u.id AS CHAR) id,u.display_name,u.role,CAST(u.parent_id AS CHAR) parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE pm.project_id=? AND pm.left_at IS NULL AND (? IN ('developer','admin','operator') OR u.id=? OR u.parent_id=?)`,[scope.projectId,user.role,user.sub,user.sub]);
   const prior=await select(c,`SELECT CAST(e.source_id AS CHAR) source_id,CAST(e.user_id AS CHAR) user_id,CAST(SUM(e.amount) AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id WHERE src.module_id='zhihu' AND src.account_id=? AND src.project_id=? AND src.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR e.user_id=?) GROUP BY e.source_id,e.user_id`,[scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub]);
   const [route]=await select(c,'SELECT mode FROM zh_engine_routes WHERE account_id=? AND project_id=?',[scope.accountId,scope.projectId]);
-  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;canAssignRetro?:boolean;retroFromDate?:string;metricType:MetricType;quantity:string|null;activations:string|null;settlementMismatch?:AttributionSnapshot['settlementMismatch'];internal?:boolean;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
+  const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;priceSources?:('agreement'|'role_rate')[];canAssignRetro?:boolean;retroFromDate?:string;metricType:MetricType;quantity:string|null;activations:string|null;settlementMismatch?:AttributionSnapshot['settlementMismatch'];internal?:boolean;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean}[]=[];
   const team=new Map<string,{executorId:string;name:string;orders:bigint;commission:bigint;activations:bigint;activationCommission:bigint}>();
   const stats={new_user:{records:0,quantity:0n,billableQuantity:0n,pendingQuantity:0n},activation:{records:0,quantity:0n,billableQuantity:0n,pendingQuantity:0n}};
   let staffTotal=0n;
@@ -80,13 +80,17 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
    const metricType:MetricType=r.metric_type==='activation'?'activation':'new_user';
    const quantity=metricType==='activation'?snap.activations??null:snap.orders;
    const typed={canAssignRetro:dutyAllows(user,'operations')&&!r.executor_id&&!Number(r.ownership_history)&&!r.stop_new_use_at&&r.release_status!=='requested'&&route?.mode!=='stopped'&&!['archived','retired'].includes(String(r.lifecycle_status)),retroFromDate:String(r.retro_from_date??snap.date),metricType,quantity,activations:snap.activations??null,...(isStaffRole(user.role)?{settlementMismatch:snap.settlementMismatch??null}:{})};
-   const targets=allocations(snap);
-   const internal=snap.obligations.some(o=>o.relation==='activation:staff_self');
+   let targets:ReturnType<typeof allocations>,allocationFailed=false;
+   try{targets=allocations(snap);}catch{allocationFailed=true;targets={total:'0.0000',staffAmount:'0.0000',list:[]};}
+   const priceSourcesFor=(payeeId:string)=>[...new Set(snap.obligations.filter(o=>o.payeeId===payeeId||o.payerKind==='user'&&o.payerId===payeeId).map(o=>o.priceSource??'agreement'))];
+   const priceSources=priceSourcesFor(isStaffRole(user.role)?String(r.executor_id??''):user.sub);
+   Object.assign(typed,{priceSources});
+   const internal=!allocationFailed&&snap.obligations.some(o=>o.relation==='activation:staff_self');
    staffTotal+=money(targets.staffAmount);
    stats[metricType].records++;stats[metricType].quantity+=BigInt(quantity??'0');
    stats[metricType][targets.list.length||internal?'billableQuantity':'pendingQuantity']+=BigInt(quantity??'0');
    if(metricType==='new_user'){orderTotal+=BigInt(snap.orders??'0');if(targets.list.length)billableOrders+=BigInt(snap.orders??'0');else pendingOrders+=BigInt(snap.orders??'0');}
-   const reasonCode=route?.mode==='stopped'?'BUSINESS_STOPPED':Number(r.pending_revision)>0?'SOURCE_REVISION_PENDING':String(r.reason_code??'')||(r.verification_status==='passed'?'':r.verification_status==='disputed'?'WORK_DISPUTED':Number(r.evidence_count)?'WORK_UNVERIFIED':'WORK_MISSING');
+   const reasonCode=allocationFailed?'PRICE_CONFLICT':route?.mode==='stopped'?'BUSINESS_STOPPED':Number(r.pending_revision)>0?'SOURCE_REVISION_PENDING':String(r.reason_code??'')||(r.verification_status==='passed'?'':r.verification_status==='disputed'?'WORK_DISPUTED':Number(r.evidence_count)?'WORK_UNVERIFIED':'WORK_MISSING');
    const text=reasonCode?reasonText(reasonCode,{metricType,bindingId:r.binding_id,executorId:r.executor_id,executorName:r.executor_name,executorRole:r.executor_role,leaderName:r.leader_name}):{reason:'',next:'财务：核对并确认账单'};
    const blocked=text.reason;
    if(user.role==='leader'&&String(r.leader_id)===user.sub&&r.executor_id&&String(r.executor_id)!==user.sub){
@@ -106,7 +110,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     if(!isStaffRole(user.role)&&a.userId!==user.sub)continue;
     const payee=users.find(u=>String(u.id)===a.userId);
     const before=money(String(prior.find(p=>String(p.source_id)===String(r.source_id)&&String(p.user_id)===a.userId)?.amount??'0'),true);
-    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,ready:isStaffRole(user.role)&&!blocked&&!confirmed});
+    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,priceSources:priceSourcesFor(a.userId),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,ready:isStaffRole(user.role)&&!blocked&&!confirmed});
    }
   }
   // A source without a matching keyword has no fact yet. Include it for staff,

@@ -56,6 +56,8 @@ async function main() {
         const [ratesBefore]=await db.query("SELECT id,project_id,rule_code,unit_price FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");
         const rateMigration=await readFile(path.resolve('schema/zhihu/030_activation_rates.sql'),'utf8');
         await db.query(rateMigration);await db.query(rateMigration);
+        const newUserSeed=await readFile(path.resolve('schema/zhihu/031_new_user_rates.sql'),'utf8');
+        await db.query(newUserSeed);await db.query(newUserSeed);
         const [ratesAfter]=await db.query("SELECT id,project_id,rule_code,unit_price FROM opc_rate_rules WHERE module_id='zhihu' ORDER BY id");
         if(JSON.stringify(ratesBefore)!==JSON.stringify(ratesAfter))throw Error('重复迁移改变了初始单价');
         console.log('REVIEW_RATE_REPLAY_VERIFIED',JSON.stringify(ratesAfter));

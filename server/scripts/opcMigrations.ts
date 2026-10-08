@@ -64,6 +64,7 @@ export async function runOpcMigrations(
       // A fresh install creates its project after module migrations. Replay this
       // single idempotent seed once associations exist; never replace user rates.
       await conn.query(await readFile(path.join(schemaRoot,moduleId,'030_activation_rates.sql'),'utf8'));
+      await conn.query(await readFile(path.join(schemaRoot,moduleId,'031_new_user_rates.sql'),'utf8'));
     }
   } finally {
     await conn.end();
