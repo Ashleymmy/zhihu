@@ -52,7 +52,8 @@ it('实际接口逐行保留进度，重复来源不重复合计，金额结论�
 });
 it('运营只能读取无金额的分析，团长和达人不能读取或回答，其他项目不能混用',async()=>{
  const response=await get(initial,ops);expect(response.status,response.text).toBe(200);expect(response.body.data.totals).toBeUndefined();expect(JSON.stringify(response.body.data)).not.toContain('¥');
- expect(response.body.data.steps.flatMap((step:{asks?:unknown[]})=>step.asks??[])).toEqual([]);
+ expect(response.body.data.steps[5].asks).toBeUndefined();
+ expect(response.body.data.steps[1].asks[0].id).toMatch(/^name:channel:/);
  for(const actor of [creator,leader]){expect((await get(initial,actor)).status).toBe(403);expect((await answer(initial,'revision:1:1','new',actor)).status).toBe(403);}
  expect((await answer(initial,'revision:1:1','new',ops)).status).toBe(403);
  expect((await request(app).get(endpoint(initial)+'/analysis').set(headers[finance.sub]).query({...scope,projectId:'999'})).status).toBe(403);

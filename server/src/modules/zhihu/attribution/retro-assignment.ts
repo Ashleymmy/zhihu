@@ -6,13 +6,19 @@ import { audit, insert, keywordLock, mutate, select } from './store';
 import { teamLeader } from './relationships';
 import { attribute } from './facts';
 import { unconfirmedFactSql } from './keyword-usability';
+import type {PoolConnection} from 'mysql2/promise';
 
 export async function assignRetro(user:AuthUser,scope:Scope,id:string,key:string,input:{executorId:string;fromDate?:string}) {
   if(!isStaffRole(user.role))fail('指定执行人需要运营权限',403);
   assertDuty(user,'operations');
   scope={projectId:scope.projectId,accountId:scope.accountId};
-  if(input.fromDate){day(input.fromDate);if(input.fromDate>businessDay())fail('开始日期不能晚于今天');}
-  return mutate(user,scope,'binding.assign-retro',key,{id,...input},async c=>{
+  return mutate(user,scope,'binding.assign-retro',key,{id,...input},c=>assignRetroInTransaction(c,user,scope,id,input));
+}
+// Callers hold the account/project lock and keep registration, assignment and
+// report repair in the same transaction.
+export async function assignRetroInTransaction(c:PoolConnection,user:AuthUser,scope:Scope,id:string,input:{executorId:string;fromDate?:string}){
+    assertDuty(user,'operations');
+    if(input.fromDate){day(input.fromDate);if(input.fromDate>businessDay())fail('开始日期不能晚于今天');}
     const word=await keywordLock(c,scope,id);
     if(['archived','retired'].includes(String(word.lifecycle_status)))fail('关键词已停用，不能指定新的执行人',409);
     const bindings=await select(c,'SELECT b.*,u.display_name executor_name FROM zh_keyword_bindings b LEFT JOIN users u ON u.id=b.executor_id WHERE b.keyword_id=? FOR UPDATE',[id]);
@@ -46,5 +52,4 @@ export async function assignRetro(user:AuthUser,scope:Scope,id:string,key:string
     const facts=await select(c,`SELECT f.*,DATE_FORMAT(f.business_date,'%Y-%m-%d') business_day FROM zh_metric_facts f WHERE f.keyword_id=? AND ${unconfirmedFactSql()} ORDER BY f.id FOR UPDATE`,[id]);
     for(const fact of facts)await attribute(c,scope,fact);
     return {id:bindingId,executorId:input.executorId,executorName:String(target.display_name),fromDate,recalculated:facts.length};
-  });
 }

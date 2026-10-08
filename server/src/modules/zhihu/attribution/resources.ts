@@ -186,7 +186,7 @@ export async function options(user: AuthUser, scope: Scope) {
   await authorize(user, scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
-    const tasks = await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_task_id,unit_price,settle_type,status,start_time,end_time,synced_at FROM tasks WHERE project_id=? ORDER BY id', [
+    const tasks = await select(c, `SELECT CAST(id AS CHAR) id,name,zhihu_task_id,${isStaffRole(user.role)&&!dutyAllows(user,'finance')?'NULL unit_price':'unit_price'},settle_type,status,start_time,end_time,synced_at FROM tasks WHERE project_id=? ORDER BY id`, [
       scope.projectId,
     ]);
     const channels = await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_channel_id,generation,synced_at FROM channels WHERE project_id=? AND is_enabled=1', [

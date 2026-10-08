@@ -410,7 +410,7 @@ describe('报告事实与独占归因', () => {
     expect(own.list[0]).not.toHaveProperty('agencyMargin');
     const trace = await facts.trace(admin, scope, factId);
     expect(trace.revisions).toHaveLength(2);
-    await expect(facts.importDetail(creator, scope, other.id, 1, 25)).rejects.toThrow('仅管理员');
+    await expect(facts.importDetail(creator, scope, other.id, 1, 25)).rejects.toThrow('财务权限');
   });
   it('渠道更名不重复事实；不同值进入修订，原结果保持不变', async () => {
     const facts = await import('../../src/modules/zhihu/attribution/facts');
@@ -534,14 +534,15 @@ describe('首次核验、对账及不可变差额', () => {
   });
 });
 describe('管理角色的项目业务查询范围一致', () => {
-  it.each([operator, developer])('$role 无上下级绑定也能读取项目报价、归因和对账记录', async viewer => {
+  it.each([operator, developer])('$role 的金额读取按岗位校验，业绩数量按项目校验', async viewer => {
     const { listPrices } = await import('../../src/modules/zhihu/attribution/pricing');
     const { listAttributions } = await import('../../src/modules/zhihu/attribution/facts');
     const { listStatements } = await import('../../src/modules/zhihu/attribution/statements');
     for (const list of [listPrices, listAttributions, listStatements]) {
       const expected = await list(admin, scope, 1, 100);
       expect(expected.total).toBeGreaterThan(0);
-      expect(await list(viewer, scope, 1, 100)).toEqual(expected);
+      if(viewer.role==='operator')await expect(list(viewer,scope,1,100)).rejects.toThrow('财务权限');
+      else expect(await list(viewer, scope, 1, 100)).toEqual(expected);
     }
     const { attributionDataProvider } = await import('../../src/modules/zhihu/attribution/provider');
     const { businessDay } = await import('../../src/modules/zhihu/attribution/domain');

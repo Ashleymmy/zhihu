@@ -30,6 +30,7 @@ async function main(){
    const page=await context.newPage();activePage=page;page.setDefaultTimeout(15000);
    page.on('response',response=>{if(response.status()===429)console.log(role+' 请求达到频率限制：'+new URL(response.url()).pathname)});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
+   if(role==='operations')page.on('request',req=>{if(new URL(req.url()).pathname.endsWith('/price-agreements'))errors.push('运营页面不应读取报价');});
    await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
    await page.goto(`http://127.0.0.1:${port}/app/login`);
    await page.locator('input[autocomplete="username"]').fill(username);
@@ -62,6 +63,7 @@ async function main(){
    }
    const destination=role==='operations'?'dashboard':role==='admin'||role==='finance'?'modules/zhihu/finance':'modules/zhihu/wallet';
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
+   if(role==='operations'){await page.locator('.studio-app').waitFor();await page.getByRole('heading',{level:1}).waitFor();}
    if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).waitFor();
    if(role!=='operations')await page.getByText('按成员报价',{exact:true}).first().waitFor({state:'attached'});
    if(role==='admin'||role==='finance'){
@@ -160,6 +162,10 @@ async function main(){
    // limit. This harness must not weaken or bypass the production limiter.
    await new Promise(resolve=>setTimeout(resolve,Math.max(0,20000-(Date.now()-roleStarted))));
   }
+  if(process.env.OPC_REVIEW_BASE_ONLY==='1'){
+   fs.writeFileSync(path.join(out,'base-result.json'),JSON.stringify({date,results},null,2));
+   console.log('基础角色验收通过：'+JSON.stringify(results));return;
+  }
   // Repair the unowned demo keyword through the real finance page, then verify
   // its keyword page. This runs after baseline role checks so their totals stay stable.
   const repairContext=await browser.newContext({viewport:{width:375,height:1100}});
@@ -252,6 +258,8 @@ async function main(){
    }
    assert.deepEqual(errors,[]);await context.close();activePage=null;results.push({role:role+'-default-rate',status:200,widths:[1440,375]});
   }
+  await require('./name-matching-flow.cjs')({browser,port,out,date});
+  results.push({role:'admin-finance-operations-names',status:200,widths:[1440,375]});
   fs.writeFileSync(path.join(out,process.env.OPC_REVIEW_REPAIR_ONLY==='1'?'repair-result.json':'result.json'),JSON.stringify({date,results},null,2));
   console.log('角色验收通过：'+JSON.stringify(results));
  }catch(error){

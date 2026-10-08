@@ -46,12 +46,14 @@ export async function ensurePoolMapping(c: PoolConnection, user: AuthUser, scope
     [scope.accountId, scope.projectId, channelId]);
   if (mappings.length > 1) fail('这个渠道有多个报表名称，请在关键词库中选择具体名称');
   if (mappings.length) return String(mappings[0].id);
-  const [channel] = await select(c, 'SELECT name FROM channels WHERE id=? AND project_id=? AND is_enabled=1', [channelId, scope.projectId]);
+  const [channel] = await select(c, `SELECT ch.name,DATE_FORMAT(LEAST(CURDATE(),COALESCE((SELECT MIN(DATE(p.created_at)) FROM plans p
+    WHERE p.project_id=ch.project_id AND p.channel_id=ch.zhihu_channel_id),CURDATE())),'%Y-%m-%d') start_day
+    FROM channels ch WHERE ch.id=? AND ch.project_id=? AND ch.is_enabled=1`, [channelId, scope.projectId]);
   if (!channel) fail('渠道不属于当前项目');
-  const overlaps = await select(c, "SELECT id FROM zh_channel_mappings WHERE account_id=? AND channel_name=? AND (effective_to IS NULL OR effective_to>CURDATE())", [scope.accountId, channel.name]);
+  const overlaps = await select(c, "SELECT id FROM zh_channel_mappings WHERE account_id=? AND channel_name=? AND (effective_to IS NULL OR effective_to>?)", [scope.accountId, channel.name,channel.start_day]);
   if (overlaps.length) fail('报表渠道名称已有对应关系，请在渠道与任务中核对');
-  const id = await insert(c, 'INSERT INTO zh_channel_mappings(account_id,project_id,channel_id,channel_name,effective_from,created_by) VALUES(?,?,?,?,CURDATE(),?)',
-    [scope.accountId,scope.projectId,channelId,channel.name,user.sub]);
+  const id = await insert(c, 'INSERT INTO zh_channel_mappings(account_id,project_id,channel_id,channel_name,effective_from,created_by) VALUES(?,?,?,?,?,?)',
+    [scope.accountId,scope.projectId,channelId,channel.name,channel.start_day,user.sub]);
   await audit(c,user,'channel.create',id,{source:'plan.create',channelId});
   return id;
 }
