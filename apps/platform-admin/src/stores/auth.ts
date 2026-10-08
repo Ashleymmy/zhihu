@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { AuthUser, RegisterReq } from '@zhihu-koc/shared-contracts/core'
-import { createCoreApis, createHttpClient } from '@zhihu-koc/shared-services/core'
+import { createCoreApis, createHttpClient, isApiError } from '@zhihu-koc/shared-services/core'
 import { isValidAccount } from '../access'
 
 export const http = createHttpClient({
@@ -24,11 +24,15 @@ export const useAuthStore = defineStore('auth', () => {
     validationTask ??= (async () => {
       try {
         const current = await apis.auth.me()
-        if (!isValidAccount(current)) throw new Error('账号角色异常，请联系管理员')
+        if (!isValidAccount(current)) throw { code: 'INVALID_ACCOUNT', status: 401, message: '账号角色异常，请联系管理员' }
         user.value = current
       } catch (error) {
-        user.value = null
-        http.tokens.set(null)
+        // A temporary outage or throttling is not a revoked login. Keep the
+        // current session so retrying does not force another password entry.
+        if (isApiError(error) && error.status === 401) {
+          user.value = null
+          http.tokens.set(null)
+        }
         throw error
       } finally { validationTask = null }
     })()
