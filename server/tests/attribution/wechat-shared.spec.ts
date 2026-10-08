@@ -1,3 +1,4 @@
+import { zhihuAccountLifecycle } from '../../src/modules/zhihu/services/account-lifecycle';
 import { contentDigest } from '../../src/wechat/content-safety';
 import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
@@ -138,6 +139,7 @@ beforeAll(async () => {
   const runtime = new ModuleRuntime([zhihuManifest]);
   runtime.register({
     manifest: zhihuManifest,
+    accountLifecycle: zhihuAccountLifecycle,
     router: express.Router().use(miniBusinessRouter).use(attributionRouter).use('/compositions', compositionsRouter),
   });
   app = createCoreApp(runtime);

@@ -39,7 +39,7 @@ describe('core boundaries', () => {
       const s = fs.readFileSync(file, 'utf8');
       expect(s, file).not.toMatch(/ZHIHU_|DEFAULT_PROJECT_ID|config\.zhihu|config\.defaultProjectId/);
       expect(s, file).not.toMatch(
-        /\b(?:FROM|JOIN|INTO|UPDATE)\s+(?:plans|channels|compositions|daily_metrics|earnings|data_import_batches|attribution_tasks)\b/i,
+        /\b(?:FROM|JOIN|INTO|UPDATE)\s+`?(?:zh_\w+|plans|channels|compositions|daily_metrics|earnings|data_import_batches|attribution_tasks|withdrawal_requests)\b/i,
       );
     }
   });

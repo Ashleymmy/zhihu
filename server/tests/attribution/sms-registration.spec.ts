@@ -1,3 +1,4 @@
+import { accountRuntime } from '../support/accountRuntime';
 import { contentDigest } from '../../src/wechat/content-safety';
 import { beforeAll, beforeEach, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
@@ -304,10 +305,10 @@ it('same phone edit preserves verification, changed phone clears it through both
     r = await signup(p, code),
     id = String(r.body.data.user.id);
   const { updateMemberAccess } = await import('../../src/services/member-access.service');
-  await updateMemberAccess(actor, id, { phone: p.phone });
+  await updateMemberAccess(actor, id, { phone: p.phone }, accountRuntime());
   let [[row]] = await c.query<RowDataPacket[]>('SELECT phone_verified_at FROM users WHERE id=?', [id]);
   expect(row.phone_verified_at).toBeTruthy();
-  await updateMemberAccess(actor, id, { phone: '13899990001' });
+  await updateMemberAccess(actor, id, { phone: '13899990001' }, accountRuntime());
   [[row]] = await c.query<RowDataPacket[]>('SELECT phone_verified_at FROM users WHERE id=?', [id]);
   expect(row.phone_verified_at).toBeNull();
   await c.query('UPDATE users SET phone_verified_at=NOW(3) WHERE id=?', [id]);

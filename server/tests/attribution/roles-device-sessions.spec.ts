@@ -1,3 +1,4 @@
+import { accountRuntime } from '../support/accountRuntime';
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
@@ -75,7 +76,7 @@ beforeAll(async () => {
   const { authRouter } = await import('../../src/routes/auth');
   const { requireAuth } = await import('../../src/auth/middleware');
   const { staffRouter } = await import('../../src/core/staff');
-  const { teamRouter } = await import('../../src/routes/team');
+  const { createTeamRouter } = await import('../../src/routes/team');
   const { requirePermission, setModulePermissions } = await import('../../src/auth/permissions');
   const { requirePermission: zhPermission } = await import('../../src/modules/zhihu/permissions');
   const { zhihuManifest } = await import('../../src/modules/zhihu/manifest');
@@ -85,7 +86,7 @@ beforeAll(async () => {
     .set('trust proxy', 1)
     .use(express.json())
     .use('/auth', authRouter)
-    .use('/team', teamRouter)
+    .use('/team', createTeamRouter(accountRuntime()))
     .use('/staff', requireAuth, staffRouter);
   app.get('/developer-tool', requireAuth, requirePermission('system.develop'), (_req, res) => res.sendStatus(204));
   app.get('/operations', requireAuth, zhPermission('keyword.create'), (_req, res) => res.sendStatus(204));
