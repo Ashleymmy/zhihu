@@ -34,6 +34,14 @@ Web 与后端先完成角色、金额和旧小程序接口回归，再发布；�
 - 单独启动同一新镜像的后台实例（`RUN_BACKGROUND_JOBS=true`，不映射公网端口，直接运行服务、不再次迁移），恢复队列。Web 实例继续禁用后台任务；后续切换必须同时跟踪 API 和后台实例的版本。
 - 保留上一版静态资源供已打开的页面加载，切换后核验公网页面、认证、财务权限、队列进度及错误日志。回退应用不回灌旧数据库、不删新增业务数据。若旧版无法理解新增业绩类型，产生此类数据后不能直接恢复旧消费者，必须使用兼容版本或向前修复。
 
+发布镜像在候选镜像构建完成后用 `deploy/Dockerfile.release` 合并上一版静态资源：
+
+```bash
+docker build -f deploy/Dockerfile.release --build-arg CANDIDATE_IMAGE=zhihu-koc:<新提交号>-build --build-arg PREVIOUS_IMAGE=zhihu-koc:<当前在线提交号> -t zhihu-koc:<新提交号> .
+```
+
+只合并 `assets/`：入口 HTML 和运行命令仍来自候选镜像，重名资源使用候选文件。执行前从在线容器核实上一版镜像，不把示例标签直接用于生产。蓝绿候选和后台实例均显式覆盖命令为 `node dist/src/index.js`。 2026-10-09 已用独立合成镜像实测旧资源保留、新入口保留、重名资源以新版为准、候选运行配置保留及非 root 读取通过；演练镜像已清理，未重启线上服务。
+
 后台开关回归：`cd server && npx vitest run tests/unit/background-runtime.spec.ts`。
 
 拉活写入由 `ZHIHU_ACTIVATION_ENABLED` 控制，默认关闭。只有拉活计价、隔离迁移与角色验收全部通过、旧版后台消费者停止并换成兼容版本后，才可在新 API 和后台实例中设为 `true`。迁移 `029_metric_types.sql` 保留旧插入的 `new_user` 默认值，并原子替换同日同词的唯一键；它可重复执行。产生拉活数据后，不能把处理这些数据的后台实例退回不识别类型的版本。

@@ -1,0 +1,10 @@
+# Add the previous version's hashed chunks so already-open browsers can finish
+# loading them after a blue-green switch. The candidate owns index.html and wins
+# any shared asset filename; API compatibility is verified separately.
+ARG CANDIDATE_IMAGE
+ARG PREVIOUS_IMAGE
+FROM ${CANDIDATE_IMAGE} AS candidate
+FROM ${PREVIOUS_IMAGE} AS previous
+FROM candidate AS release
+COPY --from=previous --chown=node:node /apps/platform-admin/dist/assets/ /apps/platform-admin/dist/assets/
+COPY --from=candidate --chown=node:node /apps/platform-admin/dist/assets/ /apps/platform-admin/dist/assets/
