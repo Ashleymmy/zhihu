@@ -6,6 +6,7 @@ const props = defineProps<{
   open: boolean;
   projectId: string;
   moduleId: string;
+  initialMetricType?: string;
   http?: WorkspaceHttp;
 }>();
 const emit = defineEmits<{
@@ -17,6 +18,7 @@ interface Metric {
   code: string;
   label: string;
   unit: string;
+  earliestFrom?: string;
   note?: string;
   rules: { code: string; label: string; editable: boolean }[];
 }
@@ -47,6 +49,7 @@ const feedback = ref<HTMLElement>();
 const metric = computed(() =>
   view.value?.metrics.find((m) => m.code === metricType.value),
 );
+const earliest = computed(() => metric.value?.earliestFrom ?? view.value?.earliestFrom[metricType.value] ?? "");
 const history = computed(
   () =>
     view.value?.versions
@@ -76,7 +79,7 @@ function resetForm() {
       .filter((r) => r.editable)
       .map((r) => [r.code, latest(r.code)?.unitPrice ?? ""]) ?? [],
   );
-  effectiveFrom.value = view.value?.earliestFrom[metricType.value] ?? "";
+  effectiveFrom.value = earliest.value;
 }
 let generation = 0;
 async function load(preserveNotice = false) {
@@ -93,6 +96,8 @@ async function load(preserveNotice = false) {
     });
     if (current !== generation) return;
     view.value = data;
+    if (!preserveNotice && data.metrics.some((m) => m.code === props.initialMetricType))
+      metricType.value = props.initialMetricType!;
     if (!data.metrics.some((m) => m.code === metricType.value))
       metricType.value = data.metrics[0]?.code ?? "";
     resetForm();
@@ -138,7 +143,7 @@ async function publish() {
 }
 watch(metricType, resetForm);
 watch(
-  () => [props.open, props.projectId, props.moduleId],
+  () => [props.open, props.projectId, props.moduleId, props.initialMetricType],
   () => {
     if (props.open) void load();
     else {
@@ -197,7 +202,7 @@ watch(
             >生效日期<input
               v-model="effectiveFrom"
               type="date"
-              :min="view.earliestFrom[metricType]"
+              :min="earliest"
               required
               :disabled="saving"
           /></label>
