@@ -6,6 +6,7 @@ import {audit,insert,json,select,type RecordRow} from './store';
 import {nearestNames,normalizedName,resolvedNames} from './matching';
 import {processImportRow} from './facts';
 import {registerHistoricalKeyword,type HistoricalSelection} from './historical-keywords';
+import {processResolvedNames} from './automatic-repair';
 
 type NameSource={date:string;channel:string;keyword:string};
 export type ChannelSelection={channelId:string}|{mappingId:string}|{upstreamId:string;generation:1|2};
@@ -113,23 +114,4 @@ export async function applyNameChoice(c:PoolConnection,user:AuthUser,scope:Scope
  }
  await audit(c,user,'report.names-confirm',choice.rows[0],{rowIds:choice.rows,mappingId,keywordId,originalChannel:choice.source.channel,originalKeyword:choice.source.keyword});
  await processResolvedNames(c,user,scope);
-}
-
-// Other reports with this now-known identity also continue without re-upload.
-async function processResolvedNames(c:PoolConnection,user:AuthUser,scope:Scope){
- const rows=await select(c,`SELECT r.id,b.report_kind,JSON_OBJECT('date',JSON_EXTRACT(r.normalized_json,'$.date'),
-   'channel',JSON_EXTRACT(r.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(r.normalized_json,'$.keyword')) source
-   FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE b.account_id=? AND b.project_id=?
-   AND b.status IN ('processed','committed') AND r.fact_id IS NULL AND r.processing_status='exception'
-   AND r.error_text IN ('CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH','KEYWORD_UNKNOWN') ORDER BY r.id`,[scope.accountId,scope.projectId]);
- const [route]=await select(c,"SELECT DATE_FORMAT(exclusive_from,'%Y-%m-%d') start FROM zh_engine_routes WHERE account_id=? AND project_id=?",[scope.accountId,scope.projectId]);
- const processed:string[]=[];
- for(const row of rows){
-   const source=json<NameSource>(row.source);
-   if(row.report_kind==='activation'&&process.env.ZHIHU_ACTIVATION_ENABLED!=='true'||route&&source.date<String(route.start))continue;
-   if((await resolvedNames(c,scope,String(row.id),source)).code)continue;
-   await c.query("UPDATE zh_import_rows SET processing_status='pending',error_text=NULL WHERE id=?",[row.id]);
-   await processImportRow(c,user,scope,String(row.id));processed.push(String(row.id));
- }
- if(processed.length)await audit(c,user,'report.names-reprocess',processed[0],{rowIds:processed});
 }

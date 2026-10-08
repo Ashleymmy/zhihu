@@ -13,6 +13,7 @@ import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
 import { assignRetro } from '../attribution/retro-assignment';
+import { historicalWorks } from '../attribution/historical-works';
 import { importAnalysis, answerImportAnalysis } from '../attribution/analysis';
 import { listWorks, workActivity, workDetail } from '../attribution/works';
 import { assertDuty } from '../../../core/duties';
@@ -369,6 +370,10 @@ attributionRouter.post(
     );
   }),
 );
+attributionRouter.get('/evidence/historical-tasks',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.merge(pagingSchema).extend({batchId:idSchema.optional(),search:z.string().trim().max(128).optional()}).parse(req.query);
+ ok(res,await historicalWorks(req.user,q,q));
+}));
 attributionRouter.get(
   '/evidence',
   asyncHandler(async (req, res) => {

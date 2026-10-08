@@ -439,8 +439,8 @@ describe('首次核验、对账及不可变差额', () => {
   it('核验、待定修订与付款顺序均阻止提前确认', async () => {
     const s = await import('../../src/modules/zhihu/attribution/statements');
     const facts = await import('../../src/modules/zhihu/attribution/facts');
-    const up = (await s.previewStatement(admin, scope, key(), factId)).entries[0];
-    const low = (await s.previewStatement(leader, scope, key(), factId)).entries[0];
+    let up = (await s.previewStatement(admin, scope, key(), factId)).entries[0];
+    let low = (await s.previewStatement(leader, scope, key(), factId)).entries[0];
     const hash = async (id: string) => {
       const [r] = await c.query<mysql.RowDataPacket[]>('SELECT input_hash FROM zh_statement_entries WHERE id=?', [id]);
       return String(r[0].input_hash);
@@ -462,6 +462,10 @@ describe('首次核验、对账及不可变差额', () => {
     });
     await expect(s.reviewEvidence(creator, scope, evidence.id, key(), true, '本人核验')).rejects.toThrow('仅管理员');
     await s.reviewEvidence(leader, scope, evidence.id, key(), true, '已核对关键词和作者');
+    await expect(s.confirmStatement(leader, scope, low.id, key(), await hash(low.id))).rejects.toThrow('来源已修订');
+    // Verification refreshes unconfirmed results; old previews cannot be confirmed.
+    up = (await s.previewStatement(admin, scope, key(), factId)).entries[0];
+    low = (await s.previewStatement(leader, scope, key(), factId)).entries[0];
     await expect(s.confirmStatement(leader, scope, low.id, key(), await hash(low.id))).rejects.toThrow('来源修订');
     await facts.acceptRevision(admin, scope, pendingRevision, key(), originalRevision, '暂不采纳待核实版本', false);
     const { businessDay: statementDay } = await import('../../src/modules/zhihu/attribution/domain');
@@ -486,8 +490,8 @@ describe('首次核验、对账及不可变差额', () => {
     const upperHash = await hash(up.id);
     await Promise.all(Array.from({ length: 10 }, () => s.confirmStatement(admin, scope, up.id, key(), upperHash)));
     const own = await s.listStatements(creator, scope, 1, 25);
-    expect(own.list).toHaveLength(1);
-    expect(own.list[0].target_amount).toBe('1300.0000');
+    expect(own.list.filter(row=>row.status==='confirmed')).toHaveLength(1);
+    expect(own.list.find(row=>row.status==='confirmed')!.target_amount).toBe('1300.0000');
     const [count] = await c.query<mysql.RowDataPacket[]>(
       "SELECT COUNT(*) n FROM zh_statement_entries WHERE status='confirmed'",
     );
@@ -525,7 +529,7 @@ describe('首次核验、对账及不可变差额', () => {
     await s.confirmStatement(admin, scope, String(up.id), key(), String(up.input_hash));
     expect(
       list
-        .filter((x) => x.entry_kind === 'initial')
+        .filter((x) => x.entry_kind === 'initial' && x.status === 'confirmed')
         .map((x) => x.amount)
         .sort(),
     ).toEqual(['1300.0000', '1500.0000']);

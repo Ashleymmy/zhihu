@@ -14,6 +14,7 @@ import { synchronizeKeywords } from './keyword-readiness';
 import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql, ownershipHistorySql } from './keyword-usability';
 import { dutyAllows } from '../../../core/duties';
 import { unconfirmedFactSql } from './keyword-usability';
+import { processResolvedNames } from './automatic-repair';
 import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
 import { bindingStartDay, recomputeStartDateFacts } from './activation-date';
@@ -259,6 +260,7 @@ export async function createMapping(
       ],
     );
     await audit(c, user, 'channel.create', id, input);
+    await processResolvedNames(c,user,scope);
     return { id };
   });
 }

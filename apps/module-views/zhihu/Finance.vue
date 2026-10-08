@@ -135,7 +135,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <form @submit.prevent="run(upload)"><label>选择报表文件<input ref="uploadInput" type="file" accept=".xlsx,.csv,.xls" required :disabled="busy||!!progress" @change="file=($event.target as HTMLInputElement).files?.[0]??null" /></label><button class="primary" :disabled="busy||!!progress||!file">{{progress?'正在分析…':'上传并自动分析'}}</button></form>
   </div>
   <div v-if="error" role="alert" class="engine-error"><strong>{{error}}</strong><span v-if="errorHelp">{{errorHelp}}</span><button v-if="suggestedType" :disabled="busy" @click="chooseReportType(suggestedType);run(upload)">{{suggestedType==='activation'?'按拉活处理':'按拉新订单处理'}}</button></div><p v-if="notice" role="status">{{notice}}</p><p v-if="progress" role="status">{{progress}}</p>
-  <ReportAnalysis v-if="admin&&!wallet&&analysis" :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" />
+  <ReportAnalysis v-if="admin&&!wallet&&analysis" :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" @refresh="run(async()=>{await inspectImport(importId);await refresh()})" />
   <section v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果">
    <h2>{{importResult.fileName}} · 读取结果</h2>
    <p>共读取 {{importTotal}} 行，每行的处理结果都已保留。</p>

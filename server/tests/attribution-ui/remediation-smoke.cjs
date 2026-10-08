@@ -259,6 +259,7 @@ async function main(){
    assert.deepEqual(errors,[]);await context.close();activePage=null;results.push({role:role+'-default-rate',status:200,widths:[1440,375]});
   }
   await require('./name-matching-flow.cjs')({browser,port,out,date});
+  await require('./historical-work-flow.cjs')({browser,port,out,date});
   results.push({role:'admin-finance-operations-names',status:200,widths:[1440,375]});
   fs.writeFileSync(path.join(out,process.env.OPC_REVIEW_REPAIR_ONLY==='1'?'repair-result.json':'result.json'),JSON.stringify({date,results},null,2));
   console.log('角色验收通过：'+JSON.stringify(results));

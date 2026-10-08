@@ -10,6 +10,7 @@ import { assertNewRoute } from './routing';
 import { assertDuty } from '../../../core/duties';
 import { assertKeywordReady } from './keyword-usability';
 import { blockIncome } from '../../../core/finance';
+import { refreshUnconfirmedKeyword } from './automatic-repair';
 
 export async function submitEvidence(
   user: AuthUser,
@@ -26,13 +27,16 @@ export async function insertEvidence(
   scope: Scope,
   input: { bindingId: string; url: string; description: string },
 ) {
+  if(isStaffRole(user.role))assertDuty(user,'operations');
   const url = new URL(input.url);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) fail('作品地址必须是公开 HTTP 链接');
   const { word, binding } = await bindingLock(c, scope, input.bindingId);
   ownBinding(user, binding);
   if (!binding.used_at || binding.released_at) fail('请先声明实际使用关键词');
   if (String(word.current_binding_id) !== String(binding.id) || binding.stop_new_use_at || binding.release_status === 'requested') fail('关键词已停止或正在释放，不可新增作品',409);
-  await assertKeywordReady(c,String(word.id));
+  const [historical]=await select(c,`SELECT p.id FROM plans p WHERE p.id=? AND p.project_id=? AND p.sync_status='historical'
+    AND p.status='active' AND ?='historical_registered'`,[word.plan_id,scope.projectId,word.legacy_mode]);
+  if(!historical)await assertKeywordReady(c,String(word.id));
   const id = await insert(c, 'INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by) VALUES(?,?,?,?)', [
     binding.id,
     input.url,
@@ -51,6 +55,7 @@ export async function reviewEvidence(
   accept: boolean,
   reason: string,
 ) {
+  if(isStaffRole(user.role))assertDuty(user,'operations');
   return mutate(user, scope, 'evidence.review', key, { id, accept, reason }, async (c) => {
     const [ref] = await select(c, 'SELECT binding_id FROM zh_evidence WHERE id=?', [id]);
     if (!ref) fail('作品不存在', 404);
@@ -73,6 +78,7 @@ export async function reviewEvidence(
         binding.id,
       ]);
     await audit(c, user, 'evidence.review', id, { accept, reason });
+    await refreshUnconfirmedKeyword(c,scope,String(binding.keyword_id));
     return { id };
   });
 }
@@ -102,6 +108,7 @@ export async function disputeBinding(
         resolve ? '争议已解除，待财务重新核对' : '作品存在争议',
       );
     await audit(c, user, resolve ? 'evidence.resolve-dispute' : 'evidence.dispute', id, { reason });
+    if(resolve)await refreshUnconfirmedKeyword(c,scope,String(binding.keyword_id));
     return { id };
   });
 }
