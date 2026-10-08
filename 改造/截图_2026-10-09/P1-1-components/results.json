@@ -1,0 +1,18 @@
+[
+  {
+    "width": 1440,
+    "filterTotals": true,
+    "questionAnswer": true,
+    "rowActionDoesNotOpenDrawer": true,
+    "keyboardDrawer": true,
+    "noOverflow": true
+  },
+  {
+    "width": 375,
+    "filterTotals": true,
+    "questionAnswer": true,
+    "rowActionDoesNotOpenDrawer": true,
+    "keyboardDrawer": true,
+    "noOverflow": true
+  }
+]
