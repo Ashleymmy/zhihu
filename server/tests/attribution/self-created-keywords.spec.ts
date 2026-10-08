@@ -118,6 +118,11 @@ it('creator, team creator and leader routes create exactly one initial owner wit
     const own = await resources.listKeywords(who, scope, 1, 25, payload.keyword);
     expect(own.total).toBe(1);
     expect(own.list[0].allocation_ready).toBe(0);
+    expect(own.list[0].ownership_conflict).toBe(0);
+    expect(own.list[0].has_usage_history).toBe(0);
+    expect(own.list[0].upstream_ready).toBe(1);
+    expect(own.list[0].has_upstream_plan).toBe(1);
+    expect(own.list[0].usage_ready).toBe(1);
     expect((await resources.listKeywords(other, scope, 1, 25, payload.keyword)).total).toBe(0);
     await expect(resources.claim(other, scope, r.body.data.id, key())).rejects.toThrow('已被占用');
     await expect(resources.distribute(admin, scope, r.body.data.id, key(), other.sub)).rejects.toThrow('已分配');

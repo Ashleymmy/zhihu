@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { keywordProgress } from '../../module-views/zhihu/keyword-progress'
 
 describe('keyword submission and business status', () => {
+  it('interprets database string flags by value for reserved and conflicted keywords', () => {
+    expect(keywordProgress({ syncStatus: 'synced', lifecycleStatus: 'reserved', ownershipConflict: '0', allocationReady: '0' })).toBe('等待分发')
+    expect(keywordProgress({ syncStatus: 'synced', lifecycleStatus: 'assigned', ownershipConflict: '1', allocationReady: '0' })).toBe('归属待核对，禁止新增使用')
+    expect(keywordProgress({ syncStatus: 'synced', lifecycleStatus: 'available', ownershipConflict: '0', allocationReady: '0' })).toBe('暂不可领取，请联系管理员核对')
+  })
   it('does not show a successful creation as still waiting to be submitted', () => {
     expect(keywordProgress({ syncStatus: 'synced', lifecycleStatus: 'available', allocationReady: 1 })).toBe('可以领取')
     expect(keywordProgress({ syncStatus: 'synced', lifecycleStatus: 'pending', allocationReady: 0 })).toBe('创建记录待核对，暂不可领取')

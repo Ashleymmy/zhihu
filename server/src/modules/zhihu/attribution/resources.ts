@@ -411,6 +411,11 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
     const simulated = await simulationScope(c, scope);
     const stopped = await select(c, "SELECT id FROM zh_engine_routes WHERE account_id=? AND project_id=? AND mode='stopped'", [scope.accountId, scope.projectId]);
     for (const word of list) {
+      // MySQL returns BIGINT expressions as strings. Expose numeric flags so
+      // clients do not interpret a false value ("0") as a conflict or prior use.
+      for (const flag of ['ownership_conflict','has_usage_history','upstream_ready','has_upstream_plan','priority_ended']) {
+        word[flag] = Number(word[flag]);
+      }
       // Historical use without a current binding is not a public-pool word.
       if (!word.binding_id && Number(word.has_usage_history)) { word.lifecycle_status = 'historical'; word.read_only = 1; }
       word.read_only = Number(word.read_only);
