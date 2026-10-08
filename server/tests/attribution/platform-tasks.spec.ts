@@ -317,3 +317,51 @@ it('assigns report-only historical usage inline and recalculates without a secon
   ).toBeTruthy();
   expect((await action(historicalId, 'resolve-owner', { executorId: '3' }, ops)).status).toBe(403);
 });
+
+it('continues historical work submission, return and verification inside task details without normal-work approval', async () => {
+  await c.query(
+    "UPDATE plans p JOIN zh_keywords k ON k.plan_id=p.id SET p.sync_status='historical',k.legacy_mode='historical_registered' WHERE k.id=?",
+    [historicalId],
+  );
+  const d = await detail(historicalId, independent);
+  expect(d.status, d.text).toBe(200);
+  expect(d.body.data.next.action.key).toBe('history-submit');
+  expect(
+    (
+      await action(
+        historicalId,
+        'history-submit',
+        { url: 'https://www.douyin.com/video/77', description: '历史已发布作品' },
+        independent,
+      )
+    ).status,
+  ).toBe(200);
+  const waiting = (await detail(historicalId, independent)).body.data;
+  expect(waiting.status.label).toBe('历史作品待核验');
+  expect(waiting.actions.some((a: { key: string }) => a.key === 'history-accept')).toBe(false);
+  expect((await action(historicalId, 'history-accept', {}, independent)).status).toBe(403);
+  expect((await action(historicalId, 'history-return', { reason: '补充完整作品链接' }, ops)).status).toBe(200);
+  const returned = (await detail(historicalId, independent)).body.data;
+  expect(returned.next.text).toBe('补充完整作品链接');
+  expect(returned.next.action.key).toBe('history-submit');
+  expect(returned.actions.find((a: { key: string }) => a.key === 'history-submit').fields[0].value).toBe(
+    'https://www.douyin.com/video/77',
+  );
+  expect(
+    (
+      await action(
+        historicalId,
+        'history-submit',
+        { url: 'https://www.douyin.com/video/78', description: '补充后的历史作品' },
+        independent,
+      )
+    ).status,
+  ).toBe(200);
+  expect((await action(historicalId, 'history-accept', {}, ops)).status).toBe(200);
+  expect(
+    (await detail(historicalId, independent)).body.data.progress.find((p: { label: string }) => p.label === '核验')
+      .status,
+  ).toBe('done');
+  const { enqueue } = await import('../../src/modules/zhihu/queue');
+  expect(vi.mocked(enqueue).mock.calls.some((call) => String(call[0]).includes('composition'))).toBe(false);
+});
