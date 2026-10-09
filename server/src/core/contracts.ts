@@ -63,16 +63,39 @@ export interface BusinessModule {
   taskProvider?: ModuleTaskProvider;
 }
 
-export interface TaskScope { projectId: string; accountId: string }
-export interface TaskFilter { page: number; pageSize: number; search: string; view: 'all' | 'available' | 'owned' }
+export interface TaskScope {
+  projectId: string;
+  accountId: string;
+}
+export interface TaskFilter {
+  page: number;
+  pageSize: number;
+  search: string;
+  view: 'all' | 'available' | 'owned';
+  attention?: 'assignment' | 'review' | 'work' | 'disputed';
+}
 export interface TaskAction {
-  key: string; label: string; path?: string; confirm?: string;
-  fields?: { key: string; label: string; type: 'text' | 'url' | 'select' | 'textarea'; required?: boolean; value?: string; options?: { value: string; label: string }[] }[];
+  key: string;
+  label: string;
+  path?: string;
+  confirm?: string;
+  fields?: {
+    key: string;
+    label: string;
+    type: 'text' | 'url' | 'select' | 'textarea';
+    required?: boolean;
+    value?: string;
+    options?: { value: string; label: string }[];
+  }[];
 }
 export interface TaskItem {
-  id: string; title: string; subtitle?: string;
+  id: string;
+  title: string;
+  subtitle?: string;
   status: { key: string; label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' | 'leader' };
-  executor: string; leader?: string; next: { actor: string; text: string; action?: TaskAction };
+  executor: string;
+  leader?: string;
+  next: { actor: string; text: string; action?: TaskAction };
   metrics: { label: string; value: string }[];
 }
 export interface TaskDetail extends TaskItem {
@@ -81,9 +104,20 @@ export interface TaskDetail extends TaskItem {
   actions: TaskAction[];
 }
 export interface ModuleTaskProvider {
-  list(scope: TaskScope, user: AuthUser, filter: TaskFilter): Promise<{ list: TaskItem[]; total: number; create?: { label: string; path: string } }>;
+  list(
+    scope: TaskScope,
+    user: AuthUser,
+    filter: TaskFilter,
+  ): Promise<{ list: TaskItem[]; total: number; create?: { label: string; path: string } }>;
   detail(scope: TaskScope, user: AuthUser, id: string): Promise<TaskDetail>;
-  execute(scope: TaskScope, user: AuthUser, id: string, action: string, input: Record<string, unknown>, requestKey: string): Promise<{ message: string }>;
+  execute(
+    scope: TaskScope,
+    user: AuthUser,
+    id: string,
+    action: string,
+    input: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<{ message: string }>;
 }
 
 export interface TodoItem {
@@ -94,7 +128,9 @@ export interface TodoItem {
   actionLabel: string;
   path: string;
 }
-export interface DashboardMetric extends MetricSummary { path: string }
+export interface DashboardMetric extends MetricSummary {
+  path: string;
+}
 export interface ModuleTodoProvider {
   overview(scope: DataScope, user: AuthUser): Promise<{ todos: TodoItem[]; metrics: DashboardMetric[] }>;
 }

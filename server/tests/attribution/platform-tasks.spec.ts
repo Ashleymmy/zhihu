@@ -365,3 +365,48 @@ it('continues historical work submission, return and verification inside task de
   const { enqueue } = await import('../../src/modules/zhihu/queue');
   expect(vi.mocked(enqueue).mock.calls.some((call) => String(call[0]).includes('composition'))).toBe(false);
 });
+
+it('filters assignment and historical review before pagination while retaining role and project isolation', async () => {
+  const reserved = await resources.createKeyword(admin, scope, key(), {
+    keyword: '分页待分配',
+    taskId: '1',
+    mappingId,
+    landingUrl: 'https://www.zhihu.com/story/1',
+    popularizeType: 1,
+  });
+  await c.query("UPDATE plans SET sync_status='synced',zhihu_plan_id='paging-reserved' WHERE id=?", [reserved.planId]);
+  await resources.synchronizeKeywords(scope);
+  await resources.distribute(admin, scope, reserved.id, key(), leader.sub);
+  for (let i = 0; i < 3; i++)
+    await resources.createKeyword(admin, scope, key(), {
+      keyword: '较新的无关任务' + i,
+      taskId: '1',
+      mappingId,
+      landingUrl: 'https://www.zhihu.com/story/1',
+      popularizeType: 1,
+    });
+  const filtered = (who: AuthUser, attention: string, extra = {}) =>
+    request(app)
+      .get('/api/v1/core/tasks')
+      .set(headers[who.sub])
+      .query({ ...scope, attention, pageSize: 1, ...extra });
+  const assignments = await filtered(leader, 'assignment');
+  expect(assignments.status, assignments.text).toBe(200);
+  expect(assignments.body.data.groups[0].list[0].id).toBe(reserved.id);
+  expect((await filtered(creator, 'assignment')).body.data.groups[0].total).toBe(0);
+  const [binding] = await q('SELECT current_binding_id id FROM zh_keywords WHERE id=?', [historicalId]);
+  await c.query("UPDATE zh_keyword_bindings SET verification_status='pending' WHERE id=?", [binding.id]);
+  await c.query("UPDATE zh_evidence SET status='pending' WHERE binding_id=?", [binding.id]);
+  const reviews = await filtered(ops, 'review');
+  expect(reviews.status, reviews.text).toBe(200);
+  expect(reviews.body.data.groups[0].list[0].id).toBe(historicalId);
+  expect((await filtered(independent, 'review')).body.data.groups[0].total).toBe(0);
+  expect((await filtered(finance, 'review')).status).toBe(403);
+  expect((await filtered(stranger, 'review')).status).toBe(403);
+  expect((await filtered(leader, 'assignment', { projectId: '999' })).status).toBe(403);
+  await c.query("UPDATE zh_evidence SET status='rejected' WHERE binding_id=?", [binding.id]);
+  expect((await filtered(independent, 'work')).body.data.groups[0].list[0].id).toBe(historicalId);
+  await c.query("UPDATE zh_keyword_bindings SET verification_status='disputed' WHERE id=?", [binding.id]);
+  expect((await filtered(ops, 'disputed')).body.data.groups[0].list[0].id).toBe(historicalId);
+  expect((await filtered(independent, 'disputed')).body.data.groups[0].total).toBe(0);
+});

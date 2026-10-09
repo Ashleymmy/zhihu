@@ -31,7 +31,7 @@ function createBridge({
         };
       if (
         !event ||
-        !/^\/(core|modules\/zhihu)\/[a-zA-Z0-9_/-]+$/.test(event.path || "") ||
+        !/^\/(core|modules\/zhihu)\/(?:[a-zA-Z0-9_-]+|plan%3[Aa]\d+)(?:\/(?:[a-zA-Z0-9_-]+|plan%3[Aa]\d+))*$/.test(event.path || "") ||
         !["GET", "POST", "PATCH", "PUT", "DELETE"].includes(
           event.method || "GET",
         )

@@ -472,7 +472,7 @@ async function metrics(scope: TaskScope, user: AuthUser, words: RecordRow[]) {
 }
 export const zhihuTaskProvider: ModuleTaskProvider = {
   async list(scope, user, filter) {
-    const result = await resources.listKeywords(user, scope, filter.page, filter.pageSize, filter.search, filter.view),
+    const result = await resources.listKeywords(user, scope, filter.page, filter.pageSize, filter.search, filter.view, undefined, filter.attention),
       config = await resources.options(user, scope),
       amounts = await metrics(scope, user, result.list);
     await enrichWorks(user, result.list);

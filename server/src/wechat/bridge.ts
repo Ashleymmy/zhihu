@@ -14,7 +14,7 @@ const envelopeSchema = z
     path: z
       .string()
       .max(256)
-      .regex(/^\/(core|modules\/zhihu)\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/),
+      .regex(/^\/(core|modules\/zhihu)\/(?:[a-zA-Z0-9_-]+|plan%3[Aa]\d+)(?:\/(?:[a-zA-Z0-9_-]+|plan%3[Aa]\d+))*$/),
     method: z.enum(['GET', 'POST', 'PATCH', 'PUT', 'DELETE']),
     data: z.record(z.unknown()).default({}),
     token: z.string().max(4096).optional(),
