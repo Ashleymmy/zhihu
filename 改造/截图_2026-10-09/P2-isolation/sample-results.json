@@ -18,6 +18,14 @@
       ]
     },
     {
+      "role": "admin",
+      "route": "finance",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
       "role": "operations",
       "route": "dashboard",
       "widths": [
@@ -42,6 +50,14 @@
       ]
     },
     {
+      "role": "finance",
+      "route": "finance",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
       "role": "leader",
       "route": "dashboard",
       "widths": [
@@ -60,6 +76,14 @@
     {
       "role": "leader",
       "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader",
+      "route": "income",
       "widths": [
         1440,
         375
@@ -90,6 +114,14 @@
       ]
     },
     {
+      "role": "creator",
+      "route": "income",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
       "role": "independent",
       "route": "dashboard",
       "widths": [
@@ -108,6 +140,14 @@
     {
       "role": "independent",
       "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "independent",
+      "route": "income",
       "widths": [
         1440,
         375

@@ -7,7 +7,7 @@ OPC 提供公共身份、组织、项目、模块接入和统一工作台。知�
 - 公共后端：`server/src/core` 及公共身份/组织服务；组合入口在 `server/src/composition`。
 - 知乎实现：后端 `server/src/modules/zhihu`，前端各端 `src/modules/zhihu`。
 
-**运行、迁移和验收以 [OPC 公共核心重构说明](docs/OPC公共核心重构.md) 为准。** `OPC_MODULES` 默认空；已有知乎部署升级必须显式设置 `OPC_MODULES=zhihu`。公共核心不要求知乎凭证。公共财务本期只建独立入口和契约。
+**运行、迁移和验收以 [OPC 公共核心重构说明](docs/OPC公共核心重构.md) 为准。** `OPC_MODULES` 默认空；已有知乎部署升级必须显式设置 `OPC_MODULES=zhihu`。公共核心不要求知乎凭证。当前整改要求以根目录 `AGENTS.md` 指向的任务书和规范为准。
 
 `pnpm verify:opc` 执行公共核心与统一前端构建、类型检查和隔离数据库验收；旧单测的 13 项既有失败见上述说明。
 
@@ -48,6 +48,10 @@ npx tsx scripts/migrate-new-user-role-rates.ts --project 项目ID --account 账�
 原始拉活 Excel 的闭环复验：Web 构建后，在仓库根目录设置 `OPC_REVIEW_ORIGINAL_ACTIVATION=1`、`OPC_ACTIVATION_SAMPLE=本机原件绝对路径`、`OPC_PLAYWRIGHT_MODULE=本机Playwright模块路径`，运行 `node server/tests/attribution-ui/remediation-smoke.cjs`。该专项针对本次四行、五个拉活量的原始样本，使用自动回收的 MySQL 容器和演示成员完成类型纠正、历史登记、作品核验、财务确认及六角色隔离检查。原件始终在仓库外，脚本校验上传前后及下载内容一致；含业务名称的截图只写入被忽略的 `.opc-work/remediation-review/original-activation`，不要纳入提交。
 
 ## 历史账目
+
+平台 `/finance` 按有权访问的项目显示统一财务页面。`GET /api/v1/core/finance/workspace` 提供项目范围，`/entries` 只读平台确认资金和对应收益明细，按项目、账号和日期分页；运营及成员不可访问。模块可在前端组合层注册现有业务面板，知乎继续提供上传、分析及账单确认；没有专用面板的项目直接使用共享已确认账目、款项开放和提现付款组件，无需改页面。公共接口不生成账单、不越过模块的确认条件，也不查询项目专属表。
+
+隔离验证：Web 构建后运行 `node server/tests/attribution-ui/platform-isolation.cjs`；设置 `OPC_REVIEW_SAMPLE=1` 时启用两个示例项目，否则关闭所有模块。脚本使用本机 Docker 的独立 MySQL，六角色检查首页、任务、收益及财务在 1440/375 宽度的显示，示例模式还实际完成任务领取、两个项目分别开放资金及同一达人分别申请提现；不注册生产示例项目，也不发送实际付款。
 
 模块可用可选 `financeHistoryPath` 声明只读历史入口；共享 `FinanceHistoryLinks` 从模块目录生成折叠入口。知乎旧收益、提现、申诉、结算及邮件 / Excel 页面保留原地址，统一显示只读记录、详情和去新财务入口。历史金额只按原存储单位显示，不重算或写回；团长及达人只读本人金额，运营岗位不能读取资金记录。历史发票仍可由本人或财务下载。
 

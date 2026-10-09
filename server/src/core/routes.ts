@@ -11,6 +11,7 @@ import { createRateRouter } from './rate-routes';
 import { dashboard } from './dashboard';
 import { createTaskRouter } from './task-routes';
 import { createEarningRouter } from './earning-routes';
+import { createFinanceWorkspaceRouter } from './finance-workspace';
 import {
   listAccounts,
   createAccount,
@@ -32,6 +33,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
     '/modules',
     asyncHandler(async (req, res) => ok(res, runtime.list(req.user.role))),
   );
+  r.use('/finance/workspace',createFinanceWorkspaceRouter(runtime));
   r.use('/finance',financeRouter);
   r.use('/staff',staffRouter);
   r.use('/rates',createRateRouter(runtime));

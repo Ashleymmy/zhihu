@@ -302,17 +302,84 @@ it('资金写入失败回滚全部确认，迁移重复执行不改已有收益�
   expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
 });
 
+it('共享财务在无项目表环境读取确认金额，拒绝运营、成员和跨项目来源', async () => {
+  const endpoint = '/api/v1/core/finance/workspace';
+  expect((await request(app).get(endpoint)).status).toBe(401);
+  for (const actor of ['2', '3', '4']) {
+    expect((await request(app).get(endpoint).set(headers[actor])).status).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get(endpoint + '/entries')
+          .set(headers[actor])
+      ).status,
+    ).toBe(403);
+  }
+  const scopes = await request(app).get(endpoint).set(headers['1']);
+  expect(scopes.status, scopes.text).toBe(200);
+  expect(scopes.body.data).toHaveLength(3);
+  expect((await request(emptyApp).get(endpoint).set(headers['1'])).body.data).toEqual([]);
+  const filter = { ...scope, from: '2026-10-01', to: '2026-10-09' };
+  const ledger = await request(app)
+    .get(endpoint + '/entries')
+    .set(headers['1'])
+    .query(filter);
+  expect(ledger.status, ledger.text).toBe(200);
+  expect(ledger.body.data).toMatchObject({ total: 1, amount: '8.0000' });
+  expect(ledger.body.data.list[0]).toMatchObject({ payeeName: '人员2', quantity: '1', unitPrice: '8.0000' });
+  expect(
+    (
+      await request(app)
+        .get(endpoint + '/entries')
+        .set(headers['1'])
+        .query({ ...filter, projectId: '2' })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await request(emptyApp)
+        .get(endpoint + '/entries')
+        .set(headers['1'])
+        .query(filter)
+    ).status,
+  ).toBe(404);
+  expect(
+    (
+      await request(app)
+        .get(endpoint + '/entries')
+        .set(headers['1'])
+        .query({ ...filter, from: '2026-10-10' })
+    ).status,
+  ).toBe(422);
+  const second = input('finance-second', '5.0000');
+  second.lines[0].quantity = '1';
+  second.lines[0].unitPrice = '5.0000';
+  await write(second, { ...scope, projectId: '2', accountId: '2' });
+  await confirm(second, { ...scope, projectId: '2', accountId: '2' });
+  const other = await request(app)
+    .get(endpoint + '/entries')
+    .set(headers['1'])
+    .query({ ...filter, projectId: '2', accountId: '2' });
+  expect(other.body.data).toMatchObject({ total: 1, amount: '5.0000' });
+  expect((await q("SHOW TABLES LIKE 'zh_%'")).length).toBe(0);
+});
+
 it('风险排除说明不当作未处理，后续业务阻断仍覆盖当前就绪状态且不改确认账', async () => {
   const value = input('status-review', '0.0000');
   value.lines[0].reason = '本次推广不计费';
   await write(value);
   await confirm(value);
-  const read = async () => (await get('2', {search: 'status-review'})).body.data.list[0];
-  expect(await read()).toMatchObject({isReady: 1, amount: '0.0000', calculationAmount: '16.0000', reason: '本次推广不计费'});
+  const read = async () => (await get('2', { search: 'status-review' })).body.data.list[0];
+  expect(await read()).toMatchObject({
+    isReady: 1,
+    amount: '0.0000',
+    calculationAmount: '16.0000',
+    reason: '本次推广不计费',
+  });
   expect((await read()).confirmedAt).toBeTruthy();
   const original = await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id');
-  const {blockIncome} = await import('../../src/core/finance');
-  await tx(conn => blockIncome(conn, scope, value.sourceKey, '作品需要再次核对'));
-  expect(await read()).toMatchObject({isReady: 0, reason: '作品需要再次核对'});
+  const { blockIncome } = await import('../../src/core/finance');
+  await tx((conn) => blockIncome(conn, scope, value.sourceKey, '作品需要再次核对'));
+  expect(await read()).toMatchObject({ isReady: 0, reason: '作品需要再次核对' });
   expect(await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id')).toEqual(original);
 });
