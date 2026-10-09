@@ -12,7 +12,8 @@ import { planAccountSql } from '../services/plan-account';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { synchronizeKeywords } from './keyword-readiness';
 import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql, ownershipHistorySql } from './keyword-usability';
-import { dutyAllows } from '../../../core/duties';
+import { assertDuty, dutyAllows } from '../../../core/duties';
+import { resolveExecutor } from './executor';
 import { unconfirmedFactSql } from './keyword-usability';
 import { processResolvedNames } from './automatic-repair';
 import { teamLeader } from './relationships';
@@ -208,6 +209,10 @@ export async function options(user: AuthUser, scope: Scope) {
       AND (?=1 OR u.parent_id=? OR u.id=?) ORDER BY u.id`,
             [scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub],
           );
+    if(isStaffRole(user.role)&&dutyAllows(user,'operations')&&!users.some(u=>String(u.id)===user.sub)){
+      const [self]=await select(c,'SELECT CAST(id AS CHAR) id,display_name,role,CAST(parent_id AS CHAR) parent_id FROM users WHERE id=? AND is_active=1',[user.sub]);
+      if(self)users.push(self);
+    }
     const [actor] = await select(c, 'SELECT parent_id FROM users WHERE id=?', [user.sub]);
     const [parent] = actor?.parent_id ? await select(c, 'SELECT role FROM users WHERE id=?', [actor.parent_id]) : [];
     return { tasks, channels, mappings, users, hasTeamLeader: parent?.role === 'leader', integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
@@ -450,7 +455,9 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
   });
 }
 export async function claim(user: AuthUser, scope: Scope, id: string, key: string) {
-  if (!['leader', 'creator'].includes(user.role)) fail('管理员请通过团长或达人身份领取', 403);
+  const staff=isStaffRole(user.role);
+  if(staff)assertDuty(user,'operations');
+  else if (!['leader', 'creator'].includes(user.role)) fail('当前身份不能领取任务', 403);
   await authorize(user, scope);
   await synchronizeKeywords(scope);
   return mutate(user, scope, 'keyword.claim', key, { id }, async (c) => {
@@ -461,6 +468,7 @@ export async function claim(user: AuthUser, scope: Scope, id: string, key: strin
     await assertNoLiveBinding(c, id);
     const [actor] = await select(c, 'SELECT id,role,parent_id,is_active FROM users WHERE id=? FOR SHARE', [user.sub]);
     if (!actor?.is_active || actor.role !== user.role) fail('账号权限已变化，请重新登录', 403);
+    if(staff)await resolveExecutor(c,user,scope,user.sub);
     const [time] = await select(c, 'SELECT (priority_until<=NOW(3)) AS ended FROM zh_keywords WHERE id=?', [id]);
     if (user.role === 'creator' && ((await teamLeader(c, scope, actor)) !== null || Number(time.ended) !== 1))
       fail('仅优先期结束后的直属达人可领取', 403);
@@ -470,7 +478,7 @@ export async function claim(user: AuthUser, scope: Scope, id: string, key: strin
       'INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,relation_snapshot,assigned_at) VALUES(?,?,?,?,?,?)',
       [
         id,
-        leader ? 'reserved' : 'direct_creator',
+        staff ? 'staff_self' : leader ? 'reserved' : 'direct_creator',
         leader ? user.sub : null,
         leader ? null : user.sub,
         JSON.stringify({ ...scope, actor }),
@@ -550,7 +558,8 @@ export async function changeBinding(
       if (
         (binding.path_type === 'team_creator' && String(executor.parent_id) !== String(binding.leader_id)) ||
         (binding.path_type === 'direct_creator' && (await teamLeader(c, scope, executor)) !== null) ||
-        (binding.path_type === 'leader_self' && executor.role !== 'leader')
+        (binding.path_type === 'leader_self' && executor.role !== 'leader') ||
+        (binding.path_type === 'staff_self' && !isStaffRole(String(executor.role)))
       )
         fail('团队关系已变化，请使用新团队分配的关键词', 409);
       if (binding.release_status === 'requested') fail('释放申请中不可使用', 409);
@@ -593,6 +602,7 @@ export async function changeBinding(
 
 export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,targetId:string){
  if(!isStaffRole(user.role))fail('只有运营人员可以直接分发关键词',403);
+ assertDuty(user,'operations');
  await authorize(user,scope);
  await synchronizeKeywords(scope);
  return mutate(user,scope,'keyword.distribute',key,{id,targetId},async c=>{
@@ -601,15 +611,14 @@ export async function distribute(user:AuthUser,scope:Scope,id:string,key:string,
   await assertKeywordReady(c,id);
   await assertKeywordUnused(c,id);
   await assertNoLiveBinding(c,id);
-  const [target]=await select(c,'SELECT u.id,u.role,u.parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE',[targetId,scope.projectId]);
-  if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择有效的团长或达人');
-  const leader=target.role==='leader'?targetId:await teamLeader(c,scope,target);
+  const target=await resolveExecutor(c,user,scope,targetId),staff=isStaffRole(String(target.role));
+  const leader=staff?null:target.role==='leader'?targetId:await teamLeader(c,scope,target);
   if(leader&&target.role==='creator'){
    const parents=await select(c,"SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.role='leader' AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE",[leader,scope.projectId]);
    if(!parents.length)fail('请先将该达人的团长加入项目');
   }
   const reserved=target.role==='leader';
-  const bindingId=await insert(c,'INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,relation_snapshot,assigned_at) VALUES(?,?,?,?,?,?)',[id,reserved?'reserved':leader?'team_creator':'direct_creator',leader,reserved?null:targetId,JSON.stringify({scope,target,assignedBy:user.sub}),reserved?null:new Date()]);
+  const bindingId=await insert(c,'INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,relation_snapshot,assigned_at) VALUES(?,?,?,?,?,?)',[id,staff?'staff_self':reserved?'reserved':leader?'team_creator':'direct_creator',leader,reserved?null:targetId,JSON.stringify({scope,target,assignedBy:user.sub}),reserved?null:new Date()]);
   await c.query('UPDATE zh_keywords SET current_binding_id=?,lifecycle_status=?,version=version+1 WHERE id=?',[bindingId,reserved?'reserved':'assigned',id]);
   await audit(c,user,'keyword.distribute',id,{targetId,bindingId});return{id:bindingId};
  });

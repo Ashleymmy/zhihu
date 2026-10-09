@@ -2,7 +2,7 @@
 import {computed,onMounted,reactive,ref,watch,onUnmounted,nextTick} from 'vue'
 import {fetchAllPages} from '@zhihu-koc/shared-services'
 import {ActionDialog} from '@zhihu-koc/shared-components'
-import {errorText,requestKey,type EngineContext} from './context'
+import {errorText,executorOptions,requestKey,type EngineContext} from './context'
 import {keywordProgress,type KeywordSummary} from './keyword-progress'
 import NovelInfo from './NovelInfo.vue'
 import AssignExecutor from './AssignExecutor.vue'
@@ -26,7 +26,7 @@ onMounted(revealCreate)
 function openCreate(){createOpen.value=!createOpen.value;if(createOpen.value)createKey.value=requestKey()}
 async function createWord(){await post('/keywords',{...form,mappingId:form.mappingId||undefined,channelId:form.channelId||undefined},createKey.value);createOpen.value=false;form.keyword='';form.landingUrl='';form.novel={title:'',url:''};notice.value=admin.value?'关键词已进入公共词库，等待同步就绪后领取或分发。':props.context.role==='leader'?'关键词已归属你的团队，等待知乎创建成功后分配或使用。':'关键词已绑定本人，等待同步就绪后登记作品。'}
 const summary=ref<KeywordSummary|null>(null)
-const members=computed(()=>props.context.options.users.filter(u=>action.value==='distribute'?u.role==='leader'||u.role==='creator':u.id===selected.value?.leaderId||u.role==='creator'&&u.parentId===selected.value?.leaderId))
+const members=computed(()=>action.value==='distribute'?executorOptions(props.context):props.context.options.users.filter(u=>u.id===selected.value?.leaderId||u.role==='creator'&&u.parentId===selected.value?.leaderId))
 watch(()=>[props.context.options.tasks,props.context.options.mappings],()=>{
  if(!form.taskId) form.taskId=props.context.options.tasks[0]?.id||''
  if(!form.mappingId) form.mappingId=props.context.options.mappings[0]?.id||''
@@ -76,7 +76,7 @@ onMounted(()=>run(async()=>{if(props.context.adminDuty!=='operations')prices.val
 <form @submit.prevent="page=1;run(load)"><label>查找关键词或小说<input v-model="search" placeholder="输入关键词或小说原名" /></label><button :disabled="busy">搜索</button></form><p v-if="error" role="alert" class="engine-error">{{error}}</p><p v-if="notice" role="status">{{notice}}</p>
 <div class="engine-table"><table><thead><tr><th>关键词 / 小说</th><th v-if="context.role!=='creator'">使用人</th><th v-else>适用单价</th><th>进度</th><th>操作</th></tr></thead><tbody><tr v-for="w in list" :key="w.id"><td>{{w.keyword}}<small>{{w.taskName||context.options.tasks.find(t=>t.id===w.taskId)?.name}}</small><NovelInfo :title="w.novelTitle" :url="w.novelUrl||w.landingUrl" /><button v-if="w.canEditNovel" type="button" class="novel-edit" :disabled="busy" @click="choose(w,'novel')">编辑小说资料</button></td><td v-if="context.role!=='creator'" data-label="使用人">{{w.readOnly?(w.ownerName||'原计划归属'):w.executorId?context.options.users.find(u=>u.id===w.executorId)?.displayName||'项目成员':w.leaderId?(context.options.users.find(u=>u.id===w.leaderId)?.displayName||'团长')+'待分发':'没有执行人'}}</td><td v-else data-label="适用单价">{{price(w)}}</td><td data-label="进度">{{w.syncStatus==='failed'||Number(w.ownershipConflict)===1?keywordProgress(w):w.readOnly?(w.compositionCount?'已有作品，保留原归属':'历史计划，保留原归属'):w.canAssignRetro?'没有执行人':keywordProgress(w)}}<small v-if="context.options.integrationMode==='simulation'">本地联测，未提交知乎</small><small v-if="w.compositionCount">已登记 {{w.compositionCount}} 个作品<span v-if="w.verificationStatus==='disputed'"> · 作品有争议</span></small><small v-if="w.allocationReady">{{w.priorityEnded?'团长、独立达人可领取':'团长优先领取中（创建后 30 分钟）'}}</small><small v-if="w.syncError">{{w.syncError||'请联系管理员核对知乎接入'}}</small></td><td><router-link v-if="w.compositionCount" :to="{path:'/modules/zhihu/works',query:{planId:w.planId,keyword:w.keyword}}">查看关联作品</router-link><div class="engine-actions"><button v-if="w.canEditFailed" :disabled="busy" @click="choose(w,'edit-retry')">编辑并重试</button><button v-if="w.canCopyFailed" :disabled="busy" @click="choose(w,'copy-retry')">沿用信息新建</button><button v-if="w.canDeleteFailed" :disabled="busy" @click="choose(w,'delete-failed')">删除错误记录</button></div><div v-if="!w.readOnly" class="engine-actions">
 <button v-if="w.canAssignRetro" :disabled="busy" @click="assignment=w">指定执行人</button>
-<button v-if="admin&&w.allocationReady" class="primary" :disabled="busy" @click="choose(w,'distribute')">分发给成员</button>
+<button v-if="admin&&context.adminDuty!=='finance'&&w.allocationReady" :disabled="busy" @click="run(()=>post('/keywords/'+w.id+'/claim'))">我来执行</button><button v-if="admin&&w.allocationReady" class="primary" :disabled="busy" @click="choose(w,'distribute')">分发给成员</button>
 <button v-if="admin&&w.syncStatus==='failed'&&!w.usedEverAt&&!w.canEditFailed&&!w.canDeleteFailed" :disabled="busy" @click="run(()=>post('/keywords/'+w.id+'/retry-upstream'))">重试同步</button>
 <button v-if="!admin&&w.allocationReady&&(context.role==='leader'||!hasTeamLeader&&w.priorityEnded)" class="primary" :disabled="busy" @click="run(()=>post('/keywords/'+w.id+'/claim'))">领取关键词</button>
 <button v-if="w.usageReady&&w.bindingId&&!w.usedEverAt&&!Number(w.hasUsageHistory)&&w.leaderId&&(admin||w.leaderId===context.userId)" :disabled="busy" @click="choose(w,'assign')">分配使用人</button>

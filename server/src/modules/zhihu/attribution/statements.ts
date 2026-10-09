@@ -11,6 +11,7 @@ import { assertDuty } from '../../../core/duties';
 import { assertKeywordReady } from './keyword-usability';
 import { blockIncome } from '../../../core/finance';
 import { refreshUnconfirmedKeyword } from './automatic-repair';
+import { internalPerformance } from './executor';
 
 export async function submitEvidence(
   user: AuthUser,
@@ -126,7 +127,8 @@ export async function listEvidence(user: AuthUser, scope: Scope, page: number, p
     return { list, total: Number(total.total), page, pageSize };
   });
 }
-function ownsPayer(user: AuthUser, o: { payerKind: string; payerId: string }) {
+function ownsPayer(user: AuthUser, o: { payerKind: string; payerId: string; relation?: string }) {
+  if(o.relation&&internalPerformance(o.relation))return false;
   return o.payerKind === 'agency' ? isStaffRole(user.role) : user.role === 'leader' && o.payerId === user.sub;
 }
 async function lastConfirmed(c: PoolConnection, factId: unknown, relation: string) {
@@ -147,6 +149,7 @@ async function buildEntry(
   o: Obligation,
   onlyAdjustment: boolean,
 ) {
+  if(internalPerformance(o.relation))return;
   const previous = await lastConfirmed(c, fact.id, o.relation);
   if (onlyAdjustment && !previous) return;
   const delta = money(o.amount) - (previous ? money(String(previous.target)) : 0n);
@@ -241,6 +244,7 @@ async function confirmEntry(
     'SELECT *,CAST(amount AS CHAR) amount_text,CAST(target_amount AS CHAR) target_text FROM zh_statement_entries WHERE id=? FOR UPDATE',
     [id],
   );
+  if(internalPerformance(String(entry.relation_type)))fail('管理员业绩不生成应付账单',403);
   if (
     !(central && isStaffRole(user.role)) &&
     !ownsPayer(user, { payerKind: String(entry.payer_kind), payerId: String(entry.payer_id) })

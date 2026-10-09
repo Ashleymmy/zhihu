@@ -4,7 +4,7 @@ export interface BillEntry {
  metricType:'new_user'|'activation';quantity:string|null;settlementMismatch?:{expected:string;actual:string}|null;
  keyword:string;date:string;orders:string|null;payerName:string;payeeName:string;payeeId:string;parentId:string|null;role:string;
  amount:string|null;confirmedAmount:string;pendingAmount:string;status:string;kind:string;ownPayable:boolean;ownReceivable:boolean;
- blocked:string;reason:string;next:string;ready:boolean;
+ blocked:string;reason:string;next:string;ready:boolean;internal?:boolean;
  calculation?:{quantity:string;unitPrice:string;beforeRiskAmount:string};
  comparison?:import('@zhihu-koc/shared-components').AnalysisComparison[];
 }

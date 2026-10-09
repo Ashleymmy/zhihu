@@ -109,6 +109,8 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
   )
     result.push({ key: 'claim', label: '领取任务' });
   if (Number(word.allocation_ready) && staff)
+    result.push({key:'claim',label:'我来执行'});
+  if (Number(word.allocation_ready) && staff)
     result.push({
       key: 'distribute',
       label: '分发任务',
@@ -119,10 +121,10 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
           type: 'select',
           required: true,
           options: options.users
-            .filter((u) => ['leader', 'creator'].includes(String(u.role)))
+            .filter((u) => ['leader', 'creator'].includes(String(u.role)) || String(u.id)===user.sub)
             .map((u) => ({
               value: String(u.id),
-              label: String(u.display_name) + (u.role === 'leader' ? ' · 团长' : ' · 达人'),
+              label: String(u.display_name) + (isStaffRole(String(u.role)) ? ' · 本人执行' : u.role === 'leader' ? ' · 团长' : ' · 达人'),
             })),
         },
       ],
@@ -182,7 +184,7 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
           type: 'select',
           required: true,
           options: options.users
-            .filter((u) => ['leader', 'creator'].includes(String(u.role)))
+            .filter((u) => ['leader', 'creator'].includes(String(u.role)) || String(u.id)===user.sub)
             .map((u) => ({ value: String(u.id), label: String(u.display_name) })),
         },
       ],
@@ -495,7 +497,7 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
     const word = await one(scope, user, id),
       config = await resources.options(user, scope),
       item = taskItem(word, user, scope, config);
-    const financial = !isStaffRole(user.role) || dutyAllows(user, 'finance');
+    const financial = !isStaffRole(user.role) || dutyAllows(user, 'finance'),internal=word.path_type==='staff_self';
     const state = word.keyword_id
       ? await withTransaction(async (c) => {
           const [data] = await select(
@@ -580,11 +582,11 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
         { label: '原文', value: '查看小说原文', url: String(word.novel_url || word.landing_url || '') },
         { label: '推广活动', value: String(word.task_name || '尚未填写') },
       ],
-      progress: steps.slice(0, financial ? 8 : 5).map((label, index) => ({
-        label,
+      progress: steps.slice(0, financial ? internal?6:8 : 5).map((label, index) => ({
+        label:internal&&index===5?'记入管理员业绩':label,
         status: done[index] ? 'done' : index === current ? 'current' : 'waiting',
         actor: owners[index],
-        description: descriptions[index],
+        description: internal&&index===5?'按单价记录本人业绩，不计入应付或提现':descriptions[index],
       })),
       actions: actions(word, user, scope, config),
     };

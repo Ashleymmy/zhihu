@@ -12,7 +12,7 @@ export interface ReasonContext {
 
 // Shared by the bill and the data inbox so the same blocker has one next step.
 export function reasonText(code: string | null | undefined, context: ReasonContext = {}) {
-  const executorRole = context.executorRole==='leader'?'团长':'达人';
+  const executorRole = context.executorRole==='leader'?'团长':['admin','operator','developer'].includes(String(context.executorRole))?'管理员':'达人';
   const executor = context.executorName ? `${executorRole} ${context.executorName}` : executorRole;
   const leader = context.leaderName ? `团长 ${context.leaderName}` : '团长';
   switch (code) {

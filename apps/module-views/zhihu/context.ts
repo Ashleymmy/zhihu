@@ -43,6 +43,8 @@ export const errorText = (e: unknown) =>
   typeof e === 'object' && e !== null && 'message' in e
     ? String(e.message)
     : '操作失败，请稍后重试'
+export const executorOptions = (context: EngineContext, users: Option[] = context.options.users) =>
+  users.filter(user=>user.role==='leader'||user.role==='creator'||context.role==='admin'&&context.adminDuty!=='finance'&&user.id===context.userId)
 export function requestKey() {
   return createRequestKey()
 }

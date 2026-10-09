@@ -188,6 +188,13 @@ export async function quote(
 ): Promise<Obligation[]> {
   day(date);
   const quantity = count(orders);
+  if(binding.path_type==='staff_self'){
+    let rule:Awaited<ReturnType<typeof rateRuleFor>>;
+    try{rule=await rateRuleFor(c,{projectId:scope.projectId,moduleId:'zhihu',metricType:'new_user',ruleCode:'staff_self',date});}
+    catch(error){if(error instanceof Error&&error.message==='RATE_OVERLAP')fail('PRICE_OVERLAP',409);throw error;}
+    if(!rule)fail('PRICE_MISSING',409);
+    return [{relation:'new_user:staff_self',payerKind:'agency',payerId:'1',payeeId:String(binding.executor_id),versionId:rule.id,priceSource:'role_rate',unitPrice:rule.unitPrice,amount:moneyText(quantity*money(rule.unitPrice))}];
+  }
   const paths: [string, string, string, string][] = [];
   if (binding.path_type === 'team_creator' || binding.path_type === 'leader_self')
     paths.push(['agency_leader', 'agency', '1', String(binding.leader_id)]);
