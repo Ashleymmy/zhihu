@@ -1,0 +1,50 @@
+[
+  {
+    "role": "admin",
+    "widths": [
+      1440,
+      375
+    ],
+    "errors": []
+  },
+  {
+    "role": "finance",
+    "widths": [
+      1440,
+      375
+    ],
+    "errors": []
+  },
+  {
+    "role": "operations",
+    "widths": [
+      1440,
+      375
+    ],
+    "errors": []
+  },
+  {
+    "role": "leader",
+    "widths": [
+      1440,
+      375
+    ],
+    "errors": []
+  },
+  {
+    "role": "creator",
+    "widths": [
+      1440,
+      375
+    ],
+    "errors": []
+  },
+  {
+    "role": "independent",
+    "widths": [
+      1440,
+      375
+    ],
+    "errors": []
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "productCommit": "48c8d4e",
+  "regression": {
+    "initial": {
+      "filesPassed": 39,
+      "filesFailed": 1,
+      "testsPassed": 423,
+      "testsFailed": 7,
+      "skipped": 1
+    },
+    "fixtureCorrection": "core.integration uses real device login sessions and current refreshed token",
+    "retest": {
+      "filesPassed": 3,
+      "testsPassed": 16,
+      "skipped": 1
+    },
+    "remainingFailures": 0
+  },
+  "checks": [
+    "server typecheck",
+    "web typecheck",
+    "web unit tests",
+    "web production build"
+  ],
+  "browser": {
+    "widths": [
+      1440,
+      375
+    ],
+    "roles": [
+      "admin",
+      "operations",
+      "finance",
+      "leader",
+      "creator",
+      "independent"
+    ],
+    "homeDestinations": 34,
+    "taskRoleCount": 5,
+    "flows": [
+      "platform income with disputes and withdrawals",
+      "staff two metric types and no cash",
+      "original activation Excel",
+      "disabled modules",
+      "two sample projects with isolated funding and withdrawals"
+    ]
+  },
+  "productionChanged": false
+}
