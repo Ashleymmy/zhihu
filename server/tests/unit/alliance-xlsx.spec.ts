@@ -33,6 +33,23 @@ async function rejects(buffer: Buffer, options: { allowFormulas?: boolean } = {}
 }
 
 describe('Alliance XLSX fail-closed validator', () => {
+  it('accepts unreferenced spreadsheet metadata left by real activation report exports', async () => {
+    const metadata = `<metadata xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><metadataTypes count="1"><metadataType name="XLDAPR"/></metadataTypes></metadata>`;
+    const entries = [...minimalXlsxEntries(8), { name: 'xl/metadata.xml', data: metadata }];
+    await expect(validateAllianceXlsxBuffer(buildXlsxZipFixture(entries))).resolves.toBeUndefined();
+    for (const data of [metadata.replace('<metadata ', '<worksheet ').replace('</metadata>', '</worksheet>'), metadata.replace('spreadsheetml/2006/main', 'unexpected'), metadata.replace('</metadata>', '<script/></metadata>')]) {
+      await rejects(buildXlsxZipFixture([...entries.slice(0, -1), { name: 'xl/metadata.xml', data }]));
+    }
+  });
+
+  it('still requires the declared metadata type when the workbook references it', async () => {
+    const entries = minimalXlsxEntries().map((entry) => entry.name === 'xl/_rels/workbook.xml.rels'
+      ? { ...entry, data: String(entry.data).replace('</Relationships>', '<Relationship Id="metadata" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata" Target="metadata.xml"/></Relationships>') }
+      : entry);
+    await rejects(buildXlsxZipFixture([...entries, { name: 'xl/metadata.xml', data: '<metadata xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>' }]));
+    await rejects(buildXlsxZipFixture([...minimalXlsxEntries(), { name: 'xl/styles.xml', data: '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>' }]));
+  });
+
   it('P0007-R3-ZIP-001 accepts independent minimal stored and deflate OOXML fixtures', async () => {
     await expect(validateAllianceXlsx(upload(buildMinimalXlsxFixture(0)))).resolves.toBeUndefined();
     await expect(validateAllianceXlsx(upload(buildMinimalXlsxFixture(8)))).resolves.toBeUndefined();
