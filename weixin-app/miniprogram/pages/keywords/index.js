@@ -203,6 +203,14 @@ Page(
       items[Number(e.currentTarget.dataset.index)] = { ...items[Number(e.currentTarget.dataset.index)], [e.currentTarget.dataset.field]: e.detail.value };
       this.setData({ batchItems: items });
     },
+    normalizeWorkUrl(e) {
+      const url=composition.extractUrl(e.detail.value);
+      if(e.currentTarget.dataset.index===undefined){this.setData({workUrl:url});return;}
+      const index=Number(e.currentTarget.dataset.index),items=[...this.data.batchItems];
+      if(!items[index])return;
+      items[index]={...items[index],url};
+      this.setData({batchItems:items});
+    },
     batchChoosePlatform(e) {
       const idx = Number(e.currentTarget.dataset.index), pi = Number(e.detail.value);
       const items = [...this.data.batchItems];

@@ -131,7 +131,8 @@
             <view class="kw-field"><text class="kw-label">作品子分类</text><picker range="{{item.categories}}" range-key="label" value="{{item.contentTypeIndex}}" data-index="{{index}}" bindchange="batchChooseContentType">{{item.contentTypeIndex >= 0 ? item.categories[item.contentTypeIndex].label : '请选择子分类'}} ▾</picker></view>
             <view class="kw-field">
               <text class="kw-label">作品链接</text>
-              <input value="{{item.url}}" placeholder="https://" maxlength="2048" data-index="{{index}}" data-field="url" bindinput="updateBatchItem" class="kw-input" />
+              <input value="{{item.url}}" placeholder="粘贴作品链接或完整分享文本" maxlength="-1" data-index="{{index}}" data-field="url" bindinput="updateBatchItem" bindblur="normalizeWorkUrl" class="kw-input" />
+              <text class="muted">自动提取链接，无需手动删除分享文案。</text>
             </view>
             <view class="kw-field">
               <text class="kw-label">发布日期</text>
@@ -177,11 +178,13 @@
             <input
               data-name="workUrl"
               value="{{workUrl}}"
-              placeholder="https://"
-              maxlength="2048"
+              placeholder="粘贴作品链接或完整分享文本"
+              maxlength="-1"
               bindinput="input"
+              bindblur="normalizeWorkUrl"
               class="kw-input"
             />
+            <text class="muted">自动提取链接，无需手动删除分享文案。</text>
           </view>
           <view class="kw-field">
             <text class="kw-label">发布日期</text>
