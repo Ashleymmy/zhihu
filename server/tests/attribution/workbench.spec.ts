@@ -255,3 +255,33 @@ describe('简化工作台完整资金流程',()=>{
   const gated=await upload(fin,'activation');expect(gated.status,gated.text).toBe(503);expect(gated.body.message).toContain('拉活报表尚未开放');
  });
 });
+
+it('旧来源列表和明细向团长只返回本人净分成，达人及岗位越权仍被拒',async()=>{
+ const [fact]=await q("SELECT f.id FROM zh_metric_facts f JOIN zh_keywords k ON k.id=f.keyword_id WHERE k.keyword='联测词0' AND f.business_date=?",[day]);
+ const response=await get(leader,path('/attributions/'+fact.id+'/trace'),scope);expect(response.status,response.text).toBe(200);
+ expect(response.body.data.revisions).toEqual([]);
+ for(const row of response.body.data.results){
+  expect(row.obligations).toHaveLength(1);expect(row.obligations[0]).toMatchObject({payeeId:leader.sub,relation:'leader_override',unitPrice:'2.0000'});
+  expect(row.teamMargin).toBe(row.obligations[0].amount);
+  expect(row.obligations.some((o:{payeeId:string})=>o.payeeId===a.sub)).toBe(false);
+ }
+ const list=await get(leader,path('/attributions'),{...scope,page:1,pageSize:100});expect(list.status).toBe(200);
+ expect(list.body.data.list.flatMap((r:{obligations:{payeeId:string}[]})=>r.obligations).every((o:{payeeId:string})=>o.payeeId===leader.sub)).toBe(true);
+ const own=await get(a,path('/attributions/'+fact.id+'/trace'),scope);expect(own.status).toBe(200);expect(own.body.data.results[0].obligations[0].unitPrice).toBe('13.0000');
+ for(const actor of [b,other,ops])expect((await get(actor,path('/attributions/'+fact.id+'/trace'),scope)).status).toBe(403);
+});
+it('同样计算结果重算后仍可提现，原确认账和资金逐行不变',async()=>{
+ const word=await resource.createKeyword(admin,scope,key(),{keyword:'不变重算检查',taskId:'1',mappingId:mapping,landingUrl:'https://example.com/unchanged',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['unchanged-'+word.id,word.planId]);await resource.synchronizeKeywords(scope);
+ const bind=await resource.distribute(admin,scope,word.id,key(),a.sub);await resource.changeBinding(a,scope,bind.id,key(),{action:'activate'});
+ const evidence=await statements.submitEvidence(a,scope,key(),{bindingId:bind.id,url:'https://example.com/unchanged-work',description:'不变结果测试'});await statements.reviewEvidence(leader,scope,evidence.id,key(),true,'已核验');
+ const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${day},联测渠道,不变重算检查,1`);await workbench.uploadReport(fin,scope,{buffer,size:buffer.length,originalname:'unchanged.csv',mimetype:'text/csv'});
+ const view=await workbench.overview(fin,scope,{from:day,to:day});await workbench.confirmBills(fin,scope,{from:day,to:day},key(),view.reviewHash);
+ const funding=await finance.financeOverview(fin,common());await finance.releaseFunding(fin,common(),funding.funding.hash,'隔离验证款项可用');
+ const before=await finance.financeOverview(a,common()),[fact]=await q('SELECT * FROM zh_metric_facts WHERE keyword_id=?',[word.id]);
+ const entries=await q('SELECT * FROM opc_income_entries ORDER BY id'),sources=await q('SELECT * FROM opc_income_sources ORDER BY id'),confirmed=await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id");
+ await facts.recompute(fin,scope,String(fact.id));await facts.recompute(fin,scope,String(fact.id));
+ expect((await q('SELECT * FROM zh_metric_facts WHERE id=?',[fact.id]))[0]).toEqual(fact);
+ expect((await finance.financeOverview(a,common())).balance).toEqual(before.balance);
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(entries);expect(await q('SELECT * FROM opc_income_sources ORDER BY id')).toEqual(sources);expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(confirmed);
+});
