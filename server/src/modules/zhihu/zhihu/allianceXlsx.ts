@@ -689,8 +689,30 @@ function parseContentTypes(parts: ReadonlyMap<string, string>): void {
                           : name === 'docProps/core.xml'
                             ? 'application/vnd.openxmlformats-package.core-properties+xml'
                             : 'application/vnd.openxmlformats-officedocument.custom-properties+xml';
-    if (contentType !== expectedType) return invalid();
+    if (contentType !== expectedType) {
+      // Some report exports retain unused dynamic-array metadata after removing
+      // its content-type override and relationship. It is inert XML; do not
+      // reject the report, but keep strict types for every referenced part.
+      const unusedMetadata =
+        name === 'xl/metadata.xml' &&
+        override === undefined &&
+        contentType === 'application/xml' &&
+        isUnusedSpreadsheetMetadata(parts);
+      if (!unusedMetadata) return invalid();
+    }
   }
+}
+
+function isUnusedSpreadsheetMetadata(parts: ReadonlyMap<string, string>): boolean {
+  const root = parseXml(parts.get('xl/metadata.xml') ?? '').find((token) => !token.closing && token.depth === 0);
+  if (!root || localName(root.name) !== 'metadata') return false;
+  const prefix = root.name.includes(':') ? ':' + root.name.split(':')[0] : '';
+  if (attribute(root, 'xmlns' + prefix) !== 'http://schemas.openxmlformats.org/spreadsheetml/2006/main') return false;
+  for (const name of parts.keys()) {
+    if (name.endsWith('.rels') && parseRelationships(parts, name).some((item) => item.target === 'xl/metadata.xml'))
+      return false;
+  }
+  return true;
 }
 
 interface Relationship {
