@@ -97,7 +97,7 @@ attributionRouter.get('/project-agency',asyncHandler(async(req,res)=>ok(res,awai
 attributionRouter.post('/project-agency',asyncHandler(async(req,res)=>{const q=scopeSchema.extend({name:z.string().trim().min(1).max(200),expected:z.string().max(200).nullable()}).parse(req.body);ok(res,await setAgency(req.user,q,key(req),q.name,q.expected));}));
 const workFiltersSchema=scopeSchema.merge(pagingSchema).extend({
   from:z.string().date().optional(),to:z.string().date().optional(),
-  view:z.enum(['self','team','all']).optional(),ownerId:idSchema.optional(),
+  view:z.enum(['self','team','all']).optional(),ownerId:idSchema.optional(),planId:idSchema.optional(),
   registeredOnly:z.enum(['1','true']).optional().transform(v=>!!v),
   result:z.enum(['submitted','failed','pending']).optional(),
 }).refine(q=>!q.from||!q.to||q.from<=q.to,{message:'开始日期不能晚于结束日期'});

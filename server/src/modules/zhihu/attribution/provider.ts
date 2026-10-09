@@ -3,7 +3,9 @@ import { isStaffRole } from '../../../auth/roles';
 import { withTransaction } from '../../../db';
 import { authorize, select } from './store';
 import { day, fail } from './domain';
+import { performance } from './performance';
 export const attributionDataProvider: ModuleDataProvider = {
+  activity: performance,
   async summary(scope, user) {
     await authorize(user, scope);
     day(scope.from);

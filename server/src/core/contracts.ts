@@ -40,6 +40,25 @@ export interface ModuleSummary {
 }
 export interface ModuleDataProvider {
   summary(scope: DataScope, user: AuthUser): Promise<ModuleSummary>;
+  activity?(scope: DataScope, user: AuthUser, filter: ActivityFilter): Promise<ActivityResult>;
+}
+export interface ActivityFilter {
+  view: 'self' | 'team' | 'all';
+  ownerId?: string;
+  metricType?: string;
+  page: number;
+  pageSize: number;
+}
+export interface ActivityResult {
+  status: 'ready' | 'empty';
+  metrics: (MetricSummary & { records: number; pending: number })[];
+  list: {
+    id: string; taskId: string; taskName: string; performerId: string | null; performerName: string;
+    businessDate: string; metricType: string; metricLabel: string; quantity: string | null; quantityUnit: string;
+  }[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 export interface FinanceProvider {
   capabilities: { income: boolean; settlements: boolean; withdrawals: boolean };

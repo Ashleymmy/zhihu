@@ -120,8 +120,13 @@ beforeAll(async () => {
   const { compositionsRouter } = await import('../../src/modules/zhihu/routes/compositions');
   const { plansRouter } = await import('../../src/modules/zhihu/routes/plans');
   const { errorHandler } = await import('../../src/middleware/errors');
+  const {ModuleRuntime}=await import('../../src/core/module-runtime');
+  const {zhihuManifest}=await import('../../src/modules/zhihu/manifest');
+  const runtime=new ModuleRuntime([zhihuManifest]);
+  runtime.register({manifest:zhihuManifest,router:express.Router(),dataProvider:(await import('../../src/modules/zhihu/attribution/provider')).attributionDataProvider});
   app = express()
     .use(express.json())
+    .use('/core/activity',(req,_res,next)=>{req.user=actor;next();},(await import('../../src/core/activity-routes')).createActivityRouter(runtime))
     .use('/compositions', compositionsRouter)
     .use('/activity', (await import('../../src/modules/zhihu/routes/attribution')).attributionRouter)
     .use('/plans', plansRouter)
@@ -263,3 +268,47 @@ it('routes reject invalid dates, reversed range and malformed identifiers', asyn
     .query({ ...scope, ...period, view: 'self' });
   expect(good.status, JSON.stringify(good.body)).toBe(200);
 });
+
+it('report activity isolates roles, keeps both metrics and totals before pagination, without amounts',async()=>{
+  const insert=async(sql:string,values:unknown[])=>{
+    const [r]=await c.query<import('mysql2/promise').ResultSetHeader>(sql,values);return String(r.insertId);
+  };
+  const batch=await insert(`INSERT INTO zh_import_batches(account_id,project_id,file_name,file_sha256,file_bytes,report_kind,template_version,preview_hash,created_by)
+    VALUES(?,1,'isolated-metrics',?,?,'combined','test',?,1)`,[scope.accountId,'b'.repeat(64),Buffer.from('test'),'c'.repeat(64)]);
+  const mine=await keyword(team),own=await keyword(leader),foreign=await keyword(direct);
+  let line=0;
+  for(const [k,type,n] of [[mine,'new_user','3'],[mine,'activation','5'],[own,'new_user','7'],[foreign,'activation','9']] as const){
+    const source=await insert("INSERT INTO zh_import_rows(batch_id,line_number,normalized_json,raw_json) VALUES(?,?,?,?)",[batch,++line,'{}','{}']);
+    const fact=await insert("INSERT INTO zh_metric_facts(account_id,project_id,channel_mapping_id,keyword_id,business_date,metric_type) VALUES(?,1,?,?,'2026-10-02',?)",[scope.accountId,mappingId,k.id,type]);
+    const revision=await insert("INSERT INTO zh_metric_revisions(fact_id,source_row_id,snapshot_json,status) VALUES(?,?,?,'accepted')",[fact,source,JSON.stringify(type==='activation'?{activations:n,settlementAmount:'999'}:{orders:n,revenue:'999'})]);
+    await c.query('UPDATE zh_metric_facts SET current_revision_id=? WHERE id=?',[revision,fact]);
+    const oldSource=await insert("INSERT INTO zh_import_rows(batch_id,line_number,normalized_json,raw_json) VALUES(?,?,?,?)",[batch,++line,'{}','{}']);
+    await insert("INSERT INTO zh_metric_revisions(fact_id,source_row_id,snapshot_json,status) VALUES(?,?,?,'accepted')",[fact,oldSource,JSON.stringify({orders:'999',activations:'999'})]);
+  }
+  const get=(extra:Record<string,unknown>={})=>request(app).get('/core/activity').query({...scope,...period,moduleId:'zhihu',view:'self',...extra});
+  actor=team;const self=await get({view:'all',pageSize:1});expect(self.status,JSON.stringify(self.body)).toBe(200);
+  expect(self.body.data.total).toBe(2);expect(self.body.data.list).toHaveLength(1);
+  expect(self.body.data.metrics.map((m:any)=>[m.key,m.value]).sort()).toEqual([['activation','5'],['new_user','3']]);
+  expect(JSON.stringify(self.body)).not.toMatch(/amount|price|revenue|settlement/i);
+  expect((await get({ownerId:direct.sub})).body.data.total).toBe(0);
+  actor=leader;expect((await get({view:'team'})).body.data.total).toBe(2);expect((await get()).body.data.total).toBe(1);
+  for(const duty of ['operations','finance','all'] as const){actor={...admin,adminDuty:duty};const all=await get({view:'all'});expect(all.body.data.total).toBe(4);expect(JSON.stringify(all.body)).not.toMatch(/amount|price|revenue|settlement/i);}
+  actor=direct;expect((await get()).body.data.metrics[0].value).toBe('9');
+  actor=other;expect((await get()).body.data.status).toBe('empty');
+  actor=team;expect((await get({accountId:'999'})).status).toBe(403);expect((await get({projectId:'999'})).status).toBe(403);
+  expect((await get({from:'2026-10-04',to:'2026-10-01'})).status).toBe(422);
+  expect((await get({metricType:'price'})).status).toBe(422);
+  expect((await get({metricType:'activation',from:'2026-10-02',to:'2026-10-02'})).body.data.total).toBe(1);
+  expect((await get({from:'2026-10-03',to:'2026-10-03'})).body.data.total).toBe(0);
+});
+
+ describe('keyword work drilldown',()=>{it('filters a specific plan before paging and cannot expose another creator works',async()=>{
+  const mine=await keyword(team),someone=await keyword(direct);
+  await works.createComposition(team,input(mine.planId));await works.createComposition(direct,input(someone.planId));
+  actor=team;
+  const own=await request(app).get('/activity/workbench/works').query({...scope,planId:mine.planId});
+  expect(own.status).toBe(200);expect(own.body.data.total).toBe(1);expect(own.body.data.list[0].planId).toBe(mine.planId);
+  const other=await request(app).get('/activity/workbench/works').query({...scope,planId:someone.planId});
+  expect(other.status).toBe(200);expect(other.body.data.total).toBe(0);
+  const cross=await request(app).get('/activity/workbench/works').query({...scope,projectId:'999',planId:mine.planId});expect(cross.status).toBe(403);
+ });});

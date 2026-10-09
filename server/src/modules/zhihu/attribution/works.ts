@@ -14,6 +14,7 @@ export interface WorkFilters {
   to?: string;
   view?: 'self' | 'team' | 'all';
   ownerId?: string;
+  planId?: string;
   registeredOnly?: boolean;
   result?: 'submitted' | 'failed' | 'pending';
   id?: string;
@@ -95,6 +96,7 @@ function filteredQuery(user: AuthUser, scope: Scope, filters: WorkFilters = {}) 
     where.push('executor_id=?');
     args.push(filters.ownerId);
   }
+  if (filters.planId) { where.push('plan_id=?'); args.push(filters.planId); }
   if (filters.registeredOnly) where.push('composition_id IS NOT NULL');
   if (filters.result) {
     where.push(`${resultSql}=?`);
