@@ -7,7 +7,7 @@ import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
 import RiskReview from './RiskReview.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
-import {CashWallet,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
+import {CashWallet,FinanceHistoryLinks,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[]}>()
@@ -180,6 +180,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   <AssignExecutor v-if="assignment" :context="context" :keyword-id="assignment.keywordId" :keyword="assignment.keyword" :from-date="assignment.retroFromDate" @close="assignment=null" @saved="assigned" />
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
   <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
+  <FinanceHistoryLinks />
  </section>
 </template>
 
