@@ -45,9 +45,9 @@ export async function syncIncome(c:PoolConnection,u:AuthUser,s:FinanceScope,inpu
  await c.query('UPDATE opc_income_sources SET source_version=?,snapshot_hash=?,blocked_reason=NULL WHERE id=?',[input.version,hash,source.id]);
  await writeAudit({userId:u.sub,action:'finance.income_confirm',resourceType:'income_source',resourceId:String(source.id),detail:{moduleId:s.moduleId,sourceKey:input.sourceKey,version:input.version,total:input.total}},c);
 }
-export async function blockIncome(c:PoolConnection,s:FinanceScope,sourceKey:string,reason:string){
+export async function blockIncome(c:PoolConnection,s:FinanceScope,sourceKey:string,reason:string,next='财务：核对来源记录'){
  await lockFinance(c,s);await c.query('UPDATE opc_income_sources SET blocked_reason=? WHERE module_id=? AND account_id=? AND source_key=?',[reason,s.moduleId,s.accountId,sourceKey]);
- await c.query('UPDATE opc_earning_sources SET blocked_reason=? WHERE module_id=? AND project_id=? AND account_id=? AND source_key=?',[reason,s.moduleId,s.projectId,s.accountId,sourceKey]);
+ await c.query('UPDATE opc_earning_sources SET blocked_reason=?,next_action=? WHERE module_id=? AND project_id=? AND account_id=? AND source_key=?',[reason,next,s.moduleId,s.projectId,s.accountId,sourceKey]);
 }
 async function balance(c:PoolConnection,u:AuthUser,s:FinanceScope){
  const [income]=await q(c,`SELECT CAST(COALESCE(SUM(e.amount),0) AS CHAR) confirmed,

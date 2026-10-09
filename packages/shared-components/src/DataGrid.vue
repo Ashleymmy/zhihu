@@ -13,6 +13,7 @@ const props = withDefaults(
     rows: DataGridRow[];
     columns: DataGridColumn[];
     views?: DataGridView[];
+    viewCounts?: Record<string, number>;
     modelValue?: string;
     title?: string;
     titleLabel?: string;
@@ -116,7 +117,7 @@ function text(row: DataGridRow, column: DataGridColumn) {
         >
           {{ view.label }}
           <span class="view-count">{{
-            gridViewRows(rows, view.key).length
+            viewCounts?.[view.key] ?? gridViewRows(rows, view.key).length
           }}</span>
         </button>
       </div>

@@ -282,12 +282,12 @@ describe('真实 Bull 队列与进程故障恢复', () => {
     expect(result.total).toBe(1);
     const factId = String(result.list[0].id);
     expect((await facts.trace(admin, scope, factId)).revisions).toHaveLength(1);
-    for (const payer of [leader, admin]) {
-      const draft = (await statements.previewStatement(payer, scope, key(), factId)).entries[0];
-      const entry = (await statements.listStatements(payer, scope, 1, 25)).list.find((e) => e.id === draft.id)!;
-      await statements.confirmStatement(payer, scope, draft.id, key(), String(entry.input_hash));
+    await expect(statements.previewStatement(leader, scope, key(), factId)).rejects.toThrow('付款主体');
+    for (const draft of (await statements.previewStatement(admin, scope, key(), factId)).entries) {
+      const entry = (await statements.listStatements(admin, scope, 1, 25)).list.find((e) => e.id === draft.id)!;
+      await statements.confirmStatement(admin, scope, draft.id, key(), String(entry.input_hash));
     }
-    expect((await amountSnapshot()).map((e) => e.amount).sort()).toEqual(['1300.0000', '1500.0000']);
+    expect((await amountSnapshot()).map((e) => e.amount).sort()).toEqual(['50.0000', '800.0000']);
   }, 90000);
 
   it('账号停用和重复投递不重复事实、应付或确认金额', async () => {

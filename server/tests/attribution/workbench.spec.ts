@@ -94,7 +94,7 @@ describe('简化工作台完整资金流程',()=>{
   const result=await request(app).post(path('/workbench/import')).set('X-Client-Id','workbench-client-8').set('Authorization','Bearer '+tokens['8']).field('projectId',scope.projectId).field('accountId',scope.accountId).attach('file',file.buffer,'联测.xlsx');
   expect(result.status,result.text).toBe(202);batch=result.body.data.id;
   const v=await workbench.overview(fin,scope,{from:day,to:day});
-  expect(v.summary.orders).toBe('65');expect(v.summary.payable).toBe('965.0000');expect(v.entries.every(e=>!e.ready)).toBe(true);
+  expect(v.summary.orders).toBe('65');expect(v.summary.payable).toBe('547.5000');expect(v.entries.every(e=>!e.ready)).toBe(true);
   expect((await finance.financeOverview(a,common())).balance?.confirmed).toBe('0.0000');
  });
  it('部分错误与汇总行不影响正常订单，全部错误也保留读取结果',async()=>{
@@ -117,7 +117,7 @@ describe('简化工作台完整资金流程',()=>{
   const response=await get(fin,path('/workbench'),{...scope,from:day,to:day});expect(response.status,response.text).toBe(200);
   const confirmed=await post(fin,path('/workbench/confirm'),{...scope,from:day,to:day,requestKey:key(),acknowledged:true,reviewHash:response.body.data.reviewHash});
   expect(confirmed.status,confirmed.text).toBe(200);expect(confirmed.body.data.confirmed,JSON.stringify(response.body.data.groups)).toBe(5);
-  for(const [actor,amount] of [[a,'390.0000'],[b,'240.0000'],[solo,'140.0000'],[leader,'195.0000']] as const){
+  for(const [actor,amount] of [[a,'240.0000'],[b,'160.0000'],[solo,'80.0000'],[leader,'67.5000']] as const){
    const own=await finance.financeOverview(actor,common());expect(own.balance?.confirmed).toBe(amount);expect(own.balance?.held).toBe(amount);expect(own.balance?.available).toBe('0.0000');
   }
   const before=(await q('SELECT COUNT(*) n FROM opc_income_entries'))[0].n;
@@ -127,14 +127,14 @@ describe('简化工作台完整资金流程',()=>{
   const l=await workbench.overview(leader,scope,{from:day,to:day});expect(l.groups.some(g=>g.payeeId===solo.sub)).toBe(false);
   expect(l.entries.length).toBeGreaterThan(0);
   expect(l.entries.every(e=>e.payeeId===leader.sub)).toBe(true);
-  expect(new Set(l.entries.map(e=>e.calculation?.unitPrice))).toEqual(new Set(['2.0000','3.0000','15.0000']));
+  expect(new Set(l.entries.map(e=>e.calculation?.unitPrice))).toEqual(new Set(['0.5000','8.5000']));
   expect(l.entries.every(e=>e.calculation?.beforeRiskAmount===e.amount)).toBe(true);
-  expect((await workbench.overview(a,scope,{from:day,to:day})).entries.every(e=>e.calculation?.unitPrice==='13.0000')).toBe(true);
+  expect((await workbench.overview(a,scope,{from:day,to:day})).entries.every(e=>e.calculation?.unitPrice==='8.0000')).toBe(true);
   expect(l.groups.map(g=>g.payeeId)).toEqual([leader.sub]);
   expect(l.summary.payable).toBe(l.summary.receivable);
   expect(l.teamPerformance).toEqual([
-   {executorId:a.sub,name:a.displayName,orders:'30',commission:'60.0000',activations:'0',activationCommission:'0.0000'},
-   {executorId:b.sub,name:b.displayName,orders:'20',commission:'60.0000',activations:'0',activationCommission:'0.0000'},
+   {executorId:a.sub,name:a.displayName,orders:'30',commission:'15.0000',activations:'0',activationCommission:'0.0000'},
+   {executorId:b.sub,name:b.displayName,orders:'20',commission:'10.0000',activations:'0',activationCommission:'0.0000'},
   ]);
   expect((await workbench.overview(a,scope,{from:day,to:day})).teamPerformance).toEqual([]);
   const leaderResponse=await get(leader,path('/workbench'),{...scope,from:day,to:day});
@@ -148,27 +148,42 @@ describe('简化工作台完整资金流程',()=>{
   const problem=(await facts.listExceptions(fin,scope,1,100)).list.find(e=>e.reason_code==='SOURCE_REVISION_PENDING')!;
   await facts.acceptRevision(fin,scope,String(problem.revision_id),key(),problem.expected_revision_id===null?null:String(problem.expected_revision_id),'核对测试报表更正',true);
   const v=await workbench.overview(fin,scope,{from:day,to:day});await workbench.confirmBills(fin,scope,{from:day,to:day},key(),v.reviewHash);
-  const own=await finance.financeOverview(a,common());expect(own.balance?.confirmed).toBe('377.0000');expect(own.balance?.held).toBe('377.0000');expect(own.balance?.offset).toBe('0.0000');
+  const own=await finance.financeOverview(a,common());expect(own.balance?.confirmed).toBe('232.0000');expect(own.balance?.held).toBe('232.0000');expect(own.balance?.offset).toBe('0.0000');
  });
  it('资金开放后并发提现只占用一次，驳回和撤回释放占用',async()=>{
-  const view=await finance.financeOverview(fin,common());expect(view.funding.amount).toBe('950.0000');
+  const view=await finance.financeOverview(fin,common());expect(view.funding.amount).toBe('539.0000');
   await finance.releaseFunding(fin,common(),view.funding.hash,'隔离测试：模拟款项已准备');
-  const input={amount:'377.00',receiverName:'测试A',bankName:'测试银行',bankAccount:'TEST-ONLY'};
+  const input={amount:'232.00',receiverName:'测试A',bankName:'测试银行',bankAccount:'TEST-ONLY'};
   const results=await Promise.allSettled([finance.applyWithdrawal(a,common(),key(),input),finance.applyWithdrawal(a,common(),key(),input)]);
   expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
   const win=results.find(r=>r.status==='fulfilled');if(win?.status!=='fulfilled')throw Error('无有效申请');withdrawal=win.value.id;
   expect((await finance.financeOverview(a,common())).balance?.available).toBe('0.0000');
-  await finance.reviewWithdrawal(fin,common(),withdrawal,'reject','测试退回');expect((await finance.financeOverview(a,common())).balance?.available).toBe('377.0000');
+  await finance.reviewWithdrawal(fin,common(),withdrawal,'reject','测试退回');expect((await finance.financeOverview(a,common())).balance?.available).toBe('232.0000');
   const receipt=key();withdrawal=(await finance.applyWithdrawal(a,common(),receipt,input)).id;
   expect((await finance.applyWithdrawal(a,common(),receipt,input)).id).toBe(withdrawal);
   expect((await finance.financeOverview(b,common())).withdrawals).toHaveLength(0);
  });
  it('作品争议阻止审核付款，解除后仍需财务重新核对',async()=>{
+  const originalLines=await q('SELECT * FROM opc_earning_lines ORDER BY id'),originalCash=await q('SELECT * FROM opc_income_entries ORDER BY id');
+  const earning=async()=>{
+   const response=await get(a,'/api/v1/core/earnings/mine',{from:day,to:day});expect(response.status,response.text).toBe(200);
+   return response.body.data.list.find((row:{taskName:string})=>row.taskName==='联测词0');
+  };
   await statements.disputeBinding(ops,scope,bindingA,key(),false,'测试争议');
+  expect(await earning()).toMatchObject({reason:'作品存在争议',nextAction:'运营：核实作品归属',isReady:0,amount:'232.0000'});
+  expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(originalLines);
+  const beforeMigration=await q('SELECT * FROM opc_earning_sources ORDER BY id');
+  const migration=await (await import('node:fs/promises')).readFile('schema/extensions/016_earning_source_actions.sql','utf8');
+  for(let repeat=0;repeat<2;repeat++)for(const sql of migration.split(/;\s*(?:\r?\n|$)/).filter(sql=>sql.trim()))await c.query(sql);
+  expect(await q('SELECT * FROM opc_earning_sources ORDER BY id')).toEqual(beforeMigration);
   await expect(finance.reviewWithdrawal(fin,common(),withdrawal,'approve','')).rejects.toThrow('来源金额或状态');
   await statements.disputeBinding(ops,scope,bindingA,key(),true,'测试解除');
+  expect(await earning()).toMatchObject({reason:'争议已解除，待财务重新核对',nextAction:'财务：重新核对金额',isReady:0});
+  expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(originalLines);
+  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(originalCash);
   await expect(finance.reviewWithdrawal(fin,common(),withdrawal,'approve','')).rejects.toThrow('来源金额或状态');
   const v=await workbench.overview(fin,scope,{from:day,to:day});await workbench.confirmBills(fin,scope,{from:day,to:day},key(),v.reviewHash);
+  expect(await earning()).toMatchObject({reason:'',nextAction:'财务：核对并确认金额',isReady:1,amount:'232.0000'});
   await finance.reviewWithdrawal(fin,common(),withdrawal,'approve','测试审核');
  });
  it('付款必须有凭证；重复登记不会付款两次，凭证只供财务和本人查看',async()=>{
@@ -176,7 +191,7 @@ describe('简化工作台完整资金流程',()=>{
   await expect(finance.recordPayment(fin,common(),withdrawal,{reference:'TEST-PAYMENT-1',paidOn:day},{buffer:Buffer.from('invalid'),originalname:'fake.pdf',size:7})).rejects.toThrow('付款凭证');
   await finance.recordPayment(fin,common(),withdrawal,{reference:'TEST-PAYMENT-1',paidOn:day},proof);
   await finance.recordPayment(fin,common(),withdrawal,{reference:'TEST-PAYMENT-1',paidOn:day},proof);
-  const own=await finance.financeOverview(a,common());expect(own.balance?.paid).toBe('377.0000');expect(own.balance?.processing).toBe('0.0000');
+  const own=await finance.financeOverview(a,common());expect(own.balance?.paid).toBe('232.0000');expect(own.balance?.processing).toBe('0.0000');
   expect((await finance.paymentProof(a,common(),withdrawal)).buffer).toEqual(proof.buffer);
   await expect(finance.paymentProof(b,common(),withdrawal)).rejects.toThrow('无权');
   await expect(finance.paymentProof(leader,common(),withdrawal)).rejects.toThrow('无权');
@@ -189,7 +204,7 @@ describe('简化工作台完整资金流程',()=>{
   let view=await finance.financeOverview(fin,common());await finance.releaseFunding(fin,common(),view.funding.hash,'测试开放');
   await withTransaction(conn=>finance.syncIncome(conn,fin,common(),{...source,version:'v2',allocations:[{userId:solo.sub,amount:'150.0000'}],total:'150.0000'}));
   await withTransaction(conn=>finance.syncIncome(conn,fin,common(),{...source,version:'v3',allocations:[{userId:solo.sub,amount:'80.0000'}],total:'80.0000'}));
-  const own=await finance.financeOverview(solo,common());expect(own.balance?.available).toBe('220.0000');expect(own.balance?.held).toBe('0.0000');
+  const own=await finance.financeOverview(solo,common());expect(own.balance?.available).toBe('160.0000');expect(own.balance?.held).toBe('0.0000');
   view=await finance.financeOverview(fin,common());await finance.releaseFunding(fin,common(),view.funding.hash,'零额抵扣明细清理测试');
   await expect(withTransaction(conn=>finance.syncIncome(conn,fin,common(),{...source,version:'v3',allocations:[{userId:solo.sub,amount:'90.0000'}],total:'90.0000'}))).rejects.toThrow('同一账单版本');
   expect((await q("SELECT CAST(amount AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.source_key='mixed-test' ORDER BY e.id")).map(r=>r.amount)).toEqual(['100.0000','50.0000','-50.0000','-20.0000']);
@@ -231,7 +246,7 @@ describe('简化工作台完整资金流程',()=>{
    }
   }
   const rows=(await get(leader,'/api/v1/core/earnings/mine',{from:day,to:day})).body.data.list;
-  expect(rows.filter((r:{earningGroup:string})=>r.earningGroup==='team').every((r:{unitPrice:string})=>['2.0000','3.0000'].includes(r.unitPrice))).toBe(true);
+  expect(rows.filter((r:{earningGroup:string})=>r.earningGroup==='team').every((r:{unitPrice:string})=>['0.5000'].includes(r.unitPrice))).toBe(true);
   expect((await get(ops,'/api/v1/core/earnings/mine',{from:day,to:day})).status).toBe(403);
   expect((await q('SELECT COUNT(*) n FROM opc_earning_lines WHERE confirmed_at IS NOT NULL'))[0].n).toBeGreaterThan(0);
  });
@@ -261,13 +276,13 @@ it('旧来源列表和明细向团长只返回本人净分成，达人及岗位�
  const response=await get(leader,path('/attributions/'+fact.id+'/trace'),scope);expect(response.status,response.text).toBe(200);
  expect(response.body.data.revisions).toEqual([]);
  for(const row of response.body.data.results){
-  expect(row.obligations).toHaveLength(1);expect(row.obligations[0]).toMatchObject({payeeId:leader.sub,relation:'leader_override',unitPrice:'2.0000'});
+  expect(row.obligations).toHaveLength(1);expect(row.obligations[0]).toMatchObject({payeeId:leader.sub,relation:'leader_override',unitPrice:'0.5000'});
   expect(row.teamMargin).toBe(row.obligations[0].amount);
   expect(row.obligations.some((o:{payeeId:string})=>o.payeeId===a.sub)).toBe(false);
  }
  const list=await get(leader,path('/attributions'),{...scope,page:1,pageSize:100});expect(list.status).toBe(200);
  expect(list.body.data.list.flatMap((r:{obligations:{payeeId:string}[]})=>r.obligations).every((o:{payeeId:string})=>o.payeeId===leader.sub)).toBe(true);
- const own=await get(a,path('/attributions/'+fact.id+'/trace'),scope);expect(own.status).toBe(200);expect(own.body.data.results[0].obligations[0].unitPrice).toBe('13.0000');
+ const own=await get(a,path('/attributions/'+fact.id+'/trace'),scope);expect(own.status).toBe(200);expect(own.body.data.results[0].obligations[0].unitPrice).toBe('8.0000');
  for(const actor of [b,other,ops])expect((await get(actor,path('/attributions/'+fact.id+'/trace'),scope)).status).toBe(403);
 });
 it('同样计算结果重算后仍可提现，原确认账和资金逐行不变',async()=>{
@@ -284,4 +299,17 @@ it('同样计算结果重算后仍可提现，原确认账和资金逐行不变'
  expect((await q('SELECT * FROM zh_metric_facts WHERE id=?',[fact.id]))[0]).toEqual(fact);
  expect((await finance.financeOverview(a,common())).balance).toEqual(before.balance);
  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(entries);expect(await q('SELECT * FROM opc_income_sources ORDER BY id')).toEqual(sources);expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(confirmed);
+});
+
+it('成员报价旧接口全部停用且保留历史表，运营和未登录读取仍被拒',async()=>{
+ const agreements=await q('SELECT * FROM zh_price_agreements ORDER BY id'),versions=await q('SELECT * FROM zh_price_versions ORDER BY id');
+ for(const actor of [admin,fin,leader,a]){
+  const response=await get(actor,path('/price-agreements'),scope);expect(response.status).toBe(410);expect(response.body.message).toContain('平台计费规则');
+ }
+ expect((await get(ops,path('/price-agreements'),scope)).status).toBe(403);
+ expect((await request(app).get(path('/price-agreements')).query(scope)).status).toBe(401);
+ for(const suffix of ['/price-agreements','/price-versions/1/publish'])for(const actor of [admin,leader])expect((await post(actor,path(suffix),{...scope,requestKey:key()})).status).toBe(410);
+ expect(await q('SELECT * FROM zh_price_agreements ORDER BY id')).toEqual(agreements);expect(await q('SELECT * FROM zh_price_versions ORDER BY id')).toEqual(versions);
+ const mine=await get(a,path('/attribution-options'),scope);expect(mine.body.data.currentNewUserPrice).toBe('8.0000');
+ for(const actor of [leader,ops])expect((await get(actor,path('/attribution-options'),scope)).body.data).not.toHaveProperty('currentNewUserPrice');
 });

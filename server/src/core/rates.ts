@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { AppError } from '../middleware/errors';
+import { cash, cashText } from './money';
 
 export interface RateScope {
   projectId: string;
@@ -22,4 +23,11 @@ export async function rateRuleFor(c: PoolConnection, s: RateScope): Promise<{ id
 
 export async function rateFor(c: PoolConnection, s: RateScope): Promise<string | null> {
   return (await rateRuleFor(c,s))?.unitPrice ?? null;
+}
+
+/** Calculate a published per-unit rule using exact platform money arithmetic. */
+export async function quoteRate(c: PoolConnection,s: RateScope,quantity:string){
+  if(!/^\d{1,16}$/.test(quantity))throw new AppError(422,42200,'数量必须是非负整数');
+  const rule=await rateRuleFor(c,s);
+  return rule?{...rule,quantity,amount:cashText(BigInt(quantity)*cash(rule.unitPrice))}:null;
 }

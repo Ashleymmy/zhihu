@@ -22,6 +22,7 @@ export interface Option {
   syncedAt?: string | null
 }
 export interface EngineOptions {
+  currentNewUserPrice?: string | null
   hasTeamLeader?: boolean
   integrationMode?: 'simulation' | 'upstream'
   tasks: Option[]

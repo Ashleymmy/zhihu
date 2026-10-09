@@ -65,11 +65,28 @@ async function main() {
           // Only this disposable database: expose a missing-price row without changing production rules.
           await db.query("UPDATE opc_rate_rules SET effective_to=CURDATE() WHERE module_id='zhihu' AND metric_type='activation' AND rule_code='creator'");
         }
+        if(process.env.OPC_REVIEW_ROLE_PRICES_ONLY==='1'){
+          // Distinct legacy prices prove that the UI and live calculations use role rules.
+          await db.query("UPDATE zh_price_versions SET unit_price=20 WHERE status='published'");
+        }
+        if(process.env.OPC_REVIEW_ISSUES_ONLY==='1'){
+          const [[issue]]=await db.query<mysql.RowDataPacket[]>("SELECT * FROM zh_exceptions WHERE status='open' ORDER BY id LIMIT 1");
+          if(!issue)throw Error('隔离待办样本缺失');
+          for(let n=0;n<30;n++)await db.query("INSERT INTO zh_exceptions(account_id,project_id,source_row_id,fact_id,reason_code,status,resolution) VALUES(?,?,?,?,?,'resolved','隔离分页验收：已处理')",[issue.account_id,issue.project_id,issue.source_row_id,issue.fact_id,issue.reason_code]);
+        }
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         if(process.env.OPC_REVIEW_FINANCE_HISTORY==='1') await (await import('./finance-history-fixture')).seedFinanceHistory(db);
         await db.end();
-        process.send?.({port});console.log('REVIEW_READY',port);
+        let sample;
+        if(process.env.OPC_REVIEW_ORIGINAL_ACTIVATION==='1'){
+          const file=process.env.OPC_ACTIVATION_SAMPLE;if(!file)throw Error('请提供本机原件路径 OPC_ACTIVATION_SAMPLE');
+          const buffer=await readFile(file),{parseReport}=await import('../../src/modules/zhihu/attribution/report');
+          const rows=await parseReport({originalname:path.basename(file),buffer,size:buffer.length,mimetype:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},'activation');
+          if(rows.some(row=>row.error||row.skipped))throw Error('原件包含未通过解析的记录');
+          sample=rows.map(row=>row.value);
+        }
+        process.send?.({port,sample});console.log('REVIEW_READY',port);
       }
     });
     child.stderr?.pipe(process.stderr);

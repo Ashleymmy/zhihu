@@ -7,7 +7,7 @@ import { asyncHandler, AppError } from '../../../middleware/errors';
 import { ok } from '../../../utils/response';
 import {getAgency,setAgency} from '../attribution/agency';
 import * as resource from '../attribution/resources';
-import * as pricing from '../attribution/pricing';
+
 import * as facts from '../attribution/facts';
 import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
@@ -211,35 +211,12 @@ attributionRouter.post(
     ok(res, await resource.changeBinding(req.user, scope, idSchema.parse(req.params.id), key(req), input));
   }),
 );
-attributionRouter.get(
-  '/price-agreements',
-  asyncHandler(async (req, res) => {
-    const q = scopeSchema.merge(pagingSchema).parse(req.query);
-    ok(res, await pricing.listPrices(req.user, q, q.page, q.pageSize));
-  }),
-);
-attributionRouter.post(
-  '/price-agreements',
-  asyncHandler(async (req, res) => {
-    const input = scopeSchema
-      .extend({
-        taskId: idSchema,
-        payeeId: idSchema,
-        unitPrice: z.string(),
-        from: z.string().date(),
-        to: z.string().date().optional(),
-        reason: z.string().trim().min(1).max(500),
-      })
-      .parse(req.body);
-    ok(res, await pricing.draftPrice(req.user, input, key(req), input), 201);
-  }),
-);
-attributionRouter.post(
-  '/price-versions/:id/publish',
-  asyncHandler(async (req, res) =>
-    ok(res, await pricing.publishPrice(req.user, scopeSchema.parse(req.body), idSchema.parse(req.params.id), key(req))),
-  ),
-);
+const retiredMemberPrices:import('express').RequestHandler=(req,_res,next)=>{
+  try { if(isStaffRole(req.user.role))assertDuty(req.user,'finance');throw new AppError(410,41000,'成员报价已停用，请在平台计费规则中查看和设置角色单价'); }catch(error){next(error)}
+};
+attributionRouter.get('/price-agreements',retiredMemberPrices);
+attributionRouter.post('/price-agreements',retiredMemberPrices);
+attributionRouter.post('/price-versions/:id/publish',retiredMemberPrices);
 const multipart = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: XLSX_MAX_BYTES, files: 1, fields: 5, parts: 6 },
@@ -328,8 +305,8 @@ attributionRouter.post(
 attributionRouter.get(
   '/exceptions',
   asyncHandler(async (req, res) => {
-    const q = scopeSchema.merge(pagingSchema).extend({factId:idSchema.optional()}).parse(req.query);
-    ok(res, await facts.listExceptions(req.user, q, q.page, q.pageSize,q.factId));
+    const q = scopeSchema.merge(pagingSchema).extend({factId:idSchema.optional(),status:z.enum(['all','open','done']).default('all'),search:z.string().trim().max(128).default('')}).parse(req.query);
+    ok(res, await facts.listExceptions(req.user, q, q.page, q.pageSize,q.factId,q));
   }),
 );
 attributionRouter.post(

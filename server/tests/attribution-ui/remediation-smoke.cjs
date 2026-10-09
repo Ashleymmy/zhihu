@@ -13,15 +13,27 @@ async function main(){
   cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc'],env:{...process.env,REMEDIATION_REVIEW:'1'},
  });
  host.stdout.pipe(log);host.stderr.pipe(log);
- let browser,activePage,activeRole='';
+ let browser,activePage,activeRole='',sample;
  try{
   const port=await new Promise((resolve,reject)=>{
    const timer=setTimeout(()=>reject(Error('隔离演示环境启动超时，查看 host.log')),120000);
-   host.once('message',message=>{clearTimeout(timer);resolve(message.port)});
+   host.once('message',message=>{clearTimeout(timer);sample=message.sample;resolve(message.port)});
    host.once('exit',code=>{clearTimeout(timer);reject(Error('隔离演示环境退出 '+code))});
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_ISSUES_ONLY==='1'){
+   await require('./issues-pagination-flow.cjs')({browser,port,out});
+   console.log('数据待办筛选与分页六角色验收通过');return;
+  }
+  if(process.env.OPC_REVIEW_ORIGINAL_ACTIVATION==='1'){
+   await require('./original-activation-flow.cjs')({browser,port,out,sample});
+   console.log('原始拉活 Excel 六角色闭环验收通过');return;
+  }
+  if(process.env.OPC_REVIEW_ROLE_PRICES_ONLY==='1'){
+   await require('./role-prices-flow.cjs')({browser,port,out,date});
+   console.log('拉新角色计价与旧入口六角色验收通过');return;
+  }
   if(process.env.OPC_REVIEW_INCOME_ONLY==='1'){
    await require('./platform-income-flow.cjs')({browser,port,out,date});
    console.log('平台收益与任务、提现全流程通过');return;
@@ -91,7 +103,7 @@ async function main(){
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
    if(role==='operations'){await page.locator('.studio-app').waitFor();await page.getByRole('heading',{level:1}).waitFor();}
    if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).first().waitFor();
-   if(role==='admin'||role==='finance')await page.getByText('按成员报价',{exact:true}).first().waitFor({state:'attached'});
+   if(role==='admin'||role==='finance')await page.getByText('按角色单价',{exact:true}).first().waitFor({state:'attached'});
    if(role==='admin'||role==='finance'){
     await page.getByText('拉新：可计费 37 单 ¥313.00',{exact:true}).waitFor();
     await page.getByText('报表问题与更正',{exact:true}).click();

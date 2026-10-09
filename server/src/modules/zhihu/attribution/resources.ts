@@ -19,6 +19,7 @@ import { processResolvedNames } from './automatic-repair';
 import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
 import { bindingStartDay, recomputeStartDateFacts } from './activation-date';
+import { rateFor } from '../../../core/rates';
 export { synchronizeKeywords } from './keyword-readiness';
 
 async function simulationScope(c: PoolConnection, scope: Scope) {
@@ -215,7 +216,10 @@ export async function options(user: AuthUser, scope: Scope) {
     }
     const [actor] = await select(c, 'SELECT parent_id FROM users WHERE id=?', [user.sub]);
     const [parent] = actor?.parent_id ? await select(c, 'SELECT role FROM users WHERE id=?', [actor.parent_id]) : [];
-    return { tasks, channels, mappings, users, hasTeamLeader: parent?.role === 'leader', integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
+    let currentNewUserPrice:string|null=null;
+    if(user.role==='creator')try{currentNewUserPrice=await rateFor(c,{projectId:scope.projectId,moduleId:'zhihu',metricType:'new_user',ruleCode:'creator',date:businessDay()});}
+    catch(error){if(!(error instanceof Error&&error.message==='RATE_OVERLAP'))throw error;}
+    return { tasks, channels, mappings, users, ...(user.role==='creator'?{currentNewUserPrice}:{}), hasTeamLeader: parent?.role === 'leader', integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
   });
 }
 export async function createMapping(

@@ -420,9 +420,7 @@ async function enrichRules(scope: TaskScope, user: AuthUser, words: RecordRow[])
                 : (await quoteActivation(c, scope, binding, businessDay(), '1', null)).obligations;
             const own = obligations.find((o) => o.payeeId === user.sub);
             if (own) {
-              let value = money(own.unitPrice);
-              if (type === 'new_user' && binding.path_type === 'team_creator' && String(binding.leader_id) === user.sub)
-                value -= money(obligations.find((o) => o.relation === 'leader_creator')!.unitPrice);
+              const value = money(own.unitPrice);
               if (value < 0n) throw new AppError(409, 40901, 'PRICE_CONFLICT');
               prices.push({
                 label:

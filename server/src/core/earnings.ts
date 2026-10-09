@@ -121,7 +121,7 @@ export async function writeEarningLines(c: PoolConnection, s: FinanceScope, inpu
       ],
     );
   }
-  await c.query('UPDATE opc_earning_sources SET current_version=?,blocked_reason=NULL WHERE id=?', [
+  await c.query('UPDATE opc_earning_sources SET current_version=?,blocked_reason=NULL,next_action=NULL WHERE id=?', [
     input.version,
     source.id,
   ]);

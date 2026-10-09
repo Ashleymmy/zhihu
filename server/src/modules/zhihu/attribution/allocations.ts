@@ -11,7 +11,7 @@ export function allocations(snapshot: AttributionSnapshot) {
       staffAmount += amount;
       continue;
     }
-    if (o.relation === 'agency_leader' || o.relation === 'agency_creator' || o.relation.startsWith('activation:')) {
+    if (o.relation === 'agency_leader' || o.relation === 'agency_creator' || o.relation === 'leader_override' || o.relation.startsWith('activation:')) {
       values.set(o.payeeId, (values.get(o.payeeId) ?? 0n) + amount);
       total += amount;
     } else if (o.relation === 'leader_creator') {

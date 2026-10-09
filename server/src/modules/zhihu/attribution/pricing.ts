@@ -2,9 +2,9 @@ import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../../../types';
 import { withTransaction } from '../../../db';
-import { audit, authorize, insert, mutate, scopeLock, select, type RecordRow } from './store';
+import { audit, authorize, insert, json, mutate, scopeLock, select, type RecordRow } from './store';
 import { businessDay, count, day, fail, money, moneyText, type Scope } from './domain';
-import { rateRuleFor } from '../../../core/rates';
+import { rateRuleFor,quoteRate } from '../../../core/rates';
 import { independentCreatorSql } from './relationships';
 import { assertDuty } from '../../../core/duties';
 
@@ -178,7 +178,8 @@ export interface Obligation {
   unitPrice: string;
   amount: string;
 }
-export async function quote(
+/** Retained for verifying historical pricing evidence, never used for new facts. */
+export async function quoteLegacy(
   c: PoolConnection,
   scope: Scope,
   taskId: string,
@@ -232,4 +233,39 @@ export async function quote(
   }
   if(binding.path_type==='team_creator'&&result.some(o=>o.priceSource==='role_rate')&&money(result[1].unitPrice)>money(result[0].unitPrice))fail('PRICE_MISSING',409);
   return result;
+}
+
+export async function quote(c:PoolConnection,scope:Scope,_taskId:string,binding:RecordRow,date:string,orders:string):Promise<Obligation[]>{
+  day(date);count(orders);
+  const paths:[string,string,string][]=[];
+  if(binding.path_type==='leader_self')paths.push(['leader_self','agency_leader',String(binding.leader_id)]);
+  else if(binding.path_type==='team_creator')paths.push(['creator','agency_creator',String(binding.executor_id)],['leader_override','leader_override',String(binding.leader_id)]);
+  else if(binding.path_type==='direct_creator')paths.push(['creator','agency_creator',String(binding.executor_id)]);
+  else if(binding.path_type==='staff_self')paths.push(['staff_self','new_user:staff_self',String(binding.executor_id)]);
+  if(!paths.length)fail('执行人尚未分配',409);
+  const result:Obligation[]=[];
+  for(const [ruleCode,relation,payeeId] of paths){
+    let quoted:Awaited<ReturnType<typeof quoteRate>>;
+    try{quoted=await quoteRate(c,{projectId:scope.projectId,moduleId:'zhihu',metricType:'new_user',ruleCode,date},orders);}
+    catch(error){if(error instanceof Error&&error.message==='RATE_OVERLAP')fail('PRICE_OVERLAP',409);throw error;}
+    if(!quoted)fail('PRICE_MISSING',409);
+    result.push({relation,payerKind:'agency',payerId:'1',payeeId,versionId:quoted.id,priceSource:'role_rate',unitPrice:quoted.unitPrice,amount:quoted.amount});
+  }
+  return result;
+}
+
+/** Corrections retain the original confirmed recipients, relations and unit prices. */
+export async function quoteFact(c:PoolConnection,scope:Scope,factId:string,taskId:string,binding:RecordRow,date:string,orders:string){
+  const [confirmed]=await select(c,`SELECT r.snapshot_json FROM zh_attribution_results r
+    WHERE r.fact_id=? AND (EXISTS(SELECT 1 FROM zh_statement_entries se WHERE se.result_id=r.id AND se.fact_id=r.fact_id AND se.status='confirmed')
+      OR EXISTS(SELECT 1 FROM opc_income_sources src WHERE src.module_id='zhihu' AND src.project_id=? AND src.account_id=? AND src.source_key=? AND BINARY src.source_version=BINARY CAST(r.id AS CHAR)))
+    ORDER BY r.id DESC LIMIT 1`,[factId,scope.projectId,scope.accountId,'fact:'+factId]);
+  if(!confirmed)return quote(c,scope,taskId,binding,date,orders);
+  const original=json<{obligations:Obligation[]}>(confirmed.snapshot_json);
+  // MySQL JSON reorders keys. Restore the quote shape so unchanged confirmed
+  // inputs retain their original result hash and released cash availability.
+  return original.obligations.map(line=>({
+    relation:line.relation,payerKind:line.payerKind,payerId:line.payerId,payeeId:line.payeeId,versionId:line.versionId,
+    ...(line.priceSource?{priceSource:line.priceSource}:{}),unitPrice:line.unitPrice,amount:moneyText(count(orders)*money(line.unitPrice)),
+  }));
 }

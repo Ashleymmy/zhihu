@@ -23,9 +23,29 @@ OPC 提供公共身份、组织、项目、模块接入和统一工作台。知�
 
 平台读取使用 `GET /api/v1/core/earnings/mine`，支持日期、项目、账号、业绩类型、本人作品/团队分成、搜索与分页；收款人始终来自登录身份，运营岗位无金额权限。返回 `scopes`、当前页 `list`、按项目及类型的 `groups` 和 `summary`。`GET /api/v1/core/earnings/:id/history` 只返回本人的确认与更正凭据。关闭模块后不返回其收益入口或数据；这些接口不查询任何项目专属表。
 
+`016_earning_source_actions.sql` 为当前来源状态补充可空的下一步指引，可重复执行；模块调用 `blockIncome` 时可同时提供处理人和动作。发生争议时平台显示最新处理指引，解除后再由财务核对，原确认收益行及资金行不改写。升级 API 前先执行平台迁移；旧版忽略该新增字段，回退保留字段及数据。
+
 已有知乎计算结果在发布时需要补入新收益表。在已配置目标数据库的服务目录运行 `npx tsx scripts/backfill-earning-lines.ts --project 项目ID --account 账号ID --actor 财务人员ID`，默认只预览；检查后增加 `--apply`。每个项目账号分别执行，整个范围在同一事务并使用业务锁；补录不重新计算，不改原报表、确认账和资金行，重复执行没有新增工作。先在备份隔离副本演练，再由发布流程执行。旧版本不会更新新收益表，因此切换收益页面前应退出旧计算实例、补齐已有记录，并保持 API 与后台使用同一兼容版本；回退保留新表和数据。
 
-收益后端验证：`cd server && npx vitest run tests/opc/earnings.integration.spec.ts tests/attribution/workbench.spec.ts tests/attribution/staff-self.spec.ts tests/opc/boundaries.spec.ts`。平台收益页面仍在接线时，现有财务及收益兼容页面继续工作。
+收益后端验证：`cd server && npx vitest run tests/opc/earnings.integration.spec.ts tests/attribution/workbench.spec.ts tests/attribution/staff-self.spec.ts tests/opc/boundaries.spec.ts`。平台 `/income` 汇总各项目的本人收益，支持查看计算过程、确认与更正凭据，并进入项目任务和提现。
+
+## 拉新角色计价切换
+
+P2 后，新计算使用平台 `opc_rate_rules`：达人取 `creator`，团长本人取 `leader_self`，团队分成取 `leader_override`，管理员本人取 `staff_self` 并只记录内部业绩。平台 `quoteRate` 使用字符串数量和整数金额运算。成员报价旧表保留作历史证据，旧写接口停用，旧页面引导到平台计费规则；已确认来源的数量更正始终使用原收款关系、单价及价格版本。
+
+已有未确认拉新数据使用独立脚本转换。在配置好隔离副本数据库的 `server` 目录运行：
+
+```bash
+npx tsx scripts/migrate-new-user-role-rates.ts --project 项目ID --account 账号ID --actor 财务人员ID
+```
+
+默认仅输出原分配、新分配和缺价问题；增加 `--apply` 才在一个事务内重新计算该项目账号的未确认拉新。已确认来源、原确认账、公共资金和拉活不会被迁移；缺单价保持待处理，不当作零元。重复执行已转换范围返回零条，失败时全范围回滚。脚本要求财务权限，不能代替审核金额或开放资金。
+
+发布前先在备份副本运行预览与执行演练。切换时暂停来源导入和财务写操作、等待在途请求及队列完成，退出所有旧计价 API/消费者，再由同一兼容版本执行角色价迁移及收益补录，核对后恢复处理。不能让新旧计价实例同时处理同一来源；产生角色分成记录后，回退须使用理解 `leader_override` 和冻结原价规则的兼容版本，不能直接恢复旧计价程序。原确认账和新增表均保留。本脚本不会连接上游或执行发布。
+
+专项验证：`cd server && npx vitest run tests/attribution/new-user-rates.spec.ts tests/attribution/workbench.spec.ts tests/attribution/engine.spec.ts`；Web 构建后设置 `OPC_REVIEW_ROLE_PRICES_ONLY=1`，运行 `node tests/attribution-ui/remediation-smoke.cjs`，实际检查六角色的角色单价、旧入口和手机页面。
+
+原始拉活 Excel 的闭环复验：Web 构建后，在仓库根目录设置 `OPC_REVIEW_ORIGINAL_ACTIVATION=1`、`OPC_ACTIVATION_SAMPLE=本机原件绝对路径`、`OPC_PLAYWRIGHT_MODULE=本机Playwright模块路径`，运行 `node server/tests/attribution-ui/remediation-smoke.cjs`。该专项针对本次四行、五个拉活量的原始样本，使用自动回收的 MySQL 容器和演示成员完成类型纠正、历史登记、作品核验、财务确认及六角色隔离检查。原件始终在仓库外，脚本校验上传前后及下载内容一致；含业务名称的截图只写入被忽略的 `.opc-work/remediation-review/original-activation`，不要纳入提交。
 
 ## 历史账目
 

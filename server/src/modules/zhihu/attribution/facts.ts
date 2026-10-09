@@ -8,7 +8,7 @@ import { normalizeUploadFilename } from '../services/data-import.service';
 import { audit, authorize, insert, json, mutate, scopeLock, select, type RecordRow } from './store';
 import { digest, fail, money, moneyText, type Scope } from './domain';
 import { parseReport, reportTemplate, assertReportWriteEnabled, type MetricType, type ReportKind, type SourceRow } from './report';
-import { quote, type Obligation } from './pricing';
+import { quoteFact, type Obligation } from './pricing';
 import { quoteActivation } from './activation-pricing';
 import { refreshAdjustments } from './statements';
 import { blockIncome } from '../../../core/finance';
@@ -233,7 +233,7 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
   });
 }
 async function exception(c: PoolConnection, scope: Scope, rowId: string | null, factId: string | null, code: string) {
-  if(factId) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+factId,'来源数据待核对');
+  if(factId) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+factId,'来源数据待核对',reasonText(code).next);
   const exists = await select(
     c,
     "SELECT id FROM zh_exceptions WHERE source_row_id<=>? AND fact_id<=>? AND reason_code=? AND status='open'",
@@ -301,7 +301,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   else {
     await select(c, 'SELECT id FROM tasks WHERE id=? FOR SHARE', [word.task_id]);
     try {
-      snapshot.obligations = await quote(c, scope, String(word.task_id), binding, date, source.orders);
+      snapshot.obligations = await quoteFact(c, scope, String(fact.id), String(word.task_id), binding, date, source.orders);
     } catch (e) {
       if (e instanceof Error && ['PRICE_MISSING', 'PRICE_OVERLAP'].includes(e.message)) code = e.message;
       else throw e;
@@ -548,11 +548,15 @@ export async function rebaseRevision(
     return { id: revisionId };
   });
 }
-export async function listExceptions(user: AuthUser, scope: Scope, page: number, pageSize: number, factId?:string) {
+export async function listExceptions(user: AuthUser, scope: Scope, page: number, pageSize: number, factId?:string, filter: {status?:'all'|'open'|'done';search?:string}={}) {
   if (!isStaffRole(user.role)) fail('来源异常仅管理员可处理', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const finance=dutyAllows(user,'finance');
+    const search=filter.search?.trim()??'', status=filter.status??'all';
+    const where=`e.account_id=? AND e.project_id=? AND (? IS NULL OR e.fact_id=?)${search?" AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.keyword')),k.keyword,'') LIKE ?":''}`;
+    const params=[scope.accountId,scope.projectId,factId??null,factId??null,...(search?['%'+search+'%']:[])];
+    const statusWhere=status==='open'?" AND e.status='open'":status==='done'?" AND e.status<>'open'":'';
     const list = await select(
       c,
       `SELECT CAST(e.id AS CHAR) id,e.reason_code,e.status,e.resolution,CAST(e.source_row_id AS CHAR) source_row_id,
@@ -566,16 +570,14 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
       LEFT JOIN users executor ON executor.id=b.executor_id LEFT JOIN users leader ON leader.id=b.leader_id
       LEFT JOIN zh_metric_revisions v ON v.source_row_id=e.source_row_id AND v.status='pending'
-      WHERE e.account_id=? AND e.project_id=? AND (? IS NULL OR e.fact_id=?) ORDER BY e.id DESC LIMIT ? OFFSET ?`,
-      [scope.accountId, scope.projectId, factId??null, factId??null, pageSize, (page - 1) * pageSize],
+      WHERE ${where}${statusWhere} ORDER BY e.id DESC LIMIT ? OFFSET ?`,
+      [...params, pageSize, (page - 1) * pageSize],
     );
-    const [total] = await select(c, 'SELECT COUNT(*) total FROM zh_exceptions WHERE account_id=? AND project_id=? AND (? IS NULL OR fact_id=?)', [
-      scope.accountId,
-      scope.projectId,
-      factId??null,
-      factId??null,
-    ]);
-    return { list: list.map(row=>{const current=row.current_snapshot_json;delete row.current_snapshot_json;return Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}),finance&&row.revision_id&&row.snapshot_json?{comparison:reportComparison(current?json<FactSnapshot>(current):null,json<FactSnapshot>(row.snapshot_json),String(row.metric_type))}:{})}), total: Number(total.total), page, pageSize };
+    const [count] = await select(c,`SELECT COUNT(*) total,COALESCE(SUM(e.status='open'),0) pending FROM zh_exceptions e
+      LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
+      LEFT JOIN zh_keywords k ON k.id=f.keyword_id WHERE ${where}`,params);
+    const counts={all:Number(count.total),pending:Number(count.pending),done:Number(count.total)-Number(count.pending)};
+    return { list: list.map(row=>{const current=row.current_snapshot_json;delete row.current_snapshot_json;return Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}),finance&&row.revision_id&&row.snapshot_json?{comparison:reportComparison(current?json<FactSnapshot>(current):null,json<FactSnapshot>(row.snapshot_json),String(row.metric_type))}:{})}), total:status==='open'?counts.pending:status==='done'?counts.done:counts.all,counts,page,pageSize };
   });
 }
 export async function retryException(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {
