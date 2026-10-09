@@ -10,7 +10,15 @@ import type {
   TaskAction,
   TaskGroup,
 } from "./platform-tasks";
-const props = defineProps<{ hall?: boolean; initialProjectId?: string }>();
+type TaskReference = {
+  group: Pick<TaskGroup, "projectId" | "moduleId" | "accountId">;
+  task: PlatformTask;
+};
+const props = defineProps<{
+  hall?: boolean;
+  initialProjectId?: string;
+  initialTask?: { moduleId: string; accountId: string; taskId: string };
+}>();
 const w = inject<CoreWorkspace>("opc")!,
   emit = defineEmits<{ navigate: [path: string] }>();
 const groups = ref<TaskGroup[]>([]),
@@ -20,7 +28,7 @@ const groups = ref<TaskGroup[]>([]),
   loading = ref(false),
   error = ref(""),
   notice = ref("");
-const selected = ref<{ group: TaskGroup; task: PlatformTask } | null>(null),
+const selected = ref<TaskReference | null>(null),
   detail = ref<PlatformTaskDetail | null>(null),
   detailLoading = ref(false),
   detailError = ref(""),
@@ -72,11 +80,34 @@ async function load() {
   }
 }
 watch(
-  [() => props.hall, () => props.initialProjectId],
-  () => {
+  [
+    () => props.hall,
+    () => props.initialProjectId,
+    () => props.initialTask?.moduleId,
+    () => props.initialTask?.accountId,
+    () => props.initialTask?.taskId,
+  ],
+  async () => {
     projectId.value = props.initialProjectId ?? "";
     selected.value = null;
-    void load();
+    await load();
+    if (props.initialTask && props.initialProjectId) {
+      await inspectEntry({
+        group: {
+          projectId: props.initialProjectId,
+          moduleId: props.initialTask.moduleId,
+          accountId: props.initialTask.accountId,
+        },
+        task: {
+          id: props.initialTask.taskId,
+          title: "任务详情",
+          executor: "",
+          status: { key: "loading", label: "正在读取", tone: "neutral" },
+          next: { actor: "", text: "" },
+          metrics: [],
+        },
+      });
+    }
   },
   { immediate: true },
 );
@@ -109,7 +140,7 @@ async function more(group: TaskGroup) {
     if (current === generation) loading.value = false;
   }
 }
-const taskKey = (group: TaskGroup, task: PlatformTask) =>
+const taskKey = (group: TaskReference["group"], task: PlatformTask) =>
   [group.projectId, group.moduleId, group.accountId, task.id].join(":");
 const lookup = computed(
   () =>
@@ -150,7 +181,7 @@ const creations = computed(() => groups.value.filter((g) => g.create));
 const total = computed(() =>
   groups.value.reduce((sum, g) => sum + (g.total ?? 0), 0),
 );
-const path = (group: TaskGroup, task: PlatformTask) =>
+const path = (group: TaskReference["group"], task: PlatformTask) =>
   "/tasks/" +
   encodeURIComponent(group.moduleId) +
   "/" +
@@ -173,6 +204,9 @@ function chooseAction(value: TaskAction) {
 async function inspect(row: DataGridRow, actionKey?: string) {
   const entry = lookup.value.get(row.id);
   if (!entry) return;
+  await inspectEntry(entry, actionKey);
+}
+async function inspectEntry(entry: TaskReference, actionKey?: string) {
   const current = ++detailGeneration;
   selected.value = entry;
   detail.value = null;
@@ -186,6 +220,7 @@ async function inspect(row: DataGridRow, actionKey?: string) {
     );
     if (current !== detailGeneration) return;
     detail.value = result;
+    selected.value = { ...entry, task: result };
     if (actionKey) {
       const found = result.actions.find((a) => a.key === actionKey);
       if (found) chooseAction(found);
@@ -220,7 +255,7 @@ async function perform() {
     );
     await load();
     const refreshed = lookup.value.get(taskKey(entry.group, entry.task));
-    if (refreshed)
+    if (refreshed || props.initialTask?.taskId === entry.task.id)
       detail.value = await w.http.get<PlatformTaskDetail>(
         path(entry.group, entry.task),
         { projectId: entry.group.projectId },
@@ -368,16 +403,7 @@ async function copy(value: string) {
       ><p v-if="detailLoading" role="status">正在加载任务进度…</p>
       <div v-if="detailError" role="alert" class="task-error">
         <p>{{ detailError }}</p>
-        <button
-          v-if="!detail && selected"
-          @click="
-            inspect(
-              rows.find(
-                (r) => r.id === taskKey(selected!.group, selected!.task),
-              )!,
-            )
-          "
-        >
+        <button v-if="!detail && selected" @click="inspectEntry(selected!)">
           重新加载
         </button>
       </div>
@@ -390,7 +416,7 @@ async function copy(value: string) {
           <button
             v-for="a in detail.actions"
             :key="a.key"
-            :class="{'task-primary': a.key === detail.next.action?.key}"
+            :class="{ 'task-primary': a.key === detail.next.action?.key }"
             type="button"
             @click="chooseAction(a)"
           >
@@ -484,7 +510,6 @@ async function copy(value: string) {
             }}</span>
           </li>
         </ol>
-
       </template></DetailDrawer
     >
   </section>

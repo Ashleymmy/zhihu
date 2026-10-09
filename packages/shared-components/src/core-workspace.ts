@@ -17,6 +17,8 @@ export interface WorkspaceHttp {
   post<T>(url: string, data?: unknown): Promise<T>
   patch<T>(url: string, data?: unknown): Promise<T>
   del<T>(url: string): Promise<T>
+  postForm<T>(url: string, form: FormData): Promise<T>
+  getBlob(url: string): Promise<Blob>
 }
 export interface CoreWorkspace {
   http: WorkspaceHttp

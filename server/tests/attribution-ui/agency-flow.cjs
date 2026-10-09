@@ -23,7 +23,7 @@ module.exports=async({browser,port,out})=>{
     // Reopen the previous report, then verify finance can use its inline drawer too.
     await upload(role,'广州渡川二');const button=page.locator('.analysis-run').getByRole('button',{name:'采用这份报表',exact:true});await button.click();await page.locator('.agency-check').waitFor();await page.locator('.agency-check').getByRole('button',{name:'核对代理名称'}).click();await save(role,'广州渡川二');await page.locator('.agency-check').waitFor({state:'hidden'});await shot(role,'saved');
    }else{
-    const r=await context.request.get(base+'/api/v1/modules/zhihu/project-agency?projectId=1&accountId=1',{headers:sessions[role].headers});assert.equal(r.status(),403);await page.goto(base+'/app/income');await page.getByText(role==='leader'?'团队业绩与分成':'我的收入明细',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'核对代理名称',exact:true}).count(),0);await shot(role,'income');
+    const r=await context.request.get(base+'/api/v1/modules/zhihu/project-agency?projectId=1&accountId=1',{headers:sessions[role].headers});assert.equal(r.status(),403);await page.goto(base+'/app/income');await page.getByRole('heading',{name:role==='leader'?'团队业绩与分成':'我的收入明细',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'核对代理名称',exact:true}).count(),0);await shot(role,'income');
    }
    results.push({role,widths:[1440,375]});console.log(role+' agency verified');
   }

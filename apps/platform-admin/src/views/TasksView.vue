@@ -8,6 +8,15 @@ const route = useRoute(),
   <PlatformTasks
     :hall="route.path === '/task-hall'"
     :initial-project-id="String(route.query.projectId || '')"
+    :initial-task="
+      route.query.taskId && route.query.moduleId && route.query.accountId
+        ? {
+            taskId: String(route.query.taskId),
+            moduleId: String(route.query.moduleId),
+            accountId: String(route.query.accountId),
+          }
+        : undefined
+    "
     @navigate="router.push"
   />
 </template>

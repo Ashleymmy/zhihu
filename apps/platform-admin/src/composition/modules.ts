@@ -22,7 +22,6 @@ export async function installBusinessRoutes(router: Router, enabled: string[], r
           const pages = [
             { path: 'works', title: role === 'leader' ? '作品跟进' : '作品记录', section: 'operations', pageKind: 'works', tab: 'works' },
             { path: 'data-issues', title: '数据待办', section: 'operations', pageKind: 'issues', tab: 'issues' },
-            { path: 'income', title: '我的收益', section: 'wallet', pageKind: 'income', tab: 'keywords' },
             { path: 'finance', title: '财务', section: 'finance', pageKind: 'finance', tab: 'keywords' },
           ]
           for (const page of pages) removers.push(router.addRoute('shell', { path: page.path, name: page.path,

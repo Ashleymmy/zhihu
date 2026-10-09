@@ -22,6 +22,10 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_INCOME_ONLY==='1'){
+   await require('./platform-income-flow.cjs')({browser,port,out,date});
+   console.log('平台收益与任务、提现全流程通过');return;
+  }
   if(process.env.OPC_REVIEW_STAFF_ONLY==='1'){
    await require('./staff-self-flow.cjs')({browser,port,out,date});
    console.log('管理员本人执行与业绩隔离全流程通过');return;
@@ -86,8 +90,8 @@ async function main(){
    const destination=role==='operations'?'dashboard':role==='admin'||role==='finance'?'modules/zhihu/finance':'modules/zhihu/wallet';
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
    if(role==='operations'){await page.locator('.studio-app').waitFor();await page.getByRole('heading',{level:1}).waitFor();}
-   if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).waitFor();
-   if(role!=='operations')await page.getByText('按成员报价',{exact:true}).first().waitFor({state:'attached'});
+   if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).first().waitFor();
+   if(role==='admin'||role==='finance')await page.getByText('按成员报价',{exact:true}).first().waitFor({state:'attached'});
    if(role==='admin'||role==='finance'){
     await page.getByText('拉新：可计费 37 单 ¥313.00',{exact:true}).waitFor();
     await page.getByText('报表问题与更正',{exact:true}).click();
@@ -269,10 +273,17 @@ async function main(){
    await page.goto(`http://127.0.0.1:${port}/app/login`);await page.locator('input[autocomplete="username"]').fill(username);await page.locator('input[type="password"]').fill('Review123456');
    await page.locator('button[type="submit"]').click();await page.waitForURL(url=>!url.pathname.endsWith('/login'));
    await page.goto(`http://127.0.0.1:${port}/app/modules/zhihu/${role==='finance'?'finance':'wallet'}`);
-   await page.locator('.period-filter input[type="date"]').first().fill(earlier);await page.locator('.period-filter input[type="date"]').last().fill(earlier);await page.getByRole('button',{name:'查看账单',exact:true}).click();
-   await page.getByText('按角色单价',{exact:true}).first().waitFor({state:'attached'});
-   const card=page.locator('.bill-details .grid-card').filter({hasText:'悬疑短篇'}).filter({hasText:'¥'+amount});
-   await card.waitFor({state:'attached'});assert((await card.innerText()).includes('按角色单价'));
+   if(role==='finance'){
+    await page.locator('.period-filter input[type="date"]').first().fill(earlier);await page.locator('.period-filter input[type="date"]').last().fill(earlier);await page.getByRole('button',{name:'查看账单',exact:true}).click();
+    await page.getByText('按角色单价',{exact:true}).first().waitFor({state:'attached'});
+    const card=page.locator('.bill-details .grid-card').filter({hasText:'悬疑短篇'}).filter({hasText:'¥'+amount});
+    await card.waitFor({state:'attached'});assert((await card.innerText()).includes('按角色单价'));
+   }else{
+    await page.getByLabel('开始日期').fill(earlier);await page.getByLabel('结束日期').fill(earlier);await page.getByRole('button',{name:'查看收益',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('.platform-income')?.getAttribute('aria-busy')==='false');
+    const row=page.locator('.income-details .grid-row').filter({hasText:'悬疑短篇'});assert((await row.innerText()).includes('¥'+amount));
+    await row.getByRole('button',{name:'悬疑短篇',exact:true}).click();await page.locator('.income-calculation').getByText(role==='leader'?'10单 × ¥0.5000 = ¥5.00':'10单 × ¥8.0000 = ¥80.00',{exact:true}).waitFor();await page.keyboard.press('Escape');
+   }
    for(const width of [1440,375]){
     await page.setViewportSize({width,height:1100});await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await page.screenshot({path:path.join(out,`${role}-default-rate-${width}.png`),fullPage:true,animations:'disabled'});

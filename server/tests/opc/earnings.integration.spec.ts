@@ -301,3 +301,18 @@ it('资金写入失败回滚全部确认，迁移重复执行不改已有收益�
   expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(lines);
   expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
 });
+
+it('风险排除说明不当作未处理，后续业务阻断仍覆盖当前就绪状态且不改确认账', async () => {
+  const value = input('status-review', '0.0000');
+  value.lines[0].reason = '本次推广不计费';
+  await write(value);
+  await confirm(value);
+  const read = async () => (await get('2', {search: 'status-review'})).body.data.list[0];
+  expect(await read()).toMatchObject({isReady: 1, amount: '0.0000', calculationAmount: '16.0000', reason: '本次推广不计费'});
+  expect((await read()).confirmedAt).toBeTruthy();
+  const original = await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id');
+  const {blockIncome} = await import('../../src/core/finance');
+  await tx(conn => blockIncome(conn, scope, value.sourceKey, '作品需要再次核对'));
+  expect(await read()).toMatchObject({isReady: 0, reason: '作品需要再次核对'});
+  expect(await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id')).toEqual(original);
+});

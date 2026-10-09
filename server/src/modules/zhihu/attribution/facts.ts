@@ -340,7 +340,8 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       [riskReview?'运营已核实：'+String(riskReview.reason):'已接受的订单来源风险判定为空',fact.id],
     );
   }
-  await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+fact.id,'账单更新，待财务核对');
+  if(String(fact.current_result_id??'')!==id)
+    await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+fact.id,'账单更新，待财务核对');
   await refreshAdjustments(c, scope, fact, id, snapshot);
   await projectEarnings(c,scope,String(fact.id));
   return { id, snapshot, code, binding, source };
@@ -659,8 +660,15 @@ export async function recompute(user: AuthUser, scope: Scope, id: string) {
 }
 export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
   const obligations = snapshot.obligations.filter(
-    (o) => isStaffRole(user.role) || o.payeeId === user.sub || (o.payerKind === 'user' && o.payerId === user.sub),
-  );
+    (o) => isStaffRole(user.role) || o.payeeId === user.sub,
+  ).map(o=>{
+    if(user.role!=='leader'||o.relation!=='agency_leader')return o;
+    const outgoing=snapshot.obligations.filter(line=>line.payerKind==='user'&&line.payerId===user.sub);
+    if(!outgoing.length)return o;
+    return {...o,relation:'leader_override',
+      amount:moneyText(money(o.amount)-outgoing.reduce((total,line)=>total+money(line.amount),0n)),
+      unitPrice:moneyText(money(o.unitPrice)-outgoing.reduce((total,line)=>total+money(line.unitPrice),0n))};
+  });
   const result: Record<string, unknown> = {
     metricType:snapshot.metricType??'new_user',
     activations:snapshot.activations??null,
@@ -686,10 +694,7 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
   if (user.role === 'leader')
     result.teamMargin = snapshot.obligations.length
       ? moneyText(
-          obligations.filter((o) => o.payeeId === user.sub).reduce((n, o) => n + money(o.amount), 0n) -
-            obligations
-              .filter((o) => o.payerKind === 'user' && o.payerId === user.sub)
-              .reduce((n, o) => n + money(o.amount), 0n),
+          obligations.filter((o) => o.payeeId === user.sub).reduce((n, o) => n + money(o.amount,true), 0n),
         )
       : null;
   return result;
