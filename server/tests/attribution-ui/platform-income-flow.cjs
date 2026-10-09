@@ -129,6 +129,9 @@ module.exports = async ({ browser, port, out, date }) => {
             .getByText(role === 'leader' ? '20单 × ¥0.5000 = ¥10.00' : '20单 × ¥8.0000 = ¥160.00', { exact: true })
             .waitFor();
           await d.locator('.income-history li').first().waitFor();
+          await page.locator('.grid-row').filter({ hasText: '重生千金' }).filter({ hasText: '拉新' })
+            .getByText('无需处理', { exact: true }).waitFor({ state: 'attached' });
+          assert(!(await d.innerText()).includes('财务：核对并确认金额'));
           await shot('calculation');
           await d.getByRole('button', { name: '查看任务与作品' }).click();
           await page

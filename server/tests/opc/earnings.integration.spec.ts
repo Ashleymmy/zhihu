@@ -240,9 +240,13 @@ it('重复投影幂等、确认幂等；更正保留确认行并只追加资金�
   expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(before);
   const value = input('correct', '16.0000');
   await write(value);
+  expect((await get('2', { search: 'correct' })).body.data.list[0].nextAction).toBe('财务：核对并确认金额');
   await confirm(value);
   const confirmed = await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id'),
     cashBefore = await q('SELECT * FROM opc_income_entries ORDER BY id');
+  expect((await get('2', { search: 'correct' })).body.data.list[0].nextAction).toBe('金额已确认，可查看提现状态');
+  expect(await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id')).toEqual(confirmed);
+  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(cashBefore);
   await confirm(value);
   expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(cashBefore);
   const changed = input('correct', '8.0000', '2');
@@ -250,8 +254,14 @@ it('重复投影幂等、确认幂等；更正保留确认行并只追加资金�
   await write(changed);
   expect(await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id')).toEqual(confirmed);
   const own = (await get()).body.data.list.find((l: { taskId: string }) => l.taskId === 'correct');
-  expect(own).toMatchObject({ amount: '8.0000', confirmedAmount: '16.0000', pendingAmount: '-8.0000' });
+  expect(own).toMatchObject({
+    amount: '8.0000',
+    confirmedAmount: '16.0000',
+    pendingAmount: '-8.0000',
+    nextAction: '财务：核对并确认金额',
+  });
   await confirm(changed);
+  expect((await get('2', { search: 'correct' })).body.data.list[0].nextAction).toBe('金额已确认，可查看提现状态');
   expect(
     (await q('SELECT CAST(amount AS CHAR) amount FROM opc_income_entries ORDER BY id')).map((r) => r.amount),
   ).toEqual(['16.0000', '-8.0000']);

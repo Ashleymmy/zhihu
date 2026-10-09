@@ -183,7 +183,7 @@ describe('简化工作台完整资金流程',()=>{
   expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(originalCash);
   await expect(finance.reviewWithdrawal(fin,common(),withdrawal,'approve','')).rejects.toThrow('来源金额或状态');
   const v=await workbench.overview(fin,scope,{from:day,to:day});await workbench.confirmBills(fin,scope,{from:day,to:day},key(),v.reviewHash);
-  expect(await earning()).toMatchObject({reason:'',nextAction:'财务：核对并确认金额',isReady:1,amount:'232.0000'});
+  expect(await earning()).toMatchObject({reason:'',nextAction:'金额已确认，可查看提现状态',isReady:1,amount:'232.0000'});
   await finance.reviewWithdrawal(fin,common(),withdrawal,'approve','测试审核');
  });
  it('付款必须有凭证；重复登记不会付款两次，凭证只供财务和本人查看',async()=>{

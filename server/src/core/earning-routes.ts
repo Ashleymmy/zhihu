@@ -92,7 +92,8 @@ export function createEarningRouter(runtime: ModuleRuntime) {
           const [list] = await c.query<RowDataPacket[]>(
             `SELECT CAST(l.id AS CHAR) id,s.module_id,CAST(s.project_id AS CHAR) project_id,p.name project_name,CAST(s.account_id AS CHAR) account_id,s.task_id,s.task_name,DATE_FORMAT(s.business_date,'%Y-%m-%d') business_date,s.metric_type,s.metric_label,s.quantity_unit,
         CAST(l.performer_id AS CHAR) performer_id,l.performer_name,l.rule_code,CAST(l.quantity AS CHAR) quantity,CAST(l.unit_price AS CHAR) unit_price,CAST(l.quantity*l.unit_price AS CHAR) calculation_amount,CAST(l.amount AS CHAR) amount,l.is_internal,IF(COALESCE(s.blocked_reason,inc.blocked_reason,'')='',l.is_ready,0) is_ready,l.confirmed_at,
-        COALESCE(s.blocked_reason,inc.blocked_reason,NULLIF(l.blocked_reason,''),'') reason,COALESCE(NULLIF(s.next_action,''),l.next_action) next_action,
+        COALESCE(s.blocked_reason,inc.blocked_reason,NULLIF(l.blocked_reason,''),'') reason,
+        COALESCE(NULLIF(s.next_action,''),CASE WHEN l.is_ready=1 AND l.confirmed_at IS NOT NULL AND COALESCE(s.blocked_reason,inc.blocked_reason,'')='' THEN '金额已确认，可查看提现状态' ELSE l.next_action END) next_action,
         CAST(COALESCE(paid.confirmed,0) AS CHAR) confirmed_amount,CAST(l.amount-COALESCE(paid.confirmed,0) AS CHAR) pending_amount,
         IF(l.performer_id<>l.payee_id,'team','self') earning_group
         ${joins} ${cashJoins} WHERE ${where} ORDER BY s.business_date DESC,l.id DESC LIMIT ? OFFSET ?`,
