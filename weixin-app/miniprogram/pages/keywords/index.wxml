@@ -62,6 +62,23 @@
       <view class="kw-card-meta text-sun" wx:if="{{item.releaseStatus === 'requested'}}">已申请释放，等待运营审核</view>
       <view class="kw-card-meta text-clay" wx:if="{{item.syncError}}">{{item.syncError}}</view>
       <view class="kw-card-meta" wx:if="{{item.compositionCount}}">已登记作品 {{item.compositionCount}} 条；提交结果请查看“作品记录”。</view>
+      <button size="mini" class="btn-action" data-id="{{item.id}}" bindtap="followup" disabled="{{busy || loading}}">查看进度与作品</button>
+      <view wx:if="{{followupRecord.recordId === item.id}}" class="notice">
+        <view>{{followupRecord.status.label}} · {{followupRecord.next.actor}}：{{followupRecord.next.text}}</view>
+        <view wx:for="{{followupRecord.metrics}}" wx:for-item="metric" wx:key="label">{{metric.label}}：{{metric.value}}</view>
+        <view wx:for="{{followupRecord.fields}}" wx:for-item="field" wx:key="label"><button wx:if="{{field.url}}" size="mini" data-text="{{field.url}}" bindtap="copy">复制{{field.label}}链接</button></view>
+        <button size="mini" bindtap="followupWorks">查看作品记录</button>
+        <view class="wrap"><button wx:for="{{followupRecord.actions}}" wx:for-item="op" wx:key="key" size="mini" data-key="{{op.key}}" bindtap="followupChoose" disabled="{{busy}}">{{op.label}}</button></view>
+        <view wx:if="{{followupAction}}">
+          <view class="section-title">{{followupAction.label}}</view>
+          <view class="field" wx:for="{{followupAction.fields}}" wx:for-item="field" wx:key="key"><view class="field-label">{{field.label}}</view>
+            <picker wx:if="{{field.type === 'select'}}" range="{{field.options}}" range-key="label" value="{{field.index}}" data-key="{{field.key}}" bindchange="followupInput">{{field.index >= 0 ? field.options[field.index].label : '请选择'}} ▾</picker>
+            <textarea wx:elif="{{field.type === 'textarea'}}" value="{{field.value}}" data-key="{{field.key}}" maxlength="500" bindinput="followupInput" />
+            <input wx:else value="{{field.value}}" data-key="{{field.key}}" maxlength="1024" bindinput="followupInput" />
+          </view>
+          <button class="primary" bindtap="followupSave" disabled="{{busy || loading}}" loading="{{busy}}">确认{{followupAction.label}}</button>
+        </view>
+      </view>
       <view class="kw-card-actions" wx:if="{{item.actions.length}}">
         <button
           wx:for="{{item.actions}}"

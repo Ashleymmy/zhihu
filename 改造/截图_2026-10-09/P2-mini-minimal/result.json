@@ -1,0 +1,35 @@
+{
+  "results": [
+    {
+      "role": "admin",
+      "width": 375,
+      "status": "passed"
+    },
+    {
+      "role": "operations",
+      "width": 375,
+      "status": "passed"
+    },
+    {
+      "role": "leader",
+      "width": 375,
+      "status": "passed"
+    },
+    {
+      "role": "creator",
+      "width": 375,
+      "status": "passed"
+    },
+    {
+      "role": "independent",
+      "width": 375,
+      "status": "passed"
+    },
+    {
+      "role": "finance",
+      "width": 375,
+      "status": "passed"
+    }
+  ],
+  "errors": []
+}

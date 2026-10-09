@@ -29,7 +29,8 @@ function allowed(user, page) {
   if (page === "reports") return duty(user, "finance");
   if (page === "projects") return ["admin","developer"].includes(user.role) && duty(user,"operations");
   if (page === "admin") return duty(user,"operations");
-  if (["team", "prices"].includes(page))
+  if (page === "prices") return canFinance(user);
+  if (page === "team")
     return user.role === "leader" || duty(user, "operations");
   return false;
 }

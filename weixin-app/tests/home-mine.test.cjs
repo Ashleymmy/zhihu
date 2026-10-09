@@ -26,10 +26,10 @@ const keys = list => Array.from(list, item => item.key)
 
 // 角色 → 我的页菜单。与 README 的角色能力表一一对应；「邀请好友」对全部角色开放。
 const MINE_MENUS = [
-  ['creator', null, ['join-team', 'invite', 'withdrawals', 'password']],
+  ['creator', null, ['join-team', 'prices', 'invite', 'withdrawals', 'password']],
   ['leader', null, ['team', 'prices', 'invite', 'withdrawals', 'password']],
-  ['admin', 'operations', ['team', 'prices', 'admin', 'invite', 'password']],
-  ['admin', 'finance', ['reports', 'invite', 'withdrawals', 'password']],
+  ['admin', 'operations', ['team', 'admin', 'invite', 'password']],
+  ['admin', 'finance', ['reports', 'prices', 'invite', 'withdrawals', 'password']],
   ['admin', 'all', ['reports', 'team', 'prices', 'admin', 'invite', 'withdrawals', 'password']],
   ['admin', null, ['reports', 'team', 'prices', 'admin', 'invite', 'withdrawals', 'password']]
 ]

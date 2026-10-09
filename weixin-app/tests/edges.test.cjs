@@ -121,39 +121,9 @@ test("password change clears session and routes back to login", async () => {
   assert.equal(page.data.newPassword, "");
   assert.equal(h.navigation.at(-1), "/pages/login/index");
 });
-test("leader pricing is restricted to own project creators and retains draft before publication", async () => {
-  const h = harness((c) => {
-    const scope = scoped(c);
-    if (scope !== undefined) return scope;
-    if (c.path.endsWith("/attribution-options"))
-      return {
-        tasks: [{ id: "1", name: "Task" }],
-        users: [
-          { id: "3", role: "creator", parentId: "2", displayName: "Own" },
-          { id: "4", role: "creator", parentId: "5", displayName: "Other" },
-        ],
-      };
-    if (c.method === "GET") return { list: [], total: 0 };
-    return { id: "9" };
-  });
-  h.session({ id: "2", role: "leader" });
-  const page = h.page("prices");
-  await page.onShow();
-  // 收款对象第一位是「全部达人（全局统一价）」分组，其后才是成员
-  assert.equal(page.data.payees[0].id, "3");
-  assert.deepEqual(
-    Array.from(page.data.payees.filter((x) => !x.payeeRole), (x) => x.id),
-    ["3"],
-  );
-  page.setData({
-    taskIndex: 0,
-    payeeIndex: 0,
-    form: { unitPrice: "1.1234", from: "2026-09-16", to: "", reason: "新定价" },
-  });
-  await page.create();
-  const posts = h.calls.filter((c) => c.method === "POST");
-  assert.equal(posts.length, 1);
-  assert.equal(posts[0].path, "/modules/zhihu/price-agreements");
-  assert.equal(posts[0].data.payeeId, "3");
-  assert.equal(posts[0].data.unitPrice, "1.1234");
+test("leader cannot write a member price through the former page", async () => {
+ const h=harness(c=>scoped(c)??{groups:[{projectId:'1',accountId:'7',moduleId:'zhihu',status:'ready',list:[],total:0}]});
+ h.session({id:'2',role:'leader'});const p=h.page('prices');await p.onShow();
+ assert.equal(typeof p.create,'undefined');assert.equal(typeof p.publish,'undefined');
+ assert(!h.calls.some(c=>c.path.includes('price-agreement')||c.method==='POST'));
 });

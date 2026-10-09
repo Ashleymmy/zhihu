@@ -3,14 +3,15 @@ const assert = require('node:assert/strict')
 const { harness, scoped } = require('./harness.cjs')
 
 /**
- * 收益页（pages/income）重做后的行为契约：
- *   - 只展示真实数据：workbench 的 ownReceivable 记录 + 邀请奖励，没有写死的假分类
+ * 原收益页同步平台收益接口后的行为契约：
+ *   - 收益及分页合计来自服务端；拉新/拉活分开，不掺入邀请奖励
  *   - 期间筛选：快捷 本月/上月、自定义起止；from > to 被拒绝且不发请求
- *   - 邀请奖励按本期口径前端筛选并重算合计
+ *   - 详情展示本人计算过程、确认历史，岗位和过期请求不会泄露数据
  */
 
 const CREATOR = { id: '3', role: 'creator' }
 const SUMMARY = {
+  amount:'35.00',confirmedAmount:'20.00',pendingAmount:'15.00',internalAmount:'0',pendingCalculations:0,
   records: 3,
   orders: '9',
   issues: 0,
@@ -54,10 +55,15 @@ function setup(options = {}) {
   const h = harness(call => {
     const common = scoped(call)
     if (common !== undefined) return common
-    if (call.path === '/modules/zhihu/workbench') {
+    if (call.path === '/core/earnings/mine') {
       state.workbench.push(call.data)
-      return { entries, groups: [], reviewHash: 'h', summary: SUMMARY, needsReview: false }
+      return {list:entries.filter(e=>e.ownReceivable).map((e,i)=>({id:String(i+1),taskName:e.keyword,businessDate:e.date,amount:e.amount,
+        confirmedAmount:e.confirmedAmount,pendingAmount:e.pendingAmount,isReady:e.blocked?'0':'1',isInternal:'0',
+        confirmedAt:e.status==='confirmed'?'2026-10-09':null,reason:e.blocked,metricType:i?'activation':'new_user',metricLabel:i?'拉活':'拉新',
+        quantityUnit:i?'个':'单',quantity:'5',unitPrice:'1.2000',calculationAmount:'6.0000',earningGroup:'self',nextAction:e.nextAction||(e.status==='confirmed'&&e.pendingAmount==='0'?'金额已确认，可查看提现状态':'财务：核对并确认金额')})),
+        groups:[{projectId:'1',metricType:'new_user',metricLabel:'拉新',quantity:'5',quantityUnit:'单',amount:'20'}],total:41,summary:SUMMARY}
     }
+    if (call.path.endsWith('/history')) return {list:[{amount:'-1.2000',confirmedAt:'2026-10-09'}],total:1};
     if (call.path === '/modules/zhihu/invite/rewards') return invite
     return {}
   })
@@ -82,7 +88,7 @@ test('income shows the real summary and only my own receivable records', async (
   assert.deepEqual(page.data.records.map(r => r.keyword), ['关键词一', '关键词二'],
     'ownReceivable=false 的记录不得出现在我的收益里')
   assert.equal(page.data.records[0].statusText, '已确认')
-  assert.equal(page.data.records[1].statusText, '待确认')
+  assert.equal(page.data.records[1].statusText, '平台核对中')
   assert.equal(page.data.records[1].blocked, '待审核作品')
 })
 
@@ -148,7 +154,7 @@ test('dateChange with a valid custom range clears the quick flag and reloads', a
 })
 
 test('income never requests or adds invitation rewards', async () => {
-  const h=harness(c=>scoped(c)??{entries:[],summary:{receivable:'0',confirmedReceivable:'0',pendingReceivable:'0'}});
+  const h=harness(c=>scoped(c)??{list:[],groups:[],total:0,summary:{amount:'0',confirmedAmount:'0',pendingAmount:'0',internalAmount:'0'}});
   h.session({id:'3',role:'creator'});const page=h.page('income');await page.onShow();
   assert.equal(h.calls.some(c=>c.path.includes('/invite/')),false);
   assert.equal(page.data.inviteTotal,undefined);
@@ -160,7 +166,7 @@ test('operations admin sees a guidance state instead of a 403 error', async () =
   const h = harness(call => {
     const common = scoped(call)
     if (common !== undefined) return common
-    if (call.path === '/modules/zhihu/workbench')
+    if (call.path === '/core/earnings/mine')
       return { http: 403, body: { code: 40300, message: '当前账号无此操作权限' } }
     if (call.path === '/modules/zhihu/invite/rewards') return { total: '0', records: [] }
     return {}
@@ -172,4 +178,53 @@ test('operations admin sees a guidance state instead of a 403 error', async () =
   assert.equal(page.data.restricted, true, 'workbench 403 时必须降级为引导态')
   assert.equal(page.data.error, '', '不得把权限问题显示为页面错误')
   assert.equal(page.data.summary, null)
+  assert.equal(h.calls.some(c=>c.path==='/core/earnings/mine'),false,'运营端不请求财务数据')
 })
+
+test('type/group filters and pagination use the full server summary, never the current page total',async()=>{
+  const {h,page,state}=await open();
+  h.session({id:'2',role:'leader'});await page.onShow();
+  await page.filter({currentTarget:{dataset:{field:'metricType',value:'activation'}}});
+  await page.filter({currentTarget:{dataset:{field:'group',value:'team'}}});
+  await page.next();
+  assert.equal(state.workbench.at(-1).page,2);
+  assert.equal(state.workbench.at(-1).metricType,'activation');
+  assert.equal(state.workbench.at(-1).group,'team');
+  assert.equal(page.data.total,41);assert.equal(page.data.summary.receivable,'35.00');
+  await page.quickRange({currentTarget:{dataset:{q:'prev'}}});assert.equal(state.workbench.at(-1).page,1);
+  assert.equal(h.calls.some(c=>c.path==='/modules/zhihu/workbench'),false);
+});
+
+test('income detail retains backend quantity, price, correction and current confirmed guidance',async()=>{
+  const {h,page}=await open();await page.detail({currentTarget:{dataset:{id:'1'}}});
+  assert.equal(page.data.selected.priceText,'¥1.2');assert.equal(page.data.selected.calculationText,'¥6.00');
+  assert.equal(page.data.selected.nextText,'金额已确认，可查看提现状态');
+  assert.equal(page.data.history[0].amountText,'¥-1.20');
+  assert.equal(h.calls.at(-1).path,'/core/earnings/1/history');
+  page.keyword();assert.match(h.navigation.at(-1),/keywords\/index\?search=/);
+  const p=h.page('keywords');p.onLoad({search:encodeURIComponent('关键词一')});assert.equal(p.data.search,'关键词一');
+});
+
+test('late history requests cannot overwrite another selected earning or a cleared session',async()=>{
+  const {h,page}=await open();let complete;
+  const request=h.load('utils/request'),old=request.get;
+  request.get=(url,data)=>url.endsWith('/1/history')?new Promise(r=>complete=r):old(url,data);
+  const pending=page.detail({currentTarget:{dataset:{id:'1'}}});
+  await page.detail({currentTarget:{dataset:{id:'2'}}});
+  complete({list:[{amount:'999.0000'}],total:1});await pending;
+  assert.equal(page.data.selected.id,'2');assert.equal(page.data.history[0].amountText,'¥-1.20');
+  const again=page.detail({currentTarget:{dataset:{id:'1'}}});page.onHide();
+  complete({list:[{amount:'888.0000'}],total:1});await again;assert.equal(page.data.history.length,0);
+});
+
+test('decimal formatting preserves null, exact rounding and values beyond Number precision',()=>{
+  const {money,units}=require('../miniprogram/utils/amount');
+  assert.equal(money(null),'待计算');assert.equal(money('0'),'0.00');assert.equal(money('1.0050'),'1.01');
+  assert.equal(money('-0.0050'),'-0.01');assert.equal(money('9007199254740993.9950'),'9007199254740994.00');
+  assert.ok(units('10.0001')>units('10.0000'));
+});
+
+test('confirmed original with a new delta keeps server follow-up and marks only the delta pending',async()=>{
+ const {page}=await open({entries:[{id:'f1',keyword:'已更正',date:'2026-10-09',amount:'7.2000',confirmedAmount:'6.0000',pendingAmount:'1.2000',status:'confirmed',ownReceivable:true,blocked:'',nextAction:'财务：核对本次差额'}]});
+ assert.equal(page.data.records[0].statusText,'差额待确认');assert.equal(page.data.records[0].nextText,'财务：核对本次差额');assert.equal(page.data.records[0].confirmedText,'¥6.00');assert.equal(page.data.records[0].pendingText,'¥1.20');
+});

@@ -5,10 +5,10 @@ test("role matrix denies unknown roles and uses backend default admin duty", () 
   const p = harness().load("utils/permissions");
   for (const [role, duty, expected] of [
     // keywords/works/wallet 已迁到知乎工作台二级入口，不再出现在通用菜单里
-    ["creator", null, ["join-team"]],
+    ["creator", null, ["join-team", "prices"]],
     ["leader", null, ["team", "prices"]],
-    ["admin", "operations", ["team", "prices", "admin"]],
-    ["admin", "finance", ["reports"]],
+    ["admin", "operations", ["team", "admin"]],
+    ["admin", "finance", ["reports", "prices"]],
     ["admin", null, ["reports", "team", "prices", "admin"]],
     ["unknown", null, []],
   ])

@@ -264,7 +264,7 @@ function define(page, config) {
     prev() {
       if (!this.data.busy && !this.data.loading && this.data.page > 1) {
         this.setData({ page: this.data.page - 1 });
-        this.load();
+        return this.load();
       }
     },
     next() {
@@ -274,7 +274,7 @@ function define(page, config) {
         this.data.page * (config.pageSize || 20) < this.data.total
       ) {
         this.setData({ page: this.data.page + 1 });
-        this.load();
+        return this.load();
       }
     },
     copy(e) {

@@ -3,6 +3,7 @@
   <view class="row page-heading"><view class="title">作品记录</view><button size="mini" disabled="{{busy || loading}}" bindtap="load">刷新</button></view>
   <view wx:if="{{from || to || ownerId || registeredOnly}}" class="notice"><view>{{ownerName || (view === 'self' ? '我的作品' : view === 'team' ? '团队成员' : '可查看的作品')}} · {{from || '不限开始日期'}} 至 {{to || '今天'}}</view><view wx:if="{{result}}">{{result === 'submitted' ? '已提交知乎' : result === 'failed' ? '提交失败' : '待提交'}}</view><button size="mini" bindtap="clearFilters">查看全部作品</button></view>
   <view class="muted">登记后自动提交知乎，无需管理员逐条审核。</view>
+  <view wx:if="{{planId}}" class="notice">{{keyword}}的作品 <button size="mini" bindtap="clearFilters">查看全部作品</button></view>
   <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest,skeleton:true}}" />
   <skeleton wx:if="{{allowed && scopeReady && loading && !list.length}}" rows="{{3}}" />
   <block wx:if="{{allowed && scopeReady}}">

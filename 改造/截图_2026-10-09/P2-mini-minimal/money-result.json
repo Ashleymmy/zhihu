@@ -1,0 +1,31 @@
+{
+  "isolated": true,
+  "quantities": [
+    {
+      "role": "creator",
+      "quantity": "4",
+      "unitPrice": "1.2000",
+      "confirmed": "4.80"
+    },
+    {
+      "role": "leader",
+      "quantity": "4",
+      "unitPrice": "0.4000",
+      "confirmed": "1.60"
+    }
+  ],
+  "withdrawal": {
+    "amount": "1.2000",
+    "status": "paid",
+    "miniAndWebConsistent": true
+  },
+  "balance": {
+    "confirmed": "164.8000",
+    "held": "0.0000",
+    "available": "163.6000",
+    "offset": "0.0000",
+    "paid": "1.2000",
+    "processing": "0.0000"
+  },
+  "realFileUpload": true
+}

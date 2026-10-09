@@ -3,6 +3,7 @@ const screen = require("../../utils/screen");
 const request = require("../../utils/request");
 const actions = require("../../utils/actions");
 const feedback = require("../../utils/feedback");
+const amount = require("../../utils/amount");
 const { upload } = require("../../utils/upload");
 const empty = () => ({
   amount: "",
@@ -86,7 +87,7 @@ Page(
           }, {});
           if (!actions.money(form.amount))
             throw new Error("金额须大于零，最多两位小数");
-          if (Number(form.amount) > Number(this.data.view.balance.available))
+          if (amount.units(form.amount) > amount.units(this.data.view.balance.available))
             throw new Error("申请金额超过可提现余额");
           if (!form.receiverName || !form.bankName || !form.bankAccount)
             throw new Error("请完整填写收款资料");

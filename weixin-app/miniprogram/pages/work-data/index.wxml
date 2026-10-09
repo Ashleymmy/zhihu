@@ -14,8 +14,27 @@
    <view class="card metric" data-result="pending" bindtap="works"><text class="muted">待提交</text><view class="number">{{summary.pending}}</view><text class="hint">查看作品 ›</text></view>
   </view>
   <view class="muted" wx:if="{{summary}}">已提交知乎不代表审核通过，审核结果在作品详情中查看。</view>
+  <view class="card">
+   <view class="row"><view class="section-title">报表业绩</view><button size="mini" bindtap="activity">全部明细</button></view>
+   <view class="muted">按报表业务日期统计，拉新与拉活分别计量。</view>
+   <view wx:if="{{activityError}}"><view class="error">{{activityError}}</view><button size="mini" bindtap="load">重试</button></view>
+   <block wx:elif="{{activity}}">
+    <view wx:for="{{activity.metrics}}" wx:key="key" class="member" data-type="{{item.key}}" bindtap="activity"><view class="row"><text>{{item.label}}</text><text>{{item.value === null ? '待核对' : item.value}}{{item.value === null ? '' : item.unit}} ›</text></view><view class="muted" wx:if="{{item.pending}}">另有 {{item.pending}} 条数量待核对。</view></view>
+    <view wx:if="{{activity.status === 'empty'}}" class="muted">当前范围尚无报表业绩，可切换日期或查看其他范围。</view>
+   </block>
+  </view>
+  <view class="card activity-detail" wx:if="{{activityOpen && activity && !activityError}}">
+   <view class="row"><view class="section-title">业绩明细{{activityOwnerName ? ' · '+activityOwnerName : ''}}</view><button size="mini" bindtap="activity">全部</button></view>
+   <view wx:for="{{activity.list}}" wx:key="id" class="member">
+    <view class="row"><text class="item-title">{{item.taskName}}</text><text>{{item.metricLabel}} {{item.quantity === null ? '待核对' : item.quantity}}{{item.quantity === null ? '' : item.quantityUnit}}</text></view>
+    <view class="muted">{{item.businessDate}} · {{item.performerName}}</view>
+    <button wx:if="{{!isStaff || user.adminDuty !== 'finance'}}" size="mini" data-name="{{item.taskName}}" bindtap="keyword">查看关键词与作品</button>
+   </view>
+   <view wx:if="{{!activity.list.length}}" class="muted">当前筛选没有业绩记录，可切换日期或查看全部。</view>
+   <view class="row" wx:if="{{activity.total > 20}}"><button size="mini" disabled="{{loading || activityPage <= 1}}" data-step="-1" bindtap="activityPage">上一页</button><text>{{activityPage}}</text><button size="mini" disabled="{{loading || activityPage * 20 >= activity.total}}" data-step="1" bindtap="activityPage">下一页</button></view>
+  </view>
   <view wx:if="{{view !== 'self'}}" class="card"><view class="section-title">成员明细</view><view class="muted">点击成员查看本期登记的作品。</view>
-   <view wx:for="{{list}}" wx:key="id" class="member" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="works"><view class="row"><text class="item-title">{{item.name}}</text><text>{{item.registered}} 件 ›</text></view><view class="muted">已提交 {{item.submitted}} · 失败 {{item.failed}} · 待提交 {{item.pending}}</view></view>
+   <view wx:for="{{list}}" wx:key="id" class="member"><view class="row" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="works"><text class="item-title">{{item.name}}</text><text>{{item.registered}} 件 ›</text></view><view class="muted">已提交 {{item.submitted}} · 失败 {{item.failed}} · 待提交 {{item.pending}}</view><button size="mini" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="activity">查看拉新与拉活</button></view>
    <view wx:if="{{!loading && !list.length}}" class="muted">当前范围没有成员。</view>
   </view>
   <template wx:if="{{view !== 'self'}}" is="loadmore" data="{{total,page,loadingMore,pageSize:20}}" />

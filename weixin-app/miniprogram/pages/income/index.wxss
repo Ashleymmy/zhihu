@@ -30,3 +30,9 @@
 .entry-sub {
   margin-top: 6rpx;
 }
+.income-filters {margin-top:24rpx;gap:12rpx;}
+.income-wallet {margin:24rpx 0 0;background:#fff;color:var(--forest);}
+.income-detail {margin-top:20rpx;padding:24rpx;background:var(--forest-tint);border-radius:var(--radius-sm);overflow-wrap:anywhere;}
+.income-detail .section-title {margin-top:16rpx;}
+.item-title {min-width:0;overflow-wrap:anywhere;}
+.amount-income {flex-shrink:0;}

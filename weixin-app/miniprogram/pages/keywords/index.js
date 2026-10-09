@@ -5,6 +5,7 @@ const keyword = require("../../utils/keyword-actions");
 const composition = require("../../utils/composition");
 const {upload} = require("../../utils/upload");
 const base = "/modules/zhihu";
+const followup=require("../../utils/task-followup");
 
 const PLATFORMS = composition.mediaTypes;
 const WORK_TYPES = composition.types.map(t=>t.label);
@@ -25,7 +26,12 @@ function filterByTab(list, tabKey) {
 Page(
   screen("keywords", {
     infinite: true,
+    ...followup.methods,
+    onLoad(query={}) {
+      if(query.search){let value=query.search;try{value=decodeURIComponent(value);}catch(_){}this.setData({search:value});}
+    },
     data: {
+      ...followup.data,
       search: "",
       list: [],
       filteredList: [],
@@ -72,6 +78,7 @@ Page(
       ]);
       const list = result.list.map((item) => keyword.decorate(user, item, options));
       return {
+        followupRecord:null,followupAction:null,
         options,
         list,
         filteredList: filterByTab(list, TABS[this.data.tabIndex].key),
@@ -93,7 +100,7 @@ Page(
     },
     show() {
       clearInterval(this._pollTimer);
-      this._pollTimer = setInterval(() => { if (this.data.page === 1) this.refresh(); }, 15000);
+      this._pollTimer = setInterval(() => { if (this.data.page === 1 && !this.data.followupRecord && !this.data.selected) this.refresh(); }, 15000);
     },
     hide() {
       clearInterval(this._pollTimer);

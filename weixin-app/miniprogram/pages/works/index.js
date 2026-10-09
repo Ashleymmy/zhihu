@@ -7,8 +7,8 @@ const nav=require('../../utils/nav');
 Page(
   screen("works", {
     infinite: true,
-    onLoad(query={}){this.setData({from:query.from||'',to:query.to||'',view:query.view||'all',ownerId:query.ownerId||'',ownerName:decode(query.ownerName),result:query.result||'',registeredOnly:query.registeredOnly||'',editId:query.edit||''});},
-    data: {from:'',to:'',view:'all',ownerId:'',ownerName:'',result:'',registeredOnly:'',editId:'',list:[],selected:null,form:{},platforms:composition.mediaTypes,types:composition.types.map(t=>t.label),categories:[]},
+    onLoad(query={}){this.setData({planId:query.planId||'',keyword:decode(query.keyword),from:query.from||'',to:query.to||'',view:query.view||'all',ownerId:query.ownerId||'',ownerName:decode(query.ownerName),result:query.result||'',registeredOnly:query.registeredOnly||'',editId:query.edit||''});},
+    data: {planId:'',keyword:'',from:'',to:'',view:'all',ownerId:'',ownerName:'',result:'',registeredOnly:'',editId:'',list:[],selected:null,form:{},platforms:composition.mediaTypes,types:composition.types.map(t=>t.label),categories:[]},
     async fetch({ user, scope }) {
       const result = await request.get(
         "/modules/zhihu/workbench/works",
@@ -24,9 +24,9 @@ Page(
         ),
       };
     },
-    filters(){const out={};for(const key of ['from','to','view','ownerId','result','registeredOnly'])if(this.data[key])out[key]=this.data[key];return out;},
+    filters(){const out={};for(const key of ['from','to','view','ownerId','result','registeredOnly','planId'])if(this.data[key])out[key]=this.data[key];return out;},
     showDetail(e){if(this.canAct())nav.go('/pages/work-detail/index?id='+encodeURIComponent(e.currentTarget.dataset.id));},
-    clearFilters(){this.setData({from:'',to:'',view:'all',ownerId:'',ownerName:'',result:'',registeredOnly:'',list:[]});return this.load();},
+    clearFilters(){this.setData({planId:'',keyword:'',from:'',to:'',view:'all',ownerId:'',ownerName:'',result:'',registeredOnly:'',list:[]});return this.load();},
     choose(e) {
       const item=this.data.list[e.currentTarget.dataset.index];
       if(!this.canAct()||this.data.busy||!item?.canEdit)return;

@@ -14,18 +14,21 @@
   <!-- 运营管理员等无个人收益口径的账号：引导态而非报错 -->
   <view class="card rise" wx:if="{{allowed && scopeReady && restricted && !loading}}">
     <state-view
-      text="当前账号类型不展示收益明细，请从钱包或报表页查看财务数据。"
-      guide-text="前往钱包"
-      guide-path="/pages/wallet/index"
+      text="当前岗位可查看作品和业务数量。"
+      guide-text="查看业务数据"
+      guide-path="/pages/work-data/index"
     />
   </view>
-  <block wx:if="{{allowed && scopeReady && summary}}">
+  <block wx:if="{{allowed && scopeReady && summary && !error}}">
     <!-- 本期收益 hero：主数字 + 已确认/待确认副指标 -->
     <view class="balance-card rise">
-      <view class="balance-label">本期推广收益（元）</view>
-      <view class="balance-value">¥{{summary.receivable}}</view>
-      <view class="balance-sub">已确认 ¥{{summary.confirmedReceivable}} · 待确认 ¥{{summary.pendingReceivable}}</view>
+      <view class="balance-label">{{isStaff ? '本期内部业绩（元）' : '本期推广收益（元）'}}</view>
+      <view class="balance-value">¥{{isStaff ? summary.internalText : summary.receivable}}</view>
+      <view class="balance-sub" wx:if="{{isStaff}}">内部业绩仅作统计，不进入提现余额。</view>
+      <view class="balance-sub" wx:else>已确认 ¥{{summary.confirmedReceivable}} · 待确认 ¥{{summary.pendingReceivable}}</view>
       <view class="balance-sub">{{from}} 至 {{to}}</view>
+      <view class="balance-sub" wx:if="{{summary.pendingCalculations}}">另有 {{summary.pendingCalculations}} 条在核对中，金额尚未计入。</view>
+      <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">{{isStaff ? '查看财务账单' : '查看钱包与提现'}}</button>
     </view>
 
     <!-- 期间筛选：快捷月份 + 自定义起止 -->
@@ -54,31 +57,72 @@
           <picker mode="date" value="{{to}}" data-name="to" disabled="{{busy}}" bindchange="dateChange">{{to}}</picker>
         </view>
       </view>
+      <view class="wrap tabs income-filters">
+        <button size="mini" class="{{!metricType ? 'primary' : ''}}" data-field="metricType" data-value="" bindtap="filter">全部</button>
+        <button size="mini" class="{{metricType === 'new_user' ? 'primary' : ''}}" data-field="metricType" data-value="new_user" bindtap="filter">拉新</button>
+        <button size="mini" class="{{metricType === 'activation' ? 'primary' : ''}}" data-field="metricType" data-value="activation" bindtap="filter">拉活</button>
+      </view>
+      <view class="wrap tabs income-filters" wx:if="{{user.role === 'leader'}}">
+        <button size="mini" class="{{!group ? 'primary' : ''}}" data-field="group" data-value="" bindtap="filter">全部收益</button>
+        <button size="mini" class="{{group === 'self' ? 'primary' : ''}}" data-field="group" data-value="self" bindtap="filter">本人作品</button>
+        <button size="mini" class="{{group === 'team' ? 'primary' : ''}}" data-field="group" data-value="team" bindtap="filter">团队分成</button>
+      </view>
+    </view>
+
+    <view class="card" wx:if="{{groups.length}}">
+      <view class="section-title">分类合计</view>
+      <view class="list-item" wx:for="{{groups}}" wx:key="key" data-field="metricType" data-value="{{item.metricType}}" bindtap="filter">
+        <view class="row"><text>{{item.metricLabel}} · {{item.quantity}}{{item.quantityUnit}}</text><text>{{item.amountText}} ›</text></view>
+      </view>
+      <view class="muted" wx:if="{{isStaff}}">内部业绩 ¥{{summary.internalText}}，不计入可提现收益。</view>
     </view>
 
     <!-- 推广任务奖励：真实结算记录，带确认状态 -->
     <view class="card rise rise-d2">
       <view class="row">
-        <view class="section-title">推广任务奖励</view>
-        <text class="amount-income">¥{{summary.receivable}}</text>
+        <view class="section-title">{{isStaff ? '内部业绩明细' : '收益明细'}}</view>
+        <text class="amount-income">¥{{isStaff ? summary.internalText : summary.receivable}}</text>
       </view>
       <view class="list-item" wx:for="{{records}}" wx:key="key">
-        <view class="row">
+        <view class="row" data-id="{{item.id}}" bindtap="detail">
           <view class="item-title">{{item.keyword}}</view>
-          <text class="amount-income">¥{{item.amount}}</text>
+          <text class="amount-income">{{item.amountText}} ›</text>
         </view>
         <view class="row entry-sub">
           <text class="muted">{{item.date}}</text>
           <text class="tag {{item.status === 'confirmed' ? '' : 'tag-sun'}}">{{item.statusText}}</text>
         </view>
+        <view class="muted">{{item.metricLabel}} · {{item.quantity === null ? '待核对' : item.quantity}}{{item.quantityUnit}} · {{item.earningGroup === 'team' ? '团队分成' : '本人作品'}}</view>
         <view wx:if="{{item.blocked}}" class="text-sun income-blocked">{{item.blocked}}</view>
+        <button size="mini" data-id="{{item.id}}" bindtap="detail">查看明细</button>
+        <view class="income-detail" wx:if="{{selected && selected.id === item.id}}">
+          <view class="row"><text class="section-title">计算明细</text><button size="mini" bindtap="closeDetail">收起</button></view>
+          <view>执行人：{{item.performerName || '本人'}}</view>
+          <view>数量：{{item.quantity === null ? '待核对' : item.quantity}}{{item.quantityUnit}}</view>
+          <view>{{item.earningGroup === 'team' ? '我的分成单价' : '适用单价'}}：{{item.priceText}}／{{item.quantityUnit}}</view>
+          <view>计算金额：{{item.calculationText}}</view>
+          <view>本次应得：{{item.amountText}}</view>
+          <block wx:if="{{item.status !== 'internal'}}"><view>已确认：{{item.confirmedText}}</view><view>待确认差额：{{item.pendingText}}</view></block>
+          <view wx:else class="muted">内部业绩仅作统计，不进入提现余额。</view>
+          <view class="notice" wx:if="{{item.nextText}}">{{item.nextText}}</view>
+          <button wx:if="{{!isStaff || user.adminDuty !== 'finance'}}" size="mini" bindtap="keyword">查看关键词与作品</button>
+          <view class="section-title">确认及更正记录</view>
+          <view wx:if="{{historyLoading}}" class="muted">正在加载…</view>
+          <view wx:elif="{{historyError}}"><view class="error">{{historyError}}</view><button size="mini" bindtap="loadHistory">重试</button></view>
+          <block wx:else>
+            <view class="list-item" wx:for="{{history}}" wx:for-item="entry" wx:key="key"><view>{{entry.amountText}}</view><view class="muted">{{entry.confirmedAt}}</view></view>
+            <view wx:if="{{!history.length}}" class="muted">尚无确认记录。</view>
+            <view class="row" wx:if="{{historyTotal > 25}}"><button size="mini" disabled="{{historyPage <= 1}}" data-step="-1" bindtap="historyPage">上一页</button><text>{{historyPage}}</text><button size="mini" disabled="{{historyPage * 25 >= historyTotal}}" data-step="1" bindtap="historyPage">下一页</button></view>
+          </block>
+        </view>
       </view>
       <state-view
         wx:if="{{!records.length}}"
-        text="本期暂无推广收益。作品审核、官方报表归因和账单确认完成后展示收入，款项到账并开放后可申请提现。"
-        guide-text="去看关键词"
-        guide-path="/pages/keywords/index"
+        text="{{isStaff ? '当前范围没有内部业绩记录，可查看财务账单。' : '当前范围还没有收益记录，可先查看关键词和作品进度。'}}"
+        guide-text="{{isStaff ? '查看财务账单' : '去看关键词'}}"
+        guide-path="{{isStaff ? '/pages/wallet/index' : '/pages/keywords/index'}}"
       />
+      <template is="pager" data="{{total,page,loading,busy,pageSize:20}}" />
     </view>
 
   </block>

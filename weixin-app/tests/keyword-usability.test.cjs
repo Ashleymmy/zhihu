@@ -42,3 +42,10 @@ test('work card explains keyword rejection without falsely suggesting a pending 
  h.session(creator);const page=h.page('works');await page.onShow();
  assert.match(page.data.list[0].upstreamText,/关键词创建失败/);assert.match(page.data.list[0].upstreamReason,/更换关键词/);
 });
+
+test('historical followup uses server allowed actions and does not add normal review',async()=>{
+ const {harness,scoped}=require('./harness.cjs');
+ let historical=false;const h=harness(c=>scoped(c)??(c.path.endsWith('/attribution-options')?{tasks:[],users:[],mappings:[]}:c.path==='/modules/zhihu/keywords'?{list:[{id:'7',planId:'17',keyword:'旧词',readOnly:1}],total:1}:c.path.startsWith('/core/tasks/')&&c.method==='GET'?{id:'7',title:'旧词',metrics:[],fields:[],status:{label:'待补充'},next:{text:'补充历史作品'},actions:historical?[{key:'history-submit',label:'补登记历史作品',fields:[{key:'url',label:'作品链接',type:'url',required:true,value:'https://example.com/old'},{key:'description',label:'说明',type:'textarea',value:'保留说明',required:true}]}]:[{key:'submit-work',path:'/works/new'}]}:{}));
+ h.session({id:'3',role:'creator'});const p=h.page('keywords');await p.onShow();await p.followup({currentTarget:{dataset:{id:'7'}}});assert.equal(p.data.followupRecord.actions.length,0);
+ historical=true;await p.followup({currentTarget:{dataset:{id:'7'}}});p.followupChoose({currentTarget:{dataset:{key:'history-submit'}}});assert.equal(p.data.followupAction.fields[0].value,'https://example.com/old');await p.followupSave();const post=h.calls.find(c=>c.method==='POST');assert.equal(post.path,'/core/tasks/zhihu/10/7/actions/history-submit');assert.equal(post.data.input.description,'保留说明');assert(post.data.requestKey);p.onHide();
+});
