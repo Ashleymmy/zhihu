@@ -305,8 +305,8 @@ attributionRouter.post(
 attributionRouter.get(
   '/exceptions',
   asyncHandler(async (req, res) => {
-    const q = scopeSchema.merge(pagingSchema).extend({factId:idSchema.optional()}).parse(req.query);
-    ok(res, await facts.listExceptions(req.user, q, q.page, q.pageSize,q.factId));
+    const q = scopeSchema.merge(pagingSchema).extend({factId:idSchema.optional(),status:z.enum(['all','open','done']).default('all'),search:z.string().trim().max(128).default('')}).parse(req.query);
+    ok(res, await facts.listExceptions(req.user, q, q.page, q.pageSize,q.factId,q));
   }),
 );
 attributionRouter.post(

@@ -22,6 +22,10 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_ISSUES_ONLY==='1'){
+   await require('./issues-pagination-flow.cjs')({browser,port,out});
+   console.log('数据待办筛选与分页六角色验收通过');return;
+  }
   if(process.env.OPC_REVIEW_ORIGINAL_ACTIVATION==='1'){
    await require('./original-activation-flow.cjs')({browser,port,out,sample});
    console.log('原始拉活 Excel 六角色闭环验收通过');return;

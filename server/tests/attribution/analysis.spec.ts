@@ -119,3 +119,19 @@ it('大额四位小数的已入账金额按字符串读取，新增一单的更�
    expect(result.status,result.text).toBe(200);expect(result.body.data.totals.confirmableAmount).toBe('7.1234');
  }finally{await c.query("UPDATE opc_rate_rules SET unit_price=8 WHERE metric_type='new_user' AND rule_code='creator'");}
 });
+it('状态和关键词在分页前筛选，较早未处理项不被新近完成记录遮住',async()=>{
+ const imported=await workbench.uploadReport(finance,scope,file('日期,渠道,关键词,订单量\n'+Array.from({length:32},(_,n)=>`${date},分析渠道,分页检查${n},1`).join('\n')));
+ await c.query("UPDATE zh_exceptions e JOIN zh_import_rows r ON r.id=e.source_row_id SET e.status='resolved',e.resolution='分页隔离样本' WHERE r.batch_id=? AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.keyword')) NOT IN ('分页检查0','分页检查1')",[imported.id]);
+ const list=(actor:AuthUser,extra:object={})=>request(app).get('/api/v1/modules/zhihu/exceptions').set(headers[actor.sub]).query({...scope,search:'分页检查',status:'open',page:1,pageSize:25,...extra});
+ for(const actor of [admin,ops,finance]){
+  const pending=await list(actor);expect(pending.status,pending.text).toBe(200);expect(pending.body.data).toMatchObject({total:2,counts:{all:32,pending:2,done:30}});
+  expect(pending.body.data.list.map((row:{normalizedJson:{keyword:string}})=>row.normalizedJson.keyword).sort()).toEqual(['分页检查0','分页检查1']);
+  const closed=await list(actor,{status:'done'});expect(closed.body.data.total).toBe(30);expect(closed.body.data.list).toHaveLength(25);expect(closed.body.data.list.every((row:{status:string})=>row.status==='resolved')).toBe(true);
+  const page2=await list(actor,{status:'done',page:2});expect(page2.body.data.list).toHaveLength(5);
+  const matching=await list(actor,{search:'分页检查0'});expect(matching.body.data.total).toBe(1);expect(matching.body.data.list[0].normalizedJson.keyword).toBe('分页检查0');
+  expect((await list(actor,{search:'不存在的关键词'})).body.data).toMatchObject({list:[],total:0,counts:{all:0,pending:0,done:0}});
+ }
+ expect((await list(creator)).status).toBe(403);expect((await list(leader)).status).toBe(403);
+ expect((await list(finance,{projectId:'999'})).status).toBe(403);
+ expect((await list(finance,{status:'bad'})).status).toBe(422);
+});
