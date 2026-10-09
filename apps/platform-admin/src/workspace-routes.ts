@@ -2,7 +2,6 @@ import type { RouteRecordRaw } from 'vue-router'
 import {
   PlatformDashboard,
   ModuleDirectory,
-  PublicFinance,
 } from '@zhihu-koc/shared-components'
 export const workspaceRoutes: RouteRecordRaw[] = [
   { path: 'invitations', name: 'invitations', component: () => import('./views/InvitationLinksView.vue'), meta: { title: '邀请链接' } },
@@ -23,8 +22,8 @@ export const workspaceRoutes: RouteRecordRaw[] = [
   {
     path: 'finance',
     name: 'finance',
-    component: PublicFinance,
-    meta: { title: '财务中心' },
+    component: () => import('./views/FinanceView.vue'),
+    meta: { title: '财务' },
   },
   {
     path: 'projects',
