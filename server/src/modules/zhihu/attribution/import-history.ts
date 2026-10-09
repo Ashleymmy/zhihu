@@ -36,11 +36,15 @@ export async function reanalyzeImport(user:AuthUser,scope:Scope,id:string,key:st
    WHERE f.account_id=? AND f.project_id=? AND route.mode<>'stopped' AND f.business_date>=route.exclusive_from
    AND EXISTS(SELECT 1 FROM zh_import_rows r WHERE r.batch_id=? AND r.fact_id=f.id)
    AND ${unconfirmedFactSql()} ORDER BY f.id FOR UPDATE`,[scope.accountId,scope.projectId,id]);
-  for(const fact of records)await attribute(c,scope,fact);
+  let changed=0;
+  for(const fact of records){
+   const result=await attribute(c,scope,fact);
+   if(result&&String(fact.current_result_id)!==result.id)changed++;
+  }
   await c.query("UPDATE zh_import_batches SET status='committed' WHERE id=?",[id]);
   await c.query('DELETE FROM zh_import_history_archive WHERE batch_id=?',[id]);
   await scheduleImport(c,scope,id,user.sub);
-  await audit(c,user,'report.reanalyze',id,{refreshed:records.length});
-  return {id,refreshed:records.length};
+  await audit(c,user,'report.reanalyze',id,{refreshed:records.length,changed});
+  return {id,refreshed:records.length,changed};
  });
 }

@@ -45,6 +45,7 @@ export async function insertEvidence(
     user.sub,
   ]);
   await audit(c, user, 'evidence.submit', id, { bindingId: input.bindingId });
+  await refreshUnconfirmedKeyword(c,scope,String(word.id));
   return { id };
 }
 

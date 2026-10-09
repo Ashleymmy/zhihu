@@ -22,6 +22,7 @@ import {internalPerformance} from './executor';
 import {allocations} from './allocations';
 import {reanalyzeImport} from './import-history';
 import {randomUUID} from 'node:crypto';
+import {registeredWorkSql} from './work-receipts';
 export interface Period{from:string;to:string;metricType?:MetricType}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
 export {allocations} from './allocations';
@@ -57,7 +58,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     ${isStaffRole(user.role)?'(SELECT v.snapshot_json FROM zh_metric_revisions v WHERE v.id=f.current_revision_id)':'NULL'} current_source_json,
     ${ownershipHistorySql()} ownership_history,k.lifecycle_status,b.stop_new_use_at,b.release_status,
     (SELECT DATE_FORMAT(MIN(uf.business_date),'%Y-%m-%d') FROM zh_metric_facts uf WHERE uf.keyword_id=k.id AND ${unconfirmedFactSql('uf')}) retro_from_date,
-    (EXISTS(SELECT 1 FROM zh_evidence ev WHERE ev.binding_id=b.id) OR EXISTS(SELECT 1 FROM compositions co WHERE co.plan_id=k.plan_id AND co.owner_id=b.executor_id)) evidence_count,
+    ${registeredWorkSql} evidence_count,
     src.id source_id,src.source_version,src.blocked_reason,
     EXISTS(SELECT 1 FROM zh_metric_revisions v WHERE v.fact_id=f.id AND v.status='pending') pending_revision
     FROM zh_metric_facts f JOIN zh_keywords k ON k.id=f.keyword_id
@@ -85,7 +86,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
    try{targets=allocations(snap);}catch{allocationFailed=true;targets={total:'0.0000',staffAmount:'0.0000',list:[]};}
    const priceSourcesFor=(payeeId:string)=>[...new Set(snap.obligations.filter(o=>o.payeeId===payeeId||o.payerKind==='user'&&o.payerId===payeeId).map(o=>o.priceSource??'agreement'))];
    const priceSources=priceSourcesFor(isStaffRole(user.role)?String(r.executor_id??''):user.sub);
-   Object.assign(typed,{priceSources});
+   Object.assign(typed,{priceSources,...(isStaffRole(user.role)?{reportedSettlement:metricType==='activation'?snap.settlement??null:snap.revenue??null}:{} )});
    Object.assign(typed,{riskAssessment:snap.riskAssessment??null,riskReview:snap.riskReview??null,...(r.pending_snapshot_json?{comparison:reportComparison(r.current_source_json?json<facts.FactSnapshot>(r.current_source_json):null,json<facts.FactSnapshot>(r.pending_snapshot_json),metricType)}:{})});
    const calculationFor=(payeeId:string)=>{const price=snap.obligations.reduce((n,o)=>n+(o.payeeId===payeeId?money(o.unitPrice):0n)-(o.payerKind==='user'&&o.payerId===payeeId?money(o.unitPrice):0n),0n);return{quantity:quantity??'0',unitPrice:moneyText(price),beforeRiskAmount:moneyText(price*BigInt(quantity??'0'))}};
    const internal=snap.binding?.path_type==='staff_self';
@@ -142,6 +143,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
    stats[metricType].records++;stats[metricType].quantity+=BigInt(quantity??'0');stats[metricType].pendingQuantity+=BigInt(quantity??'0');
    entries.push({id:'source-'+id,factId:'',keywordId:'',resultId:'',revisionId:'',metricType,quantity,activations:raw.activations??null,keyword:raw.keyword,date:raw.date,orders:raw.orders,payeeId:'',payeeName:'待确定',parentId:null,role:'',payerName:'平台',amount:null,confirmedAmount:'0.0000',pendingAmount:'0.0000',kind:'initial',status:'pending',ownPayable:true,ownReceivable:false,blocked:text.reason,reasonCode:code,...text,ready:false});
    tokens.push(['source',id,raw,code]);
+   Object.assign(entries[entries.length-1],{reportedSettlement:metricType==='activation'?raw.settlement??null:raw.revenue??null});
   }
   pendingOrders+=unmatchedOrders;
   entries.sort((a,b)=>Number(b.status==='pending')-Number(a.status==='pending'));
@@ -156,7 +158,14 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   const groupSum=(predicate:(e:typeof groupEntries[number])=>boolean,field:'amount'|'confirmedAmount'|'pendingAmount'='amount')=>moneyText(groupEntries.filter(predicate).reduce((n,e)=>n+money(e[field]??'0',true),0n));
   const groups=[...new Set(groupEntries.map(e=>e.payeeId))].map(payeeId=>{const list=groupEntries.filter(e=>e.payeeId===payeeId);return{payeeId,name:list[0].payeeName,confirmed:groupSum(e=>e.payeeId===payeeId,'confirmedAmount'),pending:groupSum(e=>e.payeeId===payeeId,'pendingAmount'),total:groupSum(e=>e.payeeId===payeeId),blockers:[...new Set(list.map(e=>e.blocked).filter(Boolean))],ready:list.filter(e=>e.ready).length};});
   const [issues]=await select(c,`SELECT COUNT(*) total FROM zh_exceptions x LEFT JOIN zh_import_rows r ON r.id=x.source_row_id LEFT JOIN zh_metric_facts f ON f.id=x.fact_id WHERE x.account_id=? AND x.project_id=? AND x.status='open' AND (? IN ('developer','admin','operator')) AND COALESCE(DATE_FORMAT(f.business_date,'%Y-%m-%d'),JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date'))) BETWEEN ? AND ?`,[scope.accountId,scope.projectId,user.role,period.from,period.to]);
-  const typedSummary=(type:MetricType)=>({staffAmount:isStaffRole(user.role)?sum(e=>e.metricType===type&&!!e.internal):'0.0000',records:stats[type].records,quantity:String(stats[type].quantity),orders:String(type==='new_user'?stats[type].quantity:0n),billableQuantity:String(stats[type].billableQuantity),pendingQuantity:String(stats[type].pendingQuantity),excludedQuantity:String(stats[type].excludedQuantity),payable:sum(e=>e.metricType===type&&!e.internal),confirmedPayable:sum(e=>e.metricType===type&&!e.internal,'confirmedAmount'),pendingPayable:sum(e=>e.metricType===type&&!e.internal,'pendingAmount'),receivable:sum(e=>e.metricType===type&&e.ownReceivable),confirmedReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'confirmedAmount'),pendingReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'pendingAmount')});
+  const reported=(type:MetricType)=>{
+    if(!isStaffRole(user.role))return {};
+    const records=[...new Map(entries.filter(e=>e.metricType===type).map(e=>[e.factId||e.id,e])).values()] as (typeof entries[number]&{reportedSettlement?:string|null})[];
+    const known=records.filter(e=>e.reportedSettlement!=null);
+    return {reportedSettlement:known.length?moneyText(known.reduce((n,e)=>n+money(e.reportedSettlement!),0n)):null,
+      reportedSettlementMissing:records.length-known.length,unpricedRecords:records.filter(e=>e.amount===null).length};
+  };
+  const typedSummary=(type:MetricType)=>({...reported(type),staffAmount:isStaffRole(user.role)?sum(e=>e.metricType===type&&!!e.internal):'0.0000',records:stats[type].records,quantity:String(stats[type].quantity),orders:String(type==='new_user'?stats[type].quantity:0n),billableQuantity:String(stats[type].billableQuantity),pendingQuantity:String(stats[type].pendingQuantity),excludedQuantity:String(stats[type].excludedQuantity),payable:sum(e=>e.metricType===type&&!e.internal),confirmedPayable:sum(e=>e.metricType===type&&!e.internal,'confirmedAmount'),pendingPayable:sum(e=>e.metricType===type&&!e.internal,'pendingAmount'),receivable:sum(e=>e.metricType===type&&e.ownReceivable),confirmedReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'confirmedAmount'),pendingReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'pendingAmount')});
   const byType={new_user:typedSummary('new_user'),activation:typedSummary('activation')};
   return{period,entries,groups,teamPerformance,reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:stats.new_user.records,totalRecords:rows.length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:byType.new_user.receivable,confirmedReceivable:byType.new_user.confirmedReceivable,pendingReceivable:byType.new_user.pendingReceivable,payable:byType.new_user.payable,confirmedPayable:byType.new_user.confirmedPayable,pendingPayable:byType.new_user.pendingPayable,retained:byType.new_user.receivable,byType,staffAmount:isStaffRole(user.role)?moneyText(staffTotal):'0.0000'},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
  };

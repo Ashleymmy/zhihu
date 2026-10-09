@@ -14,7 +14,7 @@ import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[];navigate:[path:string]}>()
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
-interface TypeSummary {staffAmount:string;excludedQuantity:string;records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
+interface TypeSummary {reportedSettlement?:string|null;reportedSettlementMissing?:number;unpricedRecords?:number;staffAmount:string;excludedQuantity:string;records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
 interface View {summary:{records:number;totalRecords:number;orders:string;totalOrders:string;billableOrders:string;pendingOrders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string;byType:Record<'newUser'|'activation',TypeSummary>;staffAmount:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string;activations:string;activationCommission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
 interface Batch {id:string;fileName:string;reportKind:string;status:string;archivedAt:string|null;createdAt:string;lastError?:string}
 interface ImportDetail extends Batch {counts:{processingStatus:string;total:number}[];rows:{id:string;lineNumber:number;processingStatus:string;errorText:string|null;next?:string}[]}
@@ -54,7 +54,7 @@ function replaceFile(b?:Batch){
 }
 async function reanalyze(b:Batch){
  stopTracking();progress.value='正在重新分析 '+b.fileName+'…';notice.value='';
- try{await post('/imports/'+b.id+'/reanalyze');historyArchived.value=false;historyPage.value=1;await inspectImport(b.id);await track(b.id,++trackingVersion,'已重新检查原报表。');await nextTick();analysisPanel.value?.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){progress.value='';throw e}
+ try{const result=await post('/imports/'+b.id+'/reanalyze') as {reanalysis?:{refreshed:number;changed:number}};historyArchived.value=false;historyPage.value=1;await inspectImport(b.id);const stats=result.reanalysis;await track(b.id,++trackingVersion,'已重新检查原报表。'+(stats?`检查 ${stats.refreshed} 条未确认记录，${stats.changed} 条结果有变化。`:''));await nextTick();analysisPanel.value?.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){progress.value='';throw e}
 }
 async function archiveCurrent(){
  if(!archiveTarget.value)return
@@ -78,7 +78,7 @@ async function answerAnalysis(answer:ReportAnswer){
  catch(error){askErrors[answer.askId]=errorText(error)}finally{busyAskId.value='';busy.value=false}
 }
 function analysisAction(action:string){
- if(action==='details')openDetails('')
+ if(action==='details')void run(async()=>{const selectedPeriod=(analysis.value as (AnalysisRunModel&{period?:{from:string;to:string}})|null)?.period;if(selectedPeriod)Object.assign(period,selectedPeriod);await refresh();openDetails('')})
  else if(action==='replace-file')replaceFile(importResult.value??undefined)
  else if(action==='retry')void run(async()=>{await post('/imports/'+importId.value+'/process');await track(importId.value)})
 }
@@ -93,6 +93,8 @@ const priceSource=(e:Entry)=>(e.priceSources??[]).map(source=>source==='role_rat
 const entryStatus=(e:Entry)=>e.status==='confirmed'?(e.reasonCode==='RISK_EXCLUDED'?'已确认不计费':'已确认'):e.reason||e.blocked||'待财务确认'
 const admin=computed(()=>props.context.role==='admin'&&props.context.adminDuty!=='operations'),creator=computed(()=>props.context.role==='creator')
 const visible=computed(()=>view.value?.entries.filter(e=>props.wallet?e.ownReceivable:e.ownPayable)??[])
+const unpricedCount=computed(()=>new Set(visible.value.filter(e=>e.amount===null).map(e=>e.factId||e.id)).size)
+const attentionCount=computed(()=>new Set(visible.value.filter(e=>!!e.reasonCode).map(e=>e.factId||e.id)).size)
 const performanceOnly=ref(false)
 const details=computed(()=>visible.value.filter(e=>(!performanceOnly.value||e.internal)&&(!typeFilter.value||e.metricType===typeFilter.value)&&(!selected.value||e.payeeId===selected.value||(props.context.role==='admin'&&e.parentId===selected.value))))
 const issues=ref<InstanceType<typeof Issues>>(),issuePanel=ref<HTMLDetailsElement>()
@@ -106,7 +108,7 @@ const total=(field:keyof Pick<TypeSummary,'payable'|'confirmedPayable'|'pendingP
 let timer:ReturnType<typeof setTimeout>|undefined,disposed=false,trackingVersion=0
 function stopTracking(){trackingVersion++;if(timer)clearTimeout(timer);progress.value=''}
 function post(path:string,data:object={}){return props.context.http.post(path,{...props.context.scope,...data,requestKey:requestKey()})}
-async function refresh(){view.value=await props.context.http.get<View>('/workbench',{...props.context.scope,...period,viewVersion:'2'});updatedAt.value=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());detailPage.value=1;if(view.value.entries.some(e=>e.status==='pending'))detailsOpen.value=true}
+async function refresh(){view.value=await props.context.http.get<View>('/workbench',{...props.context.scope,...period,viewVersion:'2'});updatedAt.value=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());detailPage.value=1;if(view.value.entries.some(e=>!!e.reasonCode))detailsOpen.value=true}
 async function loadHistory(){
  const result=await props.context.http.get<{list:Batch[];total:number}>('/imports',{...props.context.scope,page:historyPage.value,pageSize:10,archived:String(historyArchived.value)})
  history.value=result.list;historyTotal.value=result.total
@@ -208,21 +210,33 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <p class="archive-file">{{archiveTarget?.fileName}}</p><p>仅从上传记录列表移除，业绩、待处理问题和已确认账单都会保留。需要时可在“已清理”中恢复。</p>
    <p v-if="archiveError" role="alert">{{archiveError}}</p><div class="engine-actions"><button :disabled="busy" @click="archiveTarget=null">取消</button><button class="primary" :disabled="busy" @click="run(archiveCurrent)">{{busy?'正在清理…':'清除记录并保留账单'}}</button></div>
   </ActionDialog>
-  <section v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果">
-   <h2>{{importResult.fileName}} · 读取结果</h2>
+  <details v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果" :open="importResult.counts.some(c=>c.processingStatus==='invalid')">
+   <summary>查看 {{importResult.fileName}} 的原表行与读取结果</summary>
    <p>共读取 {{importTotal}} 行，每行的处理结果都已保留。</p>
    <ul class="report-rows"><li v-for="row in importResult.rows" :key="row.id"><strong>第 {{row.lineNumber}} 行 · {{rowStatus(row.processingStatus)}}</strong><span>{{row.errorText||'这行已读取，金额和待处理事项见下方账单。'}}</span><span v-if="row.next">下一步：{{row.next}}</span><span v-if="row.processingStatus==='invalid'">下一步：财务：修正这行后补传报表 <button :disabled="busy||!!progress" @click="replaceFile(importResult!)">选择修正后的报表</button></span></li></ul>
    <div v-if="importTotal>25" class="engine-actions"><button :disabled="busy||importPage===1" @click="run(()=>inspectImport(importId,importPage-1))">上一页</button><span>第 {{importPage}} 页</span><button :disabled="busy||importPage*25>=importTotal" @click="run(()=>inspectImport(importId,importPage+1))">下一页</button></div>
-  </section>
+  </details>
   <form class="period-filter" @submit.prevent="run(refresh)"><label>开始日期<input type="date" v-model="period.from" required /></label><label>结束日期<input type="date" v-model="period.to" required /></label><button :disabled="busy">查看账单</button><button v-if="admin&&!wallet" type="button" :disabled="busy" @click="openRates(typeFilter||reportType)">查看与设置单价</button></form>
   <div v-if="view" class="metric-grid">
-   <article><span>{{wallet?'已确认收入':'应付合计'}}</span><strong>¥{{money(total(wallet?'confirmedReceivable':'payable'))}}</strong></article>
+   <article><span>{{wallet?'已确认收入':unpricedCount?'已算出成员应付':'成员应付合计'}}</span><strong>{{!wallet&&unpricedCount&&!view?.groups.length?'待计算':'¥'+money(total(wallet?'confirmedReceivable':'payable'))}}</strong><span v-if="!wallet&&unpricedCount">另有 {{unpricedCount}} 条待计算，业绩已保留</span></article>
    <article><span>{{wallet?'待确认收入':'已确认应付'}}</span><strong>¥{{money(total(wallet?'pendingReceivable':'confirmedPayable'))}}</strong></article>
    <article><span>{{wallet&&!creator?'本人应得收入':'拉新订单'}}</span><strong>{{wallet&&!creator?'¥'+money(total('receivable')):view.summary.totalOrders+' 单'}}</strong><span v-if="!wallet||creator">拉活 {{view.summary.byType.activation.quantity}} 个</span></article>
   </div>
-   <div v-if="view" class="analysis-result type-totals"><div v-for="type in types" :key="type"><strong>{{typeName(type)}}：{{wallet?'本人收益':'可计费 '+view.summary.byType[typeKey(type)].billableQuantity+' '+unit(type)}} ¥{{money(view.summary.byType[typeKey(type)][wallet?'receivable':'payable'])}}</strong><span v-if="wallet">已确认 ¥{{money(view.summary.byType[typeKey(type)].confirmedReceivable)}} · 待确认 ¥{{money(view.summary.byType[typeKey(type)].pendingReceivable)}}</span><span v-else>读取 {{view.summary.byType[typeKey(type)].records}} 行 · 共 {{view.summary.byType[typeKey(type)].quantity}} {{unit(type)}} · {{view.summary.byType[typeKey(type)].pendingQuantity}} {{unit(type)}}在等处理<span v-if="view.summary.byType[typeKey(type)].excludedQuantity!=='0'"> · {{view.summary.byType[typeKey(type)].excludedQuantity}}{{unit(type)}}已核实不计费</span></span></div><div v-if="admin&&!wallet"><button type="button" class="staff-total" @click="openDetails('');performanceOnly=true">管理员业绩 ¥{{money(view.summary.staffAmount)}}（不计入应付）</button><span>拉新 ¥{{money(view.summary.byType.newUser.staffAmount)}} · 拉活 ¥{{money(view.summary.byType.activation.staffAmount)}}</span></div></div>
+   <div v-if="view" class="analysis-result type-totals">
+    <div v-for="type in types" :key="type">
+     <strong>{{typeName(type)}} · {{view.summary.byType[typeKey(type)].quantity}} {{unit(type)}}</strong>
+     <template v-if="!wallet">
+      <span v-if="admin">报表结算：{{view.summary.byType[typeKey(type)].reportedSettlement==null?'原表未提供':'¥'+money(view.summary.byType[typeKey(type)].reportedSettlement)}}<template v-if="view.summary.byType[typeKey(type)].reportedSettlement!=null&&view.summary.byType[typeKey(type)].reportedSettlementMissing"> · {{view.summary.byType[typeKey(type)].reportedSettlementMissing}} 条未提供金额</template></span>
+      <span>成员应付{{view.summary.byType[typeKey(type)].unpricedRecords?'已算出':''}} ¥{{money(view.summary.byType[typeKey(type)].payable)}}<template v-if="view.summary.byType[typeKey(type)].unpricedRecords"> · 另有 {{view.summary.byType[typeKey(type)].unpricedRecords}} 条待计算</template></span>
+      <span>已确认 ¥{{money(view.summary.byType[typeKey(type)].confirmedPayable)}} · 尚未确认 ¥{{money(view.summary.byType[typeKey(type)].pendingPayable)}}</span>
+     </template>
+     <span v-else>本人收益 ¥{{money(view.summary.byType[typeKey(type)].receivable)}} · 已确认 ¥{{money(view.summary.byType[typeKey(type)].confirmedReceivable)}}</span>
+     <span v-if="view.summary.byType[typeKey(type)].excludedQuantity!=='0'">{{view.summary.byType[typeKey(type)].excludedQuantity}} {{unit(type)}}已核实不计费</span>
+    </div>
+    <div v-if="admin&&!wallet"><button type="button" class="staff-total" @click="openDetails('');performanceOnly=true">内部业绩 ¥{{money(view.summary.staffAmount)}}（不计入成员应付）</button><span>拉新 ¥{{money(view.summary.byType.newUser.staffAmount)}} · 拉活 ¥{{money(view.summary.byType.activation.staffAmount)}}</span></div>
+   </div>
 
-   <div v-if="view?.summary.issues && admin" class="attention"><strong>{{view.summary.issues}} 项数据需要处理</strong><span>明细已列出原因和下一步，金额已算出的记录可以继续核对。</span></div>
+   <div v-if="attentionCount && admin" class="attention"><strong>{{attentionCount}} 条记录需要处理</strong><span>业绩已保留。处理后金额和待办自动更新。</span><button @click="openDetails('')">处理这些记录</button></div>
   <div v-if="view && !wallet" class="work-card bill-groups">
    <div class="section-heading"><div><h2>{{admin?'本期财务账单':'团队应付账单'}}</h2><p>{{admin?'按团长（含团队达人）和独立达人汇总，便于核对和做账。':'只需核对你应付给团队达人的金额。'}}</p></div>
     <div class="engine-actions"><button :disabled="!view.groups.length||busy" @click="exportBill">导出对账单</button><button v-if="admin" class="primary" :disabled="busy||!view.entries.some(e=>e.ready)&&!(admin&&view.needsReview&&view.summary.records>0)" @click="confirming=true;checked=false">核对并确认账单</button></div>

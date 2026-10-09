@@ -129,3 +129,62 @@ it('历史作品争议出现在运营首页并可解除，财务和成员不能�
  expect((await dispute(finance,true)).status).toBe(403);expect((await dispute(creator,true)).status).toBe(403);
  expect((await dispute(ops,true)).status).toBe(200);expect((await todos(ops)).some((todo:any)=>todo.kind==='work.historical.disputed')).toBe(false);
 });
+async function receiptCase(keyword:string,otherDate:string|null){
+ const resources=await import('../../src/modules/zhihu/attribution/resources');
+ const word=await resources.createKeyword(admin,scope,key(),{keyword,taskId:'1',mappingId,landingUrl:'https://example.com/receipt-case',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['receipt-'+word.id,word.planId]);await resources.synchronizeKeywords(scope);
+ const binding=await resources.distribute(admin,scope,word.id,key(),'2');await resources.changeBinding(creator,scope,binding.id,key(),{action:'activate'});
+ await c.query("UPDATE zh_keyword_bindings SET activated_on='2026-09-30' WHERE id=?",[binding.id]);
+ const work=async(owner:number,day:string|null)=>{const [r]=await c.query<mysql.ResultSetHeader>("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,release_time,sync_status,zhihu_composition_id) VALUES(?,?,'KOC抖音','test',2,1,?,?,'synced',?)",[word.planId,owner,'https://example.com/work/'+key(),day,key().slice(0,16)]);return String(r.insertId)};
+ await work(1,otherDate);const compositionId=await work(2,'2026-10-02 12:00:00');
+ return {word,binding,compositionId};
+}
+it('上传报表复用当前执行期旧作品，早期其他人的作品不阻断当前收益',async()=>{
+ const {word,binding}=await receiptCase('日期分明的已登记作品','2026-09-23 12:00:00');
+ const report=await upload('日期分明的已登记作品','1','2026-10-03');
+ expect((await q('SELECT verification_status FROM zh_keyword_bindings WHERE id=?',[binding.id]))[0].verification_status).toBe('passed');
+ const view=await workbench.overview(finance,scope,{from:'2026-10-03',to:'2026-10-03'});
+ expect(view.entries.find(e=>e.keywordId===word.id)).toMatchObject({ready:true,amount:'8.0000',reasonCode:''});
+ expect((await q('SELECT COUNT(*) total FROM zh_evidence WHERE binding_id=?',[binding.id]))[0].total).toBe(0);
+ const progress=(actor:AuthUser,extra:object={})=>request(app).get('/api/v1/modules/zhihu/keywords/'+word.id+'/execution-progress').set(headers[actor.sub]).query({...scope,...extra});
+ const result=await progress(finance);expect(result.status,result.text).toBe(200);expect(result.body.data.works).toHaveLength(2);
+ expect(result.body.data.works.every((w:any)=>w.canReview===false)).toBe(true);
+ expect((await progress(creator)).body.data.works).toHaveLength(1);expect((await progress(leader)).status).toBe(403);expect((await progress(admin,{projectId:'999'})).status).toBe(403);
+ const before=await q('SELECT * FROM compositions WHERE plan_id=?',[word.planId]);
+ await workbench.confirmBills(finance,scope,{from:'2026-10-03',to:'2026-10-03'},key(),view.reviewHash);
+ const cashBefore=await q('SELECT * FROM opc_income_entries');
+ const reanalyzed=await request(app).post(endpoint(report)+'/reanalyze').set(headers[finance.sub]).send({...scope,requestKey:key()});
+ expect(reanalyzed.status).toBe(202);expect(reanalyzed.body.data.reanalysis.changed).toBe(0);
+ expect(await q('SELECT * FROM compositions WHERE plan_id=?',[word.planId])).toEqual(before);expect(await q('SELECT * FROM opc_income_entries')).toEqual(cashBefore);
+});
+it.each(['2026-10-01 12:00:00',null])('同期多人或日期不清时直接核验原作品并拒绝越权：%s',async otherDate=>{
+ const keyword='归属待核对'+ ++serial,{word,binding,compositionId}=await receiptCase(keyword,otherDate);
+ await upload(keyword,'1','2026-10-04');
+ let view=await workbench.overview(finance,scope,{from:'2026-10-04',to:'2026-10-04'});
+ expect(view.entries.find(e=>e.keywordId===word.id)).toMatchObject({ready:false,reasonCode:'WORK_UNVERIFIED'});
+ const [line]=await q("SELECT l.blocked_reason FROM opc_earning_lines l JOIN opc_earning_sources s ON s.id=l.source_id WHERE s.task_id=?",[word.id]);expect(line.blocked_reason).toBe('作品待核验');
+ const reviewExisting=(actor:AuthUser,extra:object={})=>request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/review-existing-work').set(headers[actor.sub]).send({...scope,bindingId:binding.id,compositionId,requestKey:key(),...extra});
+ for(const actor of [finance,creator,leader])expect((await reviewExisting(actor)).status).toBe(403);
+ expect((await reviewExisting(admin,{projectId:'999'})).status).toBe(403);
+ const before=await q('SELECT * FROM compositions WHERE plan_id=?',[word.planId]);
+ const done=await reviewExisting(ops);expect(done.status,done.text).toBe(200);
+ view=await workbench.overview(finance,scope,{from:'2026-10-04',to:'2026-10-04'});
+ expect(view.entries.find(e=>e.keywordId===word.id)).toMatchObject({ready:true,amount:'8.0000'});
+ expect(await q('SELECT * FROM compositions WHERE plan_id=?',[word.planId])).toEqual(before);expect((await reviewExisting(ops)).status).toBe(409);
+});
+it('上游明确退回的作品不被自动或人工绕过，部署修复可预览且不改变已确认账',async()=>{
+ const {word,binding,compositionId}=await receiptCase('保留真实退回状态','2026-09-23 12:00:00');
+ await c.query('UPDATE compositions SET zhihu_status_json=? WHERE id=?',[JSON.stringify({auditStatus:'rejected',rejectReason:'作品需要更正'}),compositionId]);
+ await upload('保留真实退回状态','1','2026-10-05');
+ expect((await q('SELECT verification_status FROM zh_keyword_bindings WHERE id=?',[binding.id]))[0].verification_status).toBe('pending');
+ const response=await request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/review-existing-work').set(headers[ops.sub]).send({...scope,bindingId:binding.id,compositionId,requestKey:key()});expect(response.status).toBe(409);
+ await c.query('UPDATE compositions SET zhihu_status_json=NULL WHERE id=?',[compositionId]);
+ const {reconcileRegisteredWorks}=await import('../../src/modules/zhihu/attribution/work-reconciliation');
+ const before=await q('SELECT * FROM zh_keyword_bindings'),cashBefore=await q('SELECT * FROM opc_income_entries');
+ expect((await reconcileRegisteredWorks(finance,scope)).keywordIds).toContain(word.id);expect(await q('SELECT * FROM zh_keyword_bindings')).toEqual(before);
+ await expect(reconcileRegisteredWorks(ops,scope,true)).rejects.toMatchObject({httpStatus:403});
+ await reconcileRegisteredWorks(finance,scope,true);
+ expect((await q('SELECT verification_status FROM zh_keyword_bindings WHERE id=?',[binding.id]))[0].verification_status).toBe('passed');
+ expect(await q('SELECT * FROM opc_income_entries')).toEqual(cashBefore);
+ const refreshed=await q('SELECT * FROM zh_metric_facts');await reconcileRegisteredWorks(finance,scope,true);expect(await q('SELECT * FROM zh_metric_facts')).toEqual(refreshed);
+});

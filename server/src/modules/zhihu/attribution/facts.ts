@@ -255,6 +255,10 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   const [riskReview]=source.riskAssessment?await select(c,'SELECT decision,reason,reviewed_by FROM zh_risk_reviews WHERE fact_id=? AND revision_id=?',[fact.id,revision.id]):[];
   const metricType:MetricType=fact.metric_type==='activation'?'activation':'new_user';
   const [word] = await select(c, 'SELECT * FROM zh_keywords WHERE id=?', [fact.keyword_id]);
+  // Imports and repairs reuse existing work receipts, even when those works were
+  // registered before this accounting flow existed. Never resubmit their URLs.
+  const {reconcileWorkReceipts}=await import('./work-receipts');
+  await reconcileWorkReceipts(c,scope,String(word.id));
   const [binding] = await select(
     c,
     "SELECT *,DATE_FORMAT(activated_on,'%Y-%m-%d') AS activated_day FROM zh_keyword_bindings WHERE keyword_id=? AND used_at IS NOT NULL AND released_at IS NULL",

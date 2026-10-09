@@ -5,6 +5,7 @@ import { money, moneyText, type Scope } from './domain';
 import type { AttributionSnapshot } from './facts';
 import { allocations } from './allocations';
 import { reasonText } from './reasons';
+import { registeredWorkSql } from './work-receipts';
 
 /** Project the module's calculation to platform-owned, per-recipient rows. */
 export async function projectEarnings(c: PoolConnection, scope: Scope, factId: string) {
@@ -12,7 +13,7 @@ export async function projectEarnings(c: PoolConnection, scope: Scope, factId: s
     c,
     `SELECT f.*,r.snapshot_json,r.reason_code,b.verification_status,b.executor_id,b.leader_id,
     u.display_name executor_name,u.role executor_role,leader.display_name leader_name,
-    (SELECT COUNT(*) FROM zh_evidence e WHERE e.binding_id=b.id) evidence_count,
+    ${registeredWorkSql} evidence_count,
     (SELECT COUNT(*) FROM zh_metric_revisions v WHERE v.fact_id=f.id AND v.status='pending') pending_revision,
     route.mode route_mode
     FROM zh_metric_facts f JOIN zh_attribution_results r ON r.id=f.current_result_id
@@ -53,7 +54,7 @@ export async function projectEarnings(c: PoolConnection, scope: Scope, factId: s
         executorRole: fact.executor_role,
         leaderName: fact.leader_name,
       })
-    : { reason: '', next: '财务：核对并确认金额' };
+    : { reason: '', next: internal ? '管理员业绩已记录，不计入成员应付' : '财务：核对并确认金额' };
   const values = new Map((target?.list ?? []).map((line) => [line.userId, line.amount as string | null]));
   if (internal && fact.executor_id)
     values.set(String(fact.executor_id), snapshot.obligations.length ? (target?.staffAmount ?? null) : null);

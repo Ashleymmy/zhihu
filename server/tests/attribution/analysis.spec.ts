@@ -47,7 +47,7 @@ it('实际接口逐行保留进度，重复来源不重复合计，金额结论�
  expect(run).toMatchObject({id:initial,fileName:'分析验收.csv',status:'needs_input',progress:{done:6,total:6},totals:{billableQuantity:'3',billableAmount:'24.0000',confirmableAmount:'24.0000',pendingQuantity:'4'}});
  expect(run.steps.map((step:{key:string})=>step.key)).toEqual(['read','channel','keyword','executor','work','amount']);
  expect(run.steps[0]).toMatchObject({status:'ask',summary:'6 行已保留，1 行格式需要修正，其余行继续处理'});
- expect(run.steps[1]).toMatchObject({status:'ask',summary:'2 行渠道需要运营确认'});expect(run.conclusion.value).toBe('¥24.00');
+ expect(run.steps[1]).toMatchObject({status:'ask',summary:'2 行渠道需要运营确认'});expect(run.conclusion.value).toBe('7 单');expect(run.conclusion.summary).toContain('成员金额已算出 ¥24.00');
  expect(await q('SELECT id FROM opc_analysis_answers')).toHaveLength(0);
 });
 it('运营只能读取无金额的分析，团长和达人不能读取或回答，其他项目不能混用',async()=>{

@@ -10,6 +10,7 @@ import * as resource from '../attribution/resources';
 
 import * as facts from '../attribution/facts';
 import {archiveImport,reanalyzeImport} from '../attribution/import-history';
+import {executionProgress,reviewRegisteredWork} from '../attribution/execution-progress';
 import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
@@ -249,8 +250,8 @@ attributionRouter.post('/imports/:id/archive',asyncHandler(async(req,res)=>{
 }));
 attributionRouter.post('/imports/:id/reanalyze',asyncHandler(async(req,res)=>{
  const scope=scopeSchema.parse(req.body),id=idSchema.parse(req.params.id);
- await reanalyzeImport(req.user,scope,id,key(req));
- ok(res,await facts.processBatch(req.user,scope,id),202);
+ const reanalysis=await reanalyzeImport(req.user,scope,id,key(req));
+ ok(res,{...await facts.processBatch(req.user,scope,id),reanalysis},202);
 }));
 attributionRouter.get(
   '/imports/:id',
@@ -367,6 +368,14 @@ attributionRouter.post(
 attributionRouter.get('/evidence/historical-tasks',asyncHandler(async(req,res)=>{
  const q=scopeSchema.merge(pagingSchema).extend({batchId:idSchema.optional(),keywordId:idSchema.optional(),search:z.string().trim().max(128).optional()}).parse(req.query);
  ok(res,await historicalWorks(req.user,q,q));
+}));
+attributionRouter.get('/keywords/:id/execution-progress',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.parse(req.query);
+ ok(res,await executionProgress(req.user,q,idSchema.parse(req.params.id)));
+}));
+attributionRouter.post('/keywords/:id/review-existing-work',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({bindingId:idSchema,compositionId:idSchema}).parse(req.body);
+ ok(res,await reviewRegisteredWork(req.user,q,idSchema.parse(req.params.id),key(req),q));
 }));
 attributionRouter.post('/attributions/:id/risk-review',asyncHandler(async(req,res)=>{
  const q=scopeSchema.extend({expectedRevisionId:idSchema,decision:z.enum(['accepted','excluded']),reason:z.string().trim().min(1).max(500)}).parse(req.body);

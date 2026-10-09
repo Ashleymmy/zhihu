@@ -198,3 +198,5 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 上线先执行模块迁移 `037_import_history.sql`，只增加 `zh_import_history_archive` 表，重复执行保留全部数据。重新分析仅重试未匹配行并刷新未确认结果，保留人工选择；同文件重传恢复记录并重新检查，不新增同份报表或重复计账。更正文件仍进入原值与新值核对流程。清理、恢复及重新分析仅财务或完整管理员可操作，服务端校验岗位和项目范围。
 
 专项运行：`cd server && npx vitest run --config vitest.attribution.config.ts tests/attribution/import-history.spec.ts`。Web 构建后，设置 `OPC_REVIEW_IMPORT_HISTORY_ONLY=1`、可选 `OPC_PLAYWRIGHT_MODULE`，运行 `node tests/attribution-ui/remediation-smoke.cjs`，在隔离数据库中检查六角色、1440/375 页面和实际上传操作。
+
+2026-10-09 财务旧作品衔接修复：`server/scripts/reconcile-registered-works.ts` 为显式发布修复工具。使用 `npx tsx scripts/reconcile-registered-works.ts --project 1 --account 1 --actor 财务人员ID` 先预览，备份与隔离验证后追加 `--apply` 更新已有作品相关的未确认记录。重复执行不重复记账，不确认账单、不指定缺失执行人、不修改已确认账或调用知乎。原件页面演练：设置 `OPC_NEW_USER_SAMPLE`、`OPC_ACTIVATION_SAMPLE` 为本机两份文件路径，`OPC_PLAYWRIGHT_MODULE` 为可用 Playwright 路径，然后在 server 运行 `node tests/attribution-ui/reconciliation-flow.cjs`；脚本创建并回收独立 MySQL，截图含原件关键词，仅保存在忽略目录。

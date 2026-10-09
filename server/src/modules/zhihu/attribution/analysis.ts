@@ -59,13 +59,18 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
    unique.set(key,{...row,normalized_json:{...raw,orders:raw.orders??before?.orders??null,activations:raw.activations??before?.activations??null}} as RecordRow);
  }
  let billable=0n,pendingQuantity=0n,excludedQuantity=0n,billableAmount=0n,confirmableAmount=0n,unassigned=0,work=0,price=0,conflicts=0,risk=0;
+ let reportedQuantity=0n,reportedSettlement=0n,settlementRecords=0,staffAmount=0n;
  const problems=new Set<string>();
  for(const [key,row] of unique){
    const source=json<Record<string,string|null>>(row.normalized_json),snapshot=row.snapshot_json?json<AttributionSnapshot>(row.snapshot_json):null;
    const quantity=BigInt((batch.report_kind==='activation'?snapshot?.activations??source.activations:snapshot?.orders??source.orders)??'0');
+   reportedQuantity+=BigInt((batch.report_kind==='activation'?source.activations:source.orders)??'0');
+   const settlement=batch.report_kind==='activation'?source.settlement:source.revenue;
+   if(settlement!=null){reportedSettlement+=money(settlement);settlementRecords++;}
    let target:ReturnType<typeof allocations>|null=null;
    if(snapshot){try{target=allocations(snapshot);}catch{price++;problems.add(key);}}
    const paid=target&&target.list.length>0,internal=!!target&&money(target.staffAmount)>0n;
+   if(internal&&target)staffAmount+=money(target.staffAmount);
    const excluded=snapshot?.riskReview?.decision==='excluded'||row.reason_code==='RISK_EXCLUDED';
    if(excluded)excludedQuantity+=quantity;
    else if(paid&&target){billable+=quantity;billableAmount+=money(target.total);}else if(!internal)pendingQuantity+=quantity;
@@ -115,13 +120,14 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  if(failed){const active=steps.find(step=>step.status==='running');if(active){active.status='failed';active.summary='处理暂时中断，已经读取的记录和结果都已保留。';}}
  const run:AnalysisRun={id,fileName:String(batch.file_name),source:'知乎'+type+'报表',createdAt:String(batch.created_at),
    status:failed?'failed':running?'running':need?'needs_input':'done',progress:{done:rows.length-pending,total:rows.length},steps,
-   conclusion:{title:finance?'本次报表可计费':'报表处理结果',value:finance?'¥'+cash(billableAmount):rows.length+' 行',
-     summary:finance?`${billable} ${unit}可计费${excludedQuantity?' · '+excludedQuantity+' '+unit+'已核实不计费':''} · 可确认金额 ¥${cash(confirmableAmount)}`:`${rows.length} 行已保留，金额由财务核对`,
+   conclusion:{title:`本次报表已读取 ${unique.size} 条${type}记录`,value:String(reportedQuantity)+' '+unit,
+     summary:finance?`${settlementRecords?'报表结算 ¥'+cash(reportedSettlement)+' · ':''}成员金额已算出 ¥${cash(billableAmount)} · 可确认 ¥${cash(confirmableAmount)}${staffAmount?' · 内部业绩 ¥'+cash(staffAmount):''}${excludedQuantity?' · '+excludedQuantity+' '+unit+'已核实不计费':''}`:`${rows.length} 行已保留，金额由财务核对`,
      pendingText:need?`${need} 条记录仍需处理${finance&&pendingQuantity?'，涉及 '+pendingQuantity+' '+unit:''}，其他记录可以继续核对。`:'没有待处理的数据问题。',
      actions:[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary'},...((invalid||agency)&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
- return {...run,...(agency?{agencyCheck:agency}:{}),riskCases:[...unique.values()].filter(row=>row.reason_code==='RISK_REVIEW_REQUIRED').map(row=>({factId:String(row.fact_id),revisionId:String(row.revision_id),keyword:json<Record<string,string>>(row.normalized_json).keyword,riskAssessment:String(row.risk_assessment??'')})),nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
+ const dates=usable.map(row=>String(json<Record<string,string>>(row.normalized_json).date)).filter(date=>/^\d{4}-\d{2}-\d{2}$/.test(date)).sort();
+ return {...run,period:dates.length?{from:dates[0],to:dates[dates.length-1]}:null,...(agency?{agencyCheck:agency}:{}),riskCases:[...unique.values()].filter(row=>row.reason_code==='RISK_REVIEW_REQUIRED').map(row=>({factId:String(row.fact_id),revisionId:String(row.revision_id),keyword:json<Record<string,string>>(row.normalized_json).keyword,riskAssessment:String(row.risk_assessment??'')})),nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
    candidates:choice.candidates.map(item=>({id:String(item.id),name:String(item.keyword??item.channel_name)}))})),
-   ...(finance?{totals:{billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity),excludedQuantity:String(excludedQuantity)}}:{})};
+   ...(finance?{totals:{reportedQuantity:String(reportedQuantity),reportedSettlement:settlementRecords?moneyText(reportedSettlement):null,staffAmount:moneyText(staffAmount),billableQuantity:String(billable),billableAmount:moneyText(billableAmount),confirmableAmount:moneyText(confirmableAmount),pendingQuantity:String(pendingQuantity),excludedQuantity:String(excludedQuantity)}}:{})};
 }
 export async function importAnalysis(user:AuthUser,scope:Scope,id:string){
  if(!isStaffRole(user.role))fail('报表分析仅管理人员可见',403);

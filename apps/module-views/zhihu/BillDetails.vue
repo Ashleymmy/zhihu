@@ -24,11 +24,13 @@ async function handle(e:BillEntry,key:string){selected.value=null;await nextTick
  <DetailDrawer :open="!!selected" :title="selected?.keyword??'金额明细'" @close="selected=null">
   <div v-if="selected" class="bill-detail">
    <p>{{selected.date}} · {{typeName(selected)}} · {{status(selected)}}</p><p>{{selected.internal?'执行人':wallet?'付款方':'收款人'}}：{{wallet?selected.payerName:selected.payeeName}}</p>
-   <p v-if="selected.internal">本人执行业绩单独记录，不计入应付，也不能提现。</p><h3>计算过程</h3><p v-if="selected.calculation">{{selected.calculation.quantity}}{{unit(selected)}} × ¥{{selected.calculation.unitPrice}} = {{money(selected.calculation.beforeRiskAmount)}}</p><p v-else>数量：{{selected.quantity??'未提供'}}{{unit(selected)}}。{{selected.reason}}</p>
+   <p v-if="selected.reportedSettlement!==undefined&&!wallet">报表结算金额：{{selected.reportedSettlement==null?'原表未提供':money(selected.reportedSettlement)}}<small>报表金额与成员应付分别核对。</small></p>
+   <p v-if="selected.internal">按当前结算约定，只记录内部业绩，不计入成员应付。</p><h3>{{selected.internal?'内部业绩计算':'成员金额计算'}}</h3><p v-if="selected.calculation">{{selected.calculation.quantity}}{{unit(selected)}} × ¥{{selected.calculation.unitPrice}} = {{money(selected.calculation.beforeRiskAmount)}}</p><p v-else>数量：{{selected.quantity??'未提供'}}{{unit(selected)}}。{{selected.reason}}</p>
    <p>{{priceSource(selected)}}</p><p v-if="selected.riskReview">核实结果：{{selected.riskReview.decision==='excluded'?'本条不计费':'已核实通过'}}。{{selected.riskReview.reason}}</p>
-   <dl><div><dt>{{selected.internal?'管理员业绩':wallet?'本人收益':'应付金额'}}</dt><dd>{{money(selected.amount)}}</dd></div><div><dt>已确认</dt><dd>{{money(selected.confirmedAmount)}}</dd></div><div><dt>{{selected.kind==='adjustment'?'待确认更正':'待确认'}}</dt><dd>{{money(selected.pendingAmount)}}</dd></div></dl>
+   <dl><div><dt>{{selected.internal?'管理员业绩':wallet?'本人收益':'应付金额'}}</dt><dd>{{money(selected.amount)}}</dd></div><div v-if="!selected.internal"><dt>已确认</dt><dd>{{money(selected.confirmedAmount)}}</dd></div><div v-if="!selected.internal"><dt>{{selected.kind==='adjustment'?'待确认更正':'待确认'}}</dt><dd>{{money(selected.amount===null?null:selected.pendingAmount)}}</dd></div></dl>
    <ValueComparison v-if="selected.comparison?.length" :rows="selected.comparison" />
    <p v-if="selected.next">下一步：{{selected.next}}</p><button v-if="action(selected)" :disabled="busy" @click="handle(selected,action(selected)!.key)">{{action(selected)?.label}}</button>
+   <button v-if="selected.keywordId&&action(selected)?.key!=='followup'" :disabled="busy" @click="handle(selected,'followup')">查看执行人与已有作品</button>
   </div>
  </DetailDrawer>
 </template>
