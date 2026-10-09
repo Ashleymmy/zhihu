@@ -10,6 +10,7 @@ import { staffRouter } from './staff';
 import { createRateRouter } from './rate-routes';
 import { dashboard } from './dashboard';
 import { createTaskRouter } from './task-routes';
+import { createEarningRouter } from './earning-routes';
 import {
   listAccounts,
   createAccount,
@@ -35,6 +36,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   r.use('/staff',staffRouter);
   r.use('/rates',createRateRouter(runtime));
   r.use('/tasks',createTaskRouter(runtime));
+  r.use('/earnings',createEarningRouter(runtime));
   r.get('/dashboard', asyncHandler(async (req, res) => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
     const query = z.object({ projectId: id.optional(), from: date.default(today.slice(0, 8) + '01'), to: date.default(today) }).parse(req.query);

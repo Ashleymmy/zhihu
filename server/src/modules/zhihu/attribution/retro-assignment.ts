@@ -7,6 +7,7 @@ import { teamLeader } from './relationships';
 import { attribute } from './facts';
 import { unconfirmedFactSql } from './keyword-usability';
 import type {PoolConnection} from 'mysql2/promise';
+import {resolveExecutor} from './executor';
 
 export async function assignRetro(user:AuthUser,scope:Scope,id:string,key:string,input:{executorId:string;fromDate?:string}) {
   if(!isStaffRole(user.role))fail('指定执行人需要运营权限',403);
@@ -33,14 +34,12 @@ export async function assignRetroInTransaction(c:PoolConnection,user:AuthUser,sc
       UNION SELECT e.user_id FROM earnings e WHERE e.plan_id=? AND e.user_id<>?
       UNION SELECT ev.submitted_by FROM zh_evidence ev JOIN zh_keyword_bindings eb ON eb.id=ev.binding_id WHERE eb.keyword_id=? AND ev.submitted_by<>?) FOR SHARE`,[word.plan_id,input.executorId,word.plan_id,input.executorId,id,input.executorId]);
     if(oldOwners.length)fail(`这个关键词已有执行人 ${oldOwners[0].display_name??'项目成员'}，不能改给别人`,409);
-    const [target]=await select(c,`SELECT u.id,u.role,u.parent_id,u.display_name FROM users u JOIN project_members pm ON pm.user_id=u.id
-      WHERE u.id=? AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE`,[input.executorId,scope.projectId]);
-    if(!target||!['leader','creator'].includes(String(target.role)))fail('请选择本项目有效的团长或达人');
-    const leaderId=target.role==='leader'?input.executorId:await teamLeader(c,scope,target);
+    const target=await resolveExecutor(c,user,scope,input.executorId),staff=isStaffRole(String(target.role));
+    const leaderId=staff?null:target.role==='leader'?input.executorId:await teamLeader(c,scope,target);
     if(leaderId){const members=await select(c,"SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE u.id=? AND u.role='leader' AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE",[leaderId,scope.projectId]);if(!members.length)fail('请先将该达人的团长加入项目');}
     const [earliest]=await select(c,`SELECT DATE_FORMAT(MIN(f.business_date),'%Y-%m-%d') earliest FROM zh_metric_facts f WHERE f.keyword_id=? AND ${unconfirmedFactSql()}`,[id]);
     const fromDate=input.fromDate??String(earliest?.earliest??businessDay());
-    const path=target.role==='leader'?'leader_self':leaderId?'team_creator':'direct_creator';
+    const path=staff?'staff_self':target.role==='leader'?'leader_self':leaderId?'team_creator':'direct_creator';
     const relation=JSON.stringify({scope,target,assignedBy:user.sub,reason:'报表补录'});
     let bindingId:string;
     if(live.length){

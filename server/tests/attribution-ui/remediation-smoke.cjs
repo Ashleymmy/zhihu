@@ -22,6 +22,10 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_STAFF_ONLY==='1'){
+   await require('./staff-self-flow.cjs')({browser,port,out,date});
+   console.log('管理员本人执行与业绩隔离全流程通过');return;
+  }
   if(process.env.OPC_REVIEW_RATES_ONLY==='1'){
    await require('./finance-rates-flow.cjs')({browser,port,out,date});
    console.log('财务单价入口与未来价格发布全流程通过');return;

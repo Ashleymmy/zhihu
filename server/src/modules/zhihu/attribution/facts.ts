@@ -19,6 +19,7 @@ import { resolvedNames } from './matching';
 import { agencyCheck } from './agency';
 import { assertDuty, dutyAllows } from '../../../core/duties';
 import { reportComparison } from './report-comparison';
+import { projectEarnings } from './earning-lines';
 export interface FactSnapshot {
   metricType?: MetricType;
   activations?: string | null;
@@ -341,6 +342,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   }
   await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+fact.id,'账单更新，待财务核对');
   await refreshAdjustments(c, scope, fact, id, snapshot);
+  await projectEarnings(c,scope,String(fact.id));
   return { id, snapshot, code, binding, source };
 }
 export async function processImportRow(c:PoolConnection,user:AuthUser,scope:Scope,rowId:string){

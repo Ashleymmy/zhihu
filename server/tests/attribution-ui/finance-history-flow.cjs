@@ -23,6 +23,13 @@ module.exports = async ({ browser, port, out }) => {
     await p.locator('button[type="submit"]').click();
     await p.waitForURL((u) => !u.pathname.endsWith('/login'));
     const staff = ['admin', 'finance'].includes(role);
+    if (role !== 'operations') {
+      await p.goto(`http://127.0.0.1:${port}/app/${staff ? 'finance' : 'income'}`);
+      await p.locator('.history-links summary').click();
+      const link = p.locator('.history-links a').first();
+      await link.click();
+      await p.waitForFunction(() => document.querySelector('.finance-history')?.getAttribute('aria-busy') === 'false');
+    }
     for (const kind of role === 'operations'
       ? ['earnings']
       : staff

@@ -6,6 +6,8 @@ import * as XLSX from 'xlsx';
 import type {Express} from 'express';
 import type {AuthUser} from '../../src/types';
 import {runOpcMigrations} from '../../scripts/opcMigrations';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 vi.mock('../../src/modules/zhihu/queue',async (original)=>({...await original<typeof import('../../src/modules/zhihu/queue')>(),enqueue:vi.fn(async()=>({id:'test'}))}));
 let container:StartedMySqlContainer,c:Connection,app:Express,pool:typeof import('../../src/db').db;
 let resource:typeof import('../../src/modules/zhihu/attribution/resources'),statements:typeof import('../../src/modules/zhihu/attribution/statements'),workbench:typeof import('../../src/modules/zhihu/attribution/workbench'),finance:typeof import('../../src/core/finance'),facts:typeof import('../../src/modules/zhihu/attribution/facts');
@@ -218,6 +220,32 @@ describe('简化工作台完整资金流程',()=>{
   })).rejects.toThrow('已有旧系统数据');
   expect((await cutover.getRoute(admin,scope))?.exclusive_from).toBe(earlier);
  });
+ it('平台收益与真实模块计算一致，团长仅拿到本人净价，自动确认写入不可变记录',async()=>{
+  for(const actor of [leader,a,b,solo]){
+   const view=await workbench.overview(actor,scope,{from:day,to:day});
+   const response=await get(actor,'/api/v1/core/earnings/mine',{from:day,to:day});expect(response.status,response.text).toBe(200);
+   expect(response.body.data.summary.amount).toBe(view.summary.receivable);
+   for(const row of response.body.data.list){
+    const expected=view.entries.find(e=>e.keywordId===row.taskId);expect(expected).toBeTruthy();
+    expect(row.amount).toBe(expected!.amount);expect(row.unitPrice).toBe(expected!.calculation?.unitPrice??null);
+   }
+  }
+  const rows=(await get(leader,'/api/v1/core/earnings/mine',{from:day,to:day})).body.data.list;
+  expect(rows.filter((r:{earningGroup:string})=>r.earningGroup==='team').every((r:{unitPrice:string})=>['2.0000','3.0000'].includes(r.unitPrice))).toBe(true);
+  expect((await get(ops,'/api/v1/core/earnings/mine',{from:day,to:day})).status).toBe(403);
+  expect((await q('SELECT COUNT(*) n FROM opc_earning_lines WHERE confirmed_at IS NOT NULL'))[0].n).toBeGreaterThan(0);
+ });
+ it('实际收益补录 CLI 默认不写入，应用及重复执行不修改旧账或业务计算',async()=>{
+  await c.query('DELETE FROM opc_earning_lines');await c.query('DELETE FROM opc_earning_sources');
+  const factsBefore=await q('SELECT * FROM zh_metric_facts ORDER BY id'),incomeBefore=await q('SELECT * FROM opc_income_entries ORDER BY id'),sourcesBefore=await q('SELECT * FROM opc_income_sources ORDER BY id'),statementsBefore=await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id");
+  const args=['--import','tsx','scripts/backfill-earning-lines.ts','--project',scope.projectId,'--account',scope.accountId,'--actor',fin.sub];
+  const cli=async(apply=false)=>JSON.parse((await promisify(execFile)(process.execPath,[...args,...(apply?['--apply']:[])],{env:process.env,windowsHide:true})).stdout);
+  const preview=await cli();expect(preview.apply).toBe(false);expect(preview.records).toBe(factsBefore.filter(f=>f.current_result_id).length);expect(await q('SELECT * FROM opc_earning_sources')).toHaveLength(0);
+  const applied=await cli(true);expect(applied.records).toBe(preview.records);const earningRows=await q('SELECT * FROM opc_earning_lines ORDER BY id');expect(earningRows.length).toBeGreaterThan(0);
+  expect((await cli(true)).records).toBe(0);expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(earningRows);
+  expect(await q('SELECT * FROM zh_metric_facts ORDER BY id')).toEqual(factsBefore);expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(incomeBefore);expect(await q('SELECT * FROM opc_income_sources ORDER BY id')).toEqual(sourcesBefore);expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(statementsBefore);
+  const {backfillEarnings}=await import('../../src/modules/zhihu/attribution/earning-backfill');await expect(backfillEarnings(ops,scope,true)).rejects.toThrow('这里需要财务权限');
+ },30000);
  it('上传类型建议保留到 HTTP 错误响应，运营和达人不能绕过财务上传权限',async()=>{
   const buffer=Buffer.from(`日期,渠道名称,关键词,拉活量\n${day},联测渠道,联测词0,1`);
   const upload=(actor:AuthUser,reportType:string)=>request(app).post(path('/workbench/import')).set('X-Client-Id','workbench-client-'+actor.sub).set('Authorization','Bearer '+tokens[actor.sub]).field('projectId',scope.projectId).field('accountId',scope.accountId).field('reportType',reportType).attach('file',buffer,'拉活.csv');

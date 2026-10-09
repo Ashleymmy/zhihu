@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue'
 import {AnalysisRun,DetailDrawer} from '@zhihu-koc/shared-components'
-import {errorText,type EngineContext,type Option} from './context'
+import {errorText,executorOptions,type EngineContext,type Option} from './context'
 import type {NameSelection,ReportAnswer,ReportRun,RiskCase} from './report-analysis'
 import AgencySettings from './AgencySettings.vue'
 import RiskReview from './RiskReview.vue'
@@ -22,7 +22,7 @@ async function answer(value:{askId:string;option:string}){
  try{
   const options=await props.context.http.get<{channels:Option[];mappings:Option[];tasks:Option[];users:Option[]}>('/attribution-options',props.context.scope)
   channels.value=options.channels;mappings.value=options.mappings;tasks.value=options.tasks;taskId.value=options.tasks.length===1?options.tasks[0]?.id??'':''
-  members.value=options.users.filter(user=>['creator','leader'].includes(user.role??''))
+  members.value=executorOptions(props.context,options.users)
  }
  catch(e){error.value=errorText(e)}finally{loading.value=false}
 }
@@ -65,7 +65,7 @@ function saveKeyword(){
    <template v-if="keywordId==='new'">
     <p>登记已有关键词，核对它的执行人和开始日期。</p>
     <label>推广活动<select v-model="taskId" required :disabled="loading"><option value="" disabled>请选择</option><option v-for="task in tasks" :key="task.id" :value="task.id">{{task.name}}</option></select></label>
-    <label>执行人<select v-model="executorId" required :disabled="loading"><option value="" disabled>请选择</option><option v-for="member in members" :key="member.id" :value="member.id">{{member.displayName}} · {{member.role==='leader'?'团长':'达人'}}</option></select></label>
+    <label>执行人<select v-model="executorId" required :disabled="loading"><option value="" disabled>请选择</option><option v-for="member in members" :key="member.id" :value="member.id">{{member.displayName}} · {{member.id===context.userId&&context.role==='admin'?'本人执行':member.role==='leader'?'团长':'达人'}}</option></select></label>
     <label>从哪天开始<input v-model="fromDate" type="date" required :max="today" /></label>
    </template>
    <button class="primary" :disabled="loading||!!busyAskId||keywordId==='new'&&(!executorId||!taskId)">{{busyAskId?'正在保存…':'确认并继续'}}</button>

@@ -7,6 +7,7 @@ import {businessDay,day,fail,keywordText,type Scope} from './domain';
 import {lockKeywordSpace} from './resources';
 import {assignRetroInTransaction} from './retro-assignment';
 import {normalizedName} from './matching';
+import {resolveExecutor} from './executor';
 
 export interface HistoricalSelection {taskId:string;executorId:string;fromDate?:string}
 export async function registerHistoricalKeyword(c:PoolConnection,user:AuthUser,scope:Scope,mappingId:string,source:{keyword:string;date:string},input:HistoricalSelection){
@@ -18,9 +19,7 @@ export async function registerHistoricalKeyword(c:PoolConnection,user:AuthUser,s
  const [mapping]=await select(c,`SELECT m.id,m.channel_id,ch.zhihu_channel_id FROM zh_channel_mappings m JOIN channels ch ON ch.id=m.channel_id
    WHERE m.id=? AND m.account_id=? AND m.project_id=? AND m.canonical_id IS NULL AND ch.is_enabled=1`,[mappingId,scope.accountId,scope.projectId]);
  if(!task||!mapping)fail('请选择当前项目的推广活动和渠道',409);
- const [executor]=await select(c,`SELECT u.id FROM users u JOIN project_members pm ON pm.user_id=u.id
-   WHERE u.id=? AND u.role IN ('creator','leader') AND u.is_active=1 AND pm.project_id=? AND pm.left_at IS NULL FOR SHARE`,[input.executorId,scope.projectId]);
- if(!executor)fail('请选择本项目有效的团长或达人',409);
+ await resolveExecutor(c,user,scope,input.executorId);
  const words=await select(c,'SELECT id,keyword FROM zh_keywords WHERE account_id=? AND project_id=? AND channel_mapping_id=?',[scope.accountId,scope.projectId,mappingId]);
  if(words.some(word=>normalizedName(String(word.keyword))===normalizedName(keyword)))fail('已有相同名称的关键词，请选择原来的记录',409);
  const existing=await select(c,`SELECT p.*,u.role owner_role FROM plans p JOIN users u ON u.id=p.owner_id WHERE BINARY p.keyword=? FOR UPDATE`,[keyword]);

@@ -7,12 +7,12 @@ import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
 import RiskReview from './RiskReview.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
-import {CashWallet,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
+import {CashWallet,FinanceHistoryLinks,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[]}>()
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
-interface TypeSummary {excludedQuantity:string;records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
+interface TypeSummary {staffAmount:string;excludedQuantity:string;records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
 interface View {summary:{records:number;totalRecords:number;orders:string;totalOrders:string;billableOrders:string;pendingOrders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string;byType:Record<'newUser'|'activation',TypeSummary>;staffAmount:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string;activations:string;activationCommission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
 interface Batch {id:string;fileName:string;status:string;lastError?:string}
 interface ImportDetail {fileName:string;counts:{processingStatus:string;total:number}[];rows:{id:string;lineNumber:number;processingStatus:string;errorText:string|null;next?:string}[]}
@@ -68,7 +68,8 @@ const priceSource=(e:Entry)=>(e.priceSources??[]).map(source=>source==='role_rat
 const entryStatus=(e:Entry)=>e.status==='confirmed'?(e.reasonCode==='RISK_EXCLUDED'?'已确认不计费':'已确认'):e.reason||e.blocked||'待财务确认'
 const admin=computed(()=>props.context.role==='admin'&&props.context.adminDuty!=='operations'),creator=computed(()=>props.context.role==='creator')
 const visible=computed(()=>view.value?.entries.filter(e=>props.wallet?e.ownReceivable:e.ownPayable)??[])
-const details=computed(()=>visible.value.filter(e=>(!typeFilter.value||e.metricType===typeFilter.value)&&(!selected.value||e.payeeId===selected.value||(props.context.role==='admin'&&e.parentId===selected.value))))
+const performanceOnly=ref(false)
+const details=computed(()=>visible.value.filter(e=>(!performanceOnly.value||e.internal)&&(!typeFilter.value||e.metricType===typeFilter.value)&&(!selected.value||e.payeeId===selected.value||(props.context.role==='admin'&&e.parentId===selected.value))))
 const issues=ref<InstanceType<typeof Issues>>(),issuePanel=ref<HTMLDetailsElement>()
 async function inspectConflict(entry:Entry){if(issuePanel.value)issuePanel.value.open=true;await nextTick();await issues.value?.inspectFact(entry.factId)}
 const total=(field:keyof Pick<TypeSummary,'payable'|'confirmedPayable'|'pendingPayable'|'receivable'|'confirmedReceivable'|'pendingReceivable'>)=>{
@@ -117,7 +118,7 @@ async function confirm(){
  await refresh();walletVersion.value++
 }
 function openDetails(payeeId:string){
- selected.value=payeeId
+ performanceOnly.value=false;selected.value=payeeId
  detailPage.value=1
  detailsOpen.value=true
  void nextTick(()=>detailPanel.value?.scrollIntoView({behavior:'smooth',block:'start'}))
@@ -156,7 +157,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <article><span>{{wallet?'待确认收入':'已确认应付'}}</span><strong>¥{{money(total(wallet?'pendingReceivable':'confirmedPayable'))}}</strong></article>
    <article><span>{{wallet&&!creator?'本人应得收入':'拉新订单'}}</span><strong>{{wallet&&!creator?'¥'+money(total('receivable')):view.summary.totalOrders+' 单'}}</strong><span v-if="!wallet||creator">拉活 {{view.summary.byType.activation.quantity}} 个</span></article>
   </div>
-   <div v-if="view" class="analysis-result type-totals"><div v-for="type in types" :key="type"><strong>{{typeName(type)}}：{{wallet?'本人收益':'可计费 '+view.summary.byType[typeKey(type)].billableQuantity+' '+unit(type)}} ¥{{money(view.summary.byType[typeKey(type)][wallet?'receivable':'payable'])}}</strong><span v-if="wallet">已确认 ¥{{money(view.summary.byType[typeKey(type)].confirmedReceivable)}} · 待确认 ¥{{money(view.summary.byType[typeKey(type)].pendingReceivable)}}</span><span v-else>读取 {{view.summary.byType[typeKey(type)].records}} 行 · 共 {{view.summary.byType[typeKey(type)].quantity}} {{unit(type)}} · {{view.summary.byType[typeKey(type)].pendingQuantity}} {{unit(type)}}在等处理<span v-if="view.summary.byType[typeKey(type)].excludedQuantity!=='0'"> · {{view.summary.byType[typeKey(type)].excludedQuantity}}{{unit(type)}}已核实不计费</span></span></div><div v-if="admin&&!wallet"><strong>管理员业绩 ¥{{money(view.summary.staffAmount)}}（不计入应付）</strong></div></div>
+   <div v-if="view" class="analysis-result type-totals"><div v-for="type in types" :key="type"><strong>{{typeName(type)}}：{{wallet?'本人收益':'可计费 '+view.summary.byType[typeKey(type)].billableQuantity+' '+unit(type)}} ¥{{money(view.summary.byType[typeKey(type)][wallet?'receivable':'payable'])}}</strong><span v-if="wallet">已确认 ¥{{money(view.summary.byType[typeKey(type)].confirmedReceivable)}} · 待确认 ¥{{money(view.summary.byType[typeKey(type)].pendingReceivable)}}</span><span v-else>读取 {{view.summary.byType[typeKey(type)].records}} 行 · 共 {{view.summary.byType[typeKey(type)].quantity}} {{unit(type)}} · {{view.summary.byType[typeKey(type)].pendingQuantity}} {{unit(type)}}在等处理<span v-if="view.summary.byType[typeKey(type)].excludedQuantity!=='0'"> · {{view.summary.byType[typeKey(type)].excludedQuantity}}{{unit(type)}}已核实不计费</span></span></div><div v-if="admin&&!wallet"><button type="button" class="staff-total" @click="openDetails('');performanceOnly=true">管理员业绩 ¥{{money(view.summary.staffAmount)}}（不计入应付）</button><span>拉新 ¥{{money(view.summary.byType.newUser.staffAmount)}} · 拉活 ¥{{money(view.summary.byType.activation.staffAmount)}}</span></div></div>
 
    <div v-if="view?.summary.issues && admin" class="attention"><strong>{{view.summary.issues}} 项数据需要处理</strong><span>明细已列出原因和下一步，金额已算出的记录可以继续核对。</span></div>
   <div v-if="view && !wallet" class="work-card bill-groups">
@@ -168,7 +169,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <p class="empty-state" v-if="!view.groups.length">{{admin?'还没有账单，请先上传报表。':'财务上传报表后，这里会自动显示团队账单。'}}</p>
   </div>
   <div v-if="admin && confirming && view" class="confirm-box" role="region" aria-label="核对账单"><h2>确认本期账单</h2><p>{{period.from}} 至 {{period.to}}，本期应付合计 <strong>¥{{money(total('payable'))}}</strong>。</p><p>审核完成的账单会被确认；有待办的账单继续等待处理。此操作不会发起银行转账。</p><label class="check-label"><input type="checkbox" v-model="checked" />我已核对报表、人员和计算金额</label><div class="engine-actions"><button class="primary" :disabled="!checked||busy" @click="run(confirm)">确认核对结果</button><button :disabled="busy" @click="confirming=false">返回检查</button></div></div>
-  <details ref="detailPanel" class="work-card bill-details" :open="wallet||detailsOpen" @toggle="detailsOpen=($event.currentTarget as HTMLDetailsElement).open"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected" @click="selected='';detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
+  <details ref="detailPanel" class="work-card bill-details" :open="wallet||detailsOpen" @toggle="detailsOpen=($event.currentTarget as HTMLDetailsElement).open"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected||performanceOnly" @click="selected='';performanceOnly=false;detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
    <label class="type-filter">业绩类型<select v-model="typeFilter" @change="detailPage=1"><option value="">全部</option><option value="new_user">拉新</option><option value="activation">拉活</option></select></label>
    <BillDetails :entries="details" :wallet="wallet" :admin-duty="context.adminDuty" :can-set-rates="admin&&!wallet" :busy="busy" @assign="assignment=$event" @risk="riskEntry" @changes="inspectConflict" @rates="openRates($event.metricType)" />
   </details>
@@ -179,6 +180,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   <AssignExecutor v-if="assignment" :context="context" :keyword-id="assignment.keywordId" :keyword="assignment.keyword" :from-date="assignment.retroFromDate" @close="assignment=null" @saved="assigned" />
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
   <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
+  <FinanceHistoryLinks />
  </section>
 </template>
 

@@ -88,11 +88,11 @@ afterAll(async () => {
 });
 
 describe('运营跨团队业务范围', () => {
-  it.each([admin, operator, developer])('$role 无直属下级或项目成员身份也可选择当前项目所有有效成员', async viewer => {
+  it.each([admin, operator, developer])('$role 可选择当前项目有效成员及本人，不增加其他管理账号', async viewer => {
     actor = viewer;
     const result = await request(app).get('/attribution-options').query(scope);
     expect(result.status, JSON.stringify(result.body)).toBe(200);
-    expect(result.body.data.users.map((u: { id: string }) => u.id)).toEqual(['2', '3', '4', '5', '6']);
+    expect(result.body.data.users.map((u: { id: string }) => u.id)).toEqual(['2', '3', '4', '5', '6', viewer.sub]);
   });
   it('团长仅可选择自己及直属达人，达人不返回分配对象', async () => {
     expect((await resources.options(leader, scope)).users.map(u => u.id)).toEqual(['2', '3']);
@@ -120,7 +120,7 @@ describe('运营跨团队业务范围', () => {
       await expect(list(team, secondScope, 1, 100)).rejects.toMatchObject({ httpStatus: 403 });
       await expect(list(operator, { ...scope, accountId: '999' }, 1, 100)).rejects.toMatchObject({ httpStatus: 403 });
     }
-    expect((await resources.options(operator, secondScope)).users.map(u => u.id)).toEqual(['12']);
+    expect((await resources.options(operator, secondScope)).users.map(u => u.id)).toEqual(['12', operator.sub]);
   });
   it.each([leader, team, direct, otherLeader, otherTeam])('运营可通过路由给成员 $sub 分发且保留真实归属', async target => {
     const word = await keyword();
@@ -134,13 +134,17 @@ describe('运营跨团队业务范围', () => {
       executor_id: target.role === 'leader' ? null : Number(target.sub),
     });
   });
-  it('不向停用、离项、其他项目或管理账号分发，团长不能使用运营分发入口', async () => {
+  it('不向停用、离项、其他项目或其他管理账号分发；本人执行仍独立于旧上级关系', async () => {
     const word = await keyword();
     actor = operator;
-    for (const targetId of ['9', '10', '11', '12', '1', '7', '8']) {
+    for (const targetId of ['9', '10', '11', '12', '1', '8']) {
       const result = await request(app).post(`/keywords/${word.id}/distribute`).set('Idempotency-Key', key()).send({ ...scope, targetId });
-      expect(result.status).toBe(422);
+      expect(result.status).toBe(403);
     }
+    const own=await request(app).post(`/keywords/${word.id}/distribute`).set('Idempotency-Key',key()).send({...scope,targetId:operator.sub});
+    expect(own.status,own.text).toBe(200);
+    const [ownRows]=await c.query<RowDataPacket[]>('SELECT path_type,leader_id,executor_id FROM zh_keyword_bindings WHERE id=?',[own.body.data.id]);
+    expect(ownRows[0]).toMatchObject({path_type:'staff_self',leader_id:null,executor_id:7});
     actor = leader;
     expect((await request(app).post(`/keywords/${word.id}/distribute`).set('Idempotency-Key', key()).send({ ...scope, targetId: '4' })).status).toBe(403);
   });
