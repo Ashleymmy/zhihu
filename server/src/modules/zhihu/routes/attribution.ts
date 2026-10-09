@@ -15,6 +15,7 @@ import * as cutover from '../attribution/cutover';
 import * as workbench from '../attribution/workbench';
 import { assignRetro } from '../attribution/retro-assignment';
 import { historicalWorks } from '../attribution/historical-works';
+import { recordExecutionHistory } from '../attribution/execution-history';
 import { reviewRisk } from '../attribution/risk-review';
 import { importAnalysis, answerImportAnalysis } from '../attribution/analysis';
 import { listWorks, workActivity, workDetail } from '../attribution/works';
@@ -354,7 +355,7 @@ attributionRouter.post(
   }),
 );
 attributionRouter.get('/evidence/historical-tasks',asyncHandler(async(req,res)=>{
- const q=scopeSchema.merge(pagingSchema).extend({batchId:idSchema.optional(),search:z.string().trim().max(128).optional()}).parse(req.query);
+ const q=scopeSchema.merge(pagingSchema).extend({batchId:idSchema.optional(),keywordId:idSchema.optional(),search:z.string().trim().max(128).optional()}).parse(req.query);
  ok(res,await historicalWorks(req.user,q,q));
 }));
 attributionRouter.post('/attributions/:id/risk-review',asyncHandler(async(req,res)=>{
@@ -454,4 +455,8 @@ attributionRouter.post('/keywords/:id/distribute',asyncHandler(async(req,res)=>{
 attributionRouter.post('/keywords/:id/assign-retro',asyncHandler(async(req,res)=>{
  const q=scopeSchema.extend({executorId:idSchema,fromDate:z.string().date().optional()}).parse(req.body);
  ok(res,await assignRetro(req.user,q,idSchema.parse(req.params.id),key(req),q));
+}));
+attributionRouter.post('/keywords/:id/execution-history',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({bindingId:idSchema,fromDate:z.string().date(),url:z.string().url().max(2048),description:z.string().trim().min(1).max(1000)}).parse(req.body);
+ ok(res,await recordExecutionHistory(req.user,q,idSchema.parse(req.params.id),key(req),q));
 }));

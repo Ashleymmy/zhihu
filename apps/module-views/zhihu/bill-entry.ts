@@ -1,6 +1,6 @@
 export interface BillEntry {
  id:string;factId:string;revisionId:string;reasonCode:string;riskAssessment?:string;riskReview?:{decision:string;reason:string};
- priceSources?:('agreement'|'role_rate')[];keywordId:string;canAssignRetro?:boolean;retroFromDate?:string;
+ priceSources?:('agreement'|'role_rate')[];keywordId:string;canAssignRetro?:boolean;retroFromDate?:string;bindingId?:string;executorName?:string;legacyMode?:string;
  metricType:'new_user'|'activation';quantity:string|null;settlementMismatch?:{expected:string;actual:string}|null;
  keyword:string;date:string;orders:string|null;payerName:string;payeeName:string;payeeId:string;parentId:string|null;role:string;
  amount:string|null;confirmedAmount:string;pendingAmount:string;status:string;kind:string;ownPayable:boolean;ownReceivable:boolean;

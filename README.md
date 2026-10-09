@@ -174,3 +174,11 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 ### 平台模块隔离检查
 
 `server/tests/attribution-ui/platform-isolation.cjs` 启动只含平台表的隔离 MySQL 和真实 Web 服务；`OPC_REVIEW_SAMPLE=0` 检查全部模块停用，设为 `1` 检查同一套首页/任务页面接入两个示例项目。脚本不连接生产或上游，启动要求内部 `REMEDIATION_REVIEW=1`，生产环境会拒绝。可通过 `OPC_PLAYWRIGHT_MODULE` 指定已有 Playwright 安装，浏览器使用 Edge。
+
+### 报表旧记录与执行进度修复（2026-10-09）
+
+报表确认关键词时优先查找同项目、同渠道的同名旧计划，展示原执行人和作品数量，由运营选择“沿用原记录与执行人”；原计划号、作品、上传原文与已确认金额保留。同名旧记录存在时不再推荐相似的新关键词，短词的相似候选只容许一个字的差异，候选仍需人工确认。多执行人或多接入来源的旧记录继续阻止合并。
+
+数据待办的操作资格统一为布尔值，避免 MySQL 返回字符串 `0` 导致“尚未登记代理名称”误显示“指定执行人”。金额明细新增“核对执行与作品”入口：运营可以给现有执行人补实际开始日期与历史作品，随后就地进入作品核验，自动更新未确认报表；不允许借此变更执行人或越权处理。财务可查看进度，不能补录执行资料。已读取但仍需处理的报表、暂未生成的账单、结果更新时间都有明确反馈；上传和保存后同时刷新分析、金额与数据待办。
+
+专项运行：Web 构建后，设置 `OPC_REVIEW_FEEDBACK_ONLY=1` 和可选的 `OPC_PLAYWRIGHT_MODULE`，在 `server` 下运行 `node tests/attribution-ui/remediation-smoke.cjs`。隔离数据库会自动回收，不访问生产；截图留在 `.opc-work/remediation-review/feedback-*`。

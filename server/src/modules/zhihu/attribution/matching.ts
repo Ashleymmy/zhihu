@@ -32,7 +32,7 @@ export function nameDistance(left:string,right:string){
  return previous[b.length];
 }
 export function nearestNames<T>(input:string,rows:T[],name:(row:T)=>string,limit=2){
- const length=[...normalizedName(input)].length,threshold=Math.min(4,Math.max(1,Math.ceil(length/3)));
+ const length=[...normalizedName(input)].length,threshold=Math.min(3,Math.max(1,Math.floor(length/3)));
  return rows.filter(row=>Math.abs([...normalizedName(name(row))].length-length)<=threshold)
    .map(row=>({row,distance:nameDistance(input,name(row))})).filter(item=>item.distance<=threshold)
    .sort((a,b)=>a.distance-b.distance||name(a.row).localeCompare(name(b.row),'zh-CN')).slice(0,limit).map(item=>item.row);

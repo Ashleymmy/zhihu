@@ -566,7 +566,7 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,
       ${finance?'currentRevision.snapshot_json':'NULL'} current_snapshot_json,
       b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name,
-      CAST(k.id AS CHAR) keyword_id,
+      CAST(k.id AS CHAR) keyword_id,k.legacy_mode,
       (SELECT DATE_FORMAT(MIN(uf.business_date),'%Y-%m-%d') FROM zh_metric_facts uf WHERE uf.keyword_id=k.id AND ${unconfirmedFactSql('uf')}) retro_from_date,
       (${Number(dutyAllows(user,'operations'))}=1 AND e.status='open' AND e.reason_code='BINDING_MISSING' AND k.id IS NOT NULL
         AND b.executor_id IS NULL AND NOT ${ownershipHistorySql()} AND b.stop_new_use_at IS NULL
@@ -584,7 +584,7 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id WHERE ${where}`,params);
     const counts={all:Number(count.total),pending:Number(count.pending),done:Number(count.total)-Number(count.pending)};
-    return { list: list.map(row=>{const current=row.current_snapshot_json;delete row.current_snapshot_json;return Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}),finance&&row.revision_id&&row.snapshot_json?{comparison:reportComparison(current?json<FactSnapshot>(current):null,json<FactSnapshot>(row.snapshot_json),String(row.metric_type))}:{})}), total:status==='open'?counts.pending:status==='done'?counts.done:counts.all,counts,page,pageSize };
+    return { list: list.map(row=>{const current=row.current_snapshot_json;delete row.current_snapshot_json;row.can_assign_retro=Number(row.can_assign_retro)===1;return Object.assign(row,reasonText(String(row.reason_code),{metricType:String(row.metric_type),bindingId:row.binding_id,executorId:row.executor_id,executorName:row.executor_name,executorRole:row.executor_role,leaderName:row.leader_name}),finance&&row.revision_id&&row.snapshot_json?{comparison:reportComparison(current?json<FactSnapshot>(current):null,json<FactSnapshot>(row.snapshot_json),String(row.metric_type))}:{})}), total:status==='open'?counts.pending:status==='done'?counts.done:counts.all,counts,page,pageSize };
   });
 }
 export async function retryException(user: AuthUser, scope: Scope, id: string, key: string, reason: string) {

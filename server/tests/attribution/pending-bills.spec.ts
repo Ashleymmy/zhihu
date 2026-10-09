@@ -47,9 +47,9 @@ it('所有不能计费的记录都有原因和下一步，未知词数量单列�
  expect(view.entries).toHaveLength(4);expect(view.entries.every(e=>e.status==='pending'&&e.amount===null&&!e.ready)).toBe(true);
  const missing=view.entries.find(e=>e.keyword==='未分配词')!;missingFact=missing.factId;
  expect(missing).toMatchObject({reason:'没有执行人',next:'运营：指定执行人'});
- expect(view.entries.find(e=>e.keyword==='未开始词')).toMatchObject({reason:'执行人还没开始',next:'达人 人员3：提交作品'});
+ expect(view.entries.find(e=>e.keyword==='未开始词')).toMatchObject({reason:'尚未登记执行记录',next:'运营：核对历史执行，或由达人 人员3提交作品'});
  expect(view.entries.find(e=>e.keyword==='团长预留词')).toMatchObject({reason:'待分配',next:'团长 人员2：分配执行人'});
- expect(view.entries.find(e=>e.keyword==='未知词')).toMatchObject({reason:'系统里没有这个关键词',next:'运营：登记并指定执行人'});
+ expect(view.entries.find(e=>e.keyword==='未知词')).toMatchObject({reason:'关键词尚未对上报表',next:'运营：核对关键词与历史记录'});
  expect((await q("SELECT id FROM zh_exceptions WHERE fact_id=? AND reason_code='BINDING_MISSING' AND status='open'",[missingFact]))).toHaveLength(1);
  const inbox=(await facts.listExceptions(admin,scope,1,25)).list.find(e=>e.fact_id===missingFact)!;
  expect(inbox).toMatchObject({reason:'没有执行人',next:'运营：指定执行人',keyword:'未分配词'});

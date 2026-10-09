@@ -56,13 +56,13 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先在项目设置中接通业务服务并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">设置项目</button></div>
 <template v-if="ready">
  <WorkActivity v-if="section==='activity'" :key="scope.projectId+'-'+scope.accountId+'-'+userId" :context="context" />
- <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-from="initialFrom" :initial-to="initialTo" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
+ <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-from="initialFrom" :initial-to="initialTo" @navigate="emit('navigate',$event)" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
  <template v-else><nav v-if="!pageKind" class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
  <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId+'-'+pageKind" :context="context" :initial-view="pageKind==='task-hall'?'available':pageKind==='tasks'&&!admin?'owned':'all'" :initial-search="initialKeyword" :initial-create="initialCreate" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
  <Works :filters="workFilters" v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />
  <Prices v-if="tab==='prices'" :context="context" />
  <Channels v-if="tab==='channels'&&admin" :context="context" @refresh="refreshOptions" @projects="emit('navigate','/projects')" />
- <Issues v-if="tab==='issues'&&admin" :context="context" />
+ <Issues v-if="tab==='issues'&&admin" :context="context" @navigate="emit('navigate',$event)" />
  <template v-if="tab==='people'&&role!=='creator'"><div class="work-card"><h2>{{admin?'团长与达人':'团队成员'}}</h2><p>按姓名管理成员，项目授权决定可以参与哪些业务。</p><div class="engine-actions"><button class="primary" @click="emit('navigate','/team')">管理{{admin?'团长与达人':'团队成员'}}</button><button v-if="admin" @click="emit('navigate','/projects')">项目成员与授权</button></div></div><StaffManager v-if="admin&&(adminDuty??'all')==='all'" :http="coreHttp" :actor-role="role" /></template>
  </template>
 </template></section></template>

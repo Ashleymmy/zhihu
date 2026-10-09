@@ -77,6 +77,7 @@ async function main() {
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         if(process.env.OPC_REVIEW_FINANCE_HISTORY==='1') await (await import('./finance-history-fixture')).seedFinanceHistory(db);
+        if(process.env.OPC_REVIEW_FEEDBACK_ONLY==='1') await (await import('./feedback-fixture')).seedFeedback(db);
         await db.end();
         let sample;
         if(process.env.OPC_REVIEW_ORIGINAL_ACTIVATION==='1'){

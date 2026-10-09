@@ -5,7 +5,7 @@ import {withTransaction} from '../../../db';
 import type {Scope} from './domain';
 import {authorize,select} from './store';
 
-export async function historicalWorks(user:AuthUser,scope:Scope,filters:{batchId?:string;search?:string;page:number;pageSize:number}){
+export async function historicalWorks(user:AuthUser,scope:Scope,filters:{batchId?:string;keywordId?:string;search?:string;page:number;pageSize:number}){
  if(isStaffRole(user.role))assertDuty(user,'operations');
  await authorize(user,scope);
  return withTransaction(async c=>{
@@ -16,6 +16,7 @@ export async function historicalWorks(user:AuthUser,scope:Scope,filters:{batchId
    if(filters.batchId){where+=` AND EXISTS(SELECT 1 FROM zh_metric_facts f JOIN zh_import_rows r ON r.fact_id=f.id
      WHERE f.keyword_id=k.id AND r.batch_id=?)`;values.push(filters.batchId);}
    if(filters.search){where+=' AND k.keyword LIKE ?';values.push('%'+filters.search+'%');}
+   if(filters.keywordId){where+=' AND k.id=?';values.push(filters.keywordId);}
    const from=`FROM zh_keywords k JOIN plans p ON p.id=k.plan_id JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
      JOIN users u ON u.id=b.executor_id LEFT JOIN zh_evidence e ON e.id=(SELECT MAX(ev.id) FROM zh_evidence ev WHERE ev.binding_id=b.id) WHERE ${where}`;
    const [count]=await select(c,`SELECT COUNT(*) total ${from}`,values);

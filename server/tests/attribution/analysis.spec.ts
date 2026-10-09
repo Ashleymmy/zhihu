@@ -141,8 +141,8 @@ it('缺执行人待办提供同一补录入口，财务没有操作权限且保�
  await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n${date},分析渠道,待办直接补录,2`));
  const inbox=(actor:AuthUser)=>request(app).get('/api/v1/modules/zhihu/exceptions').set(headers[actor.sub]).query({...scope,status:'open',search:'待办直接补录'});
  const pending=await inbox(ops);expect(pending.status,pending.text).toBe(200);expect(pending.body.data.list).toHaveLength(1);
- expect(pending.body.data.list[0]).toMatchObject({keywordId:word.id,canAssignRetro:1,retroFromDate:date});
- expect((await inbox(finance)).body.data.list[0].canAssignRetro).toBe(0);
+ expect(pending.body.data.list[0]).toMatchObject({keywordId:word.id,canAssignRetro:true,retroFromDate:date});
+ expect((await inbox(finance)).body.data.list[0].canAssignRetro).toBe(false);
  const assign=(actor:AuthUser)=>request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/assign-retro').set(headers[actor.sub]).send({...scope,executorId:'2',fromDate:date,requestKey:key()});
  expect((await assign(finance)).status).toBe(403);expect((await assign(creator)).status).toBe(403);
  const saved=await assign(ops);expect(saved.status,saved.text).toBe(200);expect((await inbox(ops)).body.data.list).toEqual([]);

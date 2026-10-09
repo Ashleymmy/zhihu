@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed,nextTick,onMounted,reactive,ref} from 'vue'
 import {DataGrid,DetailDrawer,ValueComparison,RateSettings,type AnalysisComparison,type AnalysisRunModel,type DataGridRow} from '@zhihu-koc/shared-components'
+import ExecutionFollowUp,{type ExecutionItem} from './ExecutionFollowUp.vue'
 import AgencySettings from './AgencySettings.vue'
 import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
@@ -8,13 +9,15 @@ import type {RiskCase,ReportAnswer} from './report-analysis'
 import RiskReview from './RiskReview.vue'
 import {errorText,requestKey,type EngineContext} from './context'
 const props=defineProps<{context:EngineContext}>()
-const emit=defineEmits<{changed:[]}>()
-interface Issue{id:string;batchId:string|null;metricType?:string;reasonCode:string;reason:string;next:string;status:string;resolution?:string|null;factId:string|null;keyword:string|null;keywordId?:string|null;canAssignRetro?:boolean|number;retroFromDate?:string;revisionId:string|null;expectedRevisionId:string|null;riskAssessment?:string;comparison?:AnalysisComparison[];normalizedJson:{keyword:string;orders:string}|null}
+const emit=defineEmits<{changed:[];navigate:[path:string]}>()
+interface Issue{id:string;batchId:string|null;metricType?:string;reasonCode:string;reason:string;next:string;status:string;resolution?:string|null;factId:string|null;keyword:string|null;keywordId?:string|null;canAssignRetro?:boolean|number|string;bindingId?:string;executorName?:string;legacyMode?:string;retroFromDate?:string;revisionId:string|null;expectedRevisionId:string|null;riskAssessment?:string;comparison?:AnalysisComparison[];normalizedJson:{keyword:string;orders:string}|null}
 const list=ref<Issue[]>([]),page=ref(1),total=ref(0),busy=ref(false),error=ref(''),notice=ref(''),selected=ref<Issue|null>(null)
 const view=ref('pending'),search=ref(''),appliedSearch=ref(''),counts=ref<Record<string,number>>({pending:0,all:0,done:0})
 let loadVersion=0
 const finance=props.context.adminDuty==='finance',operations=props.context.adminDuty==='operations'
-const agencyOpen=ref(false)
+const agencyOpen=ref(false),execution=ref<ExecutionItem|null>(null)
+const canAssign=(i:Issue)=>i.status==='open'&&i.reasonCode==='BINDING_MISSING'&&Number(i.canAssignRetro)===1&&!!i.keywordId
+const canFollow=(i:Issue)=>i.status==='open'&&!!i.keywordId&&['BINDING_MISSING','PERIOD_AMBIGUOUS','WORK_MISSING','WORK_UNVERIFIED','WORK_DISPUTED'].includes(i.reasonCode)
 const assignment=ref<Issue|null>(null)
 async function assigned(name:string){assignment.value=null;notice.value='已指定给 '+name+'，相关报表已自动更新。';await changed()}
 const canAgency=(i:Issue)=>i.status==='open'&&i.reasonCode.startsWith('AGENCY_')
@@ -28,27 +31,29 @@ const canMatch=(i:Issue)=>i.status==='open'&&!!i.batchId&&!finance&&['CHANNEL_UN
 const canReviewRisk=(i:Issue)=>!finance&&i.status==='open'&&i.reasonCode==='RISK_REVIEW_REQUIRED'&&!!i.factId&&!!i.expectedRevisionId
 const canChoose=(i:Issue)=>i.status==='open'&&!!i.revisionId&&!operations
 const canRetry=(i:Issue)=>i.status==='open'&&!i.revisionId&&!i.factId&&!!i.batchId&&!finance&&!canMatch(i)&&i.reasonCode!=='RISK_REVIEW_REQUIRED'
-function action(i:Issue){return i.canAssignRetro&&i.keywordId?{key:'assign',label:'指定执行人'}:canAgency(i)?{key:'agency',label:'核对代理名称'}:canMatch(i)?{key:'match',label:i.reasonCode==='KEYWORD_UNKNOWN'?'核对关键词':'确认渠道'}:canReviewRisk(i)?{key:'risk',label:'核实风险'}:canChoose(i)?{key:'choose',label:'核对原值与新值'}:canSetRates(i)?{key:'rates',label:'查看与设置单价'}:canRetry(i)?{key:'retry',label:'继续处理'}:undefined}
+function action(i:Issue){return canAssign(i)?{key:'assign',label:'指定执行人'}:canAgency(i)?{key:'agency',label:'核对代理名称'}:canMatch(i)?{key:'match',label:i.reasonCode==='KEYWORD_UNKNOWN'?'核对关键词':'确认渠道'}:canReviewRisk(i)?{key:'risk',label:'核实风险'}:canChoose(i)?{key:'choose',label:'核对原值与新值'}:canSetRates(i)?{key:'rates',label:'查看与设置单价'}:canFollow(i)?{key:'followup',label:finance?'查看执行进度':'核对执行与作品'}:canRetry(i)?{key:'retry',label:'继续处理'}:undefined}
 const rows=computed<DataGridRow[]>(()=>list.value.map(i=>{const next=i.next.split('：'),closed=i.status!=='open';return{id:i.id,title:title(i),status:{key:closed?'done':i.reasonCode,label:closed?'已处理':i.reason,tone:closed?'success':action(i)?'danger':'warning'},cells:{reason:i.reason,comparison:i.comparison?.map(row=>`${row.label}：${row.previous} → ${row.incoming}`).join('；')??'—'},next:closed?undefined:{actor:next.length>1?next[0]!:'运营',text:next.length>1?next.slice(1).join('：'):i.next,action:action(i)},viewKeys:closed?['done']:['pending']}}))
 const item=(row:DataGridRow)=>list.value.find(i=>i.id===row.id)!
 async function load(){const version=++loadVersion;busy.value=true;error.value='';try{const data=await props.context.http.get<{list:Issue[];total:number;counts:Record<string,number>}>('/exceptions',{...props.context.scope,page:page.value,pageSize:25,status:view.value==='pending'?'open':view.value,search:appliedSearch.value});if(version!==loadVersion)return;const last=Math.max(1,Math.ceil(data.total/25));if(page.value>last){page.value=last;return await load()}list.value=data.list;total.value=data.total;counts.value=data.counts;if(selected.value)selected.value=list.value.find(i=>i.id===selected.value?.id)??null}catch(e){if(version===loadVersion)error.value=errorText(e)}finally{if(version===loadVersion)busy.value=false}}
 function changeView(key:string){view.value=key;page.value=1;selected.value=null;return load()}
 function find(){appliedSearch.value=search.value.trim();page.value=1;selected.value=null;return load()}
 async function inspect(i:Issue){error.value='';try{analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+i.batchId+'/analysis',props.context.scope);await nextTick();analysisHost.value?.scrollIntoView({block:'start',behavior:'smooth'})}catch(e){error.value=errorText(e)}}
-async function changed(){if(analysis.value)analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+analysis.value.id+'/analysis',props.context.scope);await load();emit('changed')}
+async function reload(){if(analysis.value)analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+analysis.value.id+'/analysis',props.context.scope);await load()}
+async function changed(){await reload();emit('changed')}
 async function answer(value:ReportAnswer){
  if(!analysis.value||busyAskId.value)return;busyAskId.value=value.askId;askErrors[value.askId]=''
- try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});await changed()}
+ try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});notice.value='已保存选择，报表已更新。'+(analysis.value.conclusion?.pendingText??'');await changed()}
  catch(e){askErrors[value.askId]=errorText(e)}finally{busyAskId.value=''}
 }
 async function handle(i:Issue){
  selected.value=null;await nextTick()
- if(i.canAssignRetro&&i.keywordId)assignment.value=i
+ if(canAssign(i))assignment.value=i
  else if(canAgency(i))agencyOpen.value=true
  else if(canMatch(i))await inspect(i)
  else if(canReviewRisk(i))risk.value={factId:i.factId!,revisionId:i.expectedRevisionId!,keyword:title(i),riskAssessment:i.riskAssessment??''}
  else if(canChoose(i))selected.value=i
  else if(canSetRates(i)){ratesType.value=i.metricType==='activation'?'activation':'new_user';ratesOpen.value=true}
+ else if(canFollow(i))execution.value={...i,keywordId:i.keywordId!,keyword:title(i)}
  else if(canRetry(i)){busy.value=true;error.value='';try{await props.context.http.post('/exceptions/'+i.id+'/retry',{...props.context.scope,requestKey:requestKey(),reason:'继续处理报表中保留的记录'});await changed()}catch(e){error.value=errorText(e)}finally{busy.value=false}}
 }
 async function choose(option:'new'|'old'|'skip'){
@@ -58,7 +63,8 @@ async function choose(option:'new'|'old'|'skip'){
  catch(e){error.value=errorText(e)}finally{busy.value=false}
 }
 async function inspectFact(factId:string){error.value='';try{const data=await props.context.http.get<{list:Issue[]}>('/exceptions',{...props.context.scope,factId,page:1,pageSize:25});selected.value=data.list.find(canChoose)??null;if(!selected.value){notice.value='这项报表问题已更新，请查看最新结果。';await changed()}}catch(e){error.value=errorText(e)}}
-defineExpose({inspectFact})
+async function inspectKeyword(keyword:string){error.value='';try{const data=await props.context.http.get<{list:Issue[]}>('/exceptions',{...props.context.scope,search:keyword,status:'open',page:1,pageSize:100});const i=data.list.find(i=>title(i)===keyword);if(i){if(finance&&i.batchId)await inspect(i);else await handle(i)}else{notice.value='这条记录已更新，请查看最新明细。';emit('changed')}}catch(e){error.value=errorText(e)}}
+defineExpose({inspectFact,inspectKeyword,reload})
 onMounted(load)
 </script>
 <template>
@@ -78,7 +84,8 @@ onMounted(load)
     <button v-else-if="action(selected)" :disabled="busy" @click="handle(selected)">{{action(selected)?.label}}</button>
    </div>
   </DetailDrawer>
-  <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;changed()" />
+  <ExecutionFollowUp v-if="execution" :key="execution.keywordId" :context="context" :item="execution" @close="execution=null" @changed="changed" @navigate="emit('navigate',$event)" />
+  <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;notice='代理名称已保存，相关报表已自动更新。';changed()" />
   <AssignExecutor v-if="assignment?.keywordId" :context="context" :keyword-id="assignment.keywordId" :keyword="title(assignment)" :from-date="assignment.retroFromDate" @close="assignment=null" @saved="assigned" />
   <RiskReview :context="context" :item="risk" @close="risk=null" @saved="risk=null;changed()" />
   <RateSettings v-if="context.role==='admin'&&!operations" :open="ratesOpen" :project-id="context.scope.projectId" module-id="zhihu" :http="context.coreHttp" :initial-metric-type="ratesType" @close="ratesOpen=false" @published="ratesPublished" />

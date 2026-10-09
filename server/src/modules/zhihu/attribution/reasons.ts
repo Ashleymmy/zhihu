@@ -18,11 +18,11 @@ export function reasonText(code: string | null | undefined, context: ReasonConte
   switch (code) {
     case 'CHANNEL_UNMAPPED':
     case 'CHANNEL_AMBIGUOUS': return { reason: '渠道没对上', next: '运营：确认渠道' };
-    case 'KEYWORD_UNKNOWN': return { reason: '系统里没有这个关键词', next: '运营：登记并指定执行人' };
+    case 'KEYWORD_UNKNOWN': return { reason: '关键词尚未对上报表', next: '运营：核对关键词与历史记录' };
     case 'BINDING_MISSING':
       if (!context.bindingId) return { reason: '没有执行人', next: '运营：指定执行人' };
       if (!context.executorId) return { reason: '待分配', next: `${leader}：分配执行人` };
-      return { reason: '执行人还没开始', next: `${executor}：提交作品` };
+      return { reason: '尚未登记执行记录', next: `运营：核对历史执行，或由${executor}提交作品` };
     case 'PERIOD_AMBIGUOUS': return { reason: '早于执行人开始日期', next: '运营：确认从哪天算' };
     case 'PRICE_MISSING':
     case 'PRICE_OVERLAP': return { reason: '单价还没设置', next: context.metricType==='activation'?'财务：设置拉活单价':'财务：设置单价' };

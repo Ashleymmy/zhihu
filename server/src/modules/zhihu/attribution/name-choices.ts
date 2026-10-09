@@ -7,11 +7,12 @@ import {nearestNames,normalizedName,resolvedNames} from './matching';
 import {processImportRow} from './facts';
 import {registerHistoricalKeyword,type HistoricalSelection} from './historical-keywords';
 import {processResolvedNames} from './automatic-repair';
+import {legacyReportRecords,adoptLegacyReportRecord} from './legacy-report-records';
 
 type NameSource={date:string;channel:string;keyword:string};
 export type ChannelSelection={channelId:string}|{mappingId:string}|{upstreamId:string;generation:1|2};
 export type NameSelection=ChannelSelection|HistoricalSelection|{keywordId:string};
-export interface NameChoice {kind:'channel'|'keyword';ask:AnalysisAsk;rows:string[];source:NameSource;mappingId:string|null;candidates:RecordRow[]}
+export interface NameChoice {kind:'channel'|'keyword';ask:AnalysisAsk;rows:string[];source:NameSource;mappingId:string|null;candidates:RecordRow[];originals:RecordRow[]}
 export async function nameChoices(c:PoolConnection,scope:Scope,batchId:string):Promise<NameChoice[]>{
  // No financial columns are read here, including when an operator asks for candidates.
  const sources=await select(c,`SELECT r.id,JSON_OBJECT('date',JSON_EXTRACT(r.normalized_json,'$.date'),
@@ -23,29 +24,37 @@ export async function nameChoices(c:PoolConnection,scope:Scope,batchId:string):P
  const channels=await select(c,`SELECT m.id,m.channel_name,m.channel_id,DATE_FORMAT(m.effective_to,'%Y-%m-%d') until_day
    FROM zh_channel_mappings m JOIN channels ch ON ch.id=m.channel_id WHERE m.account_id=? AND m.project_id=?
    AND m.canonical_id IS NULL AND ch.is_enabled=1 ORDER BY m.id`,[scope.accountId,scope.projectId]);
- const groups=new Map<string,NameChoice>(),wordsByMapping=new Map<string,RecordRow[]>();
+ const groups=new Map<string,NameChoice>(),wordsByMapping=new Map<string,RecordRow[]>(),originalsByName=new Map<string,RecordRow[]>();
  for(const row of sources){
    const source=json<NameSource>(row.source),match=await resolvedNames(c,scope,String(row.id),source);
    const kind=match.mappings.length===1&&String(match.mappings[0].project_id)===scope.projectId?'keyword':'channel';
    const mappingId=kind==='keyword'?String(match.mappings[0].stable_id):null;
-   let candidates:RecordRow[];
+   let candidates:RecordRow[],originals:RecordRow[]=[];
    if(kind==='channel')candidates=nearestNames(source.channel,channels.filter(item=>!item.until_day||String(item.until_day)>source.date),item=>String(item.channel_name));
    else{
      if(!wordsByMapping.has(mappingId!))wordsByMapping.set(mappingId!,await select(c,'SELECT id,keyword FROM zh_keywords WHERE account_id=? AND project_id=? AND channel_mapping_id=?',[scope.accountId,scope.projectId,mappingId]));
-     candidates=nearestNames(source.keyword,wordsByMapping.get(mappingId!)!,item=>String(item.keyword));
+     const originalKey=JSON.stringify([mappingId,normalizedName(source.keyword)]);
+     if(!originalsByName.has(originalKey))originalsByName.set(originalKey,await legacyReportRecords(c,scope,mappingId!,source.keyword));
+     originals=originalsByName.get(originalKey)!;
+     candidates=originals.length?[]:nearestNames(source.keyword,wordsByMapping.get(mappingId!)!,item=>String(item.keyword));
    }
    const groupKey=JSON.stringify([kind,normalizedName(source.channel),kind==='keyword'?normalizedName(source.keyword):null,mappingId,candidates.map(item=>String(item.id))]);
    const existing=groups.get(groupKey);
    if(existing){existing.rows.push(String(row.id));if(source.date<existing.source.date)existing.source.date=source.date;continue;}
-   groups.set(groupKey,{kind,source,mappingId,candidates,rows:[String(row.id)],ask:{id:'',text:'',options:[]}});
+   groups.set(groupKey,{kind,source,mappingId,candidates,originals,rows:[String(row.id)],ask:{id:'',text:'',options:[]}});
  }
  for(const choice of groups.values()){
-   const {kind,source,candidates}=choice,name=kind==='channel'?source.channel:source.keyword;
-   choice.ask={id:'name:'+kind+':'+digest([batchId,choice.rows,choice.mappingId,source,candidates.map(item=>[String(item.id),item.channel_name??item.keyword,item.until_day??null])]).slice(0,40),
+   const {kind,source,candidates,originals}=choice,name=kind==='channel'?source.channel:source.keyword;
+   choice.ask={id:'name:'+kind+':'+digest([batchId,choice.rows,choice.mappingId,source,candidates.map(item=>[String(item.id),item.channel_name??item.keyword,item.until_day??null]),...(originals.length?[originals.map(item=>[String(item.id),item.owner_ids,item.work_count])]:[])]).slice(0,40),
      text:`${choice.rows.length} 行的${kind==='channel'?'渠道':'关键词'}「${name}」需要运营确认${candidates.length?'，是不是下面这个？':'。'}`,
      options:[...candidates.slice(0,1).map(item=>({key:kind+':'+item.id,label:'是「'+String(kind==='channel'?item.channel_name:item.keyword)+'」',tone:'primary' as const})),
        {key:kind==='channel'?'other-channel':'other-keyword',label:kind==='channel'?'其他或新渠道':candidates.length?'其他或登记历史关键词':'登记并指定执行人'},
        {key:'skip',label:'暂时跳过'}]};
+   if(originals.length){
+     const original=originals[0];
+     choice.ask.text=`${choice.rows.length} 行的关键词「${name}」找到了同名旧记录，原登记人：${original.owner_name}，已有 ${original.work_count} 条作品。确认后沿用原作品的执行归属。`;
+     choice.ask.options=[...(originals.length===1&&Number(original.work_count)>0?[{key:'legacy:'+original.id,label:'沿用原记录与执行人',tone:'primary' as const}]:[]),{key:'other-keyword',label:'核对历史登记'},{key:'skip',label:'暂时跳过'}];
+   }
  }
  return [...groups.values()];
 }
@@ -97,6 +106,8 @@ export async function applyNameChoice(c:PoolConnection,user:AuthUser,scope:Scope
        [scope.accountId,scope.projectId,mapping.channel_id,mappingId,choice.source.channel,choice.source.date,mapping.until_day,user.sub]);
      await audit(c,user,'channel.create',alias,{canonicalId:mappingId,from:choice.source.date,name:choice.source.channel,source:'report-analysis'});
    }
+ }else if(option.startsWith('legacy:')){
+   keywordId=await adoptLegacyReportRecord(c,user,scope,mappingId!,choice.source.keyword,option.slice(7));
  }else if(option==='other-keyword'){
    if(selection&&'keywordId' in selection){
      if(!choice.candidates.some(item=>String(item.id)===selection.keywordId))fail('关键词候选已变化，请重新选择',409);

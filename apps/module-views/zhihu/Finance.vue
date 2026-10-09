@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import AgencySettings from './AgencySettings.vue'
+import ExecutionFollowUp from './ExecutionFollowUp.vue'
 import Issues from './Issues.vue'
 import BillDetails from './BillDetails.vue'
 import type {BillEntry as Entry} from './bill-entry'
@@ -10,7 +12,7 @@ import type {RiskCase,ReportAnswer} from './report-analysis'
 import {CashWallet,FinanceHistoryLinks,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
-const emit=defineEmits<{issues:[]}>()
+const emit=defineEmits<{issues:[];navigate:[path:string]}>()
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
 interface TypeSummary {staffAmount:string;excludedQuantity:string;records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
 interface View {summary:{records:number;totalRecords:number;orders:string;totalOrders:string;billableOrders:string;pendingOrders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string;byType:Record<'newUser'|'activation',TypeSummary>;staffAmount:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string;activations:string;activationCommission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
@@ -20,11 +22,12 @@ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(n
 const requestedPeriod = /^\d{4}-\d{2}-\d{2}$/.test(props.initialFrom||'') && /^\d{4}-\d{2}-\d{2}$/.test(props.initialTo||'') && props.initialFrom! <= props.initialTo!
 const period=reactive({from:requestedPeriod?props.initialFrom!:today.slice(0,7)+'-01',to:requestedPeriod?props.initialTo!:today})
 const view=ref<View|null>(null),busy=ref(false),error=ref(''),errorHelp=ref(''),notice=ref(''),file=ref<File|null>(null),progress=ref(''),history=ref<Batch[]>([])
+watch(()=>view.value?.entries,entries=>{if(execution.value&&entries)execution.value=entries.find(e=>e.id===execution.value?.id)??entries.find(e=>e.factId===execution.value?.factId&&e.payeeId===execution.value?.payeeId)??entries.find(e=>e.factId===execution.value?.factId)??null})
 const walletVersion=ref(0)
 const risk=ref<RiskCase|null>(null)
 const riskEntry=(e:Entry)=>{risk.value={factId:e.factId,revisionId:e.revisionId,keyword:e.keyword,riskAssessment:e.riskAssessment??""}}
-const assignment=ref<Entry|null>(null)
-async function assigned(name:string){assignment.value=null;notice.value='已指定给 '+name+'，相关金额已重新计算。';await run(refresh)}
+const assignment=ref<Entry|null>(null),execution=ref<Entry|null>(null),agencyOpen=ref(false),updatedAt=ref('')
+async function assigned(name:string){assignment.value=null;notice.value='已指定给 '+name+'，相关金额已重新计算。';await run(reloadResults)}
 type ReportType='new_user'|'activation'
 function savedReportType():ReportType{try{return localStorage.getItem('zhihu.reportType')==='activation'?'activation':'new_user'}catch{return 'new_user'}}
 const reportType=ref<ReportType>(savedReportType()),suggestedType=ref<ReportType|null>(null)
@@ -40,7 +43,7 @@ function chooseReportType(value:ReportType){reportType.value=value;suggestedType
 const importResult=ref<ImportDetail|null>(null),importId=ref(''),importPage=ref(1),uploadInput=ref<HTMLInputElement|null>(null)
 const analysis=ref<AnalysisRunModel|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
 const importTotal=computed(()=>importResult.value?.counts.reduce((sum,c)=>sum+c.total,0)??0)
-const rowStatus=(status:string)=>({invalid:'需要修正',skipped:'已跳过',pending:'正在处理',processed:'已计算',duplicate:'已读取，不重复计算',exception:'需要处理',legacy_settled:'旧系统已结算'}[status]??'已读取')
+const rowStatus=(status:string)=>({invalid:'需要修正',skipped:'已跳过',pending:'正在处理',processed:'已读取',duplicate:'已读取，不重复计算',exception:'需要处理',legacy_settled:'旧系统已结算'}[status]??'已读取')
 async function inspectImport(id:string,page=1){
  importId.value=id;importPage.value=page
  const [detail,run]=await Promise.all([props.context.http.get<ImportDetail>('/imports/'+id,{...props.context.scope,page,pageSize:25}),props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)])
@@ -49,7 +52,7 @@ async function inspectImport(id:string,page=1){
 async function answerAnalysis(answer:ReportAnswer){
  if(busy.value||busyAskId.value)return
  busy.value=true;busyAskId.value=answer.askId;askErrors[answer.askId]=''
- try{analysis.value=await post('/imports/'+importId.value+'/answers',answer) as AnalysisRunModel;await refresh();await inspectImport(importId.value);notice.value=answer.option==='skip'?'已暂时跳过，这项记录仍保留在待处理中。':'已保存选择，相关金额已自动更新。'}
+ try{analysis.value=await post('/imports/'+importId.value+'/answers',answer) as AnalysisRunModel;await reloadResults();notice.value=answer.option==='skip'?'已暂时跳过，这项记录仍保留在待处理中。':'已保存选择，报表已更新。'+(analysis.value?.conclusion?.pendingText??'')}
  catch(error){askErrors[answer.askId]=errorText(error)}finally{busyAskId.value='';busy.value=false}
 }
 function analysisAction(action:string){
@@ -71,6 +74,7 @@ const visible=computed(()=>view.value?.entries.filter(e=>props.wallet?e.ownRecei
 const performanceOnly=ref(false)
 const details=computed(()=>visible.value.filter(e=>(!performanceOnly.value||e.internal)&&(!typeFilter.value||e.metricType===typeFilter.value)&&(!selected.value||e.payeeId===selected.value||(props.context.role==='admin'&&e.parentId===selected.value))))
 const issues=ref<InstanceType<typeof Issues>>(),issuePanel=ref<HTMLDetailsElement>()
+async function inspectKeyword(entry:Entry){if(issuePanel.value)issuePanel.value.open=true;await nextTick();await issues.value?.inspectKeyword(entry.keyword)}
 async function inspectConflict(entry:Entry){if(issuePanel.value)issuePanel.value.open=true;await nextTick();await issues.value?.inspectFact(entry.factId)}
 const total=(field:keyof Pick<TypeSummary,'payable'|'confirmedPayable'|'pendingPayable'|'receivable'|'confirmedReceivable'|'pendingReceivable'>)=>{
  const value=types.reduce((sum,type)=>{const [whole='0',fraction='']=(view.value?.summary.byType[typeKey(type)][field]??'0').split('.');return sum+BigInt(whole.replace('-',''))*10000n*(whole.startsWith('-')?-1n:1n)+BigInt(fraction.padEnd(4,'0'))*(whole.startsWith('-')?-1n:1n)},0n)
@@ -79,8 +83,9 @@ const total=(field:keyof Pick<TypeSummary,'payable'|'confirmedPayable'|'pendingP
 }
 let timer:ReturnType<typeof setTimeout>|undefined,disposed=false,polling=false
 function post(path:string,data:object={}){return props.context.http.post(path,{...props.context.scope,...data,requestKey:requestKey()})}
-async function refresh(){view.value=await props.context.http.get<View>('/workbench',{...props.context.scope,...period,viewVersion:'2'});detailPage.value=1;if(view.value.entries.some(e=>e.status==='pending'))detailsOpen.value=true}
+async function refresh(){view.value=await props.context.http.get<View>('/workbench',{...props.context.scope,...period,viewVersion:'2'});updatedAt.value=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());detailPage.value=1;if(view.value.entries.some(e=>e.status==='pending'))detailsOpen.value=true}
 async function load(){await refresh();if(admin.value)history.value=(await props.context.http.get<{list:Batch[]}>('/imports',{...props.context.scope,page:1,pageSize:5})).list}
+async function reloadResults(){await load();if(importId.value)await inspectImport(importId.value);await issues.value?.reload()}
 function showError(e:unknown){
  const message=errorText(e);error.value=message;errorHelp.value='';
  const suggested=typeof e==='object'&&e!==null&&'extras' in e?(e as {extras?:{suggestedType?:unknown}}).extras?.suggestedType:undefined
@@ -94,7 +99,7 @@ async function track(id:string){
  polling=true
  try{
   importId.value=id;analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)
-  if(analysis.value.status!=='running'){progress.value='';notice.value=analysis.value.status==='failed'?'报表处理暂时中断，已完成的结果已保留。':'报表已分析完成，人员归属和金额已更新。';await load();await inspectImport(id)}
+  if(analysis.value.status!=='running'){progress.value='';notice.value=analysis.value.status==='failed'?'报表处理暂时中断，已完成的结果已保留。':analysis.value.status==='needs_input'?'报表已读取，仍有待处理记录。'+(analysis.value.conclusion?.pendingText??''):'报表已分析完成，金额与待办已更新。';await reloadResults()}
   else{progress.value='正在分析报表，剩余 '+((analysis.value.progress?.total??0)-(analysis.value.progress?.done??0))+' 条…';timer=setTimeout(()=>{void track(id)},1000)}
  }catch(e){progress.value='';showError(new Error('分析进度暂时无法读取，请刷新查看：'+errorText(e)))}
  finally{polling=false}
@@ -107,7 +112,7 @@ async function upload(){
   const r=await props.context.http.postForm<{id:string;from:string;to:string;duplicate:boolean}>('/workbench/import',form)
   period.from=r.from;period.to=r.to
   if(r.duplicate)notice.value='这份报表已经上传，已为你打开原来的结果，不会重复计账。'
-  await load();await track(r.id)
+  await track(r.id)
  }catch(e){progress.value='';throw e}
 }
 async function confirm(){
@@ -136,6 +141,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
 </script>
 <template>
  <section class="work-section">
+  <div class="engine-actions"><span v-if="updatedAt" role="status">结果更新于 {{updatedAt}}</span><button :disabled="busy" @click="run(async()=>{await reloadResults();notice='已刷新金额与待办，请查看最新处理结果。'})">{{busy?'正在更新…':'刷新结果'}}</button></div>
   <div v-if="admin && !wallet" class="upload-box">
    <div><h2>上传知乎报表，自动计算每个人的金额</h2><p>{{reportType==='activation'?'读取日期、渠道、关键词和拉活量，按拉活单价计算金额。':'读取日期、渠道、关键词、搜索量和订单量，按拉新单价计算金额。'}}</p></div>
    <fieldset class="report-types" :disabled="busy||!!progress"><legend>报表类型</legend><label :class="{chosen:reportType==='new_user'}"><input type="radio" name="reportType" value="new_user" :checked="reportType==='new_user'" @change="chooseReportType('new_user')" /><strong>拉新订单</strong><span>知乎邮件订单报表 · 订单量</span></label><label :class="{chosen:reportType==='activation'}"><input type="radio" name="reportType" value="activation" :checked="reportType==='activation'" @change="chooseReportType('activation')" /><strong>拉活</strong><span>拉活补贴表 · 拉活量</span></label></fieldset>
@@ -144,7 +150,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    <form @submit.prevent="run(upload)"><label>选择报表文件<input ref="uploadInput" type="file" accept=".xlsx,.csv,.xls" required :disabled="busy||!!progress" @change="file=($event.target as HTMLInputElement).files?.[0]??null" /></label><button class="primary" :disabled="busy||!!progress||!file">{{progress?'正在分析…':'上传并自动分析'}}</button></form>
   </div>
   <div v-if="error" role="alert" class="engine-error"><strong>{{error}}</strong><span v-if="errorHelp">{{errorHelp}}</span><button v-if="suggestedType" :disabled="busy" @click="chooseReportType(suggestedType);run(upload)">{{suggestedType==='activation'?'按拉活处理':'按拉新订单处理'}}</button></div><p v-if="notice" role="status">{{notice}}</p><p v-if="progress" role="status">{{progress}}</p>
-  <ReportAnalysis v-if="admin&&!wallet&&analysis" :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" @refresh="run(async()=>{await inspectImport(importId);await refresh()})" />
+  <ReportAnalysis v-if="admin&&!wallet&&analysis" :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" @refresh="run(reloadResults)" />
   <section v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果">
    <h2>{{importResult.fileName}} · 读取结果</h2>
    <p>共读取 {{importTotal}} 行，每行的处理结果都已保留。</p>
@@ -166,18 +172,20 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
    </div>
    <div class="engine-table"><table><thead><tr><th>收款人</th><th>合计（元）</th><th>已确认</th><th>待确认</th><th>下一步</th><th></th></tr></thead><tbody><tr v-for="g in view.groups" :key="g.payeeId"><td>{{g.name}}</td><td>{{money(g.total)}}</td><td>{{money(g.confirmed)}}</td><td>{{money(g.pending)}}</td><td>{{g.blockers.join('；')||(g.ready?'可以确认':'已核对完成')}}</td><td><button @click="openDetails(g.payeeId)">看明细</button></td></tr></tbody></table></div>
    <ul class="bill-cards"><li v-for="g in view.groups" :key="g.payeeId"><strong>{{g.name}} · ¥{{money(g.total)}}</strong><span>已确认 ¥{{money(g.confirmed)}} · 待确认 ¥{{money(g.pending)}}</span><span>{{g.blockers.join('；')||(g.ready?'可以确认':'已核对完成')}}</span><button @click="openDetails(g.payeeId)">看明细</button></li></ul>
-   <p class="empty-state" v-if="!view.groups.length">{{admin?'还没有账单，请先上传报表。':'财务上传报表后，这里会自动显示团队账单。'}}</p>
+   <p class="empty-state" v-if="!view.groups.length">{{view.entries.length?(view.entries.some(e=>e.reasonCode)?'报表已读取，当前记录还在等待处理，暂未生成应付账单。':'本期为管理员本人执行业绩，没有成员应付账单。'):admin?'当前日期范围没有账单，请上传报表或调整日期。':'财务上传报表后，这里会自动显示团队账单。'}}<button v-if="view.entries.length" @click="openDetails('')">查看关键词明细</button></p>
   </div>
   <div v-if="admin && confirming && view" class="confirm-box" role="region" aria-label="核对账单"><h2>确认本期账单</h2><p>{{period.from}} 至 {{period.to}}，本期应付合计 <strong>¥{{money(total('payable'))}}</strong>。</p><p>审核完成的账单会被确认；有待办的账单继续等待处理。此操作不会发起银行转账。</p><label class="check-label"><input type="checkbox" v-model="checked" />我已核对报表、人员和计算金额</label><div class="engine-actions"><button class="primary" :disabled="!checked||busy" @click="run(confirm)">确认核对结果</button><button :disabled="busy" @click="confirming=false">返回检查</button></div></div>
   <details ref="detailPanel" class="work-card bill-details" :open="wallet||detailsOpen" @toggle="detailsOpen=($event.currentTarget as HTMLDetailsElement).open"><summary>{{wallet?'我的收入明细':'查看关键词与金额明细'}}</summary><div class="engine-actions"><button v-if="selected||performanceOnly" @click="selected='';performanceOnly=false;detailPage=1">查看全部人员</button><button v-if="wallet" :disabled="!visible.length" @click="exportBill">导出收入明细</button></div>
    <label class="type-filter">业绩类型<select v-model="typeFilter" @change="detailPage=1"><option value="">全部</option><option value="new_user">拉新</option><option value="activation">拉活</option></select></label>
-   <BillDetails :entries="details" :wallet="wallet" :admin-duty="context.adminDuty" :can-set-rates="admin&&!wallet" :busy="busy" @assign="assignment=$event" @risk="riskEntry" @changes="inspectConflict" @rates="openRates($event.metricType)" />
+   <BillDetails :entries="details" :wallet="wallet" :admin-duty="context.adminDuty" :can-set-rates="admin&&!wallet" :busy="busy" @assign="assignment=$event" @risk="riskEntry" @changes="inspectConflict" @rates="openRates($event.metricType)" @agency="agencyOpen=true" @followup="execution=$event" @match="inspectKeyword" />
   </details>
   <div v-if="wallet&&context.role==='leader'&&view" class="work-card team-performance"><h2>团队业绩与分成</h2><div class="engine-table"><table><thead><tr><th>达人</th><th>订单量</th><th>拉新分成（元）</th><th>拉活量</th><th>拉活分成（元）</th></tr></thead><tbody><tr v-for="g in view.teamPerformance" :key="g.executorId"><td>{{g.name}}</td><td>{{g.orders}}单</td><td>{{money(g.commission)}}</td><td>{{g.activations}}个</td><td>{{money(g.activationCommission)}}</td></tr></tbody></table></div><ul class="team-cards"><li v-for="g in view.teamPerformance" :key="g.executorId"><strong>{{g.name}}</strong><span>拉新 {{g.orders}}单 · 给我的分成 ¥{{money(g.commission)}}</span><span>拉活 {{g.activations}}个 · 给我的分成 ¥{{money(g.activationCommission)}}</span></li></ul></div>
-  <details ref="issuePanel" v-if="admin&&!wallet" class="work-card"><summary>报表问题与更正</summary><Issues ref="issues" :context="context" @changed="run(async()=>{await refresh();if(importId)await inspectImport(importId)})" /></details>
+  <details ref="issuePanel" v-if="admin&&!wallet" class="work-card"><summary>报表问题与更正</summary><Issues ref="issues" :context="context" @navigate="emit('navigate',$event)" @changed="run(async()=>{await refresh();if(importId)await inspectImport(importId)})" /></details>
   <RiskReview :context="context" :item="risk" @close="risk=null" @saved="risk=null;run(async()=>{await refresh();if(importId)await inspectImport(importId)})" />
   <RateSettings v-if="admin&&!wallet" :open="ratesOpen" :project-id="context.scope.projectId" module-id="zhihu" :http="context.coreHttp" :initial-metric-type="ratesType" @close="ratesOpen=false" @published="ratesPublished" />
   <AssignExecutor v-if="assignment" :context="context" :keyword-id="assignment.keywordId" :keyword="assignment.keyword" :from-date="assignment.retroFromDate" @close="assignment=null" @saved="assigned" />
+  <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;notice='代理名称已保存，相关报表已自动更新。';run(reloadResults)" />
+  <ExecutionFollowUp v-if="execution" :key="execution.keywordId" :context="context" :item="execution" @close="execution=null" @changed="run(reloadResults)" @navigate="emit('navigate',$event)" />
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
   <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
   <FinanceHistoryLinks />

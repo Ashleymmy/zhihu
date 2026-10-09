@@ -2,14 +2,14 @@
 import {computed,ref,watch} from 'vue'
 import {DataGrid,type DataGridRow} from '@zhihu-koc/shared-components'
 import {errorText,requestKey,type EngineContext} from './context'
-const props=defineProps<{context:EngineContext;batchId?:string}>()
+const props=defineProps<{context:EngineContext;batchId?:string;keywordId?:string}>()
 const emit=defineEmits<{changed:[]}>()
 interface Work {bindingId:string;keyword:string;executorName:string;verificationStatus:string;evidenceId:string|null;workUrl:string|null;description:string|null;status:string|null;reason:string|null;canSubmit:boolean;canReview:boolean;canResolve:boolean}
 const grid=ref<InstanceType<typeof DataGrid>>(),list=ref<Work[]>([]),selected=ref<Work|null>(null),page=ref(1),total=ref(0),busy=ref(false),error=ref(''),formError=ref(''),url=ref(''),description=ref(''),reject=ref(false),reason=ref('')
 const rows=computed<DataGridRow[]>(()=>list.value.map(work=>({id:work.bindingId,title:work.keyword,
  status:{key:work.verificationStatus==='disputed'?'disputed':work.status??'missing',label:work.verificationStatus==='disputed'?'作品有争议':work.status==='pending'?'作品待核验':work.status==='rejected'?'作品已退回':'还没有登记作品',tone:work.status==='pending'?'warning':'danger',description:'补齐并核验后，相关报表自动更新。'},
  cells:{executor:work.executorName},next:work.verificationStatus==='disputed'?{actor:'运营',text:'核实作品归属',action:{key:'detail',label:work.canResolve?'核实作品争议':'查看作品'}}:{actor:work.status==='pending'?'团长或运营':work.executorName,text:work.status==='pending'?'核验作品':'补登记作品',action:{key:'detail',label:work.canReview?'核验作品':work.status==='pending'?'查看作品':'补登记作品'}},viewKeys:['all']})))
-async function load(){busy.value=true;error.value='';try{const result=await props.context.http.get<{list:Work[];total:number}>('/evidence/historical-tasks',{...props.context.scope,...(props.batchId?{batchId:props.batchId}:{}),page:page.value,pageSize:25});list.value=result.list;total.value=result.total;if(selected.value)selected.value=list.value.find(work=>work.bindingId===selected.value?.bindingId)??null}catch(e){error.value=errorText(e)}finally{busy.value=false}}
+async function load(){busy.value=true;error.value='';try{const result=await props.context.http.get<{list:Work[];total:number}>('/evidence/historical-tasks',{...props.context.scope,...(props.batchId?{batchId:props.batchId}:{}),...(props.keywordId?{keywordId:props.keywordId}:{}),page:page.value,pageSize:25});list.value=result.list;total.value=result.total;if(selected.value)selected.value=list.value.find(work=>work.bindingId===selected.value?.bindingId)??null}catch(e){error.value=errorText(e)}finally{busy.value=false}}
 function inspect(row:DataGridRow){selected.value=list.value.find(work=>work.bindingId===row.id)??null;url.value='';description.value='';reason.value='';reject.value=false;formError.value=''}
 async function save(accept?:boolean){if(!selected.value)return;busy.value=true;formError.value='';try{
  const work=selected.value;
@@ -18,7 +18,7 @@ async function save(accept?:boolean){if(!selected.value)return;busy.value=true;f
  else await props.context.http.post('/evidence/'+work.evidenceId+'/review',{...props.context.scope,accept,reason:accept?'已核对历史作品和执行人':reason.value,requestKey:requestKey()})
  await load();emit('changed')
  }catch(e){formError.value=errorText(e)}finally{busy.value=false}}
-watch(()=>[props.context.scope.projectId,props.context.scope.accountId,props.batchId],()=>{page.value=1;selected.value=null;void load()},{immediate:true})
+watch(()=>[props.context.scope.projectId,props.context.scope.accountId,props.batchId,props.keywordId],()=>{page.value=1;selected.value=null;void load()},{immediate:true})
 </script>
 <template>
  <section v-if="list.length||error" class="historical-works">
