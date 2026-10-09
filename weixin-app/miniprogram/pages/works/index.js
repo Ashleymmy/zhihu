@@ -41,6 +41,7 @@ Page(
     },
     close(){if(!this.data.busy)this.setData({selected:null,error:''});},
     editInput(e){this.setData({['form.'+e.currentTarget.dataset.field]:e.detail.value});},
+    normalizeWorkUrl(e){this.setData({'form.url':composition.extractUrl(e.detail.value)});},
     editPlatform(e){this.setData({'form.platformIndex':Number(e.detail.value)});},
     editType(e){const index=Number(e.detail.value);this.setData({'form.workTypeIndex':index,'form.contentTypeIndex':0,categories:composition.categories(index).map(t=>t.label)});},
     editCategory(e){this.setData({'form.contentTypeIndex':Number(e.detail.value)});},

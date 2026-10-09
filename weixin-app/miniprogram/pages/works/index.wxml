@@ -22,7 +22,7 @@
     <view class="muted">{{selected.keyword}} · 已填入上次信息，可直接修改。</view>
     <view class="field"><text class="field-label">发布平台</text><picker range="{{platforms}}" value="{{form.platformIndex}}" bindchange="editPlatform"><view class="input">{{form.platformIndex >= 0 ? platforms[form.platformIndex] : '请选择'}} ▾</view></picker></view>
     <view class="field"><text class="field-label">平台账号</text><input value="{{form.mediaAccount}}" data-field="mediaAccount" bindinput="editInput" maxlength="128" /></view>
-    <view class="field"><text class="field-label">作品链接</text><input value="{{form.url}}" data-field="url" bindinput="editInput" maxlength="1024" /></view>
+    <view class="field"><text class="field-label">作品链接</text><input value="{{form.url}}" data-field="url" bindinput="editInput" bindblur="normalizeWorkUrl" maxlength="-1" placeholder="粘贴作品链接或完整分享文本" /><text class="muted">自动提取链接，无需手动删除分享文案。</text></view>
     <view class="field"><text class="field-label">作品类型</text><picker range="{{types}}" value="{{form.workTypeIndex}}" bindchange="editType"><view class="input">{{types[form.workTypeIndex]}} ▾</view></picker></view>
     <view class="field"><text class="field-label">作品子分类</text><picker range="{{categories}}" value="{{form.contentTypeIndex}}" bindchange="editCategory"><view class="input">{{form.contentTypeIndex >= 0 ? categories[form.contentTypeIndex] : '请选择'}} ▾</view></picker></view>
     <view class="field"><text class="field-label">发布日期</text><picker mode="date" value="{{form.publishDate}}" bindchange="editDate"><view class="input">{{form.publishDate || '请选择'}} ▾</view></picker></view>
