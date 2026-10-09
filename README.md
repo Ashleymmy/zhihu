@@ -130,6 +130,10 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 
 本次备份为 `precutover-20261009T084456Z/`（SQL 2227477 字节，SHA-256 `7e71076075167ee50aa1eb27503d2ab6450e4527200fee5ef5a869e1f979140d`），回执为 `feedback-cutover-20261009T084532Z/receipt.json`。兼容回退保留 `zhihu-green-4bcfdec`（3214）及已停止的 `zhihu-worker-4bcfdec`；回退仍沿用现有数据库并确保仅一个后台消费者。发布包从提交归档构建，明确排除本地尚在验证的小程序页面及新业绩接口。
 
+北京时间 17:29 发布 `2fc2fd8`（报表清理与重分析 `22234da` 合入，同时包含只读业绩及作品筛选 `b3c917b`）：当前 HTTP/HTTPS 入口为 `zhihu-green-2fc2fd8`（3216），后台 `zhihu-worker-2fc2fd8`，镜像摘要 `sha256:f4a9cf7f4555647a56dd37e85a9c4f04ba5ef4f31ce990fdc128832c93222a11`。先备份，再执行纯加表迁移 `037_import_history.sql`，既有报表、账目和资金记录逐行指纹一致。候选及公网健康/页面 200，受保护接口未登录 401，API/后台零重启；仅交接队列后台，API 未暂停，历史失败数仍 36。旧 446 个静态资源全部保留，现 578 个。
+
+备份为 `precutover-20261009T092831Z/`（SQL 2245202 字节，SHA-256 `09dcbbac7ebb49c0a6a81f8c803f3b51c4734eb051c9f162c1710e5e08d06ee9`），迁移回执 `migration-037-2fc2fd8.json`，切换回执 `feedback-cutover-20261009T092920Z/receipt.json`。保留兼容回退 API `zhihu-green-c15487a`（3215），其后台 `zhihu-worker-c15487a` 已停止；回退可保留新表和现有数据，仍仅运行一个消费者。发布包来自干净提交归档，不含本地未完成验收的小程序页面。
+
 ## 知乎模块历史功能说明
 
 ### 推广计划管理
