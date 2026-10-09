@@ -134,6 +134,10 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 
 备份为 `precutover-20261009T092831Z/`（SQL 2245202 字节，SHA-256 `09dcbbac7ebb49c0a6a81f8c803f3b51c4734eb051c9f162c1710e5e08d06ee9`），迁移回执 `migration-037-2fc2fd8.json`，切换回执 `feedback-cutover-20261009T092920Z/receipt.json`。保留兼容回退 API `zhihu-green-c15487a`（3215），其后台 `zhihu-worker-c15487a` 已停止；回退可保留新表和现有数据，仍仅运行一个消费者。发布包来自干净提交归档，不含本地未完成验收的小程序页面。
 
+北京时间 22:16 发布财务旧作品衔接 `2fda998`（实施提交 `4a2b526` 合入）：两处入口切到 `zhihu-green-2fda998`（3217），后台为 `zhihu-worker-2fda998`，镜像摘要 `sha256:84118fd253d646c4f0e5ea38ec55bc0fccf48d2050c41ec970bb49521e980974`。无结构迁移；备份后用无外网数据库副本运行显式修复，预览不写数据、重复应用不重复改变业务结果，已确认账、资金、原作品、用户及单价逐行不变。生产刷新已有作品相关的 3 条未确认记录，实际改变 1 条执行核验、1 条计算结果，其余仅更新展示指引；没有确定缺失执行人或确认真实账单。切换时接口暂停 10.09 秒，随后恢复；新 API/后台零重启、无新增错误，队列等待/执行中/延迟均为 0，既有失败数仍为 36。原 578 个静态资源全部保留，新包共 711 个。公网健康及页面 200，受保护的新旧接口未登录 401；实际已登录财务页面可看到待确认金额、执行人和原作品。
+
+本次备份为 `precutover-20261009T140911Z/`（SQL 2248869 字节，SHA-256 `7be4634a0c53bc9f943ec5e5331f4075c670b4b1b78972fc69dde75262b98622`），隔离验证回执 `reconciliation-rehearsal-2fda998.json`，发布及修复回执 `feedback-cutover-20261009T141635Z/receipt.json`、`repair.json`，发布后检查 `post-reconciliation-2fda998.json`，均位于服务器 bluegreen 私有目录。兼容回退保留 `zhihu-green-2fc2fd8`（3216）及已停止的 `zhihu-worker-2fc2fd8`；回退保留现有数据库，并保持单个后台消费者。本轮严格按用户恢复范围只更新 Web/API，未修改、上传或发布小程序。
+
 ## 知乎模块历史功能说明
 
 ### 推广计划管理
