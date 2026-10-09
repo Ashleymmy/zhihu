@@ -17,6 +17,7 @@ export { vReveal } from "./vReveal";
 export { default as PlatformDashboard } from "./PlatformDashboard.vue";
 export { default as ModuleDirectory } from "./ModuleDirectory.vue";
 export { default as PublicFinance } from "./PublicFinance.vue";
+export { default as PlatformIncome } from "./PlatformIncome.vue";
 export { default as ProjectIntegrations } from "./ProjectIntegrations.vue";
 export type { CoreWorkspace } from "./core-workspace";
 

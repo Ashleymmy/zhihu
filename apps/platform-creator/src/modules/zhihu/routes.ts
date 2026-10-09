@@ -3,7 +3,7 @@ export const modulePages: RouteRecordRaw[] = [
 {path:'more',name:'zhihu-more',component:()=>import('./views/MoreFunctionsView.vue'),meta:{moduleId:'zhihu',title:'更多功能'}},
 {path:'works/new',name:'zhihu-register-work',component:()=>import('./views/StoryWorksView.vue'),meta:{moduleId:'zhihu',title:'登记作品'}},
 {path:'operations',name:'zhihu-operations',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'operations',title:'我的关键词'}},
-{path:'wallet',name:'zhihu-wallet',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'wallet',title:'收入与提现'}},
+{path:'wallet',name:'zhihu-wallet',redirect:to=>({path:'/income',query:to.query})},
 
   {
     path: 'dashboard',
