@@ -17,6 +17,16 @@ OPC 提供公共身份、组织、项目、模块接入和统一工作台。知�
 
 `server/examples/sample-api` 演示第二个 API 型项目接入同一任务与待办页面，仅连接本地模拟服务，不注册到生产。验证命令：`cd server && npx vitest run --config vitest.opc.config.ts tests/opc/tasks.integration.spec.ts tests/opc/boundaries.spec.ts`；知乎适配器验证为 `npx vitest run --config vitest.attribution.config.ts tests/attribution/platform-tasks.spec.ts`。真实页面回归为 `node tests/attribution-ui/platform-tasks.cjs`，使用隔离数据库与模拟上游，需先完成 Web 构建并配置本机 Playwright。
 
+## 平台收益数据
+
+平台迁移 `015_earning_lines.sql` 新增收益来源和按收款人保存的收益明细。模块在自己的计算事务内调用 `core/earnings.ts` 的 `writeEarningLines(connection, scope, input)`，提交任务名称、业务日期、业绩类型、本人数量与单价、金额、阻塞原因和下一步。没有金额时传 `null`；管理员业绩标记为 `internal`。财务确认通过 `confirmEarningSource` 从这些明细生成公共资金分配，确认后的收益行不再修改，更正生成新行和资金差额。
+
+平台读取使用 `GET /api/v1/core/earnings/mine`，支持日期、项目、账号、业绩类型、本人作品/团队分成、搜索与分页；收款人始终来自登录身份，运营岗位无金额权限。返回 `scopes`、当前页 `list`、按项目及类型的 `groups` 和 `summary`。`GET /api/v1/core/earnings/:id/history` 只返回本人的确认与更正凭据。关闭模块后不返回其收益入口或数据；这些接口不查询任何项目专属表。
+
+已有知乎计算结果在发布时需要补入新收益表。在已配置目标数据库的服务目录运行 `npx tsx scripts/backfill-earning-lines.ts --project 项目ID --account 账号ID --actor 财务人员ID`，默认只预览；检查后增加 `--apply`。每个项目账号分别执行，整个范围在同一事务并使用业务锁；补录不重新计算，不改原报表、确认账和资金行，重复执行没有新增工作。先在备份隔离副本演练，再由发布流程执行。旧版本不会更新新收益表，因此切换收益页面前应退出旧计算实例、补齐已有记录，并保持 API 与后台使用同一兼容版本；回退保留新表和数据。
+
+收益后端验证：`cd server && npx vitest run tests/opc/earnings.integration.spec.ts tests/attribution/workbench.spec.ts tests/attribution/staff-self.spec.ts tests/opc/boundaries.spec.ts`。平台收益页面仍在接线时，现有财务及收益兼容页面继续工作。
+
 ## 历史账目
 
 模块可用可选 `financeHistoryPath` 声明只读历史入口；共享 `FinanceHistoryLinks` 从模块目录生成折叠入口。知乎旧收益、提现、申诉、结算及邮件 / Excel 页面保留原地址，统一显示只读记录、详情和去新财务入口。历史金额只按原存储单位显示，不重算或写回；团长及达人只读本人金额，运营岗位不能读取资金记录。历史发票仍可由本人或财务下载。

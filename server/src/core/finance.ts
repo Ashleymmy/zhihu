@@ -47,6 +47,7 @@ export async function syncIncome(c:PoolConnection,u:AuthUser,s:FinanceScope,inpu
 }
 export async function blockIncome(c:PoolConnection,s:FinanceScope,sourceKey:string,reason:string){
  await lockFinance(c,s);await c.query('UPDATE opc_income_sources SET blocked_reason=? WHERE module_id=? AND account_id=? AND source_key=?',[reason,s.moduleId,s.accountId,sourceKey]);
+ await c.query('UPDATE opc_earning_sources SET blocked_reason=? WHERE module_id=? AND project_id=? AND account_id=? AND source_key=?',[reason,s.moduleId,s.projectId,s.accountId,sourceKey]);
 }
 async function balance(c:PoolConnection,u:AuthUser,s:FinanceScope){
  const [income]=await q(c,`SELECT CAST(COALESCE(SUM(e.amount),0) AS CHAR) confirmed,

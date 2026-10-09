@@ -7,7 +7,9 @@ import {authorize,select,json,audit} from './store';
 import {businessDay,day,digest,fail,money,moneyText,type Scope} from './domain';
 import {assertDuty,dutyAllows} from '../../../core/duties';
 import {ownershipHistorySql,unconfirmedFactSql} from './keyword-usability';
-import {lockFinance,syncIncome} from '../../../core/finance';
+import {lockFinance} from '../../../core/finance';
+import {confirmEarningSource} from '../../../core/earnings';
+import {projectEarnings} from './earning-lines';
 import {parseReport,assertReportWriteEnabled,type MetricType,type ReportKind,type SourceRow} from './report';
 import {reasonText} from './reasons';
 import type {AllianceUploadFile} from '../zhihu/allianceXlsx';
@@ -17,19 +19,10 @@ import * as statements from './statements';
 import * as cutover from './cutover';
 import {reportComparison} from './report-comparison';
 import {internalPerformance} from './executor';
+import {allocations} from './allocations';
 export interface Period{from:string;to:string;metricType?:MetricType}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
-export function allocations(snapshot:AttributionSnapshot){
- const values=new Map<string,bigint>();let total=0n,staffAmount=0n;
- for(const o of snapshot.obligations){
-  const amount=money(o.amount);
-  if(internalPerformance(o.relation)){staffAmount+=amount;continue;}
-  if(o.relation==='agency_leader'||o.relation==='agency_creator'||o.relation.startsWith('activation:')){values.set(o.payeeId,(values.get(o.payeeId)??0n)+amount);total+=amount;}
-  else if(o.relation==='leader_creator'){values.set(o.payeeId,(values.get(o.payeeId)??0n)+amount);values.set(o.payerId,(values.get(o.payerId)??0n)-amount);}
- }
- if([...values.values()].some(v=>v<0n))fail('团队分配超过平台应付，请核对定价规则',409);
- return{total:moneyText(total),staffAmount:moneyText(staffAmount),list:[...values].map(([userId,amount])=>({userId,amount:moneyText(amount)}))};
-}
+export {allocations} from './allocations';
 export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUploadFile,reportType:MetricType='new_user'){
  assertDuty(user,'finance');await authorize(user,scope);
  scope={projectId:scope.projectId,accountId:scope.accountId};
@@ -178,9 +171,9 @@ export async function confirmBills(user:AuthUser,scope:Scope,period:Period,key:s
   if(route.mode==='trial'){await c.query("UPDATE zh_engine_routes SET mode='enabled',sample_verified=1,reason=?,updated_by=? WHERE id=?",['财务在做账页面已核对当前报表金额',user.sub,route.id]);await audit(c,user,'engine.finance-review',String(route.id),{period});}
   const ready=[...new Map(view.entries.filter(e=>e.ready).map(e=>[e.factId,e])).values()];
   for(const e of ready){
-   const snapshot=await statements.confirmFinancialFact(c,user,scope,e.factId,e.resultId,e.revisionId);
-   const target=allocations(snapshot);
-   await syncIncome(c,user,common,{sourceKey:'fact:'+e.factId,version:e.resultId,date:e.date,description:e.keyword,allocations:target.list,total:target.total});
+   await statements.confirmFinancialFact(c,user,scope,e.factId,e.resultId,e.revisionId);
+   await projectEarnings(c,scope,e.factId);
+   await confirmEarningSource(c,user,common,'fact:'+e.factId,e.resultId);
   }
   await audit(c,user,'workbench.confirm',scope.projectId,{key,period,count:ready.length});
   return{confirmed:ready.length,waiting:new Set(view.entries.filter(e=>!e.internal&&!['confirmed','excluded'].includes(e.status)&&!e.ready).map(e=>e.factId||e.id)).size};

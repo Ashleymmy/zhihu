@@ -63,6 +63,8 @@ it('拉新十元和拉活两元只记录管理员业绩，作品核验提示保�
  await upload('本人执行词','3');await upload('本人执行词','4','activation');
  const current=await view(),entries=current.entries.filter(e=>e.keyword==='本人执行词');
  expect(current.summary).toMatchObject({staffAmount:'38.0000',payable:'16.0000'});
+ const own=await request(app).get('/api/v1/core/earnings/mine').set(headers[admin.sub]).query({from:date,to:date});expect(own.status,own.text).toBe(200);expect(own.body.data.summary).toMatchObject({amount:'0.0000',internalAmount:'38.0000'});expect(own.body.data.list.map((l:{metricType:string})=>l.metricType).sort()).toEqual(['activation','new_user']);
+ expect(own.body.data.list.every((l:{isInternal:number;confirmedAmount:string})=>l.isInternal===1&&l.confirmedAmount==='0.0000')).toBe(true);
  expect(current.summary.byType.new_user.staffAmount).toBe('30.0000');expect(current.summary.byType.activation.staffAmount).toBe('8.0000');
  expect(entries).toHaveLength(2);expect(entries.every(e=>e.internal&&!e.ready&&!e.ownReceivable&&e.pendingAmount==='0.0000'&&e.reasonCode==='WORK_MISSING')).toBe(true);
  expect(entries.find(e=>e.metricType==='new_user')?.calculation).toEqual({quantity:'3',unitPrice:'10.0000',beforeRiskAmount:'30.0000'});
