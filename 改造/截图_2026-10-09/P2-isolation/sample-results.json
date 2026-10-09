@@ -1,0 +1,117 @@
+{
+  "mode": "sample",
+  "results": [
+    {
+      "role": "admin",
+      "route": "dashboard",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "admin",
+      "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "operations",
+      "route": "dashboard",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "operations",
+      "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "finance",
+      "route": "dashboard",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader",
+      "route": "dashboard",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader",
+      "route": "task-hall",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader",
+      "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator",
+      "route": "dashboard",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator",
+      "route": "task-hall",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator",
+      "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "independent",
+      "route": "dashboard",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "independent",
+      "route": "task-hall",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "independent",
+      "route": "tasks",
+      "widths": [
+        1440,
+        375
+      ]
+    }
+  ]
+}

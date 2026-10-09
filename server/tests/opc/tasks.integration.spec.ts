@@ -205,3 +205,10 @@ it('rejects disabled projects on list, detail and write endpoints', async () => 
     await c.query('UPDATE projects SET is_enabled=1 WHERE id=1');
   }
 });
+
+it('keeps intentionally disabled task modules out of the project selector and preserves failed sources',async()=>{
+ const {ModuleRuntime}=await import('../../src/core/module-runtime'),{createCoreApp}=await import('../../src/core/app');
+ const empty=new ModuleRuntime([sampleManifest]),emptyApp=createCoreApp(empty);
+ const result=await request(emptyApp).get('/api/v1/core/tasks').set(headers['2']);expect(result.status).toBe(200);expect(result.body.data).toEqual({projects:[],groups:[]});
+ empty.failures.set(sampleManifest.id,'initialization_failed');const failed=await request(emptyApp).get('/api/v1/core/tasks').set(headers['2']);expect(failed.status).toBe(200);expect(failed.body.data.groups[0].status).toBe('unavailable');
+});
