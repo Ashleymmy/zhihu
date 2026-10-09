@@ -126,6 +126,10 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 
 补发前备份在 `precutover-20261009T051521Z/`，回执在 `guidance-cutover-20261009T051551Z/receipt.json`（均位于上述 bluegreen 目录）。`7a106e3-b` 的 3213 入口实例保留，`zhihu-worker-7a106e3` 已停止；它们可以作为本次只读修复的兼容回退版本。回退时仍只运行一个后台消费者实例，保留当前数据库，不恢复 `5ff5794`。
 
+北京时间 16:45 发布用户反馈修复 `c15487a`（实施提交 `31aeeff`）：当前 HTTP/HTTPS 入口均为 `zhihu-green-c15487a`（3215），后台 `zhihu-worker-c15487a`，镜像摘要 `sha256:a39bfb0faead7e4956aa1e773084253413fdb0dea77d11045652f8ea10381483`。原同名计划与执行人可在报表分析中核对沿用，历史开始日期和作品可从明细处理，保存后更新状态、金额及待办。本次无迁移或自动数据修复，未暂停 API；旧 314 个静态资源全部保留，新包共 446 个。公网页面/健康 200、受保护接口未登录 401、API/后台零重启，队列恢复且失败仍为既有 36 条。
+
+本次备份为 `precutover-20261009T084456Z/`（SQL 2227477 字节，SHA-256 `7e71076075167ee50aa1eb27503d2ab6450e4527200fee5ef5a869e1f979140d`），回执为 `feedback-cutover-20261009T084532Z/receipt.json`。兼容回退保留 `zhihu-green-4bcfdec`（3214）及已停止的 `zhihu-worker-4bcfdec`；回退仍沿用现有数据库并确保仅一个后台消费者。发布包从提交归档构建，明确排除本地尚在验证的小程序页面及新业绩接口。
+
 ## 知乎模块历史功能说明
 
 ### 推广计划管理
