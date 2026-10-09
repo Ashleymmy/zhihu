@@ -4,6 +4,7 @@ const path = require('node:path'),
 module.exports = async ({ browser, port, out, date }) => {
   const base = `http://127.0.0.1:${port}`,
     results = [];
+  let financeHeaders;
   for (const [role, username, password] of [
     ['admin', 'admin', 'Admin123456!'],
     ['finance', 'review_finance', 'Review123456'],
@@ -58,6 +59,7 @@ module.exports = async ({ browser, port, out, date }) => {
         'X-Client-Id': login.request().headers()['x-client-id'],
       };
       if (role === 'admin') {
+        financeHeaders = headers;
         await page.goto(base + '/app/finance');
         await page.getByRole('radio', { name: /^拉活/ }).check();
         await page
@@ -144,6 +146,21 @@ module.exports = async ({ browser, port, out, date }) => {
           await loaded();
           assert((await page.locator('.income-totals').innerText()).includes(role === 'leader' ? '¥1.60' : '¥4.80'));
           await shot('activation');
+          const evidenceResponse=await context.request.get(base+'/api/v1/modules/zhihu/evidence?projectId=1&accountId=1&page=1&pageSize=100',{headers:financeHeaders});
+          assert.equal(evidenceResponse.status(),200);
+          const evidence=(await evidenceResponse.json()).data.list.find(row=>row.keyword==='重生千金');assert(evidence);
+          for(const resolve of [false,true]){
+            const disputed=await context.request.post(base+`/api/v1/modules/zhihu/evidence-bindings/${evidence.bindingId}/dispute`,{headers:financeHeaders,data:{projectId:'1',accountId:'1',resolve,reason:resolve?'隔离核实已完成':'隔离争议检查',requestKey:require('node:crypto').randomUUID()}});
+            assert.equal(disputed.status(),200,await disputed.text());
+            await page.goto(base+'/app/income');await loaded();
+            const line=page.locator('.grid-row').filter({hasText:'重生千金'}).filter({hasText:'拉新'});
+            await line.getByText(resolve?'财务：重新核对金额':'运营：核实作品归属',{exact:true}).waitFor({state:'attached'});
+            await shot(resolve?'dispute-resolved':'disputed');
+          }
+          const bills=await context.request.get(base+`/api/v1/modules/zhihu/workbench?projectId=1&accountId=1&from=${date}&to=${date}&viewVersion=2`,{headers:financeHeaders});assert.equal(bills.status(),200);
+          const reviewed=await context.request.post(base+'/api/v1/modules/zhihu/workbench/confirm',{headers:financeHeaders,data:{projectId:'1',accountId:'1',from:date,to:date,viewVersion:'2',reviewHash:(await bills.json()).data.reviewHash,acknowledged:true,requestKey:require('node:crypto').randomUUID()}});assert.equal(reviewed.status(),200,await reviewed.text());
+          await page.goto(base+'/app/income');await loaded();
+          assert((await page.locator('.income-totals').innerText()).includes('¥'+expected));
         }
         if (role === 'creator') {
           await page.getByRole('button', { name: '申请提现', exact: true }).click();

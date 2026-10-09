@@ -23,6 +23,8 @@ OPC 提供公共身份、组织、项目、模块接入和统一工作台。知�
 
 平台读取使用 `GET /api/v1/core/earnings/mine`，支持日期、项目、账号、业绩类型、本人作品/团队分成、搜索与分页；收款人始终来自登录身份，运营岗位无金额权限。返回 `scopes`、当前页 `list`、按项目及类型的 `groups` 和 `summary`。`GET /api/v1/core/earnings/:id/history` 只返回本人的确认与更正凭据。关闭模块后不返回其收益入口或数据；这些接口不查询任何项目专属表。
 
+`016_earning_source_actions.sql` 为当前来源状态补充可空的下一步指引，可重复执行；模块调用 `blockIncome` 时可同时提供处理人和动作。发生争议时平台显示最新处理指引，解除后再由财务核对，原确认收益行及资金行不改写。升级 API 前先执行平台迁移；旧版忽略该新增字段，回退保留字段及数据。
+
 已有知乎计算结果在发布时需要补入新收益表。在已配置目标数据库的服务目录运行 `npx tsx scripts/backfill-earning-lines.ts --project 项目ID --account 账号ID --actor 财务人员ID`，默认只预览；检查后增加 `--apply`。每个项目账号分别执行，整个范围在同一事务并使用业务锁；补录不重新计算，不改原报表、确认账和资金行，重复执行没有新增工作。先在备份隔离副本演练，再由发布流程执行。旧版本不会更新新收益表，因此切换收益页面前应退出旧计算实例、补齐已有记录，并保持 API 与后台使用同一兼容版本；回退保留新表和数据。
 
 收益后端验证：`cd server && npx vitest run tests/opc/earnings.integration.spec.ts tests/attribution/workbench.spec.ts tests/attribution/staff-self.spec.ts tests/opc/boundaries.spec.ts`。平台 `/income` 汇总各项目的本人收益，支持查看计算过程、确认与更正凭据，并进入项目任务和提现。

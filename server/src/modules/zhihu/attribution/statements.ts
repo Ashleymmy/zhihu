@@ -107,6 +107,7 @@ export async function disputeBinding(
         { ...scope, moduleId: 'zhihu' },
         'fact:' + f.id,
         resolve ? '争议已解除，待财务重新核对' : '作品存在争议',
+        resolve ? '财务：重新核对金额' : '运营：核实作品归属',
       );
     await audit(c, user, resolve ? 'evidence.resolve-dispute' : 'evidence.dispute', id, { reason });
     if(resolve)await refreshUnconfirmedKeyword(c,scope,String(binding.keyword_id));

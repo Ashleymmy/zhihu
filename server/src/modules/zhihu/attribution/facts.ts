@@ -233,7 +233,7 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
   });
 }
 async function exception(c: PoolConnection, scope: Scope, rowId: string | null, factId: string | null, code: string) {
-  if(factId) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+factId,'来源数据待核对');
+  if(factId) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+factId,'来源数据待核对',reasonText(code).next);
   const exists = await select(
     c,
     "SELECT id FROM zh_exceptions WHERE source_row_id<=>? AND fact_id<=>? AND reason_code=? AND status='open'",

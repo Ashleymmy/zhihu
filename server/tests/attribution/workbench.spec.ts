@@ -164,11 +164,26 @@ describe('简化工作台完整资金流程',()=>{
   expect((await finance.financeOverview(b,common())).withdrawals).toHaveLength(0);
  });
  it('作品争议阻止审核付款，解除后仍需财务重新核对',async()=>{
+  const originalLines=await q('SELECT * FROM opc_earning_lines ORDER BY id'),originalCash=await q('SELECT * FROM opc_income_entries ORDER BY id');
+  const earning=async()=>{
+   const response=await get(a,'/api/v1/core/earnings/mine',{from:day,to:day});expect(response.status,response.text).toBe(200);
+   return response.body.data.list.find((row:{taskName:string})=>row.taskName==='联测词0');
+  };
   await statements.disputeBinding(ops,scope,bindingA,key(),false,'测试争议');
+  expect(await earning()).toMatchObject({reason:'作品存在争议',nextAction:'运营：核实作品归属',isReady:0,amount:'232.0000'});
+  expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(originalLines);
+  const beforeMigration=await q('SELECT * FROM opc_earning_sources ORDER BY id');
+  const migration=await (await import('node:fs/promises')).readFile('schema/extensions/016_earning_source_actions.sql','utf8');
+  for(let repeat=0;repeat<2;repeat++)for(const sql of migration.split(/;\s*(?:\r?\n|$)/).filter(sql=>sql.trim()))await c.query(sql);
+  expect(await q('SELECT * FROM opc_earning_sources ORDER BY id')).toEqual(beforeMigration);
   await expect(finance.reviewWithdrawal(fin,common(),withdrawal,'approve','')).rejects.toThrow('来源金额或状态');
   await statements.disputeBinding(ops,scope,bindingA,key(),true,'测试解除');
+  expect(await earning()).toMatchObject({reason:'争议已解除，待财务重新核对',nextAction:'财务：重新核对金额',isReady:0});
+  expect(await q('SELECT * FROM opc_earning_lines ORDER BY id')).toEqual(originalLines);
+  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(originalCash);
   await expect(finance.reviewWithdrawal(fin,common(),withdrawal,'approve','')).rejects.toThrow('来源金额或状态');
   const v=await workbench.overview(fin,scope,{from:day,to:day});await workbench.confirmBills(fin,scope,{from:day,to:day},key(),v.reviewHash);
+  expect(await earning()).toMatchObject({reason:'',nextAction:'财务：核对并确认金额',isReady:1,amount:'232.0000'});
   await finance.reviewWithdrawal(fin,common(),withdrawal,'approve','测试审核');
  });
  it('付款必须有凭证；重复登记不会付款两次，凭证只供财务和本人查看',async()=>{
