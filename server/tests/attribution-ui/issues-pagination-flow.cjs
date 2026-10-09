@@ -25,6 +25,11 @@ module.exports=async function issuesPagination({browser,port,out}){
     if(keyword){await section.getByLabel('搜索关键词',{exact:true}).fill(keyword);await section.getByRole('button',{name:'查找',exact:true}).click();await loaded();assert((await section.locator('.grid-row').count())>0);await shot('search');}
     await section.getByLabel('搜索关键词',{exact:true}).fill('不存在的隔离测试关键词');await section.getByRole('button',{name:'查找',exact:true}).click();await loaded();await section.getByText('没有找到这个关键词，清空搜索后可查看其他待办。',{exact:true}).waitFor();assert.equal(await section.locator('.grid-row').count(),0);await shot('empty');
     await section.getByRole('button',{name:'清空搜索',exact:true}).click();await loaded();assert.equal(await section.locator('.grid-row').count(),Math.min(expected.total,25));
+    if(role==='admin'||role==='operations'){
+     await page.setViewportSize({width:1440,height:1100});await section.getByRole('button',{name:'指定执行人',exact:true}).click();const dialog=page.getByRole('dialog',{name:'指定执行人 · 悬疑短篇',exact:true});await dialog.getByLabel('执行人',{exact:true}).selectOption('3');assert.equal(await page.locator('dialog[open]').count(),1);await shot('assign');
+     if(role==='admin')await dialog.getByRole('button',{name:'取消',exact:true}).click();
+     else{await dialog.getByRole('button',{name:'确定',exact:true}).click();await dialog.waitFor({state:'hidden'});await section.getByText('已指定给 小李，相关报表已自动更新。',{exact:true}).waitFor();await loaded();assert.equal(await section.getByRole('button',{name:'指定执行人',exact:true}).count(),0);await shot('assigned');}
+    }else assert.equal(await section.getByRole('button',{name:'指定执行人',exact:true}).count(),0);
    }else{assert.equal(response.status(),403);await page.goto(base+'/app/data-issues');await page.getByRole('heading',{level:1}).waitFor();assert.equal(await page.locator('.issues').count(),0);await shot('restricted');}
    assert.deepEqual(errors,[]);results.push({role,widths:[1440,375],errors});console.log(role+' 数据待办分页验收通过');
   }catch(error){await page.screenshot({path:path.join(out,'failed-issues-'+role+'.png'),fullPage:true});fs.writeFileSync(path.join(out,'failed-issues-'+role+'.txt'),await page.locator('body').innerText());throw error;}

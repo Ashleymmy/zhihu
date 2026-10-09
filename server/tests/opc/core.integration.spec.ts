@@ -11,6 +11,7 @@ import { createSampleModule, sampleManifest } from '../../examples/sample-api/mo
 let container: StartedMySqlContainer, conn: mysql.Connection, app: Express, upstream: Server;
 let pool: typeof import('../../src/db').db;
 let adminToken: string, creatorToken: string;
+const clientId = 'independent-core-integration-client';
 let target: { host: string; port: number; database: string; user: string; password: string };
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
@@ -61,13 +62,24 @@ beforeAll(async () => {
   app = createCoreApp(runtime);
   pool = (await import('../../src/db')).db;
   const { signToken } = await import('../../src/auth/jwt');
-  adminToken = await signToken({ id: '1', role: 'admin', username: 'admin', displayName: '管理', parentId: null });
+  const { issueRefreshSession } = await import('../../src/auth/tokenSessions');
+  const adminSession = await issueRefreshSession('1', { type: 'web', id: clientId });
+  const creatorSession = await issueRefreshSession('2', { type: 'web', id: clientId });
+  adminToken = await signToken({
+    id: '1',
+    role: 'admin',
+    username: 'admin',
+    displayName: '管理',
+    parentId: null,
+    sessionId: adminSession.familyId,
+  });
   creatorToken = await signToken({
     id: '2',
     role: 'creator',
     username: 'creator',
     displayName: '成员',
     parentId: null,
+    sessionId: creatorSession.familyId,
   });
 }, 90000);
 afterAll(async () => {
@@ -76,7 +88,7 @@ afterAll(async () => {
   if (upstream) await new Promise<void>((resolve) => upstream.close(() => resolve()));
   if (container) await container.stop({ remove: true, removeVolumes: true });
 }, 30000);
-const auth = (token = adminToken) => 'Bearer ' + token;
+const auth = (token = adminToken) => ({ 'X-Client-Id': clientId, Authorization: 'Bearer ' + token });
 describe('OPC independent core', () => {
   it('fresh schema has no provider tables', async () => {
     const [tables] = await conn.query<mysql.RowDataPacket[]>('SHOW TABLES');
@@ -87,11 +99,13 @@ describe('OPC independent core', () => {
       expect(names).not.toContain(name);
   });
   it('login and refresh work through canonical and compatibility paths', async () => {
-    const agent = request.agent(app);
+    const agent = request.agent(app).set({ 'X-Client-Id': clientId });
     const login = await agent.post('/api/v1/core/auth/login').send({ username: 'admin', password: 'test_password' });
     expect(login.status).toBe(200);
     expect(String(login.headers['set-cookie'])).toContain('Path=/api/v1;');
-    expect((await agent.post('/api/v1/auth/refresh')).status).toBe(200);
+    const refreshed = await agent.post('/api/v1/auth/refresh');
+    expect(refreshed.status).toBe(200);
+    adminToken = refreshed.body.data.token;
   });
   it('public functions and project creation need no provider configuration', async () => {
     for (const url of [
@@ -102,11 +116,11 @@ describe('OPC independent core', () => {
       '/api/v1/core/admin-tools/site-info',
       '/api/v1/core/announcements/active',
     ]) {
-      expect((await request(app).get(url).set('Authorization', auth())).status, url).toBe(200);
+      expect((await request(app).get(url).set(auth())).status, url).toBe(200);
     }
     const created = await request(app)
       .post('/api/v1/core/projects')
-      .set('Authorization', auth())
+      .set(auth())
       .send({ name: '独立业务', slug: 'independent' });
     expect(created.status).toBe(201);
     expect(created.body.data).not.toHaveProperty('apiBaseUrl');
@@ -118,25 +132,24 @@ describe('OPC independent core', () => {
       '/api/v1/plans',
       '/api/alliance/api/popularize_plan',
     ]) {
-      expect((await request(app).get(url).set('Authorization', auth())).status, url).toBe(404);
+      expect((await request(app).get(url).set(auth())).status, url).toBe(404);
     }
   });
   it('API adapter transforms data and enforces account/project boundaries', async () => {
     const created = await request(app)
       .post('/api/v1/core/integrations')
-      .set('Authorization', auth())
+      .set(auth())
       .send({ moduleId: 'sample-api', accountKey: 'same-external-id', name: 'API 账号' });
     expect(created.status).toBe(201);
     const accountId = created.body.data.id;
     expect(
-      (await request(app).post('/api/v1/core/projects/1/integrations').set('Authorization', auth()).send({ accountId }))
-        .status,
+      (await request(app).post('/api/v1/core/projects/1/integrations').set(auth()).send({ accountId })).status,
     ).toBe(201);
     const scope = { projectId: '1', accountId, from: '2026-09-01', to: '2026-09-02' };
     const response = await request(app)
       .get('/api/v1/core/modules/sample-api/summary')
       .query(scope)
-      .set('Authorization', auth(creatorToken));
+      .set(auth(creatorToken));
     expect(response.status).toBe(200);
     expect(response.body.data.metrics[0].value).toBe('12');
     for (const token of [adminToken, creatorToken])
@@ -145,21 +158,20 @@ describe('OPC independent core', () => {
           await request(app)
             .get('/api/v1/core/modules/sample-api/summary')
             .query({ ...scope, projectId: '2' })
-            .set('Authorization', auth(token))
+            .set(auth(token))
         ).status,
       ).toBe(403);
     expect(
       (
         await request(app)
           .patch('/api/v1/core/integrations/' + accountId)
-          .set('Authorization', auth())
+          .set(auth())
           .send({ status: 'disabled' })
       ).status,
     ).toBe(200);
-    expect(
-      (await request(app).get('/api/v1/core/modules/sample-api/summary').query(scope).set('Authorization', auth()))
-        .status,
-    ).toBe(403);
+    expect((await request(app).get('/api/v1/core/modules/sample-api/summary').query(scope).set(auth())).status).toBe(
+      403,
+    );
   });
   it('module failures, bad dates and external identifiers remain isolated', async () => {
     const { ModuleRuntime } = await import('../../src/core/module-runtime');
@@ -177,7 +189,7 @@ describe('OPC independent core', () => {
     const create = (moduleId: string) =>
       request(isolated)
         .post('/api/v1/core/integrations')
-        .set('Authorization', auth())
+        .set(auth())
         .send({ moduleId, accountKey: 'isolation-id', name: moduleId });
     const a = await create('sample-api'),
       b = await create('sample-second');
@@ -186,15 +198,12 @@ describe('OPC independent core', () => {
     expect(a.body.data.id).not.toBe(b.body.data.id);
     expect((await create('sample-api')).status).toBe(409);
     const accountId = a.body.data.id;
-    await request(isolated)
-      .post('/api/v1/core/projects/1/integrations')
-      .set('Authorization', auth())
-      .send({ accountId });
+    await request(isolated).post('/api/v1/core/projects/1/integrations').set(auth()).send({ accountId });
     const scope = { projectId: '1', accountId, from: '2026-09-01', to: '2026-09-02' };
     const summary = (query: object) =>
-      request(isolated).get('/api/v1/core/modules/sample-api/summary').query(query).set('Authorization', auth());
+      request(isolated).get('/api/v1/core/modules/sample-api/summary').query(query).set(auth());
     expect((await summary(scope)).body.data.status).toBe('unavailable');
-    expect((await request(isolated).get('/api/v1/core/projects').set('Authorization', auth())).status).toBe(200);
+    expect((await request(isolated).get('/api/v1/core/projects').set(auth())).status).toBe(200);
     expect((await summary({ ...scope, from: '2026-02-30' })).status).toBe(422);
     expect((await summary({ ...scope, from: '2026-10-01' })).status).toBe(422);
     expect((await summary({ ...scope, accountId: b.body.data.id })).status).toBe(403);
@@ -233,18 +242,15 @@ describe('OPC independent core', () => {
     for (const url of ['/api/v1/modules/sample-api/probe', '/probe-raw', '/probe-legacy'])
       expect((await request(isolated).get(url)).status).toBe(404);
     expect((await request(isolated).get('/healthz')).status).toBe(200);
-    expect((await request(isolated).get('/api/v1/core/modules').set('Authorization', auth())).body.data[0].status).toBe(
-      'unavailable',
-    );
+    expect((await request(isolated).get('/api/v1/core/modules').set(auth())).body.data[0].status).toBe('unavailable');
   });
   it('public finance requires a business scope before reading balances or applying withdrawals', async () => {
-    const response = await request(app).get('/api/v1/core/finance').set('Authorization', auth());
+    const response = await request(app).get('/api/v1/core/finance').set(auth());
     expect(response.body.data.status).toBe('requires_scope');
     expect(response.body.data).not.toHaveProperty('balance');
-    expect(
-      (await request(app).post('/api/v1/core/finance/withdrawals').set('Authorization', auth()).send({ amount: 1 }))
-        .status,
-    ).toBe(422);
+    expect((await request(app).post('/api/v1/core/finance/withdrawals').set(auth()).send({ amount: 1 })).status).toBe(
+      422,
+    );
   });
   it('optional installation preserves IDs and is repeatable', async () => {
     await runOpcMigrations(target, ['zhihu']);
@@ -261,7 +267,7 @@ describe('OPC independent core', () => {
     const { createCoreApp } = await import('../../src/core/app');
     const legacyApp = createCoreApp(runtime);
     for (const url of ['/api/v1/meta/enums', '/api/v1/modules/zhihu/meta/enums'])
-      expect((await request(legacyApp).get(url).set('Authorization', auth())).status).toBe(200);
+      expect((await request(legacyApp).get(url).set(auth())).status).toBe(200);
     expect((await request(legacyApp).get('/api/v1/modules/zhihu/alliance/api/popularize_compositions')).status).toBe(
       401,
     );
@@ -269,13 +275,11 @@ describe('OPC independent core', () => {
       (
         await request(legacyApp)
           .post('/api/v1/core/integrations')
-          .set('Authorization', auth())
+          .set(auth())
           .send({ moduleId: 'zhihu', accountKey: 'unsupported', name: '额外账号' })
       ).status,
     ).toBe(422);
-    const raw = await request(legacyApp)
-      .get('/api/v1/modules/zhihu/alliance/api/not-registered')
-      .set('Authorization', auth());
+    const raw = await request(legacyApp).get('/api/v1/modules/zhihu/alliance/api/not-registered').set(auth());
     expect(raw.status).toBe(404);
   }, 30000);
   it('legacy database upgrade retains financial amounts, users and project IDs', async () => {
