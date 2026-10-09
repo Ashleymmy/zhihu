@@ -8,7 +8,7 @@ import { normalizeUploadFilename } from '../services/data-import.service';
 import { audit, authorize, insert, json, mutate, scopeLock, select, type RecordRow } from './store';
 import { digest, fail, money, moneyText, type Scope } from './domain';
 import { parseReport, reportTemplate, assertReportWriteEnabled, type MetricType, type ReportKind, type SourceRow } from './report';
-import { quote, type Obligation } from './pricing';
+import { quoteFact, type Obligation } from './pricing';
 import { quoteActivation } from './activation-pricing';
 import { refreshAdjustments } from './statements';
 import { blockIncome } from '../../../core/finance';
@@ -301,7 +301,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   else {
     await select(c, 'SELECT id FROM tasks WHERE id=? FOR SHARE', [word.task_id]);
     try {
-      snapshot.obligations = await quote(c, scope, String(word.task_id), binding, date, source.orders);
+      snapshot.obligations = await quoteFact(c, scope, String(fact.id), String(word.task_id), binding, date, source.orders);
     } catch (e) {
       if (e instanceof Error && ['PRICE_MISSING', 'PRICE_OVERLAP'].includes(e.message)) code = e.message;
       else throw e;

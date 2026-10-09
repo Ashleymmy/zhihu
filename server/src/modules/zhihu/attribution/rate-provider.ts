@@ -18,7 +18,7 @@ export const zhihuRateProvider: ModuleRateProvider = {
       label: '拉新订单',
       unit: '单',
       rules: roleRules,
-      note: '已有成员报价优先，缺价时使用角色单价。团队分成为团长单价减去达人单价。',
+      note: '按执行人角色计价，团队分成为团长单价减去达人单价。已确认账目保留原单价。',
     },
     {
       code: 'activation',

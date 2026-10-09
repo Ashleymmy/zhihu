@@ -70,10 +70,10 @@ async function entries(status: string) {
 }
 async function confirmDrafts() {
   const list = await entries('draft');
-  for (const role of [leader, admin]) {
-    const entry = list.find((e) => e.relation_type === (role === leader ? 'leader_creator' : 'agency_leader'));
+  for (const relation of ['agency_creator','leader_override']) {
+    const entry = list.find((e) => e.relation_type === relation);
     expect(entry).toBeDefined();
-    await statements.confirmStatement(role, scope, String(entry!.id), key(), String(entry!.input_hash));
+    await statements.confirmStatement(admin, scope, String(entry!.id), key(), String(entry!.input_hash));
   }
 }
 beforeAll(async () => {
@@ -199,15 +199,15 @@ describe('真实表头的归因、修订与对账', () => {
     expect(await facts.importDetail(admin, scope, previous.id, 1, 25)).toEqual(before);
     expect((await facts.importDetail(admin, scope, current.id, 1, 25)).template_version).toBe('zhihu-v3');
   });
-  it('无收益报告生成两层应付；任务名和转化率不改变计费，原字段可追溯', async () => {
+  it('无收益报告按角色生成达人及团长应付，任务名和转化率不改变计费，原字段可追溯', async () => {
     const detail = await upload(feedback(100));
     expect(detail.template_version).toBe('zhihu-v3');
     const item = await current();
     factId = String(item.id);
     expect(item).toMatchObject({ orders: '100', revenue: null, agencyMargin: null, reason_code: null });
-    expect((item.obligations as { amount: string }[]).map((o) => o.amount)).toEqual(['1500.0000', '1300.0000']);
+    expect((item.obligations as { amount: string }[]).map((o) => o.amount)).toEqual(['800.0000', '50.0000']);
     const leaderView = (await facts.listAttributions(leader, scope, 1, 25)).list[0];
-    expect(leaderView).toMatchObject({ teamMargin: '200.0000' });
+    expect(leaderView).toMatchObject({ teamMargin: '50.0000' });
     const own = (await facts.listAttributions(creator, scope, 1, 25)).list[0];
     expect(own).not.toHaveProperty('revenue');
     expect(own).not.toHaveProperty('agencyMargin');
@@ -217,7 +217,7 @@ describe('真实表头的归因、修订与对账', () => {
       riskAssessment: null,
       conversionRateRaw: 99,
     });
-    await statements.previewStatement(leader, scope, key(), factId);
+    await expect(statements.previewStatement(leader, scope, key(), factId)).rejects.toThrow('付款主体');
     await statements.previewStatement(admin, scope, key(), factId);
     await confirmDrafts();
     expect(await entries('confirmed')).toHaveLength(2);
@@ -237,7 +237,7 @@ describe('真实表头的归因、修订与对账', () => {
       ],
       'order',
     );
-    expect(await current()).toMatchObject({ agencyMargin: '500.0000', revenue: '2000.0000' });
+    expect(await current()).toMatchObject({ agencyMargin: '1150.0000', revenue: '2000.0000' });
     const order = await upload(feedback(90), 'order');
     orderCandidate = await pending(String(order.id));
     const search = await upload(
@@ -258,14 +258,14 @@ describe('真实表头的归因、修订与对账', () => {
     );
     await accept(rebased.id);
     expect(await current()).toMatchObject({ orders: '90', search: '1001', revenue: null, agencyMargin: null });
-    expect((await entries('draft')).map((e) => e.amount).sort()).toEqual(['-130.0000', '-150.0000']);
-    expect((await entries('confirmed')).map((e) => e.amount).sort()).toEqual(['1300.0000', '1500.0000']);
+    expect((await entries('draft')).map((e) => e.amount).sort()).toEqual(['-5.0000', '-80.0000']);
+    expect((await entries('confirmed')).map((e) => e.amount).sort()).toEqual(['50.0000', '800.0000']);
   });
   it('非空风险即使订单同值也形成修订；照常计价但不能确认或冒充已核实订单', async () => {
-    const low = (await entries('draft')).find((e) => e.relation_type === 'leader_creator')!;
+    const low = (await entries('draft')).find((e) => e.relation_type === 'agency_creator')!;
     const risk = await upload(feedback(90, '平台待核实', 1001));
     await expect(
-      statements.confirmStatement(leader, scope, String(low.id), key(), String(low.input_hash)),
+      statements.confirmStatement(admin, scope, String(low.id), key(), String(low.input_hash)),
     ).rejects.toThrow('来源修订');
     await accept(await pending(String(risk.id)));
     expect(await current()).toMatchObject({
@@ -273,10 +273,10 @@ describe('真实表头的归因、修订与对账', () => {
       reason_code: 'RISK_REVIEW_REQUIRED',
       agencyMargin: null,
     });
-    expect(((await current()).obligations as {amount:string}[]).map(item=>item.amount).sort()).toEqual(['1170.0000','1350.0000']);
+    expect(((await current()).obligations as {amount:string}[]).map(item=>item.amount).sort()).toEqual(['45.0000','720.0000']);
     await expect(statements.previewStatement(admin, scope, key(), factId)).rejects.toThrow('来源未完成');
     await expect(
-      statements.confirmStatement(leader, scope, String(low.id), key(), String(low.input_hash)),
+      statements.confirmStatement(admin, scope, String(low.id), key(), String(low.input_hash)),
     ).rejects.toThrow('来源已修订');
     const riskException = (await facts.listExceptions(admin, scope, 1, 25)).list.find(
       (e) => e.reason_code === 'RISK_REVIEW_REQUIRED',
@@ -304,10 +304,10 @@ describe('真实表头的归因、修订与对账', () => {
     expect(await current()).toMatchObject({ reason_code: null, orders: '90', revenue: null });
     await confirmDrafts();
     expect((await entries('confirmed')).map((e) => e.amount).sort()).toEqual([
-      '-130.0000',
-      '-150.0000',
-      '1300.0000',
-      '1500.0000',
+      '-5.0000',
+      '-80.0000',
+      '50.0000',
+      '800.0000',
     ]);
     expect((await facts.listExceptions(admin, scope, 1, 25)).list.filter((e) => e.status === 'open')).toHaveLength(0);
   });

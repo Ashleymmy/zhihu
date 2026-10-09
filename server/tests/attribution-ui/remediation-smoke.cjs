@@ -22,6 +22,10 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_ROLE_PRICES_ONLY==='1'){
+   await require('./role-prices-flow.cjs')({browser,port,out,date});
+   console.log('拉新角色计价与旧入口六角色验收通过');return;
+  }
   if(process.env.OPC_REVIEW_INCOME_ONLY==='1'){
    await require('./platform-income-flow.cjs')({browser,port,out,date});
    console.log('平台收益与任务、提现全流程通过');return;
@@ -91,7 +95,7 @@ async function main(){
    await page.goto(`http://127.0.0.1:${port}/app/${destination}`);
    if(role==='operations'){await page.locator('.studio-app').waitFor();await page.getByRole('heading',{level:1}).waitFor();}
    if(role!=='operations')await page.getByText(role==='leader'?'团队业绩与分成':role==='admin'||role==='finance'?'上传知乎报表，自动计算每个人的金额':'我的收入明细',{exact:true}).first().waitFor();
-   if(role==='admin'||role==='finance')await page.getByText('按成员报价',{exact:true}).first().waitFor({state:'attached'});
+   if(role==='admin'||role==='finance')await page.getByText('按角色单价',{exact:true}).first().waitFor({state:'attached'});
    if(role==='admin'||role==='finance'){
     await page.getByText('拉新：可计费 37 单 ¥313.00',{exact:true}).waitFor();
     await page.getByText('报表问题与更正',{exact:true}).click();

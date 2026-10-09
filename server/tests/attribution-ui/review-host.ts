@@ -65,6 +65,10 @@ async function main() {
           // Only this disposable database: expose a missing-price row without changing production rules.
           await db.query("UPDATE opc_rate_rules SET effective_to=CURDATE() WHERE module_id='zhihu' AND metric_type='activation' AND rule_code='creator'");
         }
+        if(process.env.OPC_REVIEW_ROLE_PRICES_ONLY==='1'){
+          // Distinct legacy prices prove that the UI and live calculations use role rules.
+          await db.query("UPDATE zh_price_versions SET unit_price=20 WHERE status='published'");
+        }
         const hash=await bcrypt.hash('Review123456',4);
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         if(process.env.OPC_REVIEW_FINANCE_HISTORY==='1') await (await import('./finance-history-fixture')).seedFinanceHistory(db);

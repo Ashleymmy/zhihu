@@ -272,7 +272,7 @@ describe('任务报价与金额', () => {
     });
     await pricing.publishPrice(leader, scope, low.id, key());
     const amounts = await withTransaction((connection) =>
-      pricing.quote(
+      pricing.quoteLegacy(
         connection,
         scope,
         '1',
@@ -318,9 +318,9 @@ describe('任务报价与金额', () => {
     const { withTransaction } = await import('../../src/db');
     const binding = { path_type: 'team_creator', leader_id: '2', executor_id: '3' } as mysql.RowDataPacket;
     const today = await withTransaction((connection) =>
-      pricing.quote(connection, scope, '1', binding, businessDay(), '100'),
+      pricing.quoteLegacy(connection, scope, '1', binding, businessDay(), '100'),
     );
-    const next = await withTransaction((connection) => pricing.quote(connection, scope, '1', binding, tomorrow, '100'));
+    const next = await withTransaction((connection) => pricing.quoteLegacy(connection, scope, '1', binding, tomorrow, '100'));
     expect(today[1].amount).toBe('1300.0000');
     expect(next[1].amount).toBe('1200.0000');
   });
@@ -337,7 +337,7 @@ describe('任务报价与金额', () => {
     });
     await pricing.publishPrice(admin, scope, price.id, key());
     const direct = await withTransaction((conn) =>
-      pricing.quote(
+      pricing.quoteLegacy(
         conn,
         scope,
         '1',
@@ -347,7 +347,7 @@ describe('任务报价与金额', () => {
       ),
     );
     const self = await withTransaction((conn) =>
-      pricing.quote(
+      pricing.quoteLegacy(
         conn,
         scope,
         '1',
@@ -361,7 +361,7 @@ describe('任务报价与金额', () => {
     await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(999,1,'fallback-task','未单独报价的活动',NOW())");
     await expect(
       withTransaction((conn) =>
-        pricing.quote(
+        pricing.quoteLegacy(
           conn,
           scope,
           '999',
@@ -404,7 +404,7 @@ describe('报告事实与独占归因', () => {
     originalRevision = String(item.revision_id);
     expect(item.search).toBe('1000');
     expect(item.orders).toBe('100');
-    expect(item.agencyMargin).toBe('500.0000');
+    expect(item.agencyMargin).toBe('1150.0000');
     const own = await facts.listAttributions(creator, scope, 1, 25);
     expect(own.list[0]).not.toHaveProperty('revenue');
     expect(own.list[0]).not.toHaveProperty('agencyMargin');
@@ -436,16 +436,16 @@ describe('报告事实与独占归因', () => {
   });
 });
 describe('首次核验、对账及不可变差额', () => {
-  it('核验、待定修订与付款顺序均阻止提前确认', async () => {
+  it('角色价由平台统一确认，核验和待定更正仍阻止提前确认', async () => {
     const s = await import('../../src/modules/zhihu/attribution/statements');
     const facts = await import('../../src/modules/zhihu/attribution/facts');
-    let up = (await s.previewStatement(admin, scope, key(), factId)).entries[0];
-    let low = (await s.previewStatement(leader, scope, key(), factId)).entries[0];
+    let [low,up] = (await s.previewStatement(admin, scope, key(), factId)).entries;
+    await expect(s.previewStatement(leader, scope, key(), factId)).rejects.toThrow('付款主体');
     const hash = async (id: string) => {
       const [r] = await c.query<mysql.RowDataPacket[]>('SELECT input_hash FROM zh_statement_entries WHERE id=?', [id]);
       return String(r[0].input_hash);
     };
-    await expect(s.confirmStatement(leader, scope, low.id, key(), await hash(low.id))).rejects.toThrow('试算模式');
+    await expect(s.confirmStatement(admin, scope, low.id, key(), await hash(low.id))).rejects.toThrow('试算模式');
     const cutover = await import('../../src/modules/zhihu/attribution/cutover');
     const { businessDay } = await import('../../src/modules/zhihu/attribution/domain');
     await cutover.configureRoute(admin, scope, {
@@ -454,7 +454,7 @@ describe('首次核验、对账及不可变差额', () => {
       reason: '仅隔离库金额样例验证',
       sampleVerified: true,
     });
-    await expect(s.confirmStatement(leader, scope, low.id, key(), await hash(low.id))).rejects.toThrow('首次作品');
+    await expect(s.confirmStatement(admin, scope, low.id, key(), await hash(low.id))).rejects.toThrow('首次作品');
     const evidence = await s.submitEvidence(creator, scope, key(), {
       bindingId,
       url: 'https://example.com/work/1',
@@ -462,19 +462,16 @@ describe('首次核验、对账及不可变差额', () => {
     });
     await expect(s.reviewEvidence(creator, scope, evidence.id, key(), true, '本人核验')).rejects.toThrow('仅管理员');
     await s.reviewEvidence(leader, scope, evidence.id, key(), true, '已核对关键词和作者');
-    await expect(s.confirmStatement(leader, scope, low.id, key(), await hash(low.id))).rejects.toThrow('来源已修订');
+    await expect(s.confirmStatement(admin, scope, low.id, key(), await hash(low.id))).rejects.toThrow('来源已修订');
     // Verification refreshes unconfirmed results; old previews cannot be confirmed.
-    up = (await s.previewStatement(admin, scope, key(), factId)).entries[0];
-    low = (await s.previewStatement(leader, scope, key(), factId)).entries[0];
-    await expect(s.confirmStatement(leader, scope, low.id, key(), await hash(low.id))).rejects.toThrow('来源修订');
+    [low,up] = (await s.previewStatement(admin, scope, key(), factId)).entries;
+    await expect(s.confirmStatement(admin, scope, low.id, key(), await hash(low.id))).rejects.toThrow('来源修订');
     await facts.acceptRevision(admin, scope, pendingRevision, key(), originalRevision, '暂不采纳待核实版本', false);
     const { businessDay: statementDay } = await import('../../src/modules/zhihu/attribution/domain');
-    expect(
-      (await s.previewPeriod(leader, scope, key(), { from: statementDay(), to: statementDay() })).entries[0].id,
-    ).toBe(low.id);
+    expect((await s.previewPeriod(leader, scope, key(), { from: statementDay(), to: statementDay() })).entries).toEqual([]);
     expect(
       (await s.previewPeriod(developer, scope, key(), { from: statementDay(), to: statementDay() })).entries[0].id,
-    ).toBe(up.id);
+    ).toBe(low.id);
     await expect(
       s.confirmBatch(leader, scope, key(), [
         { id: low.id, expectedHash: await hash(low.id) },
@@ -485,19 +482,18 @@ describe('首次核验、对账及不可变差额', () => {
       low.id,
     ]);
     expect(unconfirmed[0].status).toBe('draft');
-    await expect(s.confirmStatement(admin, scope, up.id, key(), await hash(up.id))).rejects.toThrow('先由团长');
-    await s.confirmBatch(leader, scope, key(), [{ id: low.id, expectedHash: await hash(low.id) }]);
+    await s.confirmBatch(admin, scope, key(), [{ id: low.id, expectedHash: await hash(low.id) }]);
     const upperHash = await hash(up.id);
     await Promise.all(Array.from({ length: 10 }, () => s.confirmStatement(admin, scope, up.id, key(), upperHash)));
     const own = await s.listStatements(creator, scope, 1, 25);
     expect(own.list.filter(row=>row.status==='confirmed')).toHaveLength(1);
-    expect(own.list.find(row=>row.status==='confirmed')!.target_amount).toBe('1300.0000');
+    expect(own.list.find(row=>row.status==='confirmed')!.target_amount).toBe('800.0000');
     const [count] = await c.query<mysql.RowDataPacket[]>(
       "SELECT COUNT(*) n FROM zh_statement_entries WHERE status='confirmed'",
     );
     expect(Number(count[0].n)).toBe(2);
   });
-  it('修订生成 -150 / -130 调整，争议暂停确认，历史确认不变', async () => {
+  it('更正生成达人 -80 和团长 -5，争议暂停确认，历史确认不变', async () => {
     const s = await import('../../src/modules/zhihu/attribution/statements');
     const facts = await import('../../src/modules/zhihu/attribution/facts');
     const { businessDay } = await import('../../src/modules/zhihu/attribution/domain');
@@ -514,25 +510,25 @@ describe('首次核验、对账及不可变差额', () => {
     await facts.acceptRevision(admin, scope, String(e!.revision_id), key(), originalRevision, '知乎确认 90 笔');
     const list = (await s.listStatements(admin, scope, 1, 25)).list;
     const adjustments = list.filter((x) => x.entry_kind === 'adjustment');
-    expect(adjustments.map((x) => x.amount).sort()).toEqual(['-130.0000', '-150.0000']);
-    const low = adjustments.find((x) => x.relation_type === 'leader_creator')!,
-      up = adjustments.find((x) => x.relation_type === 'agency_leader')!;
-    await expect(s.confirmStatement(admin, scope, String(up.id), key(), String(up.input_hash))).rejects.toThrow(
-      '先由团长',
+    expect(adjustments.map((x) => x.amount).sort()).toEqual(['-5.0000', '-80.0000']);
+    const low = adjustments.find((x) => x.relation_type === 'agency_creator')!,
+      up = adjustments.find((x) => x.relation_type === 'leader_override')!;
+    await expect(s.confirmStatement(leader, scope, String(up.id), key(), String(up.input_hash))).rejects.toThrow(
+      '付款主体',
     );
     await s.disputeBinding(creator, scope, bindingId, key(), false, '来源争议');
-    await expect(s.confirmStatement(leader, scope, String(low.id), key(), String(low.input_hash))).rejects.toThrow(
+    await expect(s.confirmStatement(admin, scope, String(low.id), key(), String(low.input_hash))).rejects.toThrow(
       '争议',
     );
     await s.disputeBinding(admin, scope, bindingId, key(), true, '已复核');
-    await s.confirmStatement(leader, scope, String(low.id), key(), String(low.input_hash));
+    await s.confirmStatement(admin, scope, String(low.id), key(), String(low.input_hash));
     await s.confirmStatement(admin, scope, String(up.id), key(), String(up.input_hash));
     expect(
       list
         .filter((x) => x.entry_kind === 'initial' && x.status === 'confirmed')
         .map((x) => x.amount)
         .sort(),
-    ).toEqual(['1300.0000', '1500.0000']);
+    ).toEqual(['50.0000', '800.0000']);
     const [legacy] = await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) n FROM earnings');
     expect(Number(legacy[0].n)).toBe(0);
   });
