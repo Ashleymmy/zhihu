@@ -1,0 +1,50 @@
+[
+  {
+    "role": "admin",
+    "widths": [
+      1440,
+      375
+    ],
+    "status": "passed"
+  },
+  {
+    "role": "finance",
+    "widths": [
+      1440,
+      375
+    ],
+    "status": "passed"
+  },
+  {
+    "role": "operations",
+    "widths": [
+      1440,
+      375
+    ],
+    "status": "passed"
+  },
+  {
+    "role": "leader",
+    "widths": [
+      1440,
+      375
+    ],
+    "status": "passed"
+  },
+  {
+    "role": "creator",
+    "widths": [
+      1440,
+      375
+    ],
+    "status": "passed"
+  },
+  {
+    "role": "independent",
+    "widths": [
+      1440,
+      375
+    ],
+    "status": "passed"
+  }
+]

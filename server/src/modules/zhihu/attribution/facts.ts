@@ -135,7 +135,7 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
   return withTransaction(async (c) => {
     const [batch] = await select(
       c,
-      'SELECT CAST(id AS CHAR) id,file_name,file_sha256,report_kind,template_version,preview_hash,status,created_at FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=?',
+      'SELECT CAST(id AS CHAR) id,file_name,file_sha256,report_kind,template_version,preview_hash,status,created_at,(SELECT archived_at FROM zh_import_history_archive WHERE batch_id=id) archived_at FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=?',
       [id, scope.accountId, scope.projectId],
     );
     if (!batch) fail('批次不存在', 404);
@@ -161,19 +161,19 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
     };
   });
 }
-export async function listImports(user: AuthUser, scope: Scope, page: number, pageSize: number) {
+export async function listImports(user: AuthUser, scope: Scope, page: number, pageSize: number, archived=false) {
   if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
     const list = await select(
       c,
-      'SELECT CAST(b.id AS CHAR) id,file_name,report_kind,b.status,b.created_at,j.status job_status,j.attempts,j.last_error FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id WHERE b.account_id=? AND b.project_id=? ORDER BY b.id DESC LIMIT ? OFFSET ?',
-      [scope.accountId, scope.projectId, pageSize, (page - 1) * pageSize],
+      'SELECT CAST(b.id AS CHAR) id,file_name,report_kind,b.status,b.created_at,a.archived_at,j.status job_status,j.attempts,j.last_error FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND (a.batch_id IS NOT NULL)=? ORDER BY b.id DESC LIMIT ? OFFSET ?',
+      [scope.accountId, scope.projectId, archived, pageSize, (page - 1) * pageSize],
     );
     const [total] = await select(
       c,
-      'SELECT COUNT(*) total FROM zh_import_batches WHERE account_id=? AND project_id=?',
-      [scope.accountId, scope.projectId],
+      'SELECT COUNT(*) total FROM zh_import_batches b LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND (a.batch_id IS NOT NULL)=?',
+      [scope.accountId, scope.projectId, archived],
     );
     return { list, total: Number(total.total), page, pageSize };
   });

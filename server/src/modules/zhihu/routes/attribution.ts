@@ -9,6 +9,7 @@ import {getAgency,setAgency} from '../attribution/agency';
 import * as resource from '../attribution/resources';
 
 import * as facts from '../attribution/facts';
+import {archiveImport,reanalyzeImport} from '../attribution/import-history';
 import * as statements from '../attribution/statements';
 import { fail } from '../attribution/domain';
 import * as cutover from '../attribution/cutover';
@@ -238,10 +239,19 @@ attributionRouter.post(
 attributionRouter.get(
   '/imports',
   asyncHandler(async (req, res) => {
-    const q = scopeSchema.merge(pagingSchema).parse(req.query);
-    ok(res, await facts.listImports(req.user, q, q.page, q.pageSize));
+    const q = scopeSchema.merge(pagingSchema).extend({archived:z.enum(['true','false']).default('false')}).parse(req.query);
+    ok(res, await facts.listImports(req.user, q, q.page, q.pageSize,q.archived==='true'));
   }),
 );
+attributionRouter.post('/imports/:id/archive',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({archived:z.boolean()}).parse(req.body);
+ ok(res,await archiveImport(req.user,q,idSchema.parse(req.params.id),key(req),q.archived));
+}));
+attributionRouter.post('/imports/:id/reanalyze',asyncHandler(async(req,res)=>{
+ const scope=scopeSchema.parse(req.body),id=idSchema.parse(req.params.id);
+ await reanalyzeImport(req.user,scope,id,key(req));
+ ok(res,await facts.processBatch(req.user,scope,id),202);
+}));
 attributionRouter.get(
   '/imports/:id',
   asyncHandler(async (req, res) => {

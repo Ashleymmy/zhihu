@@ -186,3 +186,11 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 数据待办的操作资格统一为布尔值，避免 MySQL 返回字符串 `0` 导致“尚未登记代理名称”误显示“指定执行人”。金额明细新增“核对执行与作品”入口：运营可以给现有执行人补实际开始日期与历史作品，随后就地进入作品核验，自动更新未确认报表；不允许借此变更执行人或越权处理。财务可查看进度，不能补录执行资料。已读取但仍需处理的报表、暂未生成的账单、结果更新时间都有明确反馈；上传和保存后同时刷新分析、金额与数据待办。
 
 专项运行：Web 构建后，设置 `OPC_REVIEW_FEEDBACK_ONLY=1` 和可选的 `OPC_PLAYWRIGHT_MODULE`，在 `server` 下运行 `node tests/attribution-ui/remediation-smoke.cjs`。隔离数据库会自动回收，不访问生产；截图留在 `.opc-work/remediation-review/feedback-*`。
+
+### 报表记录清理与重新分析（2026-10-09）
+
+财务页在上传框下提供“上传记录”，可查看全部分页记录、重新分析原文件、选择修正文件重新上传、清理和恢复；当前分析也提供同样入口及“收起分析”。清理只将记录移入“已清理”，不撤销业绩、不删除待办或原文件、不改已确认账单，操作前说明实际后果。正在读取的报表须先处理完成。
+
+上线先执行模块迁移 `037_import_history.sql`，只增加 `zh_import_history_archive` 表，重复执行保留全部数据。重新分析仅重试未匹配行并刷新未确认结果，保留人工选择；同文件重传恢复记录并重新检查，不新增同份报表或重复计账。更正文件仍进入原值与新值核对流程。清理、恢复及重新分析仅财务或完整管理员可操作，服务端校验岗位和项目范围。
+
+专项运行：`cd server && npx vitest run --config vitest.attribution.config.ts tests/attribution/import-history.spec.ts`。Web 构建后，设置 `OPC_REVIEW_IMPORT_HISTORY_ONLY=1`、可选 `OPC_PLAYWRIGHT_MODULE`，运行 `node tests/attribution-ui/remediation-smoke.cjs`，在隔离数据库中检查六角色、1440/375 页面和实际上传操作。

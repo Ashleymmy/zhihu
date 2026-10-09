@@ -22,6 +22,10 @@ async function main(){
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_IMPORT_HISTORY_ONLY==='1'){
+   await require('./import-history-flow.cjs')({browser,port,out,date});
+   console.log('报表清理、恢复、重新分析和重新上传六角色验收通过');return;
+  }
   if(process.env.OPC_REVIEW_FEEDBACK_ONLY==='1'){
    await require('./feedback-flow.cjs')({browser,port,out,date});
    console.log('旧记录匹配、执行核对与更新反馈页面验收通过');return;

@@ -9,15 +9,15 @@ import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
 import RiskReview from './RiskReview.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
-import {CashWallet,FinanceHistoryLinks,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
+import {ActionDialog,CashWallet,FinanceHistoryLinks,RateSettings,type AnalysisRunModel} from '@zhihu-koc/shared-components'
 import { errorText, requestKey, type EngineContext } from './context'
 const props=defineProps<{context:EngineContext; wallet?:boolean;initialFrom?:string;initialTo?:string}>()
 const emit=defineEmits<{issues:[];navigate:[path:string]}>()
 interface Group {payeeId:string;name:string;confirmed:string;pending:string;total:string;blockers:string[];ready:number}
 interface TypeSummary {staffAmount:string;excludedQuantity:string;records:number;quantity:string;billableQuantity:string;pendingQuantity:string;payable:string;confirmedPayable:string;pendingPayable:string;receivable:string;confirmedReceivable:string;pendingReceivable:string}
 interface View {summary:{records:number;totalRecords:number;orders:string;totalOrders:string;billableOrders:string;pendingOrders:string;issues:number;receivable:string;confirmedReceivable:string;pendingReceivable:string;payable:string;confirmedPayable:string;pendingPayable:string;retained:string;byType:Record<'newUser'|'activation',TypeSummary>;staffAmount:string};entries:Entry[];groups:Group[];teamPerformance?:{executorId:string;name:string;orders:string;commission:string;activations:string;activationCommission:string}[];reviewHash:string;needsReview:boolean;withdrawal:{enabled:boolean;message:string}}
-interface Batch {id:string;fileName:string;status:string;lastError?:string}
-interface ImportDetail {fileName:string;counts:{processingStatus:string;total:number}[];rows:{id:string;lineNumber:number;processingStatus:string;errorText:string|null;next?:string}[]}
+interface Batch {id:string;fileName:string;reportKind:string;status:string;archivedAt:string|null;createdAt:string;lastError?:string}
+interface ImportDetail extends Batch {counts:{processingStatus:string;total:number}[];rows:{id:string;lineNumber:number;processingStatus:string;errorText:string|null;next?:string}[]}
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
 const requestedPeriod = /^\d{4}-\d{2}-\d{2}$/.test(props.initialFrom||'') && /^\d{4}-\d{2}-\d{2}$/.test(props.initialTo||'') && props.initialFrom! <= props.initialTo!
 const period=reactive({from:requestedPeriod?props.initialFrom!:today.slice(0,7)+'-01',to:requestedPeriod?props.initialTo!:today})
@@ -41,12 +41,34 @@ const typeKey=(type:ReportType)=>type==='new_user'?'newUser':'activation'
 const unit=(type:ReportType)=>type==='activation'?'个':'单'
 function chooseReportType(value:ReportType){reportType.value=value;suggestedType.value=null;try{localStorage.setItem('zhihu.reportType',value)}catch{}}
 const importResult=ref<ImportDetail|null>(null),importId=ref(''),importPage=ref(1),uploadInput=ref<HTMLInputElement|null>(null)
+const historyArchived=ref(false),historyPage=ref(1),historyTotal=ref(0),historyOpen=ref(false),archiveTarget=ref<Batch|null>(null),archiveError=ref('')
+const analysisPanel=ref<HTMLElement|null>(null),uploadBox=ref<HTMLElement|null>(null),replacement=ref('')
+const batchStatus=(b:Batch)=>b.lastError?'处理曾中断':b.status==='processed'?'已读取，查看处理结果':b.status==='committed'?'分析中':'待处理'
+const reportName=(b:Batch)=>b.reportKind==='activation'?'拉活':'拉新'
+function closeAnalysis(){stopTracking();importId.value='';analysis.value=null;importResult.value=null}
+async function openImport(id:string){stopTracking();await inspectImport(id);await nextTick();analysisPanel.value?.scrollIntoView({behavior:'smooth',block:'start'});if(analysis.value?.status==='running')await track(id)}
+function replaceFile(b?:Batch){
+ if(b)chooseReportType(b.reportKind==='activation'?'activation':'new_user')
+ file.value=null;if(uploadInput.value)uploadInput.value.value='';replacement.value=b?.fileName??'当前报表'
+ uploadBox.value?.scrollIntoView({behavior:'smooth',block:'start'});uploadInput.value?.click()
+}
+async function reanalyze(b:Batch){
+ stopTracking();progress.value='正在重新分析 '+b.fileName+'…';notice.value='';
+ try{await post('/imports/'+b.id+'/reanalyze');historyArchived.value=false;historyPage.value=1;await inspectImport(b.id);await track(b.id,++trackingVersion,'已重新检查原报表。');await nextTick();analysisPanel.value?.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){progress.value='';throw e}
+}
+async function archiveCurrent(){
+ if(!archiveTarget.value)return
+ archiveError.value=''
+ try{const target=archiveTarget.value;await post('/imports/'+target.id+'/archive',{archived:true});if(importId.value===target.id)closeAnalysis();archiveTarget.value=null;notice.value='已清理这条分析记录，业绩和账单保留。可在“已清理”中恢复。';await loadHistory()}catch(e){if(archiveTarget.value)archiveError.value=errorText(e);else showError(e)}
+}
+async function restore(b:Batch){await post('/imports/'+b.id+'/archive',{archived:false});if(importId.value===b.id)await inspectImport(b.id);notice.value='已恢复上传记录，可查看或重新分析。';await loadHistory()}
 const analysis=ref<AnalysisRunModel|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
 const importTotal=computed(()=>importResult.value?.counts.reduce((sum,c)=>sum+c.total,0)??0)
 const rowStatus=(status:string)=>({invalid:'需要修正',skipped:'已跳过',pending:'正在处理',processed:'已读取',duplicate:'已读取，不重复计算',exception:'需要处理',legacy_settled:'旧系统已结算'}[status]??'已读取')
 async function inspectImport(id:string,page=1){
  importId.value=id;importPage.value=page
  const [detail,run]=await Promise.all([props.context.http.get<ImportDetail>('/imports/'+id,{...props.context.scope,page,pageSize:25}),props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)])
+ if(disposed||importId.value!==id||importPage.value!==page)return
  importResult.value=detail;analysis.value=run
 }
 async function answerAnalysis(answer:ReportAnswer){
@@ -57,7 +79,7 @@ async function answerAnalysis(answer:ReportAnswer){
 }
 function analysisAction(action:string){
  if(action==='details')openDetails('')
- else if(action==='replace-file')uploadInput.value?.click()
+ else if(action==='replace-file')replaceFile(importResult.value??undefined)
  else if(action==='retry')void run(async()=>{await post('/imports/'+importId.value+'/process');await track(importId.value)})
 }
 const confirming=ref(false),checked=ref(false),selected=ref(''),detailPage=ref(1),detailsOpen=ref(false),detailPanel=ref<HTMLDetailsElement|null>(null)
@@ -81,10 +103,17 @@ const total=(field:keyof Pick<TypeSummary,'payable'|'confirmedPayable'|'pendingP
  const magnitude=value<0n?-value:value
  return (value<0n?'-':'')+String(magnitude/10000n)+'.'+String(magnitude%10000n).padStart(4,'0')
 }
-let timer:ReturnType<typeof setTimeout>|undefined,disposed=false,polling=false
+let timer:ReturnType<typeof setTimeout>|undefined,disposed=false,trackingVersion=0
+function stopTracking(){trackingVersion++;if(timer)clearTimeout(timer);progress.value=''}
 function post(path:string,data:object={}){return props.context.http.post(path,{...props.context.scope,...data,requestKey:requestKey()})}
 async function refresh(){view.value=await props.context.http.get<View>('/workbench',{...props.context.scope,...period,viewVersion:'2'});updatedAt.value=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());detailPage.value=1;if(view.value.entries.some(e=>e.status==='pending'))detailsOpen.value=true}
-async function load(){await refresh();if(admin.value)history.value=(await props.context.http.get<{list:Batch[]}>('/imports',{...props.context.scope,page:1,pageSize:5})).list}
+async function loadHistory(){
+ const result=await props.context.http.get<{list:Batch[];total:number}>('/imports',{...props.context.scope,page:historyPage.value,pageSize:10,archived:String(historyArchived.value)})
+ history.value=result.list;historyTotal.value=result.total
+ if(!result.list.length&&historyPage.value>1){historyPage.value--;await loadHistory()}
+}
+async function historyView(archived:boolean){historyArchived.value=archived;historyPage.value=1;await loadHistory()}
+async function load(){await refresh();if(admin.value&&!props.wallet)await loadHistory()}
 async function reloadResults(){await load();if(importId.value)await inspectImport(importId.value);await issues.value?.reload()}
 function showError(e:unknown){
  const message=errorText(e);error.value=message;errorHelp.value='';
@@ -94,25 +123,28 @@ function showError(e:unknown){
  else if(message.includes('无法识别')){errorHelp.value='请按行号检查日期、渠道名称、关键词和订单量；空白行可以保留，修正后重新上传。';}
 }
 async function run(work:()=>Promise<unknown>){if(busy.value)return;busy.value=true;error.value='';errorHelp.value='';try{await work()}catch(e){showError(e)}finally{busy.value=false}}
-async function track(id:string){
- if(disposed||polling)return
- polling=true
+async function track(id:string,version=++trackingVersion,prefix=''){
+ if(disposed||version!==trackingVersion)return
+ if(timer)clearTimeout(timer)
  try{
-  importId.value=id;analysis.value=await props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)
-  if(analysis.value.status!=='running'){progress.value='';notice.value=analysis.value.status==='failed'?'报表处理暂时中断，已完成的结果已保留。':analysis.value.status==='needs_input'?'报表已读取，仍有待处理记录。'+(analysis.value.conclusion?.pendingText??''):'报表已分析完成，金额与待办已更新。';await reloadResults()}
-  else{progress.value='正在分析报表，剩余 '+((analysis.value.progress?.total??0)-(analysis.value.progress?.done??0))+' 条…';timer=setTimeout(()=>{void track(id)},1000)}
- }catch(e){progress.value='';showError(new Error('分析进度暂时无法读取，请刷新查看：'+errorText(e)))}
- finally{polling=false}
+  const result=await props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)
+  if(disposed||version!==trackingVersion)return
+  importId.value=id;analysis.value=result
+  if(result.status!=='running'){progress.value='';notice.value=prefix+(result.status==='failed'?'报表处理暂时中断，已完成的结果已保留。':result.status==='needs_input'?'报表已读取，仍有待处理记录。'+(result.conclusion?.pendingText??''):'报表已分析完成，金额与待办已更新。');await reloadResults()}
+  else{progress.value='正在分析报表，剩余 '+((result.progress?.total??0)-(result.progress?.done??0))+' 条…';timer=setTimeout(()=>{void track(id,version,prefix)},1000)}
+ }catch(e){if(version===trackingVersion){progress.value='';showError(new Error('分析进度暂时无法读取，请刷新查看：'+errorText(e)))}}
 }
 async function upload(){
  if(!file.value)return
+ stopTracking()
  const form=new FormData();form.append('file',file.value);form.append('projectId',props.context.scope.projectId);form.append('accountId',props.context.scope.accountId);form.append('reportType',reportType.value)
  progress.value='正在读取报表并计算…';notice.value=''
  try{
   const r=await props.context.http.postForm<{id:string;from:string;to:string;duplicate:boolean}>('/workbench/import',form)
   period.from=r.from;period.to=r.to
-  if(r.duplicate)notice.value='这份报表已经上传，已为你打开原来的结果，不会重复计账。'
-  await track(r.id)
+  historyArchived.value=false;historyPage.value=1;replacement.value='';file.value=null;if(uploadInput.value)uploadInput.value.value=''
+  await inspectImport(r.id)
+  await track(r.id,++trackingVersion,r.duplicate?'这份报表已上传过，已重新检查，不会重复计账。':'')
  }catch(e){progress.value='';throw e}
 }
 async function confirm(){
@@ -142,19 +174,44 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
 <template>
  <section class="work-section">
   <div class="engine-actions"><span v-if="updatedAt" role="status">结果更新于 {{updatedAt}}</span><button :disabled="busy" @click="run(async()=>{await reloadResults();notice='已刷新金额与待办，请查看最新处理结果。'})">{{busy?'正在更新…':'刷新结果'}}</button></div>
-  <div v-if="admin && !wallet" class="upload-box">
+  <div ref="uploadBox" v-if="admin && !wallet" class="upload-box">
    <div><h2>上传知乎报表，自动计算每个人的金额</h2><p>{{reportType==='activation'?'读取日期、渠道、关键词和拉活量，按拉活单价计算金额。':'读取日期、渠道、关键词、搜索量和订单量，按拉新单价计算金额。'}}</p></div>
    <fieldset class="report-types" :disabled="busy||!!progress"><legend>报表类型</legend><label :class="{chosen:reportType==='new_user'}"><input type="radio" name="reportType" value="new_user" :checked="reportType==='new_user'" @change="chooseReportType('new_user')" /><strong>拉新订单</strong><span>知乎邮件订单报表 · 订单量</span></label><label :class="{chosen:reportType==='activation'}"><input type="radio" name="reportType" value="activation" :checked="reportType==='activation'" @change="chooseReportType('activation')" /><strong>拉活</strong><span>拉活补贴表 · 拉活量</span></label></fieldset>
    <ol class="upload-steps"><li>选择知乎导出的 .xlsx 或 CSV 文件</li><li>点击“上传并自动分析”</li><li>查看识别结果和待处理原因，确认无误后再核对账单</li></ol>
    <p class="upload-tip">{{reportType==='activation'?'支持含有“日期 / 渠道名称 / 关键词 / 拉活量”表头的报表。':'支持含有“日期 / 渠道名称 / 关键词”以及“搜索量”或“订单量”表头的报表。'}}任何日期的报表都可以在这里上传。</p>
    <form @submit.prevent="run(upload)"><label>选择报表文件<input ref="uploadInput" type="file" accept=".xlsx,.csv,.xls" required :disabled="busy||!!progress" @change="file=($event.target as HTMLInputElement).files?.[0]??null" /></label><button class="primary" :disabled="busy||!!progress||!file">{{progress?'正在分析…':'上传并自动分析'}}</button></form>
+   <p v-if="replacement" role="status">正在重新上传：{{replacement}}。选择修正后的文件，再点击“上传并自动分析”；数字变化会列出供核对。</p>
   </div>
   <div v-if="error" role="alert" class="engine-error"><strong>{{error}}</strong><span v-if="errorHelp">{{errorHelp}}</span><button v-if="suggestedType" :disabled="busy" @click="chooseReportType(suggestedType);run(upload)">{{suggestedType==='activation'?'按拉活处理':'按拉新订单处理'}}</button></div><p v-if="notice" role="status">{{notice}}</p><p v-if="progress" role="status">{{progress}}</p>
-  <ReportAnalysis v-if="admin&&!wallet&&analysis" :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" @refresh="run(reloadResults)" />
+  <details v-if="admin&&!wallet" class="work-card import-history" :open="historyOpen" @toggle="historyOpen=($event.target as HTMLDetailsElement).open">
+   <summary>上传记录 · 查看、重新分析与清理</summary>
+   <div class="engine-actions history-views"><button :aria-pressed="!historyArchived" :disabled="busy" @click="run(()=>historyView(false))">上传记录</button><button :aria-pressed="historyArchived" :disabled="busy" @click="run(()=>historyView(true))">已清理</button><span>共 {{historyTotal}} 份</span></div>
+   <p v-if="historyArchived">这里的记录可恢复；业绩、账单及原报表来源仍保留。</p>
+   <ul class="import-history-list"><li v-for="b in history" :key="b.id">
+    <div><strong>{{b.fileName}}</strong><span>{{reportName(b)}} · {{b.createdAt?.slice(0,10)}} · {{batchStatus(b)}}</span></div>
+    <div class="engine-actions"><button :disabled="busy" @click="run(()=>openImport(b.id))">查看分析</button>
+     <template v-if="!historyArchived"><button :disabled="busy||!!progress" @click="run(()=>reanalyze(b))">重新分析</button><button :disabled="busy||!!progress" @click="replaceFile(b)">重新上传</button><button :disabled="busy||!!progress" @click="archiveTarget=b;archiveError=''">清除记录</button></template>
+     <button v-else :disabled="busy" @click="run(()=>restore(b))">恢复记录</button>
+    </div>
+   </li></ul>
+   <p v-if="!history.length">{{historyArchived?'还没有清理过的记录。':'还没有上传记录，请在上方选择报表并上传。'}}</p>
+   <div v-if="historyTotal>10" class="engine-actions"><button :disabled="busy||historyPage===1" @click="run(async()=>{historyPage--;await loadHistory()})">上一页记录</button><span>第 {{historyPage}} / {{Math.ceil(historyTotal/10)}} 页</span><button :disabled="busy||historyPage*10>=historyTotal" @click="run(async()=>{historyPage++;await loadHistory()})">下一页记录</button></div>
+  </details>
+  <section ref="analysisPanel" v-if="admin&&!wallet&&analysis" class="current-analysis" aria-label="当前报表分析">
+   <div class="engine-actions"><strong>{{importResult?.fileName||'当前报表'}}{{importResult?.archivedAt?' · 已清理':''}}</strong>
+    <template v-if="importResult&&!importResult.archivedAt"><button :disabled="busy||!!progress" @click="run(()=>reanalyze(importResult!))">重新分析</button><button :disabled="busy||!!progress" @click="replaceFile(importResult!)">重新上传</button><button :disabled="busy||!!progress" @click="archiveTarget=importResult;archiveError=''">清除记录</button></template>
+    <button v-if="importResult?.archivedAt" :disabled="busy" @click="run(()=>restore(importResult!))">恢复记录</button><button :disabled="busy" @click="closeAnalysis">收起分析</button>
+   </div>
+   <ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" @refresh="run(reloadResults)" />
+  </section>
+  <ActionDialog :open="!!archiveTarget" title="清除这条分析记录" :busy="busy" @close="archiveTarget=null">
+   <p class="archive-file">{{archiveTarget?.fileName}}</p><p>仅从上传记录列表移除，业绩、待处理问题和已确认账单都会保留。需要时可在“已清理”中恢复。</p>
+   <p v-if="archiveError" role="alert">{{archiveError}}</p><div class="engine-actions"><button :disabled="busy" @click="archiveTarget=null">取消</button><button class="primary" :disabled="busy" @click="run(archiveCurrent)">{{busy?'正在清理…':'清除记录并保留账单'}}</button></div>
+  </ActionDialog>
   <section v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果">
    <h2>{{importResult.fileName}} · 读取结果</h2>
    <p>共读取 {{importTotal}} 行，每行的处理结果都已保留。</p>
-   <ul class="report-rows"><li v-for="row in importResult.rows" :key="row.id"><strong>第 {{row.lineNumber}} 行 · {{rowStatus(row.processingStatus)}}</strong><span>{{row.errorText||'这行已读取，金额和待处理事项见下方账单。'}}</span><span v-if="row.next">下一步：{{row.next}}</span><span v-if="row.processingStatus==='invalid'">下一步：财务：修正这行后补传报表 <button :disabled="busy" @click="uploadInput?.click()">选择修正后的报表</button></span></li></ul>
+   <ul class="report-rows"><li v-for="row in importResult.rows" :key="row.id"><strong>第 {{row.lineNumber}} 行 · {{rowStatus(row.processingStatus)}}</strong><span>{{row.errorText||'这行已读取，金额和待处理事项见下方账单。'}}</span><span v-if="row.next">下一步：{{row.next}}</span><span v-if="row.processingStatus==='invalid'">下一步：财务：修正这行后补传报表 <button :disabled="busy||!!progress" @click="replaceFile(importResult!)">选择修正后的报表</button></span></li></ul>
    <div v-if="importTotal>25" class="engine-actions"><button :disabled="busy||importPage===1" @click="run(()=>inspectImport(importId,importPage-1))">上一页</button><span>第 {{importPage}} 页</span><button :disabled="busy||importPage*25>=importTotal" @click="run(()=>inspectImport(importId,importPage+1))">下一页</button></div>
   </section>
   <form class="period-filter" @submit.prevent="run(refresh)"><label>开始日期<input type="date" v-model="period.from" required /></label><label>结束日期<input type="date" v-model="period.to" required /></label><button :disabled="busy">查看账单</button><button v-if="admin&&!wallet" type="button" :disabled="busy" @click="openRates(typeFilter||reportType)">查看与设置单价</button></form>
@@ -187,7 +244,6 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;notice='代理名称已保存，相关报表已自动更新。';run(reloadResults)" />
   <ExecutionFollowUp v-if="execution" :key="execution.keywordId" :context="context" :item="execution" @close="execution=null" @changed="run(reloadResults)" @navigate="emit('navigate',$event)" />
   <CashWallet :key="walletVersion" v-if="wallet||admin" :http="context.coreHttp" :scope="{...context.scope,moduleId:'zhihu'}" />
-  <details v-if="admin&&!wallet" class="work-card"><summary>最近上传记录</summary><ul class="plain-list"><li v-for="b in history" :key="b.id"><button :disabled="busy" @click="run(()=>inspectImport(b.id))">{{b.fileName}}</button><span>{{b.status==='processed'?'已分析':b.status==='committed'?'分析中':'待处理'}}</span><button v-if="b.lastError||b.status==='committed'" :disabled="busy" @click="run(async()=>{await post('/imports/'+b.id+'/process');await track(b.id)})">继续分析</button></li></ul><p v-if="!history.length">尚未上传报表。</p></details>
   <FinanceHistoryLinks />
  </section>
 </template>
@@ -195,6 +251,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
 
 
 <style scoped>
+.import-history-list{list-style:none;padding:0;display:grid;gap:12px}.import-history-list li{display:grid;gap:12px;padding:16px 0;border-bottom:1px solid var(--line,#ddd)}.import-history-list li>div:first-child{display:grid;gap:6px;overflow-wrap:anywhere}.import-history-list span{font-size:13px}.history-views{margin-top:18px}.history-views button[aria-pressed=true]{background:#e6f3f1;color:#194f54;border-color:#25656a}.current-analysis{min-width:0}.current-analysis>.engine-actions{margin-bottom:12px}.current-analysis strong,.archive-file{overflow-wrap:anywhere;min-width:0}
 .type-totals{display:grid;gap:14px}.type-totals>div{display:grid;gap:5px}.type-totals span{font-size:13px}.type-tag{display:inline-block;padding:3px 7px;font-size:12px;border-radius:4px;background:#e5eeee;color:#254f53;white-space:nowrap}.type-tag.activation{background:#ece8f5;color:#604b82}.type-filter{display:flex;align-items:center;gap:12px;margin:16px 0}.type-filter select{width:140px}.settlement-warning{display:block;color:#8e4a08;font-size:12px;line-height:1.5;max-width:230px;margin-top:6px}
 .report-types{border:0;padding:0;margin:18px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.report-types legend{margin-bottom:8px}.report-types label{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:14px;border:1px solid #b5c7c6;border-radius:8px;cursor:pointer}.report-types label.chosen{border-color:#25656a;background:#e6f3f1}.report-types input{grid-row:span 2;width:auto;margin:3px 0}.report-types span{font-size:13px;color:#4b6263}.report-types label:focus-within{outline:2px solid #25656a;outline-offset:3px}
 @media(max-width:600px){.report-types{grid-template-columns:1fr}}

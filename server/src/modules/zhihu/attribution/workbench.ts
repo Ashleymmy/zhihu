@@ -20,6 +20,8 @@ import * as cutover from './cutover';
 import {reportComparison} from './report-comparison';
 import {internalPerformance} from './executor';
 import {allocations} from './allocations';
+import {reanalyzeImport} from './import-history';
+import {randomUUID} from 'node:crypto';
 export interface Period{from:string;to:string;metricType?:MetricType}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
 export {allocations} from './allocations';
@@ -39,6 +41,7 @@ export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUpload
  if(dates.length)await withTransaction(c=>cutover.extendRouteIfClean(c,scope,dates[0],user));
  const b=await facts.previewImport(user,scope,file,kind),detail=await facts.importDetail(user,scope,b.id,1,1);
  await facts.commitImport(user,scope,b.id,'workbench-import-'+b.id,detail.preview_hash);
+ if(b.duplicate)await reanalyzeImport(user,scope,b.id,randomUUID());
  await facts.processBatch(user,scope,b.id);
  return {...b,from:dates[0]??businessDay(),to:dates[dates.length-1]??businessDay()};
 }
