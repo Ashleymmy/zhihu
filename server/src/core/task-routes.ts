@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { ModuleRuntime } from './module-runtime';
-import { assertDataScope, projectAccounts } from './accounts';
+import { assertDataScope } from './accounts';
 import { listProjects, assertProjectMembership } from '../services/projectMembers.service';
+import { serviceProjects } from './project-scopes';
 import { isStaffRole } from '../auth/roles';
 import { dutyAllows } from './duties';
 import { AppError, asyncHandler } from '../middleware/errors';
@@ -37,12 +38,12 @@ export function createTaskRouter(runtime: ModuleRuntime) {
       const filter = query.parse(req.query);
       if (filter.accountId && !filter.projectId) throw new AppError(422, 42200, '请选择项目后查看任务');
       if (filter.projectId) await assertProjectMembership(req.user, filter.projectId);
-      const projects = (await listProjects(req.user)).filter((p) => p.isEnabled);
+      const projects = await serviceProjects(runtime,req.user);
       if (filter.projectId && !projects.some((p) => p.id === filter.projectId))
         throw new AppError(404, 40401, '项目暂不可用');
       const groups = [];
       for (const project of projects.filter((p) => !filter.projectId || p.id === filter.projectId)) {
-        const accounts = (await projectAccounts(req.user, project.id)).filter(
+        const accounts = project.accounts.filter(
           (a) => a.status === 'active' && (!filter.accountId || a.id === filter.accountId),
         );
         if (filter.accountId && !accounts.length) throw new AppError(403, 40301, '该项目的数据来源不可用');

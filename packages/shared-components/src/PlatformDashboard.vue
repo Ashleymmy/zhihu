@@ -21,7 +21,7 @@ async function load() {
 onMounted(load)
 const todos = computed(() => data.value?.groups.flatMap(project => project.services.flatMap(service =>
   service.todos.map(todo => ({ ...todo, projectName: project.name, key: project.id + ':' + service.accountId + ':' + todo.kind })))) ?? [])
-const unavailable = computed(() => data.value?.groups.some(project => project.services.some(service => service.status !== 'ready')))
+const unavailable = computed(() => data.value?.groups.some(project => project.services.some(service => service.status === 'unavailable')))
 const noActivity = computed(() => !!data.value?.groups.length && data.value.groups.every(project => project.services.every(service =>
   service.status === 'ready' && service.metrics.every(metric => /^0(\.0+)?$/.test(metric.value ?? '0')))))
 const display = (metric: Metric) => metric.value === null ? '待核对' : metric.unit === '元'

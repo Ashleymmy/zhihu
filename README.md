@@ -117,3 +117,8 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 ### 拉活代理名称
 
 运营或财务在项目设置、报表分析或数据待办填写本项目实际代理名称。提供了代理名称的拉活报表须与项目登记一致；名称未登记或不一致的行暂停计费，保存后自动核对未确认记录。名称列仍选填，不影响无该列的旧报表或拉新。设置按项目与账户隔离，迁移 `035_project_agencies.sql` 不改写已有账目；不要直接按外部报表内容替换项目实际签约名称。
+
+
+### 平台模块隔离检查
+
+`server/tests/attribution-ui/platform-isolation.cjs` 启动只含平台表的隔离 MySQL 和真实 Web 服务；`OPC_REVIEW_SAMPLE=0` 检查全部模块停用，设为 `1` 检查同一套首页/任务页面接入两个示例项目。脚本不连接生产或上游，启动要求内部 `REMEDIATION_REVIEW=1`，生产环境会拒绝。可通过 `OPC_PLAYWRIGHT_MODULE` 指定已有 Playwright 安装，浏览器使用 Edge。

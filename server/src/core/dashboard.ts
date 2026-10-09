@@ -2,9 +2,10 @@ import type { RowDataPacket } from 'mysql2/promise';
 import type { AuthUser } from '../types';
 import { rows } from '../db';
 import { isStaffRole } from '../auth/roles';
-import { listProjects, assertProjectMembership } from '../services/projectMembers.service';
+import { assertProjectMembership } from '../services/projectMembers.service';
 import { AppError } from '../middleware/errors';
-import { projectAccounts, assertDataScope } from './accounts';
+import { assertDataScope } from './accounts';
+import { serviceProjects } from './project-scopes';
 import { dutyAllows } from './duties';
 import { financeOverview } from './finance';
 import type { DashboardMetric, TodoItem } from './contracts';
@@ -13,15 +14,16 @@ import { logger } from '../utils/logger';
 
 export async function dashboard(runtime: ModuleRuntime, user: AuthUser, period: { from: string; to: string }, projectId?: string) {
   if (projectId) await assertProjectMembership(user, projectId);
-  const projects = (await listProjects(user)).filter((project) => project.isEnabled);
+  const projects = await serviceProjects(runtime,user);
   if (projectId && !projects.some((project) => project.id === projectId)) throw new AppError(404, 40401, '项目暂不可用');
   const selected = projects.filter((project) => !projectId || project.id === projectId);
   const groups = await Promise.all(selected.map(async (project) => {
-    const accounts = (await projectAccounts(user, project.id)).filter((account) => account.status === 'active');
+    const accounts = project.accounts;
     const services = await Promise.all(accounts.map(async (account) => {
       const module = runtime.get(account.moduleId);
       const empty = { moduleId: account.moduleId, accountId: account.id, todos: [] as TodoItem[], metrics: [] as DashboardMetric[] };
-      if (!module || !module.manifest.roles.includes(user.role) || !module.todoProvider) return { ...empty, status: 'unsupported' };
+      if (!module) return { ...empty, status: 'unavailable' };
+      if (!module.todoProvider) return { ...empty, status: 'unsupported' };
       try {
         await assertDataScope(user, project.id, account.id, account.moduleId);
         const data = await module.todoProvider.overview({ projectId: project.id, accountId: account.id, ...period }, user);

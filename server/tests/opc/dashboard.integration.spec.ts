@@ -61,3 +61,12 @@ it('validates dates and refuses missing or disabled projects', async () => {
   expect((await get('1', '99999')).status).toBe(404);
   expect((await request(app).get('/api/v1/core/dashboard').set(headers['1']).query({ from: '2026-02-30' })).status).toBe(422);
 });
+
+it('hides intentionally disabled modules while preserving initialization failures for retry',async()=>{
+ const {ModuleRuntime}=await import('../../src/core/module-runtime'),{dashboard}=await import('../../src/core/dashboard');
+ const user={sub:'2',role:'creator',parentId:null,username:'user2',displayName:'测试2',adminDuty:'all',jti:'test'} as AuthUser;
+ const empty=new ModuleRuntime([manifest]);
+ const result=await dashboard(empty,user,{from:'2026-10-01',to:'2026-10-09'});expect(result.projects).toEqual([]);expect(result.groups).toEqual([]);
+ empty.failures.set(manifest.id,'initialization_failed');const failed=await dashboard(empty,user,{from:'2026-10-01',to:'2026-10-09'});expect(failed.groups).toHaveLength(1);expect(failed.groups[0].services[0].status).toBe('unavailable');
+ const privateRuntime=new ModuleRuntime([{...manifest,roles:['admin']}]);privateRuntime.failures.set(manifest.id,'initialization_failed');expect((await dashboard(privateRuntime,user,{from:'2026-10-01',to:'2026-10-09'})).groups).toEqual([]);
+});
