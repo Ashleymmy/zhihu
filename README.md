@@ -43,6 +43,8 @@ npx tsx scripts/migrate-new-user-role-rates.ts --project 项目ID --account 账�
 
 专项验证：`cd server && npx vitest run tests/attribution/new-user-rates.spec.ts tests/attribution/workbench.spec.ts tests/attribution/engine.spec.ts`；Web 构建后设置 `OPC_REVIEW_ROLE_PRICES_ONLY=1`，运行 `node tests/attribution-ui/remediation-smoke.cjs`，实际检查六角色的角色单价、旧入口和手机页面。
 
+原始拉活 Excel 的闭环复验：Web 构建后，在仓库根目录设置 `OPC_REVIEW_ORIGINAL_ACTIVATION=1`、`OPC_ACTIVATION_SAMPLE=本机原件绝对路径`、`OPC_PLAYWRIGHT_MODULE=本机Playwright模块路径`，运行 `node server/tests/attribution-ui/remediation-smoke.cjs`。该专项针对本次四行、五个拉活量的原始样本，使用自动回收的 MySQL 容器和演示成员完成类型纠正、历史登记、作品核验、财务确认及六角色隔离检查。原件始终在仓库外，脚本校验上传前后及下载内容一致；含业务名称的截图只写入被忽略的 `.opc-work/remediation-review/original-activation`，不要纳入提交。
+
 ## 历史账目
 
 模块可用可选 `financeHistoryPath` 声明只读历史入口；共享 `FinanceHistoryLinks` 从模块目录生成折叠入口。知乎旧收益、提现、申诉、结算及邮件 / Excel 页面保留原地址，统一显示只读记录、详情和去新财务入口。历史金额只按原存储单位显示，不重算或写回；团长及达人只读本人金额，运营岗位不能读取资金记录。历史发票仍可由本人或财务下载。

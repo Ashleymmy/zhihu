@@ -13,15 +13,19 @@ async function main(){
   cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe','ipc'],env:{...process.env,REMEDIATION_REVIEW:'1'},
  });
  host.stdout.pipe(log);host.stderr.pipe(log);
- let browser,activePage,activeRole='';
+ let browser,activePage,activeRole='',sample;
  try{
   const port=await new Promise((resolve,reject)=>{
    const timer=setTimeout(()=>reject(Error('隔离演示环境启动超时，查看 host.log')),120000);
-   host.once('message',message=>{clearTimeout(timer);resolve(message.port)});
+   host.once('message',message=>{clearTimeout(timer);sample=message.sample;resolve(message.port)});
    host.once('exit',code=>{clearTimeout(timer);reject(Error('隔离演示环境退出 '+code))});
   });
   browser=await chromium.launch({headless:true,channel:process.env.OPC_BROWSER_CHANNEL||'msedge'});
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date());
+  if(process.env.OPC_REVIEW_ORIGINAL_ACTIVATION==='1'){
+   await require('./original-activation-flow.cjs')({browser,port,out,sample});
+   console.log('原始拉活 Excel 六角色闭环验收通过');return;
+  }
   if(process.env.OPC_REVIEW_ROLE_PRICES_ONLY==='1'){
    await require('./role-prices-flow.cjs')({browser,port,out,date});
    console.log('拉新角色计价与旧入口六角色验收通过');return;

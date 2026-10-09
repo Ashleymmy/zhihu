@@ -73,7 +73,15 @@ async function main() {
         await db.query("INSERT INTO users(username,password_hash,role,admin_duty,display_name,is_active,must_change_pwd) VALUES('review_ops',?,'admin','operations','运营测试',1,0),('review_finance',?,'admin','finance','财务测试',1,0)",[hash,hash]);
         if(process.env.OPC_REVIEW_FINANCE_HISTORY==='1') await (await import('./finance-history-fixture')).seedFinanceHistory(db);
         await db.end();
-        process.send?.({port});console.log('REVIEW_READY',port);
+        let sample;
+        if(process.env.OPC_REVIEW_ORIGINAL_ACTIVATION==='1'){
+          const file=process.env.OPC_ACTIVATION_SAMPLE;if(!file)throw Error('请提供本机原件路径 OPC_ACTIVATION_SAMPLE');
+          const buffer=await readFile(file),{parseReport}=await import('../../src/modules/zhihu/attribution/report');
+          const rows=await parseReport({originalname:path.basename(file),buffer,size:buffer.length,mimetype:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},'activation');
+          if(rows.some(row=>row.error||row.skipped))throw Error('原件包含未通过解析的记录');
+          sample=rows.map(row=>row.value);
+        }
+        process.send?.({port,sample});console.log('REVIEW_READY',port);
       }
     });
     child.stderr?.pipe(process.stderr);

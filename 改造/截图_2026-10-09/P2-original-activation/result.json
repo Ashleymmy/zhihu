@@ -1,0 +1,53 @@
+{
+  "sourceUnchanged": true,
+  "rows": 4,
+  "activationQuantity": "5",
+  "upstreamSettlement": "10.0000",
+  "memberPayable": "8.0000",
+  "creatorAvailable": "6.0000",
+  "leaderAvailable": "2.0000",
+  "results": [
+    {
+      "role": "admin",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "creator",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "leader",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "finance",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "operations",
+      "widths": [
+        1440,
+        375
+      ]
+    },
+    {
+      "role": "independent",
+      "widths": [
+        1440,
+        375
+      ]
+    }
+  ]
+}
