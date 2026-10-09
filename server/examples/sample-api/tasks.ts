@@ -36,7 +36,7 @@ export function sampleTasks(endpoint: URL): { taskProvider: ModuleTaskProvider; 
       async list(scope, user, filter) {
         const all = (await read(scope, user)).filter(
           (task) =>
-            (filter.view === 'owned'
+            !filter.attention && (filter.view === 'owned'
               ? task.executorId === user.sub
               : filter.view === 'available'
                 ? !task.executorId

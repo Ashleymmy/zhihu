@@ -36,7 +36,15 @@ function signed(body: unknown, nonce = crypto.randomBytes(16).toString('hex'), t
   };
 }
 function call(name: string, path: string, method = 'GET', data: Record<string, unknown> = {}) {
-  const { raw, headers } = signed({ appId, openId: openId(name), path, method, data, token: tokens[name], contentSafety:{version:1,digest:contentDigest(path,method,data),traceIds:["isolated-pass"]} });
+  const { raw, headers } = signed({
+    appId,
+    openId: openId(name),
+    path,
+    method,
+    data,
+    token: tokens[name],
+    contentSafety: { version: 1, digest: contentDigest(path, method, data), traceIds: ['isolated-pass'] },
+  });
   return request(app).post('/api/v1/mini/bridge').set(headers).send(raw);
 }
 async function login(name: string) {
@@ -247,7 +255,7 @@ it('a mini invitation registers the same website creator, leader provenance, and
   expect(registered.body.data.user).toMatchObject({ role: 'creator', parentId: '2' });
   const affiliation = await call('invited', '/core/team/affiliation');
   expect(affiliation.body.data.team.leaderId).toBe('2');
-  expect((await call('invited', '/core/projects')).body.data.map((p: {id:string})=>p.id)).toEqual(['1']);
+  expect((await call('invited', '/core/projects')).body.data.map((p: { id: string }) => p.id)).toEqual(['1']);
   const [[rewards]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM opc_income_entries WHERE user_id=?', [
     invitedId,
   ]);
@@ -266,9 +274,12 @@ it('unchanged project access preserves the session; changing access requires rel
   expect(removed.status, JSON.stringify(removed.body)).toBe(200);
   expect((await call('invited', '/core/projects')).status).toBe(401);
   const reduced = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
-  expect(reduced.status).toBe(200);tokens.invited=reduced.body.data.token;
+  expect(reduced.status).toBe(200);
+  tokens.invited = reduced.body.data.token;
   expect((await call('invited', '/core/projects')).body.data).toEqual([]);
-  expect((await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] })).status).toBe(200);
+  expect(
+    (await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] })).status,
+  ).toBe(200);
   expect((await call('invited', '/core/projects')).status).toBe(401);
   const fast = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
   tokens.invited = fast.body.data.token;
@@ -307,13 +318,19 @@ it('mini keyword creation, unique ownership and canonical composition submission
     releaseTime: '2026-10-01T12:00:00+08:00',
     requestKey: crypto.randomUUID(),
   };
-  await c.query("UPDATE plans SET sync_status='failed',zhihu_plan_id=NULL,sync_error='HTTP 400 / code 400402' WHERE id=?",[word.planId]);
+  await c.query(
+    "UPDATE plans SET sync_status='failed',zhihu_plan_id=NULL,sync_error='HTTP 400 / code 400402' WHERE id=?",
+    [word.planId],
+  );
   const rejected = await call('invited', '/modules/zhihu/mini-works', 'POST', payload);
-  expect(rejected.status,JSON.stringify(rejected.body)).toBe(409);
+  expect(rejected.status, JSON.stringify(rejected.body)).toBe(409);
   expect(rejected.body.message).toContain('未返回可识别的具体原因');
-  const [[untouched]]=await c.query<RowDataPacket[]>('SELECT used_ever_at FROM zh_keywords WHERE id=?',[word.id]);
+  const [[untouched]] = await c.query<RowDataPacket[]>('SELECT used_ever_at FROM zh_keywords WHERE id=?', [word.id]);
   expect(untouched.used_ever_at).toBeNull();
-  await c.query("UPDATE plans SET sync_status='synced',zhihu_plan_id=?,sync_error=NULL WHERE id=?",['isolated-'+word.planId,word.planId]);
+  await c.query("UPDATE plans SET sync_status='synced',zhihu_plan_id=?,sync_error=NULL WHERE id=?", [
+    'isolated-' + word.planId,
+    word.planId,
+  ]);
   const submitted = await call('invited', '/modules/zhihu/mini-works', 'POST', payload);
   expect(submitted.status, JSON.stringify(submitted.body)).toBe(201);
   const retry = await call('invited', '/modules/zhihu/mini-works', 'POST', payload);
@@ -619,4 +636,22 @@ it('telemetry write failures do not change successful business responses and are
   const read = await webMonitor('admin');
   expect(read.status).toBe(200);
   expect(read.body.data.technical.writer.failures).toBeGreaterThan(0);
+});
+
+it('relays platform task and earnings reads with ownership checks and accepts encoded historical task identifiers', async () => {
+  await login('leader');
+  const listing = await call('leader', '/core/tasks', 'GET', scope);
+  expect(listing.status, listing.text).toBe(200);
+  expect((await call('leader', '/core/tasks', 'GET', { ...scope, attention: 'review' })).status).toBe(200);
+  expect((await call('leader', '/core/earnings/mine')).status).toBe(200);
+  expect((await call('leader', '/core/earnings/999999/history')).status).toBe(404);
+  expect(
+    (
+      await call('leader', '/core/tasks/zhihu/' + scope.accountId + '/plan%3A999999', 'GET', {
+        projectId: scope.projectId,
+      })
+    ).status,
+  ).toBe(404);
+  for (const path of ['/core/tasks/zhihu/1/plan%2F1', '/core/tasks/zhihu/1/../auth', '/core/tasks//bad'])
+    expect((await call('leader', path)).status).toBe(422);
 });

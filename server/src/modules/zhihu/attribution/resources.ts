@@ -358,7 +358,7 @@ export async function updateKeywordNovel(user: AuthUser, scope: Scope, id: strin
     return {id};
   });
 }
-export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'owned' | 'ongoing' | 'registered' | 'retired' = 'all', recordId?: string) {
+export async function listKeywords(user: AuthUser, scope: Scope, page: number, pageSize: number, search = '', view: 'all' | 'available' | 'owned' | 'ongoing' | 'registered' | 'retired' = 'all', recordId?: string, attention?: 'assignment' | 'review' | 'work' | 'disputed') {
   await authorize(user, scope);
   await synchronizeKeywords(scope);
   return withTransaction(async (c) => {
@@ -378,10 +378,18 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       : view === 'registered' ? `${compositionCount}>0`
       : view === 'retired' ? `k.lifecycle_status='retired'` : '1=1';
     const filterArgs = view === 'owned' ? [user.sub, user.sub] : view === 'registered' ? workScope.bindings : view === 'available' && user.role === 'creator' ? [user.sub] : [];
-    const args = [scope.projectId, scope.accountId, `%${search}%`, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs, ...(recordId?[recordId]:[])];
+    const latestEvidence = "(SELECT ev.status FROM zh_evidence ev WHERE ev.binding_id=b.id ORDER BY ev.id DESC LIMIT 1)";
+    const attentionFilter = attention === 'assignment' ? "b.path_type='reserved' AND b.executor_id IS NULL"
+      : attention === 'review' ? `k.legacy_mode='historical_registered' AND b.verification_status='pending' AND ${latestEvidence}='pending' AND (?=1 OR b.leader_id=? AND b.executor_id<>?)`
+      : attention === 'work' ? `k.legacy_mode='historical_registered' AND b.verification_status='pending' AND COALESCE(${latestEvidence},'missing') IN ('missing','rejected')`
+      : attention === 'disputed' ? `k.legacy_mode='historical_registered' AND b.verification_status='disputed' AND ?=1` : '1=1';
+    const attentionArgs = attention === 'review' ? [Number(isStaffRole(user.role)), user.sub, user.sub]
+      : attention === 'disputed' ? [Number(dutyAllows(user,'operations'))] : [];
+    const args = [scope.projectId, scope.accountId, `%${search}%`, `%${search}%`, ...visibility.bindings, ...planScope.bindings, ...workScope.bindings, ...filterArgs, ...attentionArgs, ...(recordId?[recordId]:[])];
     const where = `p.project_id=? AND ${planAccountSql()}=? AND (p.keyword LIKE ? OR p.novel_title LIKE ?)
       AND (k.id IS NULL OR (k.project_id=p.project_id AND k.lifecycle_status<>'archived'))
-      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0) AND (${filter})
+      AND ((k.id IS NOT NULL AND ${visibility.clause}) OR (k.id IS NULL AND ${planScope.clause}) OR ${compositionCount}>0) AND (${filter}) AND (${attentionFilter})
+      ${attention?"AND b.released_at IS NULL AND b.stop_new_use_at IS NULL AND b.release_status<>'requested'":''}
       ${recordId?"AND COALESCE(CAST(k.id AS CHAR),CONCAT('plan:',p.id))=?":''}`;
     const from = `FROM plans p LEFT JOIN zh_keywords k ON k.plan_id=p.id
       LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id`;

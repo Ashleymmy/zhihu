@@ -18,6 +18,7 @@ const query = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().trim().max(128).default(''),
   view: z.enum(['all', 'available', 'owned']).optional(),
+  attention: z.enum(['assignment', 'review', 'work', 'disputed']).optional(),
 });
 function taskAccess(user: AuthUser) {
   if (isStaffRole(user.role) && !dutyAllows(user, 'operations')) throw new AppError(403, 40301, '这里需要运营权限');
@@ -38,7 +39,7 @@ export function createTaskRouter(runtime: ModuleRuntime) {
       const filter = query.parse(req.query);
       if (filter.accountId && !filter.projectId) throw new AppError(422, 42200, '请选择项目后查看任务');
       if (filter.projectId) await assertProjectMembership(req.user, filter.projectId);
-      const projects = await serviceProjects(runtime,req.user);
+      const projects = await serviceProjects(runtime, req.user);
       if (filter.projectId && !projects.some((p) => p.id === filter.projectId))
         throw new AppError(404, 40401, '项目暂不可用');
       const groups = [];
