@@ -119,3 +119,13 @@ it('收到真实知乎回执后自动核验作品并更新未确认金额，重�
  expect((await get(report)).body.data.totals.confirmableAmount).toBe('32.0000');
  const before=await q('SELECT * FROM zh_metric_facts WHERE keyword_id=?',[word.id]);await confirmSubmittedWorks(String(result.insertId));expect(await q('SELECT * FROM zh_metric_facts WHERE keyword_id=?',[word.id])).toEqual(before);
 });
+it('历史作品争议出现在运营首页并可解除，财务和成员不能代为处理',async()=>{
+ const work=await history('首页争议待办'),added=await submit(work.bindingId);expect((await review(added.body.data.id)).status).toBe(200);
+ const dispute=(actor:AuthUser,resolve:boolean)=>request(app).post('/api/v1/modules/zhihu/evidence-bindings/'+work.bindingId+'/dispute').set(headers[actor.sub]).send({...scope,resolve,reason:'隔离核实作品归属',requestKey:key()});
+ expect((await dispute(ops,false)).status).toBe(200);
+ expect(await todos(ops)).toContainEqual(expect.objectContaining({kind:'work.historical.disputed',count:1,actor:'运营',path:expect.stringContaining('/works?')}));
+ for(const actor of [creator,leader,finance])expect((await todos(actor)).some((todo:any)=>todo.kind==='work.historical.disputed')).toBe(false);
+ const rows=(await tasks(ops,work.id)).body.data.list;expect(rows[0]).toMatchObject({verificationStatus:'disputed',canResolve:true,canReview:false});
+ expect((await dispute(finance,true)).status).toBe(403);expect((await dispute(creator,true)).status).toBe(403);
+ expect((await dispute(ops,true)).status).toBe(200);expect((await todos(ops)).some((todo:any)=>todo.kind==='work.historical.disputed')).toBe(false);
+});

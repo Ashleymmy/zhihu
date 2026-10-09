@@ -35,16 +35,18 @@ export const zhihuTodoProvider: ModuleTodoProvider = {
       const failed = await listWorks(user, scope, 1, 1, { result: 'failed' });
       push('work.failed', failed.total, '作品提交失败', '提交人', '修改作品', link('/works', '&result=failed'));
       const [history] = await withTransaction(c=>select(c,`SELECT
-        SUM(e.id IS NULL OR e.status='rejected') missing,
-        SUM(e.status='pending' AND (?=1 OR b.leader_id=? AND b.executor_id<>?)) reviewing
+        SUM(b.verification_status='pending' AND (e.id IS NULL OR e.status='rejected')) missing,
+        SUM(b.verification_status='pending' AND e.status='pending' AND (?=1 OR b.leader_id=? AND b.executor_id<>?)) reviewing,
+        SUM(b.verification_status='disputed') disputed
         FROM zh_keywords k JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
         LEFT JOIN zh_evidence e ON e.id=(SELECT MAX(ev.id) FROM zh_evidence ev WHERE ev.binding_id=b.id)
         WHERE k.account_id=? AND k.project_id=? AND k.legacy_mode='historical_registered'
-          AND b.verification_status='pending' AND b.released_at IS NULL AND b.stop_new_use_at IS NULL
+          AND b.verification_status IN ('pending','disputed') AND b.released_at IS NULL AND b.stop_new_use_at IS NULL
           AND (?=1 OR b.executor_id=? OR b.leader_id=?)`,
         [Number(isStaffRole(user.role)),user.sub,user.sub,scope.accountId,scope.projectId,Number(isStaffRole(user.role)),user.sub,user.sub]));
       push('work.historical.submit',history.missing,'历史任务待补作品','执行人','补登记历史作品',link('/works'));
       push('work.historical.review',history.reviewing,'历史作品待核验','团长或运营','核验历史作品',link('/works'));
+      if(dutyAllows(user,'operations'))push('work.historical.disputed',history.disputed,'历史作品有争议','运营','核实作品归属',link('/works'));
       if (dutyAllows(user, 'operations')) {
         const [issues] = await withTransaction((c) => select(c, `SELECT COUNT(*) total FROM zh_exceptions
           WHERE account_id=? AND project_id=? AND status='open'

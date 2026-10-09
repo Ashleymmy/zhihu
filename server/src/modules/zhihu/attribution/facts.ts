@@ -20,6 +20,7 @@ import { agencyCheck } from './agency';
 import { assertDuty, dutyAllows } from '../../../core/duties';
 import { reportComparison } from './report-comparison';
 import { projectEarnings } from './earning-lines';
+import { ownershipHistorySql, unconfirmedFactSql } from './keyword-usability';
 export interface FactSnapshot {
   metricType?: MetricType;
   activations?: string | null;
@@ -564,7 +565,13 @@ export async function listExceptions(user: AuthUser, scope: Scope, page: number,
       ${finance?'v.snapshot_json,r.normalized_json':"NULL snapshot_json,JSON_OBJECT('date',JSON_EXTRACT(r.normalized_json,'$.date'),'channel',JSON_EXTRACT(r.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(r.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(r.normalized_json,'$.orders'),'activations',JSON_EXTRACT(r.normalized_json,'$.activations')) normalized_json"},k.keyword,
       JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,
       ${finance?'currentRevision.snapshot_json':'NULL'} current_snapshot_json,
-      b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name
+      b.id binding_id,b.executor_id,executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name,
+      CAST(k.id AS CHAR) keyword_id,
+      (SELECT DATE_FORMAT(MIN(uf.business_date),'%Y-%m-%d') FROM zh_metric_facts uf WHERE uf.keyword_id=k.id AND ${unconfirmedFactSql('uf')}) retro_from_date,
+      (${Number(dutyAllows(user,'operations'))}=1 AND e.status='open' AND e.reason_code='BINDING_MISSING' AND k.id IS NOT NULL
+        AND b.executor_id IS NULL AND NOT ${ownershipHistorySql()} AND b.stop_new_use_at IS NULL
+        AND COALESCE(b.release_status,'')<>'requested' AND k.lifecycle_status NOT IN ('archived','retired')
+        AND NOT EXISTS(SELECT 1 FROM zh_engine_routes er WHERE er.account_id=k.account_id AND er.project_id=k.project_id AND er.mode='stopped')) can_assign_retro
       FROM zh_exceptions e LEFT JOIN zh_metric_facts f ON f.id=e.fact_id LEFT JOIN zh_import_rows r ON r.id=e.source_row_id
       LEFT JOIN zh_metric_revisions currentRevision ON currentRevision.id=f.current_revision_id
       LEFT JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
