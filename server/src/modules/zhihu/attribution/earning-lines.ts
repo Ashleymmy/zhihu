@@ -15,6 +15,7 @@ export async function projectEarnings(c: PoolConnection, scope: Scope, factId: s
     u.display_name executor_name,u.role executor_role,leader.display_name leader_name,
     ${registeredWorkSql} evidence_count,
     (SELECT COUNT(*) FROM zh_metric_revisions v WHERE v.fact_id=f.id AND v.status='pending') pending_revision,
+    EXISTS(SELECT 1 FROM zh_member_objections o WHERE o.fact_id=f.id AND o.status='open') has_objection,
     route.mode route_mode
     FROM zh_metric_facts f JOIN zh_attribution_results r ON r.id=f.current_result_id
     LEFT JOIN zh_keyword_bindings b ON b.id=r.binding_id LEFT JOIN users u ON u.id=b.executor_id
@@ -33,7 +34,7 @@ export async function projectEarnings(c: PoolConnection, scope: Scope, factId: s
   } catch {
     /* Invalid legacy allocations remain visible as pending. */
   }
-  const code = !target
+  const code = Number(fact.has_objection) ? 'MEMBER_OBJECTION' : !target
     ? 'PRICE_CONFLICT'
     : fact.route_mode === 'stopped'
       ? 'BUSINESS_STOPPED'

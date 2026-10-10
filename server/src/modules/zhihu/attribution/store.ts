@@ -64,10 +64,12 @@ export async function mutate<T>(
   key: string,
   input: unknown,
   work: (c: PoolConnection) => Promise<T>,
+  exclusive = false,
 ): Promise<T> {
   await authorize(user, scope);
   if (!/^[\w.-]{8,128}$/.test(key)) fail('请提供有效的 Idempotency-Key');
   return withTransaction(async (c) => {
+    if(exclusive) await gate(c,true);
     await scopeLock(c, scope, user);
     await assertEngineWritable(c, scope);
     const hash = digest([scope, input]);

@@ -77,7 +77,7 @@ it('拉新十元和拉活两元只记录管理员业绩，作品核验提示保�
 it('作品核验自动更新；普通确认、直接账单预览都不能产生管理员应付款或公共收入',async()=>{
  const evidence=await statements.submitEvidence(admin,scope,key(),{bindingId:selfBinding,url:'https://example.com/staff-work',description:'本人发布的作品'});await statements.reviewEvidence(ops,scope,evidence.id,key(),true,'已核实作者');
  const current=await view(),entries=current.entries.filter(e=>e.keyword==='本人执行词');expect(entries.every(e=>e.reasonCode===''&&e.status==='internal'&&!e.ready)).toBe(true);
- expect(await workbench.confirmBills(finance,scope,{from:date,to:date},key(),current.reviewHash)).toEqual({confirmed:0,waiting:0});
+ expect(await workbench.confirmBills(finance,scope,{from:date,to:date},key(),current.reviewHash)).toEqual({confirmed:0,waiting:0,jobId:null,status:'done',total:0,remaining:0,skipped:0,error:null});
  for(const entry of entries)await expect(statements.previewStatement(admin,scope,key(),entry.factId)).rejects.toThrow('无权生成');
  expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(ledger);expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
  expect(await q('SELECT * FROM zh_statement_entries WHERE payee_id=1')).toEqual([]);expect(await q('SELECT * FROM opc_income_sources WHERE source_key IN (?)',[entries.map(e=>'fact:'+e.factId)])).toEqual([]);

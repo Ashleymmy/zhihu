@@ -1,3 +1,6 @@
+import {previewWorkbenchImport,commitWorkbenchImport} from '../attribution/workbench-import';
+import {confirmationStatus,retryConfirmation} from '../attribution/confirmation-jobs';
+import {raiseObjection,replyObjection,listObjections} from '../attribution/objections';
 import {previewImportWithdrawal,withdrawImport} from '../attribution/import-withdrawal';
 import { isStaffRole } from '../../../auth/roles';
 import { Router } from 'express';
@@ -30,6 +33,7 @@ import { novelSchema } from '../attribution/novel';
 export const attributionRouter = Router();
 const engineGroups = new Set([
   'workbench',
+  'objections',
   'project-agency',
   'attribution-options',
   'channel-mappings',
@@ -59,7 +63,7 @@ attributionRouter.use((req,_res,next)=>{
   // Each analysis question enforces its own duty in the service transaction.
   if(group==='project-agency')return next();
   if(group==='imports'&&/^\/imports\/\d+\/answers$/.test(req.path))return next();
-  assertDuty(req.user,['imports','metric-revisions','statements'].includes(group)||group==='workbench'&&['import','confirm'].includes(req.path.split('/')[2])?'finance':'operations');
+  assertDuty(req.user,['imports','metric-revisions','statements','objections'].includes(group)||group==='workbench'&&['import','confirm'].includes(req.path.split('/')[2])?'finance':'operations');
   next();
  }catch(e){next(e)}
 });
@@ -462,8 +466,8 @@ attributionRouter.post(
   }),
 );
 
-const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date(),viewVersion:z.enum(['1','2']).default('1')});
-const billPeriod=(q:z.infer<typeof periodSchema>):workbench.Period=>({from:q.from,to:q.to,...(q.viewVersion==='1'?{metricType:'new_user' as const}:{})});
+const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date(),viewVersion:z.enum(['1','2']).default('1'),metricType:z.enum(['new_user','activation']).optional()});
+const billPeriod=(q:z.infer<typeof periodSchema>):workbench.Period=>({from:q.from,to:q.to,...(q.metricType?{metricType:q.metricType}:q.viewVersion==='1'?{metricType:'new_user' as const}:{})});
 attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{
  if(isStaffRole(req.user.role))assertDuty(req.user,'finance');const q=periodSchema.parse(req.query);
  const view=await workbench.overview(req.user,q,billPeriod(q));
@@ -473,7 +477,7 @@ attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{
 }));
 attributionRouter.post('/workbench/import',upload,asyncHandler(async(req,res)=>{const q=scopeSchema.extend({reportType:z.enum(['new_user','activation']).default('new_user')}).parse(req.body);if(!req.file)fail('请选择知乎 Excel 报表');ok(res,await workbench.uploadReport(req.user,q,req.file,q.reportType),202);}));
 attributionRouter.post('/workbench/confirm',asyncHandler(async(req,res)=>{
- const q=periodSchema.extend({reviewHash:z.string().length(64),acknowledged:z.literal(true),requestKey:z.string().regex(/^[\w.-]{8,110}$/)}).parse(req.body);
+ const q=periodSchema.extend({reviewHash:z.string().length(64),acknowledged:z.literal(true),requestKey:z.string().regex(/^[\w.-]{8,128}$/)}).parse(req.body);
  ok(res,await workbench.confirmBills(req.user,q,billPeriod(q),q.requestKey,q.reviewHash));
 }));
 attributionRouter.post('/keywords/:id/distribute',asyncHandler(async(req,res)=>{
@@ -486,4 +490,29 @@ attributionRouter.post('/keywords/:id/assign-retro',asyncHandler(async(req,res)=
 attributionRouter.post('/keywords/:id/execution-history',asyncHandler(async(req,res)=>{
  const q=scopeSchema.extend({bindingId:idSchema,fromDate:z.string().date(),url:z.string().url().max(2048),description:z.string().trim().min(1).max(1000)}).parse(req.body);
  ok(res,await recordExecutionHistory(req.user,q,idSchema.parse(req.params.id),key(req),q));
+}));
+
+const newRequestKey=z.string().regex(/^[\w.-]{8,128}$/);
+attributionRouter.post('/workbench/import/preview',upload,asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({reportType:z.enum(['new_user','activation']).default('new_user'),requestKey:newRequestKey}).parse(req.body);
+ if(!req.file)fail('请选择知乎报表');ok(res,await previewWorkbenchImport(req.user,q,req.file,q.reportType,q.requestKey));
+}));
+attributionRouter.post('/workbench/import/:id/commit',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({previewHash:z.string().length(64),requestKey:newRequestKey}).parse(req.body);
+ ok(res,await commitWorkbenchImport(req.user,q,idSchema.parse(req.params.id),q.requestKey,q.previewHash),202);
+}));
+attributionRouter.get('/workbench/confirm/:id',asyncHandler(async(req,res)=>ok(res,await confirmationStatus(req.user,scopeSchema.parse(req.query),idSchema.parse(req.params.id)))));
+attributionRouter.post('/workbench/confirm/:id/retry',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({requestKey:newRequestKey}).parse(req.body);ok(res,await retryConfirmation(req.user,q,idSchema.parse(req.params.id),q.requestKey));
+}));
+const objectionList=scopeSchema.extend({page:z.coerce.number().int().min(1).max(100000).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(25),status:z.enum(['open','replied']).optional()});
+attributionRouter.get('/objections/mine',asyncHandler(async(req,res)=>{const q=objectionList.parse(req.query);ok(res,await listObjections(req.user,q,q,true));}));
+attributionRouter.get('/objections',asyncHandler(async(req,res)=>{const q=objectionList.parse(req.query);ok(res,await listObjections(req.user,q,q,false));}));
+attributionRouter.post('/objections',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({factId:idSchema.optional(),earningLineId:idSchema.optional(),detail:z.string().trim().min(1).max(1000),requestKey:newRequestKey}).parse(req.body);
+ ok(res,await raiseObjection(req.user,q,q.requestKey,{factId:q.factId,earningLineId:q.earningLineId,detail:q.detail}),201);
+}));
+attributionRouter.post('/objections/:id/reply',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({reply:z.string().trim().min(1).max(1000),requestKey:newRequestKey}).parse(req.body);
+ ok(res,await replyObjection(req.user,q,idSchema.parse(req.params.id),q.requestKey,q.reply));
 }));

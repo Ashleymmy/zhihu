@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import {recoverConfirmations} from './confirmation-jobs';
 import { db, withTransaction } from '../../../db';
 import { config } from '../../../config';
 import { enqueue, registerJob } from '../../../queue';
@@ -120,6 +121,7 @@ export function registerAttributionJobs() {
 export function startAttributionWorker() {
   if (timer) return;
   const tick = () => {
+    void recoverConfirmations().catch(e=>logger.error({error:String(e)},'finance_confirmation_recovery_failed'));
     void recoverImports().catch((e) => logger.error({ error: String(e) }, 'exclusive_import_recovery_failed'));
   };
   timer = setInterval(tick, 10000);

@@ -19,6 +19,7 @@ export function reasonText(code: string | null | undefined, context: ReasonConte
     case 'CHANNEL_UNMAPPED':
     case 'CHANNEL_AMBIGUOUS': return { reason: '渠道没对上', next: '运营：确认渠道' };
     case 'KEYWORD_UNKNOWN': return { reason: '关键词尚未对上报表', next: '运营：核对关键词与历史记录' };
+    case 'MEMBER_OBJECTION': return {reason:'成员金额异议待回复',next:'财务：查看并回复金额异议'};
     case 'BINDING_MISSING':
       if (!context.bindingId) return { reason: '没有执行人', next: '运营：指定执行人' };
       if (!context.executorId) return { reason: '待分配', next: `${leader}：分配执行人` };

@@ -88,7 +88,7 @@ export function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKi
     conflict = true;
   return { next, changed, conflict };
 }
-export async function previewImport(user: AuthUser, scope: Scope, file: AllianceUploadFile, kind: ReportKind) {
+export async function previewImport(user: AuthUser, scope: Scope, file: AllianceUploadFile, kind: ReportKind, options?:{key:string;deferBoundary?:boolean}) {
   if (!isStaffRole(user.role)) fail('仅管理员可导入来源报告', 403);
   await authorize(user, scope);
   assertReportWriteEnabled(kind);
@@ -99,11 +99,11 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
     .digest('hex');
   const template=reportTemplate(kind);
   const previewHash = digest({ scope, kind, hash, rows: parsed, template });
-  return withTransaction(async (c) => {
+  const work=async (c:PoolConnection) => {
     await scopeLock(c, scope, user);
     await assertEngineWritable(c, scope);
     const [route]=await select(c,"SELECT DATE_FORMAT(exclusive_from,'%Y-%m-%d') start FROM zh_engine_routes WHERE account_id=? AND project_id=?",[scope.accountId,scope.projectId]);
-    const alreadySettled=(row:typeof parsed[number])=>!row.error&&!!route&&row.value.date<String(route.start);
+    const alreadySettled=(row:typeof parsed[number])=>!options?.deferBoundary&&!row.error&&!!route&&row.value.date<String(route.start);
     const existing = await select(
       c,
       'SELECT id,project_id,template_version,status,upload_generation FROM zh_import_batches WHERE account_id=? AND file_sha256=? AND report_kind=? FOR UPDATE',
@@ -132,7 +132,8 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
       );
     await audit(c, user, 'report.preview', id, { ...scope, hash, kind });
     return { id, duplicate: false };
-  });
+  };
+  return options?.key ? mutate(user,scope,'workbench.preview',options.key,{hash,kind},work) : withTransaction(work);
 }
 export async function importDetail(user: AuthUser, scope: Scope, id: string, page: number, pageSize: number) {
   assertDuty(user,'finance');
@@ -156,6 +157,7 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
     );
     return {
       ...batch,
+      status:String(batch.status),
       id: String(batch.id),
       template_version: String(batch.template_version),
       preview_hash: String(batch.preview_hash),
@@ -213,7 +215,9 @@ export async function requeueImport(user: AuthUser, scope: Scope, id: string, ke
 }
 export async function commitImport(user: AuthUser, scope: Scope, id: string, key: string, previewHash: string) {
   if (!isStaffRole(user.role)) fail('仅管理员可确认导入', 403);
-  return mutate(user, scope, 'report.commit', key, { id, previewHash }, async (c) => {
+  return mutate(user, scope, 'report.commit', key, { id, previewHash }, c=>commitImportInTransaction(c,user,scope,id,previewHash));
+}
+export async function commitImportInTransaction(c:PoolConnection,user:AuthUser,scope:Scope,id:string,previewHash:string,extendBoundary=false){
     const [batch] = await select(
       c,
       'SELECT * FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',
@@ -224,6 +228,13 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
     if (batch.status === 'preview' && batch.template_version !== reportTemplate(batch.report_kind as ReportKind))
       fail('报告解析规则已更新，请重新上传并核对预览', 409);
     if (batch.preview_hash !== previewHash) fail('预览已变化，请重新核对', 409);
+    if(extendBoundary&&batch.status==='preview'){
+      const [range]=await select(c,"SELECT MIN(JSON_UNQUOTE(JSON_EXTRACT(normalized_json,'$.date'))) first_day FROM zh_import_rows WHERE batch_id=? AND processing_status IN ('pending','legacy_settled')",[id]);
+      if(range.first_day){
+        const {extendRouteIfClean}=await import('./cutover');const from=await extendRouteIfClean(c,scope,String(range.first_day),user);
+        await c.query("UPDATE zh_import_rows SET processing_status=IF(JSON_UNQUOTE(JSON_EXTRACT(normalized_json,'$.date'))<?,'legacy_settled','pending'),error_text=IF(JSON_UNQUOTE(JSON_EXTRACT(normalized_json,'$.date'))<?,'这一天已有旧账范围，尚未计入本期',NULL) WHERE batch_id=? AND processing_status IN ('pending','legacy_settled')",[from,from,id]);
+      }
+    }
     const dates = await select(
       c,
       "SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(normalized_json,'$.date')) day FROM zh_import_rows WHERE batch_id=? AND processing_status IN ('pending','processed','duplicate','exception')",
@@ -237,8 +248,8 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
     await scheduleImport(c, scope, id, user.sub);
     await audit(c, user, 'report.commit', id);
     return { id };
-  });
 }
+
 async function exception(c: PoolConnection, scope: Scope, rowId: string | null, factId: string | null, code: string) {
   if(factId) await blockIncome(c,{...scope,moduleId:'zhihu'},'fact:'+factId,'来源数据待核对',reasonText(code).next);
   const exists = await select(
@@ -658,8 +669,19 @@ export async function trace(user: AuthUser, scope: Scope, id: string) {
             [id],
           )
         : [];
+    const currentSource:{batchId:string;rowId:string;lineNumber:number;fileName:string;metrics:string[]}[]=[];
+    if(isStaffRole(user.role)){
+      const [revision]=await select(c,'SELECT snapshot_json FROM zh_metric_revisions WHERE id=? AND fact_id=?',[fact.current_revision_id,id]);
+      const sources=revision?json<FactSnapshot>(revision.snapshot_json).sources:{};
+      const rowIds=[...new Set(Object.values(sources).filter(Boolean).map(source=>source!.rowId))];
+      if(rowIds.length){
+        const sourceRows=await select(c,'SELECT CAST(r.id AS CHAR) id,CAST(b.id AS CHAR) batch_id,r.line_number,b.file_name FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE r.id IN (?) AND b.account_id=? AND b.project_id=? ORDER BY b.id,r.line_number',[rowIds,scope.accountId,scope.projectId]);
+        for(const row of sourceRows)currentSource.push({batchId:String(row.batch_id),rowId:String(row.id),lineNumber:Number(row.line_number),fileName:String(row.file_name),metrics:Object.entries(sources).filter(([,source])=>source?.rowId===String(row.id)).map(([metric])=>metric)});
+      }
+    }
     return {
       id,
+      ...(isStaffRole(user.role)?{currentSource}:{}),
       keyword: fact.keyword,
       results: results.map(({ snapshot_json, ...r }) => ({
         ...r,

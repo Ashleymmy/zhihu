@@ -186,7 +186,7 @@ describe('简化工作台完整资金流程',()=>{
   expect(await earning()).toMatchObject({reason:'',nextAction:'金额已确认，可查看提现状态',isReady:1,amount:'232.0000'});
   await finance.reviewWithdrawal(fin,common(),withdrawal,'approve','测试审核');
  });
- it('付款必须有凭证；重复登记不会付款两次，凭证只供财务和本人查看',async()=>{
+ it('付款凭证选填但提供时须有效；重复登记不会付款两次，凭证只供财务和本人查看',async()=>{
   const proof={buffer:Buffer.from('%PDF-1.4\nTEST ONLY - no real payment\n%%EOF'),originalname:'test-only.pdf',size:0};proof.size=proof.buffer.length;
   await expect(finance.recordPayment(fin,common(),withdrawal,{reference:'TEST-PAYMENT-1',paidOn:day},{buffer:Buffer.from('invalid'),originalname:'fake.pdf',size:7})).rejects.toThrow('付款凭证');
   await finance.recordPayment(fin,common(),withdrawal,{reference:'TEST-PAYMENT-1',paidOn:day},proof);
@@ -223,7 +223,7 @@ describe('简化工作台完整资金流程',()=>{
   await c.query("INSERT INTO daily_metrics(project_id,plan_id,channel_id,keyword,stat_date,fetched_at) VALUES(?,?,'ch1','历史词',?,NOW())",[scope.projectId,plan.plan_id,legacy]);
   const result=await workbench.uploadReport(fin,scope,csv([legacy+',联测渠道,联测词0,10',earlier+',联测渠道,联测词0,2']));
   const rows=(await facts.importDetail(fin,scope,result.id,1,25)).rows;
-  expect(rows[0]).toMatchObject({processing_status:'legacy_settled',error_text:'这一天已在旧系统结算，不重复计算'});
+  expect(rows[0]).toMatchObject({processing_status:'legacy_settled',error_text:'这一天早于本期计账启用日期，尚未计入本期；这不代表已结算'});
   expect(rows[1].processing_status).not.toBe('legacy_settled');
   expect((await cutover.getRoute(admin,scope))?.exclusive_from).toBe(earlier);
   expect((await q('SELECT COUNT(*) n FROM opc_income_entries'))[0].n).toBe(before);

@@ -1,3 +1,4 @@
+import {assertNoObjection} from './objections';
 import { isStaffRole } from '../../../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../../../types';
@@ -254,6 +255,7 @@ async function confirmEntry(
     fail('只有付款主体可确认自己的应付', 403);
   if (entry.input_hash !== expectedHash) fail('草稿摘要不一致', 409);
   if (entry.status === 'confirmed') return { id };
+  await assertNoObjection(c,scope,String(fact.id));
   await assertNewRoute(c, scope, json<{ date: string }>(entry.snapshot_json).date, true);
   if (
     entry.status !== 'draft' ||
@@ -369,6 +371,7 @@ export async function confirmFinancialFact(
   );
   if (!fact || String(fact.current_result_id) !== resultId || String(fact.current_revision_id) !== revisionId)
     fail('报表已更新，请重新核对', 409);
+  await assertNoObjection(c,scope,factId);
   const [r] = await select(c, 'SELECT * FROM zh_attribution_results WHERE id=?', [resultId]);
   if (!r || r.reason_code&&!['RISK_EXCLUDED','REPORT_WITHDRAWN'].includes(String(r.reason_code))) fail('请先处理报表待办', 409);
   const snapshot = json<AttributionSnapshot>(r.snapshot_json);
