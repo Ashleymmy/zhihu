@@ -212,3 +212,9 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 上线先执行 `038_import_withdrawal.sql`，重复执行安全；保留原文件唯一约束并加入上传轮次，允许撤销后同文件重新上传。已开始使用撤销功能的数据库不能直接回退到不识别 `withdrawn` 状态的旧程序；回退须保留本修复或先停写核验，不能恢复过期备份覆盖后续账目。
 
 专项验证：`cd server && npx vitest run tests/attribution/import-history.spec.ts`。真实页面验收沿用两份本机原件路径 `OPC_NEW_USER_SAMPLE`、`OPC_ACTIVATION_SAMPLE` 及可选 `OPC_PLAYWRIGHT_MODULE`，运行 `node tests/attribution-ui/import-withdrawal-flow.cjs`，只写入一次性测试库；六角色截图留在 `.opc-work/import-withdrawal-ui`。
+
+2026-10-10 09:52（北京时间）已将 `53cf02c` 推送主分支并完成 Web/API 蓝绿上线。两处入口为 `zhihu-green-53cf02c`（3218），后台 `zhihu-worker-53cf02c`，镜像 `sha256:5a1700668b09c97e2ef6f8172258360d3a87fb6ba3c3ac1d0e179a4e835317bb`。备份 `precutover-20261010T014344Z/`（SQL 2259913 字节，SHA-256 `7c75ccc30cabc817d391398eabdb7cfd25e86011ed06f5d0e45082eb1a1cb83b`）已在内部网络数据库副本验证：038 重复迁移不改原数据，三份新上传和一条旧上传全部撤销后，有效计账数据及待办归零，用户、关键词、作品、单价及资金记录不变。
+
+生产仅执行 038 结构迁移，迁移前后既有记录指纹相同；切换暂停接口 8.66 秒，保留旧 711 个静态资源，现共 845 个。公网页面与健康 200，受保护接口未登录 401，API 和后台零重启、无新增错误，队列等待/执行中为 0，失败仍为切换前既有 38 条。回执 `withdrawal-cutover-20261010T015206Z/receipt.json`、`withdrawal-rehearsal-53cf02c.json`、`post-withdrawal-53cf02c.json` 位于服务器 bluegreen 目录。旧 `2fda998` API（3217）保留、旧后台已停止；现已使用撤销功能，不能直接启用旧程序处理新状态。
+
+随后用户明确确认清理这四条测试上传。通过相同业务服务撤销新上传 1、2、3（含原已隐藏记录），删除无实际结账的旧上传 1，审计及原上传证据保留。线上核验有效上传、旧上传、有效计账数据、未确认收益和未处理报表问题均为 0，成员应付及内部业绩归零；用户、项目成员、关键词、原作品、使用归属、单价及资金表指纹不变。清理回执 `withdrawal-cutover-20261010T015206Z/test-import-cleanup.json`；浏览器刷新已看到“共 0 份”和金额 ¥0.00。本次未改动或发布小程序。
