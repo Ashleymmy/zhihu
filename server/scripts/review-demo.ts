@@ -53,6 +53,9 @@ async function main() {
   const port = Number(process.env.PORT ?? 3000);
   app.listen(port, '127.0.0.1', () => console.log(`演示服务已启动：http://127.0.0.1:${port}/app/`));
   if (fresh) await seed(c);
+  // Match the real server lifecycle so committed previews and confirmation jobs
+  // are consumed during browser review as well.
+  if (process.env.RUN_BACKGROUND_JOBS === 'true') app.locals.moduleRuntime.start();
 }
 
 async function seed(c: mysql.Connection) {

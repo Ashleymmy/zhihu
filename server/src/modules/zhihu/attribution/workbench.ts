@@ -19,6 +19,27 @@ import {reanalyzeImport} from './import-history';
 import {randomUUID} from 'node:crypto';
 import {registeredWorkSql} from './work-receipts';
 export interface Period{from:string;to:string;metricType?:MetricType}
+export async function listPeriods(user:AuthUser,scope:Scope,page=1){
+ assertDuty(user,'finance');await authorize(user,scope);
+ return withTransaction(async c=>{
+  // Unmatched report rows also need an entry point. Previews and withdrawn uploads do not create periods.
+  const months=`SELECT DATE_FORMAT(business_date,'%Y-%m') month FROM zh_metric_facts WHERE project_id=? AND account_id=?
+   UNION SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')),7) month FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id
+   WHERE b.project_id=? AND b.account_id=? AND b.status IN ('committed','processed') AND r.processing_status NOT IN ('invalid','skipped')`;
+  const args=[scope.projectId,scope.accountId,scope.projectId,scope.accountId];
+  const [count]=await select(c,`SELECT COUNT(*) total FROM (${months}) periods WHERE month REGEXP '^[0-9]{4}-[0-9]{2}$'`,args);
+  const rows=await select(c,`SELECT month FROM (${months}) periods WHERE month REGEXP '^[0-9]{4}-[0-9]{2}$' ORDER BY month DESC LIMIT 12 OFFSET ?`,[...args,(page-1)*12]);
+  const list=[];
+  for(const row of rows){
+   const from=String(row.month)+'-01';
+   const [info]=await select(c,`SELECT DATE_FORMAT(LAST_DAY(?),'%Y-%m-%d') last_day,COUNT(*) records,
+    COALESCE(SUM(metric_type='new_user'),0) new_user_records,COALESCE(SUM(metric_type='activation'),0) activation_records
+    FROM zh_metric_facts WHERE project_id=? AND account_id=? AND business_date BETWEEN ? AND LAST_DAY(?)`,[from,scope.projectId,scope.accountId,from,from]);
+   list.push({id:String(row.month),from,to:String(info.last_day),records:Number(info.records),newUserRecords:Number(info.new_user_records),activationRecords:Number(info.activation_records)});
+  }
+  return {list,total:Number(count.total),page,pageSize:12};
+ });
+}
 function valid(p:Period){day(p.from);day(p.to);if(p.from>p.to)fail('开始日期不能晚于结束日期')}
 export {allocations} from './allocations';
 export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUploadFile,reportType:MetricType='new_user'){

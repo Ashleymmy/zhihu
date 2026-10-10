@@ -468,6 +468,10 @@ attributionRouter.post(
 
 const periodSchema=scopeSchema.extend({from:z.string().date(),to:z.string().date(),viewVersion:z.enum(['1','2']).default('1'),metricType:z.enum(['new_user','activation']).optional()});
 const billPeriod=(q:z.infer<typeof periodSchema>):workbench.Period=>({from:q.from,to:q.to,...(q.metricType?{metricType:q.metricType}:q.viewVersion==='1'?{metricType:'new_user' as const}:{})});
+attributionRouter.get('/workbench/periods',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({page:z.coerce.number().int().min(1).max(100000).default(1)}).parse(req.query);
+ ok(res,await workbench.listPeriods(req.user,q,q.page));
+}));
 attributionRouter.get('/workbench',asyncHandler(async(req,res)=>{
  if(isStaffRole(req.user.role))assertDuty(req.user,'finance');const q=periodSchema.parse(req.query);
  const view=await workbench.overview(req.user,q,billPeriod(q));

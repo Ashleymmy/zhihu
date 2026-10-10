@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, reactive, ref, watch, type Component } from "vue";
 import type { CoreWorkspace } from "./core-workspace";
 import DataGrid from "./DataGrid.vue";
 import DetailDrawer from "./DetailDrawer.vue";
@@ -14,6 +14,7 @@ import type { DataGridRow } from "./data-grid";
 const props = defineProps<{ initialProjectId?: string }>(),
   emit = defineEmits<{ navigate: [path: string] }>();
 const w = inject<CoreWorkspace>("opc")!;
+const earningPanels = inject<Record<string,Component>>("opc-earning-panels", {});
 const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Shanghai",
 }).format(new Date());
@@ -370,6 +371,7 @@ function close() {
         <p>加入项目并完成任务后，这里会自动显示收益。</p>
         <router-link to="/task-hall">查看任务大厅</router-link>
       </div>
+      <component v-if="wallet&&['leader','creator'].includes(w.role.value)&&earningPanels[wallet.moduleId]" :is="earningPanels[wallet.moduleId]" :key="walletKey" :scope="wallet"/>
       <FinanceHistoryLinks />
     </template>
     <DetailDrawer
@@ -408,6 +410,7 @@ function close() {
           下一步：{{ selected.nextAction }}
         </p>
         <button @click="task(selected)">查看任务与作品</button>
+        <component v-if="['leader','creator'].includes(w.role.value)&&earningPanels[selected.moduleId]" :is="earningPanels[selected.moduleId]" :key="selected.id" :scope="selected" :earning-line-id="selected.id"/>
         <h3>确认与更正记录</h3>
         <p v-if="historyBusy" role="status">正在读取记录…</p>
         <div v-if="historyError" role="alert">

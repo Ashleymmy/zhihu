@@ -4,6 +4,9 @@ import { defineAsyncComponent } from 'vue'
 export const financePanels = {
   zhihu: defineAsyncComponent(() => import('../modules/zhihu/views/FinancePanel.vue')),
 }
+export const earningPanels = {
+  zhihu: defineAsyncComponent(() => import('../modules/zhihu/views/EarningQuestions.vue')),
+}
 export async function installBusinessRoutes(router: Router, enabled: string[], role: GlobalRole = 'admin') {
   if (import.meta.env.VITE_OPC_CORE_ONLY === '1') return []
   const removers: Array<() => void> = []

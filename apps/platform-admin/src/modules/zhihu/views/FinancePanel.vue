@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import Finance from "@zhihu-koc/zhihu-module-views/Finance.vue";
+import {useRoute,useRouter} from "vue-router";
+import Finance from "@zhihu-koc/zhihu-module-views/Finance/PeriodDetailView.vue";
 import { http, useAuthStore } from "../context";
 import { http as coreHttp } from "../../../stores/auth";
 const props = defineProps<{
@@ -8,6 +9,12 @@ const props = defineProps<{
   initialFrom?: string;
   initialTo?: string;
 }>();
+const route=useRoute(),router=useRouter();
+const active=computed(()=>route.query.period==='current'||!!route.query.from);
+function open(period:{from:string;to:string},step:string){void router.push({query:{...route.query,projectId:props.scope.projectId,accountId:props.scope.accountId,period:'current',...period,step}})}
+function back(){const {period,from,to,step,...rest}=route.query;void router.push({query:rest})}
+function setStep(step:string){void router.replace({query:{...route.query,step}})}
+function setPeriod(period:{from:string;to:string}){void router.replace({query:{...route.query,...period,step:'todo'}})}
 type EngineOptions = InstanceType<
   typeof Finance
 >["$props"]["context"]["options"];
@@ -60,8 +67,9 @@ const context = computed(() => ({
       v-else-if="options"
       :key="scope.projectId + ':' + scope.accountId"
       :context="context"
-      :initial-from="initialFrom"
-      :initial-to="initialTo"
+      :initial-from="String(route.query.from||initialFrom||'')"
+      :initial-to="String(route.query.to||initialTo||'')"
+      :active="active" :step="String(route.query.step||'review')" @open="open" @back="back" @step="setStep" @period="setPeriod" @navigate="router.push($event)"
     />
   </div>
 </template>

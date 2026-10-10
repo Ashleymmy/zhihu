@@ -592,3 +592,16 @@ it('并发金额异议只产生一条待回复，跨范围及岗位请求不能�
   ).toBe(403);
   expect((await get(ops, '/api/v1/core/finance/withdrawals/' + own.id + '/history', common())).status).toBe(403);
 });
+
+
+it('lists real finance months with finance-only and project isolation', async () => {
+  const response=await get(fin,path('/workbench/periods'),scope);
+  expect(response.status).toBe(200);
+  const result=response.body.data;
+  expect(result.list.some((p:{id:string})=>p.id===day.slice(0,7))).toBe(true);
+  expect(result.list.every((p:{from:string;to:string;records:number})=>p.from<=p.to&&p.records>=0)).toBe(true);
+  expect((await get(ops,path('/workbench/periods'),scope)).status).toBe(403);
+  expect((await get(a,path('/workbench/periods'),scope)).status).toBe(403);
+  expect((await get(fin,path('/workbench/periods'),{projectId:'999999',accountId:scope.accountId})).status).toBe(403);
+  expect((await get(fin,path('/workbench/periods'),{...scope,page:0})).status).toBe(422);
+});

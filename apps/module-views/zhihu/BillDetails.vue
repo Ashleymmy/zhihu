@@ -2,7 +2,9 @@
 import {computed,nextTick,ref,watch} from 'vue'
 import {DataGrid,DetailDrawer,ValueComparison,type DataGridRow} from '@zhihu-koc/shared-components'
 import {type BillEntry,moneyValue,cashText} from './bill-entry'
-const props=defineProps<{entries:BillEntry[];wallet?:boolean;adminDuty:string;canSetRates?:boolean;busy?:boolean}>()
+import TraceDrawer from './Finance/components/TraceDrawer.vue'
+import type {EngineContext} from './context'
+const props=defineProps<{context?:EngineContext;entries:BillEntry[];wallet?:boolean;adminDuty:string;canSetRates?:boolean;busy?:boolean}>()
 const emit=defineEmits<{assign:[entry:BillEntry];risk:[entry:BillEntry];changes:[entry:BillEntry];rates:[entry:BillEntry];agency:[];followup:[entry:BillEntry];match:[entry:BillEntry]}>()
 const selected=ref<BillEntry|null>(null)
 watch(()=>props.entries,entries=>{if(selected.value)selected.value=entries.find(e=>e.id===selected.value?.id)??null})
@@ -29,6 +31,7 @@ async function handle(e:BillEntry,key:string){selected.value=null;await nextTick
    <p>{{priceSource(selected)}}</p><p v-if="selected.riskReview">核实结果：{{selected.riskReview.decision==='excluded'?'本条不计费':'已核实通过'}}。{{selected.riskReview.reason}}</p>
    <dl><div><dt>{{selected.internal?'管理员业绩':wallet?'本人收益':'应付金额'}}</dt><dd>{{money(selected.amount)}}</dd></div><div v-if="!selected.internal"><dt>已确认</dt><dd>{{money(selected.confirmedAmount)}}</dd></div><div v-if="!selected.internal"><dt>{{selected.kind==='adjustment'?'待确认更正':'待确认'}}</dt><dd>{{money(selected.amount===null?null:selected.pendingAmount)}}</dd></div></dl>
    <ValueComparison v-if="selected.comparison?.length" :rows="selected.comparison" />
+   <TraceDrawer v-if="context&&!wallet&&selected.factId" :context="context" :entry="selected"/>
    <p v-if="selected.next">下一步：{{selected.next}}</p><button v-if="action(selected)" :disabled="busy" @click="handle(selected,action(selected)!.key)">{{action(selected)?.label}}</button>
    <button v-if="selected.keywordId&&action(selected)?.key!=='followup'" :disabled="busy" @click="handle(selected,'followup')">查看执行人与已有作品</button>
   </div>
