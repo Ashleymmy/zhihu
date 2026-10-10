@@ -10,7 +10,7 @@ import {scheduleImport} from './outbox';
 export async function archiveImport(user:AuthUser,scope:Scope,id:string,key:string,archived:boolean){
  assertDuty(user,'finance');
  return mutate(user,scope,'report.archive',key,{id,archived},async c=>{
-  const [batch]=await select(c,'SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',[id,scope.accountId,scope.projectId]);
+  const [batch]=await select(c,"SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status<>'withdrawn' FOR UPDATE",[id,scope.accountId,scope.projectId]);
   if(!batch)fail('报表不存在',404);
   if(archived){
    const pending=await select(c,"SELECT id FROM zh_import_rows WHERE batch_id=? AND processing_status='pending' LIMIT 1",[id]);
@@ -25,7 +25,7 @@ export async function archiveImport(user:AuthUser,scope:Scope,id:string,key:stri
 export async function reanalyzeImport(user:AuthUser,scope:Scope,id:string,key:string){
  assertDuty(user,'finance');
  return mutate(user,scope,'report.reanalyze',key,{id},async c=>{
-  const [batch]=await select(c,"SELECT id,report_kind FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status<>'preview' FOR UPDATE",[id,scope.accountId,scope.projectId]);
+  const [batch]=await select(c,"SELECT id,report_kind FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status IN ('committed','processed') FOR UPDATE",[id,scope.accountId,scope.projectId]);
   if(!batch)fail('报表不存在或尚未上传完成',404);
   assertReportWriteEnabled(batch.report_kind as ReportKind);
   // Do not replay accepted/rejected source changes: an older report must never

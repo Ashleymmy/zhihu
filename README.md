@@ -197,10 +197,18 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 
 ### 报表记录清理与重新分析（2026-10-09）
 
-财务页在上传框下提供“上传记录”，可查看全部分页记录、重新分析原文件、选择修正文件重新上传、清理和恢复；当前分析也提供同样入口及“收起分析”。清理只将记录移入“已清理”，不撤销业绩、不删除待办或原文件、不改已确认账单，操作前说明实际后果。正在读取的报表须先处理完成。
+财务页在上传框下提供“上传记录”，可查看全部分页记录、重新分析原文件、选择修正文件重新上传、隐藏和恢复；当前分析也提供同样入口及“收起分析”。隐藏只将记录移入“已隐藏”，不撤销业绩、不删除待办或原文件、不改已确认账单。传错或测试报表请使用新增的“撤销导入”，不要用隐藏代替撤销。
 
 上线先执行模块迁移 `037_import_history.sql`，只增加 `zh_import_history_archive` 表，重复执行保留全部数据。重新分析仅重试未匹配行并刷新未确认结果，保留人工选择；同文件重传恢复记录并重新检查，不新增同份报表或重复计账。更正文件仍进入原值与新值核对流程。清理、恢复及重新分析仅财务或完整管理员可操作，服务端校验岗位和项目范围。
 
 专项运行：`cd server && npx vitest run --config vitest.attribution.config.ts tests/attribution/import-history.spec.ts`。Web 构建后，设置 `OPC_REVIEW_IMPORT_HISTORY_ONLY=1`、可选 `OPC_PLAYWRIGHT_MODULE`，运行 `node tests/attribution-ui/remediation-smoke.cjs`，在隔离数据库中检查六角色、1440/375 页面和实际上传操作。
 
 2026-10-09 财务旧作品衔接修复：`server/scripts/reconcile-registered-works.ts` 为显式发布修复工具。使用 `npx tsx scripts/reconcile-registered-works.ts --project 1 --account 1 --actor 财务人员ID` 先预览，备份与隔离验证后追加 `--apply` 更新已有作品相关的未确认记录。重复执行不重复记账，不确认账单、不指定缺失执行人、不修改已确认账或调用知乎。原件页面演练：设置 `OPC_NEW_USER_SAMPLE`、`OPC_ACTIVATION_SAMPLE` 为本机两份文件路径，`OPC_PLAYWRIGHT_MODULE` 为可用 Playwright 路径，然后在 server 运行 `node tests/attribution-ui/reconciliation-flow.cjs`；脚本创建并回收独立 MySQL，截图含原件关键词，仅保存在忽略目录。
+
+### 报表撤销与重传（2026-10-10）
+
+财务页“上传记录”或当前分析点“撤销导入”，确认本文件影响后，未确认数据从业绩、金额和待办中移除；可直接“撤销后重传”。其他有效来源仍保留，已确认金额进入原核对入口生成更正。原上传原文留作操作审计，不继续计账。旧报表在历史详情可删除；确认过上传不代表已经结账，只有实际旧结算记录需要保留原凭据。
+
+上线先执行 `038_import_withdrawal.sql`，重复执行安全；保留原文件唯一约束并加入上传轮次，允许撤销后同文件重新上传。已开始使用撤销功能的数据库不能直接回退到不识别 `withdrawn` 状态的旧程序；回退须保留本修复或先停写核验，不能恢复过期备份覆盖后续账目。
+
+专项验证：`cd server && npx vitest run tests/attribution/import-history.spec.ts`。真实页面验收沿用两份本机原件路径 `OPC_NEW_USER_SAMPLE`、`OPC_ACTIVATION_SAMPLE` 及可选 `OPC_PLAYWRIGHT_MODULE`，运行 `node tests/attribution-ui/import-withdrawal-flow.cjs`，只写入一次性测试库；六角色截图留在 `.opc-work/import-withdrawal-ui`。

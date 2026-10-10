@@ -9,6 +9,17 @@ const query = async (c: PoolConnection, sql: string, args: unknown[] = []) =>
 const conflict = (): never => {
   throw new AppError(409, 40900, '收益记录已更新，请刷新后核对');
 };
+/** Remove an unconfirmed projection; a module may never erase confirmed income. */
+export async function removeUnconfirmedEarningSource(c:PoolConnection,s:FinanceScope,sourceKey:string){
+  await lockFinance(c,s);
+  const income=await query(c,'SELECT id FROM opc_income_sources WHERE module_id=? AND project_id=? AND account_id=? AND source_key=?',[s.moduleId,s.projectId,s.accountId,sourceKey]);
+  const [source]=await query(c,'SELECT id FROM opc_earning_sources WHERE module_id=? AND project_id=? AND account_id=? AND source_key=? FOR UPDATE',[s.moduleId,s.projectId,s.accountId,sourceKey]);
+  if(income.length)conflict();
+  if(!source)return;
+  if((await query(c,'SELECT id FROM opc_earning_lines WHERE source_id=? AND confirmed_at IS NOT NULL LIMIT 1',[source.id])).length)conflict();
+  await c.query('DELETE FROM opc_earning_lines WHERE source_id=?',[source.id]);
+  await c.query('DELETE FROM opc_earning_sources WHERE id=?',[source.id]);
+}
 export interface EarningLineInput {
   payeeId: string;
   performerId: string | null;

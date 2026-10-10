@@ -42,6 +42,24 @@ const unit=(type:ReportType)=>type==='activation'?'个':'单'
 function chooseReportType(value:ReportType){reportType.value=value;suggestedType.value=null;try{localStorage.setItem('zhihu.reportType',value)}catch{}}
 const importResult=ref<ImportDetail|null>(null),importId=ref(''),importPage=ref(1),uploadInput=ref<HTMLInputElement|null>(null)
 const historyArchived=ref(false),historyPage=ref(1),historyTotal=ref(0),historyOpen=ref(false),archiveTarget=ref<Batch|null>(null),archiveError=ref('')
+interface ImportWithdrawal {period:{from:string;to:string}|null;id:string;fileName:string;reviewHash:string;rows:number;removed:number;restored:number;retained:number;corrections:number}
+const withdrawalTarget=ref<ImportWithdrawal|null>(null),withdrawalError=ref('')
+async function previewWithdrawal(b:Batch){withdrawalError.value='';withdrawalTarget.value=await props.context.http.get<ImportWithdrawal>('/imports/'+b.id+'/withdrawal',props.context.scope)}
+async function withdrawCurrent(reupload=false){
+ if(!withdrawalTarget.value)return
+ const target=withdrawalTarget.value
+ withdrawalError.value=''
+ try{
+  await post('/imports/'+target.id+'/withdrawal',{reviewHash:target.reviewHash})
+  const old=history.value.find(b=>b.id===target.id)??importResult.value
+  if(importId.value===target.id)closeAnalysis()
+  withdrawalTarget.value=null
+  notice.value='已撤销并移除上传记录，相关业绩、金额和待办已更新。'+(target.corrections?target.corrections+' 条已确认记录已生成待核对的更正金额，原账保留。':'可以重新上传正确的报表。')
+  if(target.period)Object.assign(period,target.period)
+  await reloadResults();walletVersion.value++;if(target.corrections)openDetails('')
+  if(reupload)replaceFile(old??undefined)
+ }catch(e){if(withdrawalTarget.value)withdrawalError.value=errorText(e);else showError(e)}
+}
 const analysisPanel=ref<HTMLElement|null>(null),uploadBox=ref<HTMLElement|null>(null),replacement=ref('')
 const batchStatus=(b:Batch)=>b.lastError?'处理曾中断':b.status==='processed'?'已读取，查看处理结果':b.status==='committed'?'分析中':'待处理'
 const reportName=(b:Batch)=>b.reportKind==='activation'?'拉活':'拉新'
@@ -59,12 +77,12 @@ async function reanalyze(b:Batch){
 async function archiveCurrent(){
  if(!archiveTarget.value)return
  archiveError.value=''
- try{const target=archiveTarget.value;await post('/imports/'+target.id+'/archive',{archived:true});if(importId.value===target.id)closeAnalysis();archiveTarget.value=null;notice.value='已清理这条分析记录，业绩和账单保留。可在“已清理”中恢复。';await loadHistory()}catch(e){if(archiveTarget.value)archiveError.value=errorText(e);else showError(e)}
+ try{const target=archiveTarget.value;await post('/imports/'+target.id+'/archive',{archived:true});if(importId.value===target.id)closeAnalysis();archiveTarget.value=null;notice.value='已隐藏这条分析记录，业绩和账单保留。可在“已隐藏”中恢复。';await loadHistory()}catch(e){if(archiveTarget.value)archiveError.value=errorText(e);else showError(e)}
 }
 async function restore(b:Batch){await post('/imports/'+b.id+'/archive',{archived:false});if(importId.value===b.id)await inspectImport(b.id);notice.value='已恢复上传记录，可查看或重新分析。';await loadHistory()}
 const analysis=ref<AnalysisRunModel|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
 const importTotal=computed(()=>importResult.value?.counts.reduce((sum,c)=>sum+c.total,0)??0)
-const rowStatus=(status:string)=>({invalid:'需要修正',skipped:'已跳过',pending:'正在处理',processed:'已读取',duplicate:'已读取，不重复计算',exception:'需要处理',legacy_settled:'旧系统已结算'}[status]??'已读取')
+const rowStatus=(status:string)=>({invalid:'需要修正',skipped:'已跳过',pending:'正在处理',processed:'已读取',duplicate:'已读取，不重复计算',exception:'需要处理',legacy_settled:'早于本期计账日期，未计入本期'}[status]??'已读取')
 async function inspectImport(id:string,page=1){
  importId.value=id;importPage.value=page
  const [detail,run]=await Promise.all([props.context.http.get<ImportDetail>('/imports/'+id,{...props.context.scope,page,pageSize:25}),props.context.http.get<AnalysisRunModel>('/imports/'+id+'/analysis',props.context.scope)])
@@ -186,29 +204,43 @@ onUnmounted(()=>{disposed=true;if(timer)clearTimeout(timer)})
   </div>
   <div v-if="error" role="alert" class="engine-error"><strong>{{error}}</strong><span v-if="errorHelp">{{errorHelp}}</span><button v-if="suggestedType" :disabled="busy" @click="chooseReportType(suggestedType);run(upload)">{{suggestedType==='activation'?'按拉活处理':'按拉新订单处理'}}</button></div><p v-if="notice" role="status">{{notice}}</p><p v-if="progress" role="status">{{progress}}</p>
   <details v-if="admin&&!wallet" class="work-card import-history" :open="historyOpen" @toggle="historyOpen=($event.target as HTMLDetailsElement).open">
-   <summary>上传记录 · 查看、重新分析与清理</summary>
-   <div class="engine-actions history-views"><button :aria-pressed="!historyArchived" :disabled="busy" @click="run(()=>historyView(false))">上传记录</button><button :aria-pressed="historyArchived" :disabled="busy" @click="run(()=>historyView(true))">已清理</button><span>共 {{historyTotal}} 份</span></div>
+   <summary>上传记录 · 查看或撤销</summary>
+   <div class="engine-actions history-views"><button :aria-pressed="!historyArchived" :disabled="busy" @click="run(()=>historyView(false))">上传记录</button><button :aria-pressed="historyArchived" :disabled="busy" @click="run(()=>historyView(true))">已隐藏</button><span>共 {{historyTotal}} 份</span></div>
    <p v-if="historyArchived">这里的记录可恢复；业绩、账单及原报表来源仍保留。</p>
    <ul class="import-history-list"><li v-for="b in history" :key="b.id">
     <div><strong>{{b.fileName}}</strong><span>{{reportName(b)}} · {{b.createdAt?.slice(0,10)}} · {{batchStatus(b)}}</span></div>
     <div class="engine-actions"><button :disabled="busy" @click="run(()=>openImport(b.id))">查看分析</button>
-     <template v-if="!historyArchived"><button :disabled="busy||!!progress" @click="run(()=>reanalyze(b))">重新分析</button><button :disabled="busy||!!progress" @click="replaceFile(b)">重新上传</button><button :disabled="busy||!!progress" @click="archiveTarget=b;archiveError=''">清除记录</button></template>
+     <button :disabled="busy" @click="run(()=>previewWithdrawal(b))">撤销导入</button>
+     <template v-if="!historyArchived"><button :disabled="busy||!!progress" @click="run(()=>reanalyze(b))">重新分析</button><button :disabled="busy||!!progress" @click="replaceFile(b)">重新上传</button><button :disabled="busy||!!progress" @click="archiveTarget=b;archiveError=''">隐藏记录</button></template>
      <button v-else :disabled="busy" @click="run(()=>restore(b))">恢复记录</button>
     </div>
    </li></ul>
-   <p v-if="!history.length">{{historyArchived?'还没有清理过的记录。':'还没有上传记录，请在上方选择报表并上传。'}}</p>
+   <p v-if="!history.length">{{historyArchived?'还没有隐藏过的记录。':'还没有上传记录，请在上方选择报表并上传。'}}</p>
    <div v-if="historyTotal>10" class="engine-actions"><button :disabled="busy||historyPage===1" @click="run(async()=>{historyPage--;await loadHistory()})">上一页记录</button><span>第 {{historyPage}} / {{Math.ceil(historyTotal/10)}} 页</span><button :disabled="busy||historyPage*10>=historyTotal" @click="run(async()=>{historyPage++;await loadHistory()})">下一页记录</button></div>
   </details>
   <section ref="analysisPanel" v-if="admin&&!wallet&&analysis" class="current-analysis" aria-label="当前报表分析">
-   <div class="engine-actions"><strong>{{importResult?.fileName||'当前报表'}}{{importResult?.archivedAt?' · 已清理':''}}</strong>
-    <template v-if="importResult&&!importResult.archivedAt"><button :disabled="busy||!!progress" @click="run(()=>reanalyze(importResult!))">重新分析</button><button :disabled="busy||!!progress" @click="replaceFile(importResult!)">重新上传</button><button :disabled="busy||!!progress" @click="archiveTarget=importResult;archiveError=''">清除记录</button></template>
+   <div class="engine-actions"><strong>{{importResult?.fileName||'当前报表'}}{{importResult?.archivedAt?' · 已隐藏':''}}</strong>
+    <button v-if="importResult" :disabled="busy" @click="run(()=>previewWithdrawal(importResult!))">撤销导入</button>
+    <template v-if="importResult&&!importResult.archivedAt"><button :disabled="busy||!!progress" @click="run(()=>reanalyze(importResult!))">重新分析</button><button :disabled="busy||!!progress" @click="replaceFile(importResult!)">重新上传</button><button :disabled="busy||!!progress" @click="archiveTarget=importResult;archiveError=''">隐藏记录</button></template>
     <button v-if="importResult?.archivedAt" :disabled="busy" @click="run(()=>restore(importResult!))">恢复记录</button><button :disabled="busy" @click="closeAnalysis">收起分析</button>
    </div>
    <ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :busy-action="busy?'working':''" @answer="answerAnalysis" @action="analysisAction" @refresh="run(reloadResults)" />
   </section>
-  <ActionDialog :open="!!archiveTarget" title="清除这条分析记录" :busy="busy" @close="archiveTarget=null">
-   <p class="archive-file">{{archiveTarget?.fileName}}</p><p>仅从上传记录列表移除，业绩、待处理问题和已确认账单都会保留。需要时可在“已清理”中恢复。</p>
-   <p v-if="archiveError" role="alert">{{archiveError}}</p><div class="engine-actions"><button :disabled="busy" @click="archiveTarget=null">取消</button><button class="primary" :disabled="busy" @click="run(archiveCurrent)">{{busy?'正在清理…':'清除记录并保留账单'}}</button></div>
+  <ActionDialog :open="!!withdrawalTarget" title="撤销这份报表" :busy="busy" @close="withdrawalTarget=null">
+   <p class="archive-file">{{withdrawalTarget?.fileName}}</p>
+   <p>移除这次上传的 {{withdrawalTarget?.rows}} 行记录，并撤回它对业绩和金额的影响。之后可以重新上传。</p>
+   <ul v-if="withdrawalTarget">
+    <li v-if="withdrawalTarget.removed">移除 {{withdrawalTarget.removed}} 条未确认的计账数据。</li>
+    <li v-if="withdrawalTarget.restored">{{withdrawalTarget.restored}} 条数据恢复采用其他有效报表。</li>
+    <li v-if="withdrawalTarget.retained">{{withdrawalTarget.retained}} 条还有其他有效来源，保持不变。</li>
+    <li v-if="withdrawalTarget.corrections">{{withdrawalTarget.corrections}} 条已确认过金额，生成更正后由财务核对；原账和付款记录保留。</li>
+   </ul>
+   <p v-if="withdrawalError" role="alert" class="engine-error">{{withdrawalError}}</p>
+   <div class="engine-actions"><button :disabled="busy" @click="withdrawalTarget=null">取消</button><button :disabled="busy" @click="run(()=>withdrawCurrent(true))">撤销后重传</button><button class="primary" :disabled="busy" @click="run(()=>withdrawCurrent())">确认撤销</button></div>
+  </ActionDialog>
+  <ActionDialog :open="!!archiveTarget" title="隐藏这条分析记录" :busy="busy" @close="archiveTarget=null">
+   <p class="archive-file">{{archiveTarget?.fileName}}</p><p>仅从上传记录列表移除，业绩、待处理问题和已确认账单都会保留。需要时可在“已隐藏”中恢复。</p>
+   <p v-if="archiveError" role="alert">{{archiveError}}</p><div class="engine-actions"><button :disabled="busy" @click="archiveTarget=null">取消</button><button class="primary" :disabled="busy" @click="run(archiveCurrent)">{{busy?'正在清理…':'隐藏记录并保留账单'}}</button></div>
   </ActionDialog>
   <details v-if="admin&&!wallet&&importResult" class="work-card" aria-label="报表读取结果" :open="importResult.counts.some(c=>c.processingStatus==='invalid')">
    <summary>查看 {{importResult.fileName}} 的原表行与读取结果</summary>

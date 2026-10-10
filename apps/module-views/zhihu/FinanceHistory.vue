@@ -92,6 +92,7 @@ async function loadLines() {
   }
 }
 function inspect(row: DataGridRow) {
+  removal.value=null;removalError.value='';
   downloadError.value = "";
   selected.value = list.value.find((r) => r.id === row.id) || null;
   lines.value = [];
@@ -124,7 +125,27 @@ async function downloadInvoice() {
     downloading.value = false;
   }
 }
+type Removal={id:string;fileName:string;rows:number;reviewHash:string;canRemove:boolean;blocked:string;linked:{id:string;corrections:number}[]};
+const removal=ref<Removal|null>(null),removalBusy=ref(false),removalError=ref(''),notice=ref('');
+async function prepareRemoval(){
+ if(!selected.value)return;
+ removalBusy.value=true;removalError.value='';
+ try{removal.value=await props.http.get<Removal>('/finance-history/data-import/'+selected.value.id+'/removal');}
+ catch(e){removalError.value=e instanceof Error?e.message:'删除影响没加载出来，请重试。';}
+ finally{removalBusy.value=false;}
+}
+async function removeImport(){
+ if(!removal.value?.canRemove)return;
+ removalBusy.value=true;removalError.value='';
+ try{
+  await props.http.post('/finance-history/data-import/'+removal.value.id+'/removal',{reviewHash:removal.value.reviewHash});
+  notice.value='已删除这份旧报表；关联的未确认业绩已撤回。可到财务页重新上传正确文件。';
+  close();await load();
+ }catch(e){removalError.value=e instanceof Error?e.message:'删除未完成，请重新查看影响后重试。';}
+ finally{removalBusy.value=false;}
+}
 function close() {
+  removal.value=null;removalError.value='';
   selected.value = null;
   detailGeneration++;
 }
@@ -145,7 +166,7 @@ watch(linePage, () => void loadLines());
     <header class="history-heading">
       <div>
         <h2>历史账目</h2>
-        <p>保留原始记录，仅供查询。</p>
+        <p>{{kind==='data-import'?'核对或删除旧报表，关联的计账数据一起处理。':'保留原始记录，仅供查询。'}}</p>
       </div>
       <button :disabled="busy" @click="load">刷新</button>
     </header>
@@ -158,6 +179,7 @@ watch(linePage, () => void loadLines());
         >{{ c.label }}</router-link
       >
     </nav>
+    <p v-if="notice" role="status">{{notice}} <router-link to="/finance">上传正确报表</router-link></p>
     <p v-if="error" role="alert">
       {{ error }} <button @click="load">重试</button>
     </p>
@@ -196,7 +218,16 @@ watch(linePage, () => void loadLines());
       @close="close"
     >
       <template v-if="selected"
-        ><p class="readonly-label">历史记录 · 只读</p>
+        ><p class="readonly-label">{{kind==='data-import'?'历史导入记录':'历史记录 · 只读'}}</p>
+        <section v-if="staff&&kind==='data-import'" class="removal-actions">
+         <button v-if="!removal" :disabled="removalBusy" @click="prepareRemoval">{{removalBusy?'正在核对…':'删除这份旧报表'}}</button>
+         <template v-else>
+          <p>{{removal.canRemove?'删除 '+removal.rows+' 行旧报表记录，并撤回 '+removal.linked.length+' 份关联报表的计账影响。':removal.blocked}}</p>
+          <p v-if="removal.linked.some(row=>row.corrections)">已确认的金额会生成更正供财务核对，原账和付款记录保留。</p>
+          <div><button :disabled="removalBusy" @click="removal=null">取消</button> <button v-if="removal.canRemove" :disabled="removalBusy" @click="removeImport">确认删除旧报表</button><router-link v-else to="/finance">查看当前财务</router-link></div>
+         </template>
+         <p v-if="removalError" role="alert">{{removalError}} <button :disabled="removalBusy" @click="prepareRemoval">重新核对</button></p>
+        </section>
         <button
           v-if="selected.invoiceName"
           :disabled="downloading"

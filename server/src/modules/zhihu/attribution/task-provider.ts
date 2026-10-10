@@ -504,7 +504,7 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
         COALESCE(SUM(?=1 AND EXISTS(SELECT 1 FROM zh_statement_entries e WHERE e.fact_id=f.id AND e.result_id=f.current_result_id AND e.revision_id=f.current_revision_id AND e.status='confirmed' AND (?=1 OR e.payee_id=?))),0) confirmed
         FROM zh_metric_facts f LEFT JOIN zh_attribution_results r ON r.id=f.current_result_id
         JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id
-        WHERE f.keyword_id=? AND f.account_id=? AND f.project_id=? AND (?=1 OR b.executor_id=? OR b.leader_id=?)`,
+        WHERE f.current_revision_id IS NOT NULL AND f.keyword_id=? AND f.account_id=? AND f.project_id=? AND (?=1 OR b.executor_id=? OR b.leader_id=?)`,
             [
               Number(financial),
               Number(isStaffRole(user.role)),

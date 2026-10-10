@@ -36,6 +36,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  const [batch]=await select(c,`SELECT b.id,b.file_name,b.report_kind,b.status,DATE_FORMAT(b.created_at,'%Y-%m-%d %H:%i') created_at,j.status job_status
    FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id WHERE b.id=? AND b.account_id=? AND b.project_id=?`,[id,scope.accountId,scope.projectId]);
  if(!batch)fail('这份报表不存在或不属于当前项目',404);
+ if(batch.status==='withdrawn')fail('这份报表已撤销，请重新上传需要计算的报表',409);
  const finance=dutyAllows(user,'finance'),answers=await analysisAnswers(c,platformScope(scope,id));
  const rows=await select(c,`SELECT source.id,source.processing_status,source.error_text,${finance?'source.normalized_json':"JSON_OBJECT('date',JSON_EXTRACT(source.normalized_json,'$.date'),'channel',JSON_EXTRACT(source.normalized_json,'$.channel'),'keyword',JSON_EXTRACT(source.normalized_json,'$.keyword'),'orders',JSON_EXTRACT(source.normalized_json,'$.orders'),'activations',JSON_EXTRACT(source.normalized_json,'$.activations')) normalized_json"},source.fact_id,
    f.current_result_id,CAST(f.current_revision_id AS CHAR) revision_id,JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.agency')) reported_agency,JSON_UNQUOTE(JSON_EXTRACT(currentRevision.snapshot_json,'$.riskAssessment')) risk_assessment,${finance?'r.snapshot_json':'NULL snapshot_json'},r.reason_code,b.executor_id,b.verification_status,
@@ -88,7 +89,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  const unit=batch.report_kind==='activation'?'个':'单',type=batch.report_kind==='activation'?'拉活':'拉新';
  const stage=(key:string,title:string,problem:number,ok:string,help:string):AnalysisStep=>({key,title,status:pending?'running':problem?'ask':'done',summary:problem?help:ok});
  const steps:AnalysisStep[]=[
-   stage('read','读取报表',invalid,`已读取 ${rows.length} 行${skipped?`，跳过 ${skipped} 行汇总`:''}${legacy?`，${legacy} 行已在旧系统结算`:''}`,`${rows.length} 行已保留，${invalid} 行格式需要修正，其余行继续处理`),
+   stage('read','读取报表',invalid,`已读取 ${rows.length} 行${skipped?`，跳过 ${skipped} 行汇总`:''}${legacy?`，${legacy} 行早于本期计账启用日期，未计入本期`:''}`,`${rows.length} 行已保留，${invalid} 行格式需要修正，其余行继续处理`),
    stage('channel','确认渠道',channel,'报表中的渠道已对上',`${channel} 行渠道需要运营确认`),
    stage('keyword','确认关键词',keywords,'关键词已对上',`${keywords} 行关键词需要运营核对`),
    stage('executor','确定执行人',unassigned,'执行人及开始日期已核对',`${unassigned} 条记录需要运营确认执行人或开始日期`),
@@ -136,8 +137,9 @@ export async function importAnalysis(user:AuthUser,scope:Scope,id:string){
 export async function answerImportAnalysis(user:AuthUser,scope:Scope,id:string,key:string,askId:string,option:string,selection?:NameSelection){
  const naming=askId.startsWith('name:');assertDuty(user,naming?'operations':'finance');
  return mutate(user,scope,'analysis.answer',key,{id,askId,option,selection},async c=>{
-   const [batch]=await select(c,'SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? FOR UPDATE',[id,scope.accountId,scope.projectId]);
+   const [batch]=await select(c,"SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status<>'withdrawn' FOR UPDATE",[id,scope.accountId,scope.projectId]);
    if(!batch)fail('这份报表不存在或不属于当前项目',404);
+ if(batch.status==='withdrawn')fail('这份报表已撤销，请重新上传需要计算的报表',409);
    const choice=(naming?await nameChoices(c,scope,id):await revisionChoices(c,scope,id)).find(choice=>choice.ask.id===askId);
    if(!choice||!choice.ask.options.some(candidate=>candidate.key===option&&!candidate.disabled))fail('这项数据或选项已更新，请重新查看分析结果',409);
    if('kind' in choice)await applyNameChoice(c,user,scope,choice,option,selection);

@@ -29,6 +29,7 @@ export function reasonText(code: string | null | undefined, context: ReasonConte
     case 'AGENCY_NOT_CONFIGURED': return {reason:'尚未登记代理名称',next:'运营或财务：登记项目代理名称'};
     case 'AGENCY_MISMATCH': return {reason:'报表代理名称不一致',next:'运营或财务：核对代理名称'};
     case 'PRICE_CONFLICT': return { reason: '单价有冲突', next: '财务：设置单价' };
+    case 'REPORT_WITHDRAWN': return {reason:'来源报表已撤销',next:'财务：核对更正金额'};
     case 'REPORT_INCOMPLETE': return context.metricType==='activation'?{reason:'没有拉活量',next:'财务：补传拉活报表'}:{ reason: '只有搜索数据，没有订单', next: '财务：补传订单报表' };
     case 'RISK_REVIEW_REQUIRED': return { reason: '知乎标了风险', next: '运营：核实' };
     case 'RISK_EXCLUDED': return {reason:'已核实不计费',next:'核实结论已保留'};

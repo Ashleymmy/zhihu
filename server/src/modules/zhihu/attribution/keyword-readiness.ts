@@ -1,5 +1,6 @@
 import { db } from '../../../db';
 import type { Scope } from './domain';
+import { retainedReportFactSql } from './keyword-usability';
 
 // A successful create receipt is enough to open the local allocation workflow.
 // This does not claim to have queried the plan's current official audit status.
@@ -30,7 +31,7 @@ export async function synchronizeKeywords(scope?: Scope, planId?: string) {
        AND k.current_binding_id IS NULL AND k.used_ever_at IS NULL
        AND NOT EXISTS(SELECT 1 FROM zh_keyword_bindings b WHERE b.keyword_id=k.id)
        AND NOT EXISTS(SELECT 1 FROM compositions c WHERE c.plan_id=p.id)
-       AND NOT EXISTS(SELECT 1 FROM zh_metric_facts f WHERE f.keyword_id=k.id)
+       AND NOT EXISTS(SELECT 1 FROM zh_metric_facts f WHERE f.keyword_id=k.id AND ${retainedReportFactSql()})
        AND NOT EXISTS(SELECT 1 FROM daily_metrics m WHERE m.plan_id=p.id)
        AND NOT EXISTS(SELECT 1 FROM earnings e WHERE e.plan_id=p.id)
        AND (? IS NULL OR k.account_id=?) AND (? IS NULL OR k.project_id=?) AND (? IS NULL OR p.id=?)

@@ -3,7 +3,13 @@ import { fail } from './domain';
 import { select } from './store';
 import { submissionFailure } from '../services/submission-feedback';
 
-export const unconfirmedFactSql = (f='f') => `NOT EXISTS(SELECT 1 FROM zh_statement_entries se WHERE se.fact_id=${f}.id AND se.status='confirmed')
+// A missing current value alone does not prove an old record was cancelled.
+// Only disregard it when every recorded upload source was explicitly withdrawn.
+export const retainedReportFactSql = (f='f') => `(${f}.current_revision_id IS NOT NULL
+ OR NOT EXISTS(SELECT 1 FROM zh_import_rows ir WHERE ir.fact_id=${f}.id)
+ OR EXISTS(SELECT 1 FROM zh_import_rows ir JOIN zh_import_batches ib ON ib.id=ir.batch_id WHERE ir.fact_id=${f}.id AND ib.status<>'withdrawn'))`;
+
+export const unconfirmedFactSql = (f='f') => `${retainedReportFactSql(f)} AND NOT EXISTS(SELECT 1 FROM zh_statement_entries se WHERE se.fact_id=${f}.id AND se.status='confirmed')
  AND NOT EXISTS(SELECT 1 FROM opc_income_sources ins WHERE ins.module_id='zhihu' AND ins.account_id=${f}.account_id AND ins.source_key=CONCAT('fact:',${f}.id))`;
 
 // A local reservation is exclusive, but is not permission to publish or assign.
@@ -21,7 +27,7 @@ export function unusedKeywordSql(k = 'k', lock = '') {
     AND NOT EXISTS(SELECT 1 FROM zh_keyword_bindings ub WHERE ub.keyword_id=${k}.id AND ub.used_at IS NOT NULL${lock})
     AND NOT EXISTS(SELECT 1 FROM compositions uc WHERE uc.plan_id=${k}.plan_id${lock})
     AND NOT EXISTS(SELECT 1 FROM zh_evidence ue JOIN zh_keyword_bindings eb ON eb.id=ue.binding_id WHERE eb.keyword_id=${k}.id${lock})
-    AND NOT EXISTS(SELECT 1 FROM zh_metric_facts uf WHERE uf.keyword_id=${k}.id${lock})
+    AND NOT EXISTS(SELECT 1 FROM zh_metric_facts uf WHERE uf.keyword_id=${k}.id AND ${retainedReportFactSql('uf')}${lock})
     AND NOT EXISTS(SELECT 1 FROM daily_metrics um WHERE um.plan_id=${k}.plan_id${lock})
     AND NOT EXISTS(SELECT 1 FROM earnings un WHERE un.plan_id=${k}.plan_id${lock}))`;
 }

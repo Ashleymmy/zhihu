@@ -78,6 +78,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   for(const r of rows){
    if(!r.snapshot_json)continue;
    const snap=json<AttributionSnapshot>(r.snapshot_json);
+   const withdrawn=!!snap.withdrawn;
    const excluded=snap.riskReview?.decision==='excluded';
    const metricType:MetricType=r.metric_type==='activation'?'activation':'new_user';
    const quantity=metricType==='activation'?snap.activations??null:snap.orders;
@@ -104,7 +105,8 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     item[metricType==='activation'?'activations':'orders']+=BigInt(quantity??'0');
     item[metricType==='activation'?'activationCommission':'commission']+=money(targets.list.find(a=>a.userId===user.sub)?.amount??'0');team.set(executorId,item);
    }
-   const confirmed=String(r.source_version??'')===String(r.result_id)&&!r.blocked_reason&&(!blocked||excluded&&reasonCode==='RISK_EXCLUDED');
+   const confirmed=String(r.source_version??'')===String(r.result_id)&&!r.blocked_reason&&(!blocked||withdrawn&&reasonCode==='REPORT_WITHDRAWN'||excluded&&reasonCode==='RISK_EXCLUDED');
+   if(withdrawn)text.next=confirmed?'更正已确认':'财务：确认撤销产生的更正金额';
    if(confirmed)text.next='';
    tokens.push([r.id,r.result_id,r.revision_id,r.verification_status,r.pending_revision,r.source_version,r.blocked_reason,targets]);
    if(!targets.list.length){
@@ -115,7 +117,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     if(!isStaffRole(user.role)&&a.userId!==user.sub)continue;
     const payee=users.find(u=>String(u.id)===a.userId);
     const before=money(String(prior.find(p=>String(p.source_id)===String(r.source_id)&&String(p.user_id)===a.userId)?.amount??'0'),true);
-    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,calculation:calculationFor(a.userId),priceSources:priceSourcesFor(a.userId),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':excluded&&!r.source_id?'excluded':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,...(excluded&&r.source_id&&!confirmed&&before>0n?{next:r.verification_status==='passed'?'财务：确认不计费的更正金额':r.verification_status==='disputed'?'运营：核实作品争议后确认更正金额':'团长或运营：核验作品后确认更正金额'}:{}),ready:isStaffRole(user.role)&&(!blocked||excluded&&reasonCode==='RISK_EXCLUDED'&&r.verification_status==='passed'&&!!r.source_id&&before>0n)&&!confirmed});
+    entries.push({id:r.id+'-'+a.userId,factId:String(r.id),keywordId:String(r.keyword_id),resultId:String(r.result_id),revisionId:String(r.revision_id),...typed,calculation:calculationFor(a.userId),priceSources:priceSourcesFor(a.userId),keyword:snap.keyword,date:snap.date,orders:snap.orders,payeeId:a.userId,payeeName:String(payee?.display_name??'本人'),parentId:payee?.parent_id?String(payee.parent_id):null,role:String(payee?.role??''),payerName:'平台',amount:a.amount,confirmedAmount:moneyText(before),pendingAmount:moneyText(money(a.amount)-before),kind:r.source_version&&!confirmed?'adjustment':'initial',status:confirmed?'confirmed':excluded&&!r.source_id?'excluded':'draft',ownPayable:isStaffRole(user.role),ownReceivable:a.userId===user.sub,blocked,reasonCode,...text,...(excluded&&r.source_id&&!confirmed&&before>0n?{next:r.verification_status==='passed'?'财务：确认不计费的更正金额':r.verification_status==='disputed'?'运营：核实作品争议后确认更正金额':'团长或运营：核验作品后确认更正金额'}:{}),ready:isStaffRole(user.role)&&(!blocked||withdrawn&&reasonCode==='REPORT_WITHDRAWN'&&!!r.source_id||excluded&&reasonCode==='RISK_EXCLUDED'&&r.verification_status==='passed'&&!!r.source_id&&before>0n)&&!confirmed});
    }
   }
   // A source without a matching keyword has no fact yet. Include it for staff,
@@ -128,7 +130,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
       AND (? IS NULL OR IF(b.report_kind='activation','activation','new_user')=?)
       AND EXISTS(SELECT 1 FROM zh_exceptions x WHERE x.source_row_id=r.id AND x.status='open')
       AND NOT EXISTS(SELECT 1 FROM zh_import_rows matched JOIN zh_import_batches mb ON mb.id=matched.batch_id
-        WHERE mb.account_id=b.account_id AND mb.project_id=b.project_id AND matched.fact_id IS NOT NULL
+        WHERE mb.account_id=b.account_id AND mb.project_id=b.project_id AND mb.status<>'withdrawn' AND matched.fact_id IS NOT NULL
           AND (mb.report_kind='activation')=(b.report_kind='activation')
           AND JSON_EXTRACT(matched.normalized_json,'$.date')=JSON_EXTRACT(r.normalized_json,'$.date')
           AND JSON_EXTRACT(matched.normalized_json,'$.channel')=JSON_EXTRACT(r.normalized_json,'$.channel')

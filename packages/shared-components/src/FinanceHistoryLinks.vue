@@ -13,7 +13,7 @@ const modules = computed(() =>
 </script>
 <template>
   <details v-if="modules.length" class="history-links">
-    <summary>历史账目（只读）</summary>
+    <summary>历史账目与旧报表</summary>
     <router-link v-for="m in modules" :key="m.id" :to="m.financeHistoryPath!"
       >{{ m.name }}历史账目</router-link
     >

@@ -14,7 +14,7 @@ import { synchronizeKeywords } from './keyword-readiness';
 import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql, ownershipHistorySql } from './keyword-usability';
 import { assertDuty, dutyAllows } from '../../../core/duties';
 import { resolveExecutor } from './executor';
-import { unconfirmedFactSql } from './keyword-usability';
+import { unconfirmedFactSql, retainedReportFactSql } from './keyword-usability';
 import { processResolvedNames } from './automatic-repair';
 import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
@@ -71,7 +71,7 @@ export async function confirmUpstream(user: AuthUser, scope: Scope, id: string, 
       const [history] = await select(c, `SELECT
         EXISTS(SELECT 1 FROM zh_keyword_bindings WHERE keyword_id=?) OR
         EXISTS(SELECT 1 FROM compositions WHERE plan_id=?) OR
-        EXISTS(SELECT 1 FROM zh_metric_facts WHERE keyword_id=?) OR
+        EXISTS(SELECT 1 FROM zh_metric_facts f WHERE f.keyword_id=? AND ${retainedReportFactSql()}) OR
         EXISTS(SELECT 1 FROM daily_metrics WHERE plan_id=?) OR
         EXISTS(SELECT 1 FROM earnings WHERE plan_id=?) AS used`, [id, word.plan_id, id, word.plan_id, word.plan_id]);
       if (word.lifecycle_status !== 'pending' || word.legacy_mode !== 'new' || word.current_binding_id || word.used_ever_at || Number(history.used))

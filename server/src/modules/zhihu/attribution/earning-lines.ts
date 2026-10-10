@@ -86,7 +86,7 @@ export async function projectEarnings(c: PoolConnection, scope: Scope, factId: s
       amount,
       internal,
       ready:
-        !internal && amount !== null && (!code || (code === 'RISK_EXCLUDED' && fact.verification_status === 'passed')),
+        !internal && amount !== null && (!code || code==='REPORT_WITHDRAWN' && !!snapshot.withdrawn || (code === 'RISK_EXCLUDED' && fact.verification_status === 'passed')),
       reason: reason.reason,
       next: reason.next,
     };

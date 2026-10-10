@@ -22,6 +22,8 @@ import { reportComparison } from './report-comparison';
 import { projectEarnings } from './earning-lines';
 import { ownershipHistorySql, unconfirmedFactSql } from './keyword-usability';
 export interface FactSnapshot {
+  withdrawalOf?: string;
+  withdrawn?: boolean;
   metricType?: MetricType;
   activations?: string | null;
   settlement?: string | null;
@@ -33,6 +35,7 @@ export interface FactSnapshot {
   sources: Partial<Record<'search' | 'orders' | 'revenue' | 'riskAssessment' | 'activations' | 'settlement' | 'agency', { kind: ReportKind; rowId: string }>>;
 }
 export interface AttributionSnapshot {
+  withdrawn?: boolean;
   riskAssessment?: string | null;
   riskReview?: {decision:'accepted'|'excluded';reason:string;reviewedBy:string} | null;
   settlementMismatch?: {expected:string;actual:string} | null;
@@ -48,11 +51,13 @@ export interface AttributionSnapshot {
   binding: Record<string, unknown> | null;
   obligations: Obligation[];
 }
-const empty = (metricType:MetricType='new_user'): FactSnapshot => ({ metricType, search: null, orders: null, revenue: null, ...(metricType==='activation'?{activations:null,settlement:null,agency:null}:{}), sources: {} });
-function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKind, rowId: string) {
+export const empty = (metricType:MetricType='new_user'): FactSnapshot => ({ metricType, search: null, orders: null, revenue: null, ...(metricType==='activation'?{activations:null,settlement:null,agency:null}:{}), sources: {} });
+export function mergeSource(before: FactSnapshot, raw: SourceRow, kind: ReportKind, rowId: string) {
   const next: FactSnapshot = JSON.parse(JSON.stringify(before));
   const owned: ('search' | 'orders' | 'revenue' | 'activations' | 'settlement')[] =
     kind==='activation'?['activations','settlement']:kind === 'search' ? ['search'] : kind === 'order' ? ['orders', 'revenue'] : ['search', 'orders', 'revenue'];
+  if(kind==='activation'||kind==='order'||kind==='combined'){delete next.withdrawn;}
+  delete next.withdrawalOf;
   let changed = false,
     conflict = false;
   for (const metric of owned) {
@@ -101,16 +106,16 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
     const alreadySettled=(row:typeof parsed[number])=>!row.error&&!!route&&row.value.date<String(route.start);
     const existing = await select(
       c,
-      'SELECT id,project_id,template_version FROM zh_import_batches WHERE account_id=? AND file_sha256=? AND report_kind=? FOR UPDATE',
+      'SELECT id,project_id,template_version,status,upload_generation FROM zh_import_batches WHERE account_id=? AND file_sha256=? AND report_kind=? FOR UPDATE',
       [scope.accountId, hash, kind],
     );
     if (existing.some((batch) => String(batch.project_id) !== scope.projectId)) fail('相同来源已属于其他项目', 409);
-    const duplicate = existing.find((batch) => batch.template_version === template);
+    const duplicate = existing.find((batch) => batch.template_version === template && batch.status !== 'withdrawn');
     if (duplicate) return { id: String(duplicate.id), duplicate: true };
     const id = await insert(
       c,
-      'INSERT INTO zh_import_batches(account_id,project_id,file_name,file_sha256,file_bytes,report_kind,template_version,preview_hash,created_by) VALUES(?,?,?,?,?,?,?,?,?)',
-      [scope.accountId, scope.projectId, name, hash, file.buffer, kind, template, previewHash, user.sub],
+      'INSERT INTO zh_import_batches(account_id,project_id,file_name,file_sha256,file_bytes,report_kind,template_version,preview_hash,created_by,upload_generation) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      [scope.accountId, scope.projectId, name, hash, file.buffer, kind, template, previewHash, user.sub, Math.max(-1,...existing.filter(b=>b.template_version===template).map(b=>Number(b.upload_generation)))+1],
     );
     for (const row of parsed)
       await insert(
@@ -121,7 +126,7 @@ export async function previewImport(user: AuthUser, scope: Scope, file: Alliance
           row.rowNumber,
           JSON.stringify(row.value),
           JSON.stringify(row.raw),
-          alreadySettled(row)?'这一天已在旧系统结算，不重复计算':row.error,
+          alreadySettled(row)?'这一天早于本期计账启用日期，尚未计入本期；这不代表已结算':row.error,
           row.skipped ? 'skipped' : row.error ? 'invalid' : alreadySettled(row)?'legacy_settled':'pending',
         ],
       );
@@ -155,7 +160,7 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
       template_version: String(batch.template_version),
       preview_hash: String(batch.preview_hash),
       counts: counts.map((r) => ({ processing_status: String(r.processing_status), total: Number(r.total) })),
-      rows: rows.map(row=>row.processing_status==='exception'?{...row,error_text:reasonText(String(row.error_text)).reason,...reasonText(String(row.error_text))}:row),
+      rows: rows.map(row=>row.processing_status==='legacy_settled'?{...row,error_text:'这一天早于本期计账启用日期，尚未计入本期；这不代表已结算'}:row.processing_status==='exception'?{...row,error_text:reasonText(String(row.error_text)).reason,...reasonText(String(row.error_text))}:row),
       page,
       pageSize,
     };
@@ -167,12 +172,12 @@ export async function listImports(user: AuthUser, scope: Scope, page: number, pa
   return withTransaction(async (c) => {
     const list = await select(
       c,
-      'SELECT CAST(b.id AS CHAR) id,file_name,report_kind,b.status,b.created_at,a.archived_at,j.status job_status,j.attempts,j.last_error FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND (a.batch_id IS NOT NULL)=? ORDER BY b.id DESC LIMIT ? OFFSET ?',
+      "SELECT CAST(b.id AS CHAR) id,file_name,report_kind,b.status,b.created_at,a.archived_at,j.status job_status,j.attempts,j.last_error FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND b.status<>'withdrawn' AND (a.batch_id IS NOT NULL)=? ORDER BY b.id DESC LIMIT ? OFFSET ?",
       [scope.accountId, scope.projectId, archived, pageSize, (page - 1) * pageSize],
     );
     const [total] = await select(
       c,
-      'SELECT COUNT(*) total FROM zh_import_batches b LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND (a.batch_id IS NOT NULL)=?',
+      "SELECT COUNT(*) total FROM zh_import_batches b LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND b.status<>'withdrawn' AND (a.batch_id IS NOT NULL)=?",
       [scope.accountId, scope.projectId, archived],
     );
     return { list, total: Number(total.total), page, pageSize };
@@ -197,7 +202,7 @@ export async function requeueImport(user: AuthUser, scope: Scope, id: string, ke
   return mutate(user, scope, 'report.requeue', key, { id }, async (c) => {
     const [batch] = await select(
       c,
-      "SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status<>'preview' FOR UPDATE",
+      "SELECT id FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=? AND status IN ('committed','processed') FOR UPDATE",
       [id, scope.accountId, scope.projectId],
     );
     if (!batch) fail('批次尚未确认', 409);
@@ -215,6 +220,7 @@ export async function commitImport(user: AuthUser, scope: Scope, id: string, key
       [id, scope.accountId, scope.projectId],
     );
     if (!batch) fail('批次不存在', 404);
+    if(batch.status==='withdrawn')fail('这份报表已经撤销，请重新上传',409);
     if (batch.status === 'preview' && batch.template_version !== reportTemplate(batch.report_kind as ReportKind))
       fail('报告解析规则已更新，请重新上传并核对预览', 409);
     if (batch.preview_hash !== previewHash) fail('预览已变化，请重新核对', 409);
@@ -288,7 +294,15 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       : null,
     obligations: [],
   };
-  if (word.legacy_mode === 'shared_unresolved') code = 'LEGACY_SHARED';
+  if(source.withdrawn){
+    const [previous]=await select(c,'SELECT snapshot_json FROM zh_attribution_results WHERE id=?',[fact.current_result_id]);
+    if(!previous)fail('原账单信息不完整，暂时无法生成更正',409);
+    const old=json<AttributionSnapshot>(previous.snapshot_json);
+    Object.assign(snapshot,{withdrawn:true,binding:old.binding,orders:metricType==='new_user'?'0':null,search:source.search,revenue:null,activations:metricType==='activation'?'0':null,settlement:null,obligations:old.obligations.map(o=>({...o,amount:'0.0000'}))});
+    delete snapshot.riskAssessment;delete snapshot.riskReview;
+    code='REPORT_WITHDRAWN';
+  }
+  else if (word.legacy_mode === 'shared_unresolved') code = 'LEGACY_SHARED';
   else if (!binding) code = 'BINDING_MISSING';
   else if (!binding.activated_day || String(binding.activated_day) > date) code = 'PERIOD_AMBIGUOUS';
   else if (metricType==='activation') {
@@ -312,8 +326,8 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       else throw e;
     }
   }
-  if(riskReview?.decision==='excluded')code='RISK_EXCLUDED';
-  else if(source.riskAssessment&&!code&&!riskReview)code='RISK_REVIEW_REQUIRED';
+  if(!source.withdrawn&&riskReview?.decision==='excluded')code='RISK_EXCLUDED';
+  else if(!source.withdrawn&&source.riskAssessment&&!code&&!riskReview)code='RISK_REVIEW_REQUIRED';
   if(riskReview?.decision==='excluded')snapshot.obligations=snapshot.obligations.map(obligation=>({...obligation,amount:'0.0000'}));
   const state = code
     ? code === 'REPORT_INCOMPLETE' || code.startsWith('PRICE_') || code.startsWith('RISK_')
@@ -324,14 +338,14 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
   const id = await insert(
     c,
     'INSERT INTO zh_attribution_results(fact_id,revision_id,binding_id,input_hash,status,reason_code,snapshot_json) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
-    [fact.id, revision.id, binding?.id ?? null, hash, state, code, JSON.stringify(snapshot)],
+    [fact.id, revision.id, snapshot.binding?.id ?? null, hash, state, code, JSON.stringify(snapshot)],
   );
   await c.query('UPDATE zh_metric_facts SET current_result_id=? WHERE id=?', [id, fact.id]);
   // These todos follow the current fact, not one upload. Close stale causes when
   // a repair changes the blocker and keep a single open todo for the remaining one.
   await c.query("UPDATE zh_exceptions SET status='resolved',resolution='资料已更新，已重新计算',resolved_at=NOW(3) WHERE fact_id=? AND source_row_id IS NULL AND status='open' AND reason_code IN (?) AND NOT(reason_code<=>?)", [fact.id, [...factTodoReasons], code]);
   if (code && factTodoReasons.some(reason=>reason===code)) await exception(c, scope, null, String(fact.id), code);
-  if (source.riskAssessment&&!riskReview) {
+  if (!source.withdrawn&&source.riskAssessment&&!riskReview) {
     await exception(
       c,
       scope,
@@ -339,7 +353,7 @@ export async function attribute(c: PoolConnection, scope: Scope, fact: RecordRow
       String(fact.id),
       'RISK_REVIEW_REQUIRED',
     );
-  } else if (source.riskAssessment === null||riskReview) {
+  } else if (source.withdrawn||source.riskAssessment === null||riskReview) {
     await c.query(
       "UPDATE zh_exceptions SET status='resolved',resolution=?,resolved_at=NOW(3) WHERE fact_id=? AND reason_code='RISK_REVIEW_REQUIRED' AND status='open'",
       [riskReview?'运营已核实：'+String(riskReview.reason):'已接受的订单来源风险判定为空',fact.id],
@@ -357,7 +371,7 @@ export async function processImportRow(c:PoolConnection,user:AuthUser,scope:Scop
         "SELECT r.*,b.report_kind FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE r.id=? AND b.account_id=? AND b.project_id=? AND b.status IN ('committed','processed') FOR UPDATE",
         [rowId,scope.accountId,scope.projectId],
       );
-      if(!row)fail('这条报表记录不存在或尚未开始处理',404);
+      if(!row){const [cancelled]=await select(c,"SELECT r.id FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE r.id=? AND b.account_id=? AND b.project_id=? AND b.status='withdrawn'",[rowId,scope.accountId,scope.projectId]);if(cancelled)return;fail('这条报表记录不存在或尚未开始处理',404);}
       if (row.processing_status !== 'pending') return;
       const raw = json<SourceRow>(row.normalized_json),
         kind = row.report_kind as ReportKind;
@@ -445,7 +459,7 @@ export async function processBatch(user: AuthUser, scope: Scope, id: string, lim
       "SELECT COUNT(*) total FROM zh_import_rows WHERE batch_id=? AND processing_status='pending'",
       [id],
     );
-    if (!Number(r.total)) await c.query("UPDATE zh_import_batches SET status='processed' WHERE id=?", [id]);
+    if (!Number(r.total)) await c.query("UPDATE zh_import_batches SET status='processed' WHERE id=? AND status='committed'", [id]);
     return Number(r.total);
   });
   return { id, processed: ids.length, remaining };
@@ -716,7 +730,7 @@ export async function listAttributions(user: AuthUser, scope: Scope, page: numbe
   if(isStaffRole(user.role))assertDuty(user,'finance');
   await authorize(user, scope);
   return withTransaction(async (c) => {
-    const where = `f.account_id=? AND f.project_id=? AND (?=1 OR b.executor_id=? OR b.leader_id=?)`;
+    const where = `f.current_revision_id IS NOT NULL AND f.account_id=? AND f.project_id=? AND (?=1 OR b.executor_id=? OR b.leader_id=?)`;
     const args = [scope.accountId, scope.projectId, Number(isStaffRole(user.role)), user.sub, user.sub];
     const joins = `FROM zh_metric_facts f JOIN zh_keywords k ON k.id=f.keyword_id LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id`;
     const [count] = await select(c, `SELECT COUNT(*) total ${joins} WHERE ${where}`, args);

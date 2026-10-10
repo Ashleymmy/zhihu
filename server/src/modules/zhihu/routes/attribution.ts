@@ -1,3 +1,4 @@
+import {previewImportWithdrawal,withdrawImport} from '../attribution/import-withdrawal';
 import { isStaffRole } from '../../../auth/roles';
 import { Router } from 'express';
 import multer from 'multer';
@@ -244,6 +245,13 @@ attributionRouter.get(
     ok(res, await facts.listImports(req.user, q, q.page, q.pageSize,q.archived==='true'));
   }),
 );
+attributionRouter.get('/imports/:id/withdrawal',asyncHandler(async(req,res)=>{
+ ok(res,await previewImportWithdrawal(req.user,scopeSchema.parse(req.query),idSchema.parse(req.params.id)));
+}));
+attributionRouter.post('/imports/:id/withdrawal',asyncHandler(async(req,res)=>{
+ const q=scopeSchema.extend({reviewHash:z.string().length(64)}).parse(req.body);
+ ok(res,await withdrawImport(req.user,q,idSchema.parse(req.params.id),key(req),q.reviewHash));
+}));
 attributionRouter.post('/imports/:id/archive',asyncHandler(async(req,res)=>{
  const q=scopeSchema.extend({archived:z.boolean()}).parse(req.body);
  ok(res,await archiveImport(req.user,q,idSchema.parse(req.params.id),key(req),q.archived));

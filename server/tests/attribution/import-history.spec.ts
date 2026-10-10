@@ -116,3 +116,120 @@ it('拉活重传保持类型隔离，重复运行清理记录迁移保留原账�
  expect(await q('SELECT * FROM zh_import_history_archive')).toEqual(archives);expect(await q('SELECT * FROM zh_import_rows')).toEqual(rows);
  expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed'")).toEqual(confirmed);
 });
+
+const withdrawalPreview=(id:string,actor=finance)=>request(app).get(endpoint(id)+'/withdrawal').set(headers[actor.sub]).query(scope);
+const withdraw=async(id:string)=>{const preview=await withdrawalPreview(id);expect(preview.status,preview.text).toBe(200);const result=await action(id,'withdrawal',{reviewHash:preview.body.data.reviewHash});expect(result.status,result.text).toBe(200);return result.body.data;};
+it('撤销未确认报表清除金额和待办，同文件可重新上传且不被旧任务恢复',async()=>{
+ const day='2026-09-20',id=await upload(day,'分析渠道','分析关键词');
+ const before=await workbench.overview(finance,scope,{from:day,to:day});expect(before.entries.length).toBeGreaterThan(0);
+ for(const actor of [ops,creator,leader]){expect((await withdrawalPreview(id,actor)).status).toBe(403);expect((await action(id,'withdrawal',{reviewHash:'a'.repeat(64)},actor)).status).toBe(403);}
+ expect((await action(id,'withdrawal',{projectId:'999',reviewHash:'a'.repeat(64)})).status).toBe(403);
+ const preview=await withdrawalPreview(id),requestKey=key();
+ expect((await action(id,'withdrawal',{reviewHash:'a'.repeat(64)})).status).toBe(409);
+ const saved=await action(id,'withdrawal',{reviewHash:preview.body.data.reviewHash,requestKey});expect(saved.status,saved.text).toBe(200);expect(saved.body.data.removed).toBe(1);
+ expect((await action(id,'withdrawal',{reviewHash:preview.body.data.reviewHash,requestKey})).body.data).toEqual(saved.body.data);
+ expect((await workbench.overview(finance,scope,{from:day,to:day})).entries).toEqual([]);
+ expect((await q('SELECT * FROM opc_earning_sources WHERE business_date=?',[day])).length).toBe(0);
+ expect((await history()).body.data.list.map((b:{id:string})=>b.id)).not.toContain(id);
+ expect((await action(id,'reanalyze')).status).toBe(404);expect((await action(id,'process')).status).toBe(409);
+ const fresh=await upload(day,'分析渠道','分析关键词');expect(fresh).not.toBe(id);
+ expect((await workbench.overview(finance,scope,{from:day,to:day})).summary.totalOrders).toBe('3');
+});
+it('未匹配、错误行和早期报表也能撤销，不再留在待办或假称已结算',async()=>{
+ const id=await upload('2026-09-21','不存在的渠道','错误关键词');
+ expect((await withdraw(id)).rows).toBe(1);
+ expect((await q("SELECT id FROM zh_exceptions WHERE source_row_id IN (SELECT id FROM zh_import_rows WHERE batch_id=?) AND status='open'",[id])).length).toBe(0);
+ expect((await workbench.overview(finance,scope,{from:'2026-09-21',to:'2026-09-21'})).entries).toEqual([]);
+ await c.query("UPDATE zh_engine_routes SET exclusive_from='2026-01-01' WHERE account_id=? AND project_id=?",[scope.accountId,scope.projectId]);
+ const old=(await facts.previewImport(finance,scope,file('日期,渠道,关键词,订单量,收益\n2001-01-01,分析渠道,分析关键词,3,10'),'order')).id;
+ const detail=await request(app).get(endpoint(old)).set(headers[finance.sub]).query(scope);
+ expect(detail.body.data.rows[0].errorText).toContain('不代表已结算');expect((await withdraw(old)).rows).toBe(1);
+});
+it('相同数字还有其他有效文件时保留计账，撤销最后一个来源才移除',async()=>{
+ const day='2026-09-22',id=await upload(day,'分析渠道','分析关键词');
+ const duplicate=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量,收益\n${day},分析渠道,分析关键词,3,987654.3210\n`))).id;
+ expect(duplicate).not.toBe(id);expect((await withdraw(id)).retained).toBe(1);
+ expect((await workbench.overview(finance,scope,{from:day,to:day})).summary.totalOrders).toBe('3');
+ expect((await withdraw(duplicate)).removed).toBe(1);
+ expect((await workbench.overview(finance,scope,{from:day,to:day})).entries).toEqual([]);
+});
+it('撤销已采用的新数字恢复上一份，待定或驳回的数字不会被擅自采用',async()=>{
+ const day='2026-09-23',older=await upload(day,'分析渠道','分析关键词','3'),newer=await upload(day,'分析渠道','分析关键词','5');
+ const ask=(await get(newer)).body.data.steps[5].asks[0];expect((await answer(newer,ask.id,'new',finance)).status).toBe(200);
+ const pending=await upload(day,'分析渠道','分析关键词','9');
+ expect((await withdraw(newer)).restored).toBe(1);
+ expect((await workbench.overview(finance,scope,{from:day,to:day})).summary.totalOrders).toBe('3');
+ const refreshed=(await get(pending)).body.data.steps[5].asks[0];expect(refreshed.options.find((o:{key:string})=>o.key==='new').disabled).toBe(false);
+ expect((await answer(pending,refreshed.id,'old',finance)).status).toBe(200);
+ await withdraw(older);expect((await workbench.overview(finance,scope,{from:day,to:day})).entries).toEqual([]);
+});
+it('搜索与订单分报撤销只影响对应指标，拉活同日不受影响',async()=>{
+ const day='2026-09-24';
+ const search=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,搜索量\n${day},分析渠道,分析关键词,12`))).id;
+ const order=await upload(day,'分析渠道','分析关键词','4');
+ const activation=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,拉活量\n${day},分析渠道,分析关键词,2`),'activation')).id;
+ await withdraw(order);let view=await workbench.overview(finance,scope,{from:day,to:day});expect(view.summary.totalOrders).toBe('0');expect(view.summary.byType.activation.quantity).toBe('2');
+ const [fact]=await q("SELECT v.snapshot_json FROM zh_metric_facts f JOIN zh_metric_revisions v ON v.id=f.current_revision_id WHERE f.business_date=? AND metric_type='new_user'",[day]);expect(fact.snapshot_json.search).toBe('12');
+ await withdraw(search);await withdraw(activation);expect((await workbench.overview(finance,scope,{from:day,to:day})).entries).toEqual([]);
+});
+it('撤销已确认来源只生成更正，原账不改，财务确认后金额冲回且可重新上传',async()=>{
+ const day='2026-09-25',id=await upload(day,'分析渠道','分析关键词');
+ let view=await workbench.overview(finance,scope,{from:day,to:day});await workbench.confirmBills(finance,scope,{from:day,to:day},key(),view.reviewHash);
+ const originals=await q("SELECT e.* FROM zh_statement_entries e JOIN zh_metric_facts f ON f.id=e.fact_id WHERE f.business_date=? AND e.status='confirmed'",[day]);expect(originals.length).toBeGreaterThan(0);
+ const income=await q("SELECT e.* FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.business_date=?",[day]);
+ expect((await withdraw(id)).corrections).toBe(1);
+ expect(await q("SELECT e.* FROM zh_statement_entries e JOIN zh_metric_facts f ON f.id=e.fact_id WHERE f.business_date=? AND e.status='confirmed'",[day])).toEqual(originals);
+ expect(await q("SELECT e.* FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.business_date=?",[day])).toEqual(income);
+ view=await workbench.overview(finance,scope,{from:day,to:day});expect(view.entries[0]).toMatchObject({amount:'0.0000',reasonCode:'REPORT_WITHDRAWN',ready:true});expect(view.entries[0].pendingAmount.startsWith('-')).toBe(true);
+ const [withdrawnFact]=await q('SELECT id FROM zh_metric_facts WHERE business_date=?',[day]);
+ const resultsBefore=await q('SELECT * FROM zh_attribution_results WHERE fact_id=?',[withdrawnFact.id]);
+ await facts.recompute(finance,scope,String(withdrawnFact.id));await facts.recompute(finance,scope,String(withdrawnFact.id));
+ expect(await q('SELECT * FROM zh_attribution_results WHERE fact_id=?',[withdrawnFact.id])).toEqual(resultsBefore);
+ await workbench.confirmBills(finance,scope,{from:day,to:day},key(),view.reviewHash);
+ expect((await q("SELECT CAST(SUM(e.amount) AS CHAR) total FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.business_date=?",[day]))[0].total).toBe('0.0000');
+ expect(await q('SELECT * FROM zh_statement_entries WHERE id IN (?)',[originals.map(r=>r.id)])).toEqual(originals);
+ const fresh=await upload(day,'分析渠道','分析关键词');expect(fresh).not.toBe(id);
+ view=await workbench.overview(finance,scope,{from:day,to:day});expect(view.entries[0].ready).toBe(true);expect(view.summary.totalOrders).toBe('3');
+});
+it('撤销影响预览过期时拒绝，处理中的报表也可以撤销',async()=>{
+ const day='2026-09-26',id=await upload(day,'分析渠道','分析关键词');
+ const preview=await withdrawalPreview(id),view=await workbench.overview(finance,scope,{from:day,to:day});
+ await workbench.confirmBills(finance,scope,{from:day,to:day},key(),view.reviewHash);
+ expect((await action(id,'withdrawal',{reviewHash:preview.body.data.reviewHash})).status).toBe(409);
+ const running=await upload('2026-09-27','分析渠道','分析关键词');
+ await c.query("UPDATE zh_import_rows SET processing_status='pending' WHERE batch_id=?",[running]);
+ await c.query("UPDATE zh_import_batches SET status='committed' WHERE id=?",[running]);
+ await withdraw(running);expect((await q('SELECT status FROM zh_import_batches WHERE id=?',[running]))[0].status).toBe('withdrawn');
+ const [row]=await q('SELECT id FROM zh_import_rows WHERE batch_id=?',[running]);
+ const {withTransaction}=await import('../../src/db');
+ await withTransaction(tx=>facts.processImportRow(tx,finance,scope,String(row.id)));
+ expect((await q('SELECT processing_status FROM zh_import_rows WHERE id=?',[row.id]))[0].processing_status).toBe('withdrawn');
+ expect((await q('SELECT status FROM zh_processing_jobs WHERE batch_id=?',[running]))[0].status).toBe('done');
+});
+
+it('旧报表确认上传不等于已结账，删除时连带撤销关联新报表，越权被拒绝',async()=>{
+ const day='2026-09-28',id=await upload(day,'分析渠道','分析关键词');
+ const [source]=await q('SELECT file_sha256 FROM zh_import_batches WHERE id=?',[id]);
+ await c.query("INSERT INTO data_import_batches(id,file_name,file_size,file_sha256,sheet_name,status,total_rows,valid_rows,error_rows,errors_json,headers_json,created_by) VALUES(900,'测试旧报表.xlsx',10,?,'订单','confirmed',1,1,0,'[]','[]',1)",[source.file_sha256]);
+ await c.query("INSERT INTO data_import_rows(batch_id,`row_number`,occurred_at,keyword,order_count,validation_status,errors_json,raw_json) VALUES(900,2,?,'分析关键词',3,'valid','[]','{}')",[day]);
+ const path='/api/v1/modules/zhihu/finance-history/data-import/900/removal';
+ for(const actor of [ops,creator,leader]){expect((await request(app).get(path).set(headers[actor.sub])).status).toBe(403);expect((await request(app).post(path).set(headers[actor.sub]).send({reviewHash:'a'.repeat(64)})).status).toBe(403);}
+ const preview=await request(app).get(path).set(headers[finance.sub]);expect(preview.status,preview.text).toBe(200);expect(preview.body.data.canRemove).toBe(true);expect(preview.body.data.linked.map((x:{id:string})=>x.id)).toContain(id);
+ expect((await request(app).post(path).set(headers[finance.sub]).send({reviewHash:'a'.repeat(64)})).status).toBe(409);
+ const result=await request(app).post(path).set(headers[finance.sub]).send({reviewHash:preview.body.data.reviewHash});expect(result.status,result.text).toBe(200);
+ expect((await q('SELECT id FROM data_import_batches WHERE id=900')).length).toBe(0);expect((await q('SELECT id FROM data_import_rows WHERE batch_id=900')).length).toBe(0);
+ expect((await workbench.overview(finance,scope,{from:day,to:day})).entries).toEqual([]);
+});
+it('实际旧收益有记录时不直接删除原始凭据，迁移重复运行不改变报表',async()=>{
+ await c.query("INSERT INTO data_import_batches(id,file_name,file_size,file_sha256,sheet_name,status,total_rows,valid_rows,error_rows,errors_json,headers_json,created_by) VALUES(901,'真实旧报表.xlsx',10,REPEAT('e',64),'订单','confirmed',1,1,0,'[]','[]',1)");
+ await c.query("INSERT INTO data_import_rows(batch_id,`row_number`,occurred_at,keyword,order_count,validation_status,errors_json,raw_json) VALUES(901,2,'2025-09-01','分析关键词',3,'valid','[]','{}')");
+ await c.query("INSERT INTO earnings(user_id,project_id,settle_date,amount,status) VALUES(2,1,'2025-09-01',800,'paid')");
+ const path='/api/v1/modules/zhihu/finance-history/data-import/901/removal';
+ const preview=await request(app).get(path).set(headers[finance.sub]);expect(preview.body.data.canRemove).toBe(false);
+ expect((await request(app).post(path).set(headers[finance.sub]).send({reviewHash:preview.body.data.reviewHash})).status).toBe(409);
+ expect((await q('SELECT id FROM data_import_rows WHERE batch_id=901')).length).toBe(1);
+ const before=await q('SELECT * FROM zh_import_batches');
+ const migration=await readFile('schema/zhihu/038_import_withdrawal.sql','utf8');
+ for(let n=0;n<2;n++)for(const sql of migration.split(/;\s*(?:\r?\n|$)/).map(s=>s.trim()).filter(Boolean))await c.query(sql);
+ expect(await q('SELECT * FROM zh_import_batches')).toEqual(before);
+});
