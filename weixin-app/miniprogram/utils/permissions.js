@@ -29,7 +29,8 @@ function allowed(user, page) {
   if (page === "reports") return duty(user, "finance");
   if (page === "projects") return ["admin","developer"].includes(user.role) && duty(user,"operations");
   if (page === "admin") return duty(user,"operations");
-  if (page === "prices") return canFinance(user);
+  // 定价规则属于财务岗位；成员查看本人收益不代表可以进入定价页面。
+  if (page === "prices") return duty(user, "finance");
   if (page === "team")
     return user.role === "leader" || duty(user, "operations");
   return false;

@@ -26,8 +26,8 @@ const keys = list => Array.from(list, item => item.key)
 
 // 角色 → 我的页菜单。与 README 的角色能力表一一对应；「邀请好友」对全部角色开放。
 const MINE_MENUS = [
-  ['creator', null, ['join-team', 'prices', 'invite', 'withdrawals', 'password']],
-  ['leader', null, ['team', 'prices', 'invite', 'withdrawals', 'password']],
+  ['creator', null, ['join-team', 'invite', 'withdrawals', 'password']],
+  ['leader', null, ['team', 'invite', 'withdrawals', 'password']],
   ['admin', 'operations', ['team', 'admin', 'invite', 'password']],
   ['admin', 'finance', ['reports', 'prices', 'invite', 'withdrawals', 'password']],
   ['admin', 'all', ['reports', 'team', 'prices', 'admin', 'invite', 'withdrawals', 'password']],
@@ -108,6 +108,25 @@ test('home lists only the non-tab role entries', async () => {
 
   assert.deepEqual(keys(page.data.menus), ['reports', 'team', 'prices', 'admin'])
   for (const item of page.data.menus) assert.ok(item.icon || item.iconImg, item.key + ' 缺少图标')
+})
+
+test('member home and mine omit pricing while keeping earnings and withdrawals available', async () => {
+  for (const user of [
+    { id: '2', role: 'creator', parentId: null },
+    { id: '3', role: 'creator', parentId: '4' },
+    { id: '4', role: 'leader' },
+  ]) {
+    const h = setup(user)
+    for (const name of ['home', 'mine']) {
+      const page = h.page(name)
+      await page.onShow()
+      assert.equal(page.data.allowed, true)
+      assert.equal(page.data.menus.some(item => item.key === 'prices'), false)
+    }
+    const permissions = h.load('utils/permissions')
+    for (const name of ['income', 'wallet', 'withdrawals'])
+      assert.equal(permissions.allowed(user, name), true)
+  }
 })
 
 test('home shows the withdrawable balance for a creator', async () => {
