@@ -107,6 +107,7 @@ const workFiltersSchema=scopeSchema.merge(pagingSchema).extend({
   view:z.enum(['self','team','all']).optional(),ownerId:idSchema.optional(),planId:idSchema.optional(),
   registeredOnly:z.enum(['1','true']).optional().transform(v=>!!v),
   result:z.enum(['submitted','failed','pending']).optional(),
+  search:z.string().trim().max(200).optional(),
 }).refine(q=>!q.from||!q.to||q.from<=q.to,{message:'开始日期不能晚于结束日期'});
 attributionRouter.get('/workbench/work-activity',asyncHandler(async(req,res)=>{
   const q=workFiltersSchema.parse(req.query);ok(res,await workActivity(req.user,q,q,q.page,q.pageSize));

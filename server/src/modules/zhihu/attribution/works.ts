@@ -18,13 +18,14 @@ export interface WorkFilters {
   registeredOnly?: boolean;
   result?: 'submitted' | 'failed' | 'pending';
   id?: string;
+  search?: string;
 }
 // All three views use this same set: one row per composition, plus evidence-only records.
 function workQuery(user: AuthUser, scope: Scope) {
   const visibility = scopeFilter(user, 'c.owner_id');
   const query = `
       SELECT CAST(e.id AS CHAR) id,'evidence' source,CAST(e.binding_id AS CHAR) binding_id,
-        CAST(p.id AS CHAR) plan_id,p.keyword,e.work_url,e.description,e.status,e.reason,
+        CAST(p.id AS CHAR) plan_id,p.keyword,e.work_url,e.description,c.title work_title,e.status,e.reason,
         b.verification_status,CAST(b.executor_id AS CHAR) executor_id,u.display_name executor_name,
         CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,c.media_type,c.media_account,c.composition_type,c.composition_sub_type,c.release_time,COALESCE(c.created_at,e.created_at) created_at,c.status composition_status,
         (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name
@@ -41,7 +42,7 @@ function workQuery(user: AuthUser, scope: Scope) {
             AND bb.executor_id=c.owner_id AND BINARY ee.work_url=BINARY c.promo_url))
       UNION ALL
       SELECT CONCAT('composition:',c.id) id,'composition' source,NULL binding_id,
-        CAST(p.id AS CHAR) plan_id,p.keyword,c.promo_url work_url,c.title description,
+        CAST(p.id AS CHAR) plan_id,p.keyword,c.promo_url work_url,c.title description,c.title work_title,
         c.status,c.reject_reason reason,NULL verification_status,
         CAST(c.owner_id AS CHAR) executor_id,u.display_name executor_name,
         CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,c.media_type,c.media_account,c.composition_type,c.composition_sub_type,c.release_time,c.created_at,c.status composition_status,
@@ -76,6 +77,12 @@ function filteredQuery(user: AuthUser, scope: Scope, filters: WorkFilters = {}) 
   const base = workQuery(user, scope),
     where = ['1=1'],
     args: unknown[] = [...base.args];
+  const search = filters.search?.trim();
+  if (search) {
+    const columns = ['keyword', 'description', 'work_title', 'executor_name', 'work_url'];
+    where.push('(' + columns.map(column => `LOCATE(?,COALESCE(${column},''))>0`).join(' OR ') + ')');
+    args.push(...columns.map(() => search));
+  }
   if (filters.from) {
     where.push('created_at>=?');
     args.push(filters.from);

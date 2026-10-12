@@ -1061,6 +1061,22 @@ describe('关键词与推广作品使用同一计划关联', () => {
     expect((await listWorks(direct,linkedScope,1,25)).total).toBe(0);
     await expect(listWorks(outsider,linkedScope,1,25)).rejects.toThrow();
   });
+  it('作品搜索在分页前匹配关键词、名称、提交人和链接，并保留原有数据范围', async () => {
+    const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
+    const [rows]=await c.query<mysql.RowDataPacket[]>('SELECT id,promo_url FROM compositions WHERE plan_id=? ORDER BY id LIMIT 1',[historyPlan]);
+    await c.query('UPDATE compositions SET title=? WHERE id=?',['远页作品100%_标记',rows[0].id]);
+    const search=(text:string,viewer=creator)=>listWorks(viewer,linkedScope,1,25,{search:text});
+    expect((await search('  远页作品  ')).list[0]?.composition_id).toBe(String(rows[0].id));
+    expect((await search('100%_')).total).toBe(1);
+    expect((await search(String(rows[0].promo_url))).total).toBe(1);
+    expect((await search('达人')).total).toBe(130);
+    expect((await listWorks(creator,linkedScope,6,25,{search:'作品关联改名词'})).list).toHaveLength(5);
+    expect((await search('不存在的作品')).total).toBe(0);
+    expect((await search("' OR 1=1 --")).total).toBe(0);
+    expect((await search('远页作品',direct)).total).toBe(0);
+    expect((await listWorks(leader,linkedScope,1,25,{search:'远页作品',ownerId:'4'})).total).toBe(0);
+    await expect(search('远页作品',outsider)).rejects.toThrow();
+  });
   it('同一作品只显示一次，直接记录上游状态不能绕过核验流程', async () => {
     const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
     const {submitEvidence,reviewEvidence}=await import('../../src/modules/zhihu/attribution/statements');
@@ -1077,6 +1093,9 @@ describe('关键词与推广作品使用同一计划关联', () => {
     expect(result.total).toBe(131);expect(joined).toHaveLength(1);
     expect(joined[0]).toMatchObject({id:evidence.id,source:'evidence',status:'pending',verification_status:'pending'});
     expect(joined[0].composition_id).not.toBeNull();
+    expect((await listWorks(creator,linkedScope,1,25,{search:'联动核验'})).total).toBe(1);
+    await c.query('UPDATE compositions SET title=? WHERE id=?',['原作品标题独立检索',joined[0].composition_id]);
+    expect((await listWorks(creator,linkedScope,1,25,{search:'标题独立检索'})).list[0]?.id).toBe(evidence.id);
     await reviewEvidence(admin,linkedScope,evidence.id,key(),true,'已核对');
     expect((await listWorks(creator,linkedScope,1,1,{id:evidence.id})).list[0]?.status).toBe('passed');
     expect((await listWorks(direct,linkedScope,1,25)).total).toBe(0);
