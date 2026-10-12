@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
-const props = defineProps<{ open: boolean; title: string; busy?: boolean }>();
+const props = defineProps<{ open: boolean; title: string; busy?: boolean; wide?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLDialogElement>();
 watch(
@@ -22,6 +22,7 @@ onBeforeUnmount(() => dialog.value?.close());
     ><dialog
       ref="dialog"
       class="action-dialog"
+      :class="{ 'action-dialog-wide': wide }"
       :aria-label="title"
       @cancel.prevent="close"
       @click="$event.target === dialog && close()"
@@ -55,6 +56,16 @@ onBeforeUnmount(() => dialog.value?.close());
 }
 .action-dialog::backdrop {
   background: #10252770;
+}
+.action-dialog-wide {
+  width: min(880px, calc(100vw - 32px));
+}
+.action-dialog :deep(input[type="checkbox"]),
+.action-dialog :deep(input[type="radio"]) {
+  width: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  accent-color: #195e62;
 }
 header {
   display: flex;
