@@ -10,3 +10,4 @@
   margin-bottom: 8rpx;
   flex-wrap: wrap;
 }
+@import "../../templates/member-summary.wxss";

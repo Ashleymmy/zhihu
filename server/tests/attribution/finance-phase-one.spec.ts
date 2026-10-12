@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import type { Express } from 'express';
 import type { AuthUser } from '../../src/types';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
+import { cash, cashText } from '../../src/core/money';
 vi.mock('../../src/modules/zhihu/queue', async (original) => ({
   ...(await original<typeof import('../../src/modules/zhihu/queue')>()),
   enqueue: vi.fn(async () => ({ id: 'test' })),
@@ -218,6 +219,29 @@ it('两步预览幂等、限制岗位且不提前建账或锁定日期', async (
     (await q("SELECT f.id FROM zh_metric_facts f JOIN zh_keywords k ON k.id=f.keyword_id WHERE k.keyword='联测词0'"))[0]
       .id,
   );
+});
+it('团队流水使用上游报表并保留原执行归属，缺金额和撤销不伪造完整金额', async () => {
+  const endpoint='/api/v1/core/member-summary';
+  const initial=await get(leader,endpoint);
+  expect(initial.status,initial.text).toBe(200);
+  expect(initial.body.data.team).toMatchObject({memberCount:2,reward:{total:'0.0000'},turnover:{
+    total:'1100.0000',today:'1100.0000',yesterday:'0.0000',records:{total:4},missing:{total:0}}});
+  expect((await get(other,endpoint)).body.data.team.turnover.total).toBe('0.0000');
+  expect((await get(a,endpoint)).body.data.team).toBeNull();
+  await c.query('UPDATE users SET parent_id=6 WHERE id=3');
+  const [original]=await q('SELECT current_result_id FROM zh_metric_facts WHERE id=?',[factId]);
+  const [result]=await q('SELECT snapshot_json FROM zh_attribution_results WHERE id=?',[original.current_result_id]);
+  try {
+    expect((await get(leader,endpoint)).body.data.team.turnover.total).toBe('1100.0000');
+    expect((await get(other,endpoint)).body.data.team.turnover.total).toBe('0.0000');
+    await c.query("UPDATE zh_attribution_results SET snapshot_json=JSON_SET(snapshot_json,'$.revenue',NULL) WHERE id=?",[original.current_result_id]);
+    expect((await get(leader,endpoint)).body.data.team.turnover).toMatchObject({total:'500.0000',missing:{total:1,today:1}});
+    await c.query("UPDATE zh_attribution_results SET snapshot_json=JSON_SET(snapshot_json,'$.withdrawn',CAST('true' AS JSON)) WHERE id=?",[original.current_result_id]);
+    expect((await get(leader,endpoint)).body.data.team.turnover).toMatchObject({total:'500.0000',records:{total:3},missing:{total:0}});
+  } finally {
+    await c.query('UPDATE zh_attribution_results SET snapshot_json=? WHERE id=?',[typeof result.snapshot_json==='string'?result.snapshot_json:JSON.stringify(result.snapshot_json),original.current_result_id]);
+    await c.query('UPDATE users SET parent_id=2 WHERE id=3');
+  }
 });
 it('全部阻塞时确认不启用、不写启用审计，并缓存零确认回执', async () => {
   const period = { from: day, to: day },
@@ -501,6 +525,8 @@ it('同日501条一次发起，后台分段，撤权停止、恢复不重记、�
   expect((await get(a, path('/workbench/confirm/' + jobId), scope)).status).toBe(403);
 }, 120000);
 it('拉活两步上传、指标来源定位和撤销后重传不影响已确认拉新', async () => {
+  const summaryPath='/api/v1/core/member-summary';
+  const turnoverBefore=(await get(leader,summaryPath)).body.data.team.turnover;
   const { previewWorkbenchImport, commitWorkbenchImport } =
     await import('../../src/modules/zhihu/attribution/workbench-import');
   const { previewImportWithdrawal, withdrawImport } =
@@ -525,6 +551,9 @@ it('拉活两步上传、指标来源定位和撤销后重传不影响已确认�
     await commitWorkbenchImport(fin, scope, preview.id, key(), preview.previewHash);
     await facts.processBatch(fin, scope, preview.id);
     const af = (await q("SELECT CAST(id AS CHAR) id FROM zh_metric_facts WHERE metric_type='activation'"))[0].id;
+    const withActivation=(await get(leader,summaryPath)).body.data.team.turnover;
+    expect(withActivation.total).toBe(cashText(cash(turnoverBefore.total)+cash('10.0000')));
+    expect(withActivation.records.total).toBe(turnoverBefore.records.total+1);
     const trace = await facts.trace(fin, scope, af);
     expect(trace.currentSource?.[0]).toMatchObject({
       batchId: preview.id,
@@ -533,6 +562,7 @@ it('拉活两步上传、指标来源定位和撤销后重传不影响已确认�
     });
     const plan = await previewImportWithdrawal(fin, scope, preview.id);
     await withdrawImport(fin, scope, preview.id, key(), plan.reviewHash);
+    expect((await get(leader,summaryPath)).body.data.team.turnover).toEqual(turnoverBefore);
     await expect(commitWorkbenchImport(fin, scope, preview.id, key(), preview.previewHash)).rejects.toThrow('撤销');
     const again = await previewWorkbenchImport(fin, scope, file, 'activation', key());
     expect(again.status).toBe('preview');

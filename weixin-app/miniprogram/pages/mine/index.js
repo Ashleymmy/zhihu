@@ -1,6 +1,7 @@
 const screen = require("../../utils/screen");
 const auth = require("../../utils/auth");
 const permissions = require("../../utils/permissions");
+const memberSummary = require("../../utils/member-summary");
 const ICONS = {
   "join-team": { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
   team: { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
@@ -16,6 +17,7 @@ Page(
     scoped: false,
     data: {
       menus: [],
+      memberSummary: null, summaryError: '',
     },
     async fetch({ user }) {
       const menus = permissions.menus(user);
@@ -36,6 +38,7 @@ Page(
         path: "/pages/password/index",
       });
       return {
+        ...await memberSummary.load(user),
         menus: menus.map((item) =>
           Object.assign(
             {},

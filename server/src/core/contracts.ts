@@ -41,6 +41,13 @@ export interface ModuleSummary {
 export interface ModuleDataProvider {
   summary(scope: DataScope, user: AuthUser): Promise<ModuleSummary>;
   activity?(scope: DataScope, user: AuthUser, filter: ActivityFilter): Promise<ActivityResult>;
+  // Aggregate upstream amounts only; never expose individual members' income.
+  teamTurnover?(connection: PoolConnection, scope: DataScope, user: AuthUser): Promise<TeamTurnover>;
+}
+export interface AmountPeriods { total: string; today: string; yesterday: string }
+export interface TeamTurnover extends AmountPeriods {
+  missing: { total: number; today: number; yesterday: number };
+  records: { total: number; today: number; yesterday: number };
 }
 export interface ActivityFilter {
   view: 'self' | 'team' | 'all';

@@ -393,3 +393,57 @@ it('风险排除说明不当作未处理，后续业务阻断仍覆盖当前就�
   expect(await read()).toMatchObject({ isReady: 0, reason: '作品需要再次核对' });
   expect(await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id')).toEqual(original);
 });
+
+it('成员概览按业绩日期汇总已确认净额，直推和团队分成分开且不含成员个人金额', async () => {
+  const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Shanghai'}).format(new Date());
+  const yesterday = new Date(Date.parse(today)-86400000).toISOString().slice(0,10);
+  const own = input('summary-own','10.1001');
+  own.date=today;
+  Object.assign(own.lines[0],{payeeId:'3',performerId:'3',ruleCode:'leader_self'});
+  await write(own); await confirm(own);
+  const corrected = {...own,version:'2',lines:[{...own.lines[0],amount:'8.0001'}]};
+  await write(corrected); await confirm(corrected); await confirm(corrected);
+  const pending = {...own,version:'3',lines:[{...own.lines[0],amount:'90.0000'}]};
+  await write(pending);
+  const prior = {...own,sourceKey:'summary-prior',date:yesterday,lines:[{...own.lines[0],amount:'2.0011'}]};
+  await write(prior); await confirm(prior);
+  const future = {...own,sourceKey:'summary-future',date:'2099-01-01'};
+  await write(future); await confirm(future);
+  const team = input('summary-team','999.0000');team.date=yesterday;
+  team.lines.push({...team.lines[0],payeeId:'3',amount:'7.1234',ruleCode:'leader_override'});
+  await write(team); await confirm(team);
+  await c.query('UPDATE users SET parent_id=3 WHERE id=2');
+  const result = await request(app).get('/api/v1/core/member-summary').set(headers['3']);
+  expect(result.status,result.text).toBe(200);
+  expect(result.body.data).toEqual({businessDate:today,
+    direct:{total:'10.0012',today:'8.0001',yesterday:'2.0011'},
+    team:{memberCount:1,reward:{total:'7.1234',today:'0.0000',yesterday:'7.1234'},turnover:null}});
+  expect(result.text).not.toContain('999.0000');
+  expect(result.text).not.toContain('90.0000');
+  const creator = await request(app).get('/api/v1/core/member-summary').set(headers['2']);
+  expect(creator.body.data.team).toBeNull();
+  expect(creator.body.data.direct.yesterday).toBe('999.0000');
+  // Transfer today must not move yesterday's confirmed commission to the new leader.
+  await c.query('UPDATE users SET parent_id=NULL WHERE id=2');
+  expect((await request(app).get('/api/v1/core/member-summary').set(headers['3'])).body.data.team)
+    .toMatchObject({memberCount:0,reward:{total:'7.1234'}});
+  expect((await q("SHOW TABLES LIKE 'zh_%'")).length).toBe(0);
+});
+
+it('成员概览拒绝匿名、后台岗位和指定他人参数，并过滤停用或退出的项目', async () => {
+  const endpoint='/api/v1/core/member-summary';
+  expect((await request(app).get(endpoint)).status).toBe(401);
+  for(const actor of ['1','4']) expect((await request(app).get(endpoint).set(headers[actor])).status).toBe(403);
+  for(const field of ['userId','leaderId','projectId'])
+    expect((await request(app).get(endpoint).set(headers['3']).query({[field]:'2'})).status).toBe(422);
+  const none=(await request(emptyApp).get(endpoint).set(headers['3'])).body.data;
+  expect(none.direct.total).toBe('0.0000');expect(none.team.reward.total).toBe('0.0000');
+  await c.query('UPDATE projects SET is_enabled=0 WHERE id=1');
+  try {
+    const hidden=(await request(app).get(endpoint).set(headers['3'])).body.data;
+    expect(hidden.direct.total).toBe('0.0000');expect(hidden.team.reward.total).toBe('0.0000');
+  } finally { await c.query('UPDATE projects SET is_enabled=1 WHERE id=1'); }
+  await c.query('UPDATE project_members SET left_at=NOW() WHERE user_id=3 AND project_id=1');
+  try { expect((await request(app).get(endpoint).set(headers['3'])).body.data.direct.total).toBe('0.0000'); }
+  finally {await c.query('UPDATE project_members SET left_at=NULL WHERE user_id=3 AND project_id=1');}
+});

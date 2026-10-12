@@ -1,0 +1,35 @@
+<template name="amount-periods">
+  <view class="summary-days">
+    <view><text class="summary-label">今日</text><text class="summary-day-value">{{value.today}}</text></view>
+    <view><text class="summary-label">昨日</text><text class="summary-day-value">{{value.yesterday}}</text></view>
+  </view>
+</template>
+<template name="member-summary">
+  <view wx:if="{{!loading && summaryError}}" class="card summary-error">
+    <text>{{summaryError}}</text><button size="mini" disabled="{{busy}}" bindtap="load">重试</button>
+  </view>
+  <block wx:if="{{!loading && !error && memberSummary}}">
+    <view wx:if="{{mode === 'mine'}}" class="card member-summary">
+      <view class="summary-label">直推收益 · 累计</view>
+      <view class="summary-total">{{memberSummary.direct.total}}</view>
+      <template is="amount-periods" data="{{value:memberSummary.direct}}" />
+      <view class="summary-note">本人作品已确认收益 · 按业绩日期统计</view>
+    </view>
+    <block wx:elif="{{memberSummary.team}}">
+      <view class="card member-summary">
+        <view class="summary-overview">
+          <view class="summary-turnover"><view class="summary-label">团队总流水（元）</view><view class="summary-total">{{memberSummary.team.turnover.total}}</view></view>
+          <view class="summary-members"><view class="summary-label">团队总成员</view><view class="summary-count">{{memberSummary.team.memberCount}}<text> 人</text></view></view>
+        </view>
+        <template is="amount-periods" data="{{value:memberSummary.team.turnover}}" />
+        <view class="summary-note">{{memberSummary.team.turnover.note}}</view>
+      </view>
+      <view class="card member-summary">
+        <view class="summary-label">团队收益 · 累计</view>
+        <view class="summary-total">{{memberSummary.team.reward.total}}</view>
+        <template is="amount-periods" data="{{value:memberSummary.team.reward}}" />
+        <view class="summary-note">本人已确认的团队分成 · 按业绩日期统计</view>
+      </view>
+    </block>
+  </block>
+</template>

@@ -1,0 +1,51 @@
+{
+  "leaderInvite": true,
+  "writes": [],
+  "window": {
+    "pixelRatio": 2,
+    "safeArea": {
+      "top": 20,
+      "left": 0,
+      "right": 375,
+      "bottom": 667,
+      "width": 375,
+      "height": 647
+    },
+    "screenWidth": 375,
+    "screenHeight": 667,
+    "screenTop": 112,
+    "windowWidth": 375,
+    "windowHeight": 555,
+    "statusBarHeight": 20
+  },
+  "api": "offline-fixtures",
+  "leaderTeam": true,
+  "retry": true,
+  "status": "passed",
+  "roles": [
+    {
+      "role": "creator",
+      "mine": true
+    },
+    {
+      "role": "independent",
+      "mine": true
+    },
+    {
+      "role": "leader",
+      "mine": true
+    },
+    {
+      "role": "admin",
+      "mine": true
+    },
+    {
+      "role": "operations",
+      "mine": true
+    },
+    {
+      "role": "finance",
+      "mine": true
+    }
+  ]
+}

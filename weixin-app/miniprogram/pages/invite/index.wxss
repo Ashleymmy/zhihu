@@ -62,3 +62,4 @@
   margin: 16rpx 0 8rpx;
   text-align: center;
 }
+@import "../../templates/member-summary.wxss";

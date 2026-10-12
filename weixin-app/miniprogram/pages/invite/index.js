@@ -1,15 +1,18 @@
 const screen = require("../../utils/screen");
 const request = require("../../utils/request");
+const memberSummary = require("../../utils/member-summary");
 Page(
   screen("invite", {
     scoped: false,
-    data: { code: "", usageCount: 0, records: [] },
-    async fetch({ scope }) {
-      const [me, history] = await Promise.all([
+    data: { code: "", usageCount: 0, records: [], memberSummary:null, summaryError:'' },
+    async fetch({ scope, user }) {
+      const [me, history, summary] = await Promise.all([
         request.get("/modules/zhihu/invite/me", scope),
         request.get("/modules/zhihu/invite/rewards", scope),
+        memberSummary.load(user, true),
       ]);
       return {
+        ...summary,
         code: me.code || "",
         usageCount: me.usageCount || 0,
         records: (history.records || []).map((r) =>

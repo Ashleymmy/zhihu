@@ -1,4 +1,5 @@
 <import src="../../templates/shared.wxml" />
+<import src="../../templates/member-summary.wxml" />
 <view class="page"
   ><role-nav user="{{user}}" active="team" />
   <view class="row page-heading"
@@ -13,6 +14,7 @@
     is="status"
     data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}"
   /><block wx:if="{{allowed && scopeReady}}">
+    <template is="member-summary" data="{{memberSummary,summaryError,error,loading,busy,mode:'team'}}" />
     <view class="card" wx:if="{{credentials}}"
       ><view class="section-title">新账号已创建</view
       ><view selectable>账号：{{credentials.username}}</view

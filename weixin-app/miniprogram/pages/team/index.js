@@ -3,11 +3,13 @@ const request = require("../../utils/request");
 const actions = require("../../utils/actions");
 const permissions = require("../../utils/permissions");
 const feedback = require("../../utils/feedback");
+const memberSummary = require("../../utils/member-summary");
 Page(
   screen("team", {
     scoped: false,
     data: {
       members: [],
+      memberSummary: null, summaryError: '',
       applications: [],
       formOpen: false,
       credentials: null,
@@ -23,12 +25,14 @@ Page(
       projects: [], projectSelection: [],
     },
     async fetch({ user }) {
-      const [members, applications, projects] = await Promise.all([
+      const [members, applications, projects, summary] = await Promise.all([
         request.get("/core/team/members"),
         request.get("/core/team/applications"),
         request.get("/core/projects"),
+        memberSummary.load(user, true),
       ]);
       return {
+        ...summary,
         projects: projects.filter(p=>p.isEnabled),
         members: members.map((item) =>
           Object.assign({}, item, {

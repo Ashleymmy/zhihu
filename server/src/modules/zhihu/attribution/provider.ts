@@ -4,7 +4,9 @@ import { withTransaction } from '../../../db';
 import { authorize, select } from './store';
 import { day, fail } from './domain';
 import { performance } from './performance';
+import { teamTurnover } from './team-turnover';
 export const attributionDataProvider: ModuleDataProvider = {
+  teamTurnover,
   activity: performance,
   async summary(scope, user) {
     await authorize(user, scope);

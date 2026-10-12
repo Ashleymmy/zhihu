@@ -1,4 +1,5 @@
 <import src="../../templates/shared.wxml" />
+<import src="../../templates/member-summary.wxml" />
 <view class="page">
   <view class="profile-head" wx:if="{{guest}}" bindtap="toLogin">
     <image class="avatar" src="/images/avatar.png" mode="aspectFill" />
@@ -25,6 +26,7 @@
     is="status"
     data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy}}"
   />
+  <template wx:if="{{allowed}}" is="member-summary" data="{{memberSummary,summaryError,error,loading,busy,mode:'mine'}}" />
   <view class="card cell-card"><view class="cell" bindtap="openPrivacy"><text class="cell-label">帮助与隐私</text><text class="cell-arrow">›</text></view></view>
   <block wx:if="{{allowed}}">
     <view class="card cell-card">
