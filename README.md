@@ -244,3 +244,10 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 备份 `precutover-20261012T073450Z/`（SQL 2536724 字节，SHA-256 `d407e2760d29895b047991b959ed2ea9ab443cbaed4e691267ac1f555a04ddb8`）已恢复至无外网数据库副本。隔离副本、生产候选和公网小程序签名网关均完成实际身份检查：团长、达人、独立达人统计返回 200；后台身份返回 403；指定其他人参数返回 422。检查只调用统计读接口，临时独立验证会话已移除，未替换或注销用户原登录。
 
 回执 `summary-rehearsal-642db3b.json`、`summary-candidate-642db3b.json`、`summary-cutover-20261012T074234Z/receipt.json`、`post-summary-642db3b.json` 位于服务器 bluegreen 私有目录。兼容回退保留 `zhihu-green-423b1d4`（3220）及已停止的 `zhihu-worker-423b1d4`；回退保留现有数据库，仍仅运行一个消费者。此前开发版 `2026.10.12.3` 的“我的”、团队和邀请页统计现已具备线上接口；收益页顶部团队概况与钱包按钮移除需后续小程序包。
+### 作品记录搜索上线（2026-10-12）
+
+2026-10-12 15:54（北京时间）完成 `bccf0d4` Web/API 蓝绿上线，保留主分支同事已上线的成员统计能力。作品列表可按关键词、名称/说明、提交人、链接搜索，服务端分页前筛选；支持回车、清空、无结果恢复，窄屏作品改为卡片。原项目/人员/岗位范围保留，小程序本轮未发布。
+
+合并后后端类型检查及相关 MySQL 测试 50 项通过，Web 11 项类型检查与构建通过；六角色真实浏览器验收见 `.opc-work/works-search-ui`。生产候选以真实授权身份只读验证 1125 条作品范围中的五个搜索字段及跨项目拒绝，无迁移、数据修复、报表重跑或资金操作。备份 `precutover-20261012T075000Z/`（SQL 2541213 字节，SHA-256 `e72821bbf701871496f9ea167a549016c7c7b8d4e0d71fad35a19ca15a706a6b`）。
+
+两处入口指向 `zhihu-green-bccf0d4`（3222），后台 `zhihu-worker-bccf0d4`，镜像 `sha256:29a6a4140f4344b3d5324cbdac3398a968a184d41c20dbf8d06440d5393a9111`。API 未暂停，队列交接完成；旧 `642db3b` API/镜像保留，旧后台停止。公网页面/健康、接口鉴权、新静态文件字节检查通过，原 1114 个资源保留、现共 1248 个；API/后台零重启、无新增应用错误，队列等待/执行中为 0，失败保持原 42 条。回执 `works-search-cutover-20261012T075437Z/receipt.json`、`post-works-search-bccf0d4.json` 位于服务器 bluegreen 目录。
