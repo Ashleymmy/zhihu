@@ -65,6 +65,7 @@ async function load() {
 /** 卡片三指标（拉新 + 拉活合并，null 金额不计） */
 function totalPayable(c: PeriodCard): string {
   if (!c.wb) return '—'
+  if (c.wb.processingImports?.length&&!c.wb.entries.length) return '待计算'
   const s = c.wb.summary
   const sum = moneyValue(s.byType.newUser.payable) + moneyValue(s.byType.activation.payable)
   return '¥' + cashText(sum)
@@ -81,6 +82,7 @@ function todoText(c: PeriodCard): string {
 
 function statusOf(c: PeriodCard): { cls: string; label: string; stepText: string } {
   if (!c.wb) return {cls:'badge',label:c.summaryError?'读取失败':'读取中',stepText:''}
+  if (c.wb.processingImports?.length) return {cls:'badge warn',label:c.wb.processingImports.some(r=>r.status==='failed')?'报表处理待恢复':'报表处理中',stepText:'第 1 / 5 步 · 查看处理进度'}
   if (c.todoCount > 0) return { cls: 'badge danger', label: '待处理', stepText: '第 2 / 5 步 · 待处理' }
   const hasReady = c.wb.groups.some((g) => g.ready > 0)
   if (hasReady) return { cls: 'badge info', label: '待确认', stepText: '第 3 / 5 步 · 核对与确认' }

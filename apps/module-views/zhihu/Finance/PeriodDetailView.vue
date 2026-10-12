@@ -54,6 +54,6 @@ function onStepClick(n: 1 | 2 | 3 | 4 | 5) {
     <p v-if="state.step.value!==state.stepOfStatus.value" class="small muted">正在回看：{{STEPS[state.step.value-1]?.name}}</p>
     <div v-if="state.error.value" class="banner warn" role="alert">{{state.error.value}}<button @click="state.loadPeriod()">重新加载</button></div>
     <div v-if="state.loading.value&&!state.workbench.value" class="empty"><span class="spin" /> 正在加载账期数据…</div>
-    <div v-else><div class="row-actions"><button :disabled="state.loading.value" @click="state.loadPeriod()">刷新结果</button></div><Transition name="finance-step" mode="out-in"><KeepAlive><component :is="stepComponents[state.step.value-1]" :key="state.periodId.value+':'+state.step.value" class="step-body"/></KeepAlive></Transition></div>
+    <div v-else><div class="row-actions"><button :disabled="state.loading.value" @click="state.loadPeriod()">刷新结果</button></div><Transition name="finance-step" mode="out-in"><KeepAlive><component :is="stepComponents[state.step.value-1]" :key="state.step.value===1?'upload':state.periodId.value+':'+state.step.value" class="step-body"/></KeepAlive></Transition></div>
   </div>
 </template>

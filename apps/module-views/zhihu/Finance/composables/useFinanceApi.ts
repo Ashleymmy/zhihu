@@ -30,6 +30,7 @@ export interface MetricSummary {
 
 /** GET /workbench（viewVersion=2）视图 */
 export interface WorkbenchView {
+  processingImports?: {id:string;fileName:string;pendingRows:number;status:'running'|'failed'}[]
   summary: {
     records:number
     totalRecords:number

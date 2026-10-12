@@ -605,3 +605,54 @@ it('lists real finance months with finance-only and project isolation', async ()
   expect((await get(fin,path('/workbench/periods'),{projectId:'999999',accountId:scope.accountId})).status).toBe(403);
   expect((await get(fin,path('/workbench/periods'),{...scope,page:0})).status).toBe(422);
 });
+
+it('uses the current upload actor in the worker and exposes unfinished imports after refresh', async () => {
+  const worker=await import('../../src/modules/zhihu/attribution/worker');
+  const imports=await import('../../src/modules/zhihu/attribution/workbench-import');
+  const before=await q('SELECT * FROM opc_income_entries ORDER BY id');
+  for(const actor of [developer,fin,admin]){
+    const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${day},联测渠道,后台恢复测试${actor.sub},3`);
+    const preview=await imports.previewWorkbenchImport(actor,scope,{originalname:'worker-'+actor.sub+'.csv',buffer,size:buffer.length,mimetype:'text/csv'},'new_user',key());
+    await imports.commitWorkbenchImport(actor,scope,preview.id,key(),preview.previewHash);
+    const payload={...scope,moduleId:'zhihu',jobId:String((await q('SELECT id FROM zh_processing_jobs WHERE batch_id=?',[preview.id]))[0].id)};
+    let view=await workbench.overview(fin,scope,{from:day,to:day});
+    expect(view.processingImports).toContainEqual(expect.objectContaining({id:preview.id,pendingRows:1,status:'running'}));
+    if(actor===developer){
+      await c.query('UPDATE users SET is_active=0 WHERE id=?',[actor.sub]);
+      await expect(worker.processImportJob(payload)).rejects.toThrow('经办人已停用');
+      view=await workbench.overview(fin,scope,{from:day,to:day});
+      expect(view.processingImports).toContainEqual(expect.objectContaining({id:preview.id,pendingRows:1,status:'failed'}));
+      const analysis=await (await import('../../src/modules/zhihu/attribution/analysis')).importAnalysis(fin,scope,preview.id);
+      expect(analysis.status).toBe('failed');
+      expect(analysis.conclusion?.title).toBe('报表尚未处理完成');
+      expect(analysis.conclusion?.summary).not.toContain('¥0.00');
+      expect(analysis.steps.slice(1).every(s=>s.status==='pending')).toBe(true);
+      await c.query("UPDATE users SET is_active=1,role='creator' WHERE id=?",[actor.sub]);
+      await c.query('UPDATE zh_processing_jobs SET next_attempt_at=NOW(3) WHERE id=?',[payload.jobId]);
+      await expect(worker.processImportJob(payload)).rejects.toThrow('无处理权限');
+      await c.query("UPDATE users SET role='developer' WHERE id=?",[actor.sub]);
+      await c.query('UPDATE zh_processing_jobs SET next_attempt_at=NOW(3) WHERE id=?',[payload.jobId]);
+    }
+    await worker.processImportJob(payload);
+    await worker.processImportJob(payload);
+    expect((await q('SELECT status FROM zh_processing_jobs WHERE id=?',[payload.jobId]))[0].status).toBe('done');
+    expect((await q('SELECT status FROM zh_import_batches WHERE id=?',[preview.id]))[0].status).toBe('processed');
+    view=await workbench.overview(fin,scope,{from:day,to:day});
+    expect(view.processingImports.some(r=>r.id===preview.id)).toBe(false);
+    expect(view.entries.some(r=>r.keyword==='后台恢复测试'+actor.sub&&r.reasonCode==='KEYWORD_UNKNOWN')).toBe(true);
+  }
+  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(before);
+});
+
+it('does not count withdrawn empty facts as finished financial data', async () => {
+  const oldDate='2025-01-17',keyword=(await q('SELECT id FROM zh_keywords ORDER BY id LIMIT 1'))[0].id;
+  await c.query('INSERT INTO zh_metric_facts(account_id,project_id,channel_mapping_id,keyword_id,business_date) VALUES(?,?,?,?,?)',[scope.accountId,scope.projectId,mapping,keyword,oldDate]);
+  const response=await get(fin,path('/workbench'),{...scope,from:oldDate,to:oldDate,viewVersion:'2'});
+  expect(response.status).toBe(200);
+  expect(response.body.data.summary.totalRecords).toBe(0);
+  expect(response.body.data.entries).toEqual([]);
+  expect((await workbench.listPeriods(fin,scope)).list.some(p=>p.id==='2025-01')).toBe(false);
+  expect((await get(ops,path('/workbench'),{...scope,from:day,to:day,viewVersion:'2'})).status).toBe(403);
+  expect((await get(fin,path('/workbench'),{projectId:'99999',accountId:scope.accountId,from:day,to:day,viewVersion:'2'})).status).toBe(403);
+  expect((await get(a,path('/workbench'),{...scope,from:day,to:day,viewVersion:'2'})).body.data.processingImports).toEqual([]);
+});

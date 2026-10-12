@@ -4,6 +4,7 @@ import { db, withTransaction } from '../../../db';
 import { config } from '../../../config';
 import { enqueue, registerJob } from '../../../queue';
 import { logger } from '../../../utils/logger';
+import { isRole, isStaffRole } from '../../../auth/roles';
 import type { AuthUser } from '../../../types';
 import { fail } from './domain';
 import { scopeLock, select } from './store';
@@ -41,12 +42,20 @@ export async function processImportJob(data: Record<string, unknown>) {
   });
   if (!job) return;
   try {
+    const [actors] = await db.query<import('mysql2/promise').RowDataPacket[]>(
+      'SELECT id,role,admin_duty,is_active,username,display_name,parent_id FROM users WHERE id=?',
+      [job.actor_id],
+    );
+    const actor = actors[0];
+    if (!actor || !actor.is_active || !isRole(actor.role) || !isStaffRole(actor.role))
+      fail('经办人已停用或无处理权限，请由财务继续处理', 403);
     const user: AuthUser = {
-      sub: String(job.actor_id),
-      role: 'admin',
-      parentId: null,
-      username: 'report-worker',
-      displayName: '报告处理',
+      sub: String(actor.id),
+      role: actor.role,
+      adminDuty: actor.admin_duty as AuthUser['adminDuty'],
+      parentId: actor.parent_id == null ? null : String(actor.parent_id),
+      username: String(actor.username),
+      displayName: String(actor.display_name),
       jti: 'background',
     };
     const r = await processBatch(user, scope, String(job.batch_id));

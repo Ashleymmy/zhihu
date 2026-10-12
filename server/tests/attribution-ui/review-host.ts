@@ -88,7 +88,7 @@ async function main() {
           if(rows.some(row=>row.error||row.skipped))throw Error('原件包含未通过解析的记录');
           sample=rows.map(row=>row.value);
         }
-        process.send?.({port,sample,reconciliation});console.log('REVIEW_READY',port);
+        process.send?.({port,sample,reconciliation,...(process.env.OPC_REVIEW_IMPORT_RECOVERY==='1'?{importRecoveryDb:target}:{})});console.log('REVIEW_READY',port);
       }
     });
     child.stderr?.pipe(process.stderr);
