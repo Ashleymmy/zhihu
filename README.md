@@ -218,3 +218,11 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 生产仅执行 038 结构迁移，迁移前后既有记录指纹相同；切换暂停接口 8.66 秒，保留旧 711 个静态资源，现共 845 个。公网页面与健康 200，受保护接口未登录 401，API 和后台零重启、无新增错误，队列等待/执行中为 0，失败仍为切换前既有 38 条。回执 `withdrawal-cutover-20261010T015206Z/receipt.json`、`withdrawal-rehearsal-53cf02c.json`、`post-withdrawal-53cf02c.json` 位于服务器 bluegreen 目录。旧 `2fda998` API（3217）保留、旧后台已停止；现已使用撤销功能，不能直接启用旧程序处理新状态。
 
 随后用户明确确认清理这四条测试上传。通过相同业务服务撤销新上传 1、2、3（含原已隐藏记录），删除无实际结账的旧上传 1，审计及原上传证据保留。线上核验有效上传、旧上传、有效计账数据、未确认收益和未处理报表问题均为 0，成员应付及内部业绩归零；用户、项目成员、关键词、原作品、使用归属、单价及资金表指纹不变。清理回执 `withdrawal-cutover-20261010T015206Z/test-import-cleanup.json`；浏览器刷新已看到“共 0 份”和金额 ¥0.00。本次未改动或发布小程序。
+
+### FinanceFlow 与后端一期上线（2026-10-12）
+
+2026-10-12 14:51（北京时间）完成 `5dbeab6` Web/API 蓝绿上线，财务入口统一使用 FinanceFlow，包含上传预览、待办、分批确认、成员异议和线下付款记录。HTTP/TLS 两处入口均指向 `zhihu-green-5dbeab6`（3219），后台为 `zhihu-worker-5dbeab6`，镜像 `sha256:dd86e8e59e5748289494a6ba4b51f6bb03dee8a2dc4cba26eefa28ebfb11af33`。旧 `53cf02c` API、镜像保留，旧后台已停止；小程序未发布。
+
+发布前完成数据库、上传目录和配置备份 `precutover-20261012T064456Z/`（SQL 2483187 字节，SHA-256 `143cba27f3237d59606d10510f76c45eb7df4aceb75608fd82c51127c46778c0`）。在内部网络副本演练 `extensions/017_offline_payment_records.sql`、`zhihu/039_finance_workflow.sql`，79 张原有表、11656 条记录升级前后指纹一致，重复迁移通过；账期、账单、钱包和异议只读查询通过。生产切换暂停接口 10.27 秒，仅执行这两份结构迁移，同样核验原记录不变，未上传测试报表、确认账单或登记测试付款。
+
+公网健康、财务页面和静态资源校验通过，页面文件与新镜像一致；保留原 845 个静态资源，现共 981 个。API/后台零重启、无新增应用错误，队列恢复运行，等待/执行中为 0，失败为切换前既有 42 条。发布回执 `financeflow-cutover-20261012T065136Z/receipt.json`、`financeflow-rehearsal-5dbeab6.json`、`post-financeflow-5dbeab6.json` 均位于服务器 bluegreen 目录。后续回退须先暂停写入并核对新确认任务、异议及付款更正记录，不可直接启用旧后台或用备份覆盖新业务数据。

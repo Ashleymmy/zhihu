@@ -23,7 +23,7 @@ export async function listPeriods(user:AuthUser,scope:Scope,page=1){
  assertDuty(user,'finance');await authorize(user,scope);
  return withTransaction(async c=>{
   // Unmatched report rows also need an entry point. Previews and withdrawn uploads do not create periods.
-  const months=`SELECT DATE_FORMAT(business_date,'%Y-%m') month FROM zh_metric_facts WHERE project_id=? AND account_id=?
+  const months=`SELECT DATE_FORMAT(business_date,'%Y-%m') month FROM zh_metric_facts WHERE project_id=? AND account_id=? AND (current_revision_id IS NOT NULL OR current_result_id IS NOT NULL)
    UNION SELECT LEFT(JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')),7) month FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id
    WHERE b.project_id=? AND b.account_id=? AND b.status IN ('committed','processed') AND r.processing_status NOT IN ('invalid','skipped')`;
   const args=[scope.projectId,scope.accountId,scope.projectId,scope.accountId];
@@ -34,7 +34,7 @@ export async function listPeriods(user:AuthUser,scope:Scope,page=1){
    const from=String(row.month)+'-01';
    const [info]=await select(c,`SELECT DATE_FORMAT(LAST_DAY(?),'%Y-%m-%d') last_day,COUNT(*) records,
     COALESCE(SUM(metric_type='new_user'),0) new_user_records,COALESCE(SUM(metric_type='activation'),0) activation_records
-    FROM zh_metric_facts WHERE project_id=? AND account_id=? AND business_date BETWEEN ? AND LAST_DAY(?)`,[from,scope.projectId,scope.accountId,from,from]);
+    FROM zh_metric_facts WHERE project_id=? AND account_id=? AND business_date BETWEEN ? AND LAST_DAY(?) AND (current_revision_id IS NOT NULL OR current_result_id IS NOT NULL)`,[from,scope.projectId,scope.accountId,from,from]);
    list.push({id:String(row.month),from,to:String(info.last_day),records:Number(info.records),newUserRecords:Number(info.new_user_records),activationRecords:Number(info.activation_records)});
   }
   return {list,total:Number(count.total),page,pageSize:12};
@@ -189,7 +189,14 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   };
   const typedSummary=(type:MetricType)=>({...reported(type),staffAmount:isStaffRole(user.role)?sum(e=>e.metricType===type&&!!e.internal):'0.0000',records:stats[type].records,quantity:String(stats[type].quantity),orders:String(type==='new_user'?stats[type].quantity:0n),billableQuantity:String(stats[type].billableQuantity),pendingQuantity:String(stats[type].pendingQuantity),excludedQuantity:String(stats[type].excludedQuantity),payable:sum(e=>e.metricType===type&&!e.internal),confirmedPayable:sum(e=>e.metricType===type&&!e.internal,'confirmedAmount'),pendingPayable:sum(e=>e.metricType===type&&!e.internal,'pendingAmount'),receivable:sum(e=>e.metricType===type&&e.ownReceivable),confirmedReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'confirmedAmount'),pendingReceivable:sum(e=>e.metricType===type&&e.ownReceivable,'pendingAmount')});
   const byType={new_user:typedSummary('new_user'),activation:typedSummary('activation')};
-  return{period,entries,groups,teamPerformance,reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:stats.new_user.records,totalRecords:rows.length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:byType.new_user.receivable,confirmedReceivable:byType.new_user.confirmedReceivable,pendingReceivable:byType.new_user.pendingReceivable,payable:byType.new_user.payable,confirmedPayable:byType.new_user.confirmedPayable,pendingPayable:byType.new_user.pendingPayable,retained:byType.new_user.receivable,byType,staffAmount:isStaffRole(user.role)?moneyText(staffTotal):'0.0000'},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
+  const processingImports=isStaffRole(user.role)?await select(c,`SELECT CAST(b.id AS CHAR) id,b.file_name fileName,COUNT(*) pendingRows,
+    IF(j.status='failed','failed','running') status
+    FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id
+    WHERE b.project_id=? AND b.account_id=? AND b.status IN ('committed','processed') AND r.processing_status='pending'
+      AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?
+      AND (? IS NULL OR IF(b.report_kind='activation','activation','new_user')=?)
+    GROUP BY b.id,b.file_name,j.status ORDER BY b.id`,[scope.projectId,scope.accountId,period.from,period.to,period.metricType??null,period.metricType??null]):[];
+  return{period,entries,groups,teamPerformance,processingImports:processingImports.map(r=>({id:String(r.id),fileName:String(r.fileName),status:String(r.status),pendingRows:Number(r.pendingRows)})),reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:stats.new_user.records,totalRecords:rows.filter(r=>r.snapshot_json).length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:byType.new_user.receivable,confirmedReceivable:byType.new_user.confirmedReceivable,pendingReceivable:byType.new_user.pendingReceivable,payable:byType.new_user.payable,confirmedPayable:byType.new_user.confirmedPayable,pendingPayable:byType.new_user.pendingPayable,retained:byType.new_user.receivable,byType,staffAmount:isStaffRole(user.role)?moneyText(staffTotal):'0.0000'},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
  };
  return connection?read(connection):withTransaction(read);
 }

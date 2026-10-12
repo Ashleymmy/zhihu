@@ -5,7 +5,7 @@ import { isStaffRole } from '@zhihu-koc/shared-contracts/core'
 import {StaffManager} from '@zhihu-koc/shared-components'
 import Keywords from './Keywords.vue'
 import Prices from './Prices.vue'
-import Finance from './Finance.vue'
+import Finance from './Finance/FinanceFlow.vue'
 import Works from './Works.vue'
 import WorkActivity from './WorkActivity.vue'
 import Issues from './Issues.vue'
@@ -56,7 +56,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先在项目设置中接通业务服务并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">设置项目</button></div>
 <template v-if="ready">
  <WorkActivity v-if="section==='activity'" :key="scope.projectId+'-'+scope.accountId+'-'+userId" :context="context" />
- <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-from="initialFrom" :initial-to="initialTo" @navigate="emit('navigate',$event)" @issues="emit('navigate','/modules/zhihu/operations?tab=issues')" />
+ <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-period="initialFrom?.slice(0,7)" @navigate="emit('navigate',$event)" />
  <template v-else><nav v-if="!pageKind" class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
  <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId+'-'+pageKind" :context="context" :initial-view="pageKind==='task-hall'?'available':pageKind==='tasks'&&!admin?'owned':'all'" :initial-search="initialKeyword" :initial-create="initialCreate" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />
  <Works :filters="workFilters" v-if="tab==='works'" :key="scope.projectId+'-'+scope.accountId" :context="context" />

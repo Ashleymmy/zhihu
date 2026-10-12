@@ -87,7 +87,7 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  const channel=usable.filter(r=>['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH'].includes(String(r.error_text))).length;
  const keywords=usable.filter(r=>r.error_text==='KEYWORD_UNKNOWN').length;
  const unit=batch.report_kind==='activation'?'个':'单',type=batch.report_kind==='activation'?'拉活':'拉新';
- const stage=(key:string,title:string,problem:number,ok:string,help:string):AnalysisStep=>({key,title,status:pending?'running':problem?'ask':'done',summary:problem?help:ok});
+ const stage=(key:string,title:string,problem:number,ok:string,help:string):AnalysisStep=>({key,title,status:pending?'pending':problem?'ask':'done',summary:pending?'报表读取完成后继续核对':problem?help:ok});
  const steps:AnalysisStep[]=[
    stage('read','读取报表',invalid,`已读取 ${rows.length} 行${skipped?`，跳过 ${skipped} 行汇总`:''}${legacy?`，${legacy} 行早于本期计账启用日期，未计入本期`:''}`,`${rows.length} 行已保留，${invalid} 行格式需要修正，其余行继续处理`),
    stage('channel','确认渠道',channel,'报表中的渠道已对上',`${channel} 行渠道需要运营确认`),
@@ -118,13 +118,13 @@ async function readAnalysis(c:PoolConnection,user:AuthUser,scope:Scope,id:string
  if((channel||keywords||unassigned)&&!work){steps[4].status='pending';steps[4].summary='执行人确认后继续核对作品';}
  if((channel||keywords||unassigned)&&!billable&&!price&&!conflicts&&!agency){steps[5].status='pending';steps[5].summary=finance?'相关资料补齐后自动计算金额':'金额由财务核对';}
  const need=problems.size+invalid,failed=pending>0&&batch.job_status==='failed',running=pending>0||batch.status==='preview';
- if(failed){const active=steps.find(step=>step.status==='running');if(active){active.status='failed';active.summary='处理暂时中断，已经读取的记录和结果都已保留。';}}
+ if(pending){steps[0].status=failed?'failed':'running';steps[0].summary=failed?`处理暂时中断，${pending} 行尚未完成，原文件和已有结果已保存。`:`已处理 ${rows.length-pending} 行，还有 ${pending} 行正在处理。`;}
  const run:AnalysisRun={id,fileName:String(batch.file_name),source:'知乎'+type+'报表',createdAt:String(batch.created_at),
    status:failed?'failed':running?'running':need?'needs_input':'done',progress:{done:rows.length-pending,total:rows.length},steps,
-   conclusion:{title:`本次报表已读取 ${unique.size} 条${type}记录`,value:String(reportedQuantity)+' '+unit,
-     summary:finance?`${settlementRecords?'报表结算 ¥'+cash(reportedSettlement)+' · ':''}成员金额已算出 ¥${cash(billableAmount)} · 可确认 ¥${cash(confirmableAmount)}${staffAmount?' · 内部业绩 ¥'+cash(staffAmount):''}${excludedQuantity?' · '+excludedQuantity+' '+unit+'已核实不计费':''}`:`${rows.length} 行已保留，金额由财务核对`,
-     pendingText:need?`${need} 条记录仍需处理${finance&&pendingQuantity?'，涉及 '+pendingQuantity+' '+unit:''}，其他记录可以继续核对。`:'没有待处理的数据问题。',
-     actions:[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary'},...((invalid||agency)&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
+   conclusion:{title:pending?'报表尚未处理完成':`本次报表已读取 ${unique.size} 条${type}记录`,value:pending?`${rows.length-pending} / ${rows.length} 行`:String(reportedQuantity)+' '+unit,
+     summary:pending?'原文件已保存，处理完成后显示各行结果和金额。':finance?`${settlementRecords?'报表结算 ¥'+cash(reportedSettlement)+' · ':''}成员金额已算出 ¥${cash(billableAmount)} · 可确认 ¥${cash(confirmableAmount)}${staffAmount?' · 内部业绩 ¥'+cash(staffAmount):''}${excludedQuantity?' · '+excludedQuantity+' '+unit+'已核实不计费':''}`:`${rows.length} 行已保留，金额由财务核对`,
+     pendingText:pending?(failed?'点击“继续处理”恢复这份报表，无需重新上传。':'系统正在处理，请稍候；刷新页面后仍可查看进度。'):need?`${need} 条记录仍需处理${finance&&pendingQuantity?'，涉及 '+pendingQuantity+' '+unit:''}，其他记录可以继续核对。`:'没有待处理的数据问题。',
+     actions:[...(!pending?[{key:'details',label:finance?'查看金额与待处理明细':'查看待处理记录',tone:'primary' as const}]:[]),...((invalid||agency)&&finance?[{key:'replace-file',label:'选择修正后的报表'}]:[]),...(failed&&finance?[{key:'retry',label:'继续处理'}]:[])]}};
  const dates=usable.map(row=>String(json<Record<string,string>>(row.normalized_json).date)).filter(date=>/^\d{4}-\d{2}-\d{2}$/.test(date)).sort();
  return {...run,period:dates.length?{from:dates[0],to:dates[dates.length-1]}:null,...(agency?{agencyCheck:agency}:{}),riskCases:[...unique.values()].filter(row=>row.reason_code==='RISK_REVIEW_REQUIRED').map(row=>({factId:String(row.fact_id),revisionId:String(row.revision_id),keyword:json<Record<string,string>>(row.normalized_json).keyword,riskAssessment:String(row.risk_assessment??'')})),nameMatches:names.map(choice=>({askId:choice.ask.id,kind:choice.kind,...choice.source,mappingId:choice.mappingId,
    candidates:choice.candidates.map(item=>({id:String(item.id),name:String(item.keyword??item.channel_name)}))})),
