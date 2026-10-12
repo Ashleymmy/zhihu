@@ -8,7 +8,7 @@ import ReportAnalysis from './ReportAnalysis.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
 import RiskReview from './RiskReview.vue'
 import {errorText,requestKey,type EngineContext} from './context'
-const props=defineProps<{context:EngineContext}>()
+const props=defineProps<{context:EngineContext;headless?:boolean}>()
 const emit=defineEmits<{changed:[];navigate:[path:string]}>()
 interface Issue{id:string;batchId:string|null;metricType?:string;reasonCode:string;reason:string;next:string;status:string;resolution?:string|null;factId:string|null;keyword:string|null;keywordId?:string|null;canAssignRetro?:boolean|number|string;bindingId?:string;executorName?:string;legacyMode?:string;retroFromDate?:string;revisionId:string|null;expectedRevisionId:string|null;riskAssessment?:string;comparison?:AnalysisComparison[];normalizedJson:{keyword:string;orders:string}|null}
 const list=ref<Issue[]>([]),page=ref(1),total=ref(0),busy=ref(false),error=ref(''),notice=ref(''),selected=ref<Issue|null>(null)
@@ -69,10 +69,10 @@ onMounted(load)
 </script>
 <template>
  <section class="work-card issues">
-  <div class="section-heading"><div><h2>数据待办</h2><p>按下一步补齐资料，金额已算出的记录可以继续核对。</p></div><button :disabled="busy" @click="load">刷新</button></div>
+  <div v-if="!headless" class="section-heading"><div><h2>数据待办</h2><p>按下一步补齐资料，金额已算出的记录可以继续核对。</p></div><button :disabled="busy" @click="load">刷新</button></div>
   <p v-if="error&&!selected" class="engine-error" role="alert">{{error}}</p><p v-if="notice" role="status">{{notice}}</p>
   <div v-if="analysis" ref="analysisHost" class="issue-analysis"><ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" @answer="answer" @action="load" @refresh="changed" /><button @click="analysis=null">收起分析</button></div>
-  <DataGrid title="报表待办" title-label="关键词" :rows="rows" :columns="[{key:'reason',label:'需要处理什么'},...(operations?[]:[{key:'comparison',label:'原值与新值'}])]" :views="[{key:'pending',label:'需要跟进'},{key:'all',label:'全部'},{key:'done',label:'已处理'}]" :model-value="view" :view-counts="counts" :busy="busy" hide-search external-details :empty-text="appliedSearch?'没有找到这个关键词，清空搜索后可查看其他待办。':view==='pending'?'这里的报表问题已处理完，可以继续核对其他记录。':'这里还没有处理记录。'" @update:model-value="changeView" @inspect="selected=item($event)" @action="handle(item($event.row))">
+  <DataGrid v-if="!headless" title="报表待办" title-label="关键词" :rows="rows" :columns="[{key:'reason',label:'需要处理什么'},...(operations?[]:[{key:'comparison',label:'原值与新值'}])]" :views="[{key:'pending',label:'需要跟进'},{key:'all',label:'全部'},{key:'done',label:'已处理'}]" :model-value="view" :view-counts="counts" :busy="busy" hide-search external-details :empty-text="appliedSearch?'没有找到这个关键词，清空搜索后可查看其他待办。':view==='pending'?'这里的报表问题已处理完，可以继续核对其他记录。':'这里还没有处理记录。'" @update:model-value="changeView" @inspect="selected=item($event)" @action="handle(item($event.row))">
    <template #filters><form class="issue-search" @submit.prevent="find"><label><span class="sr-only">搜索关键词</span><input v-model="search" type="search" maxlength="128" placeholder="搜索关键词" /></label><button :disabled="busy">查找</button><button v-if="appliedSearch" type="button" :disabled="busy" @click="search='';find()">清空搜索</button></form></template>
    <template #cell="{row,column,value}"><ValueComparison v-if="column.key==='comparison'&&item(row).comparison?.length" :rows="item(row).comparison!" /><template v-else>{{value}}</template></template>
   </DataGrid>

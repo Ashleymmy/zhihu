@@ -1,45 +1,150 @@
 <script setup lang="ts">
-import {onMounted,onUnmounted,ref} from 'vue'
-import type {EngineContext} from '../context'
-import {errorText} from '../context'
-import {moneyValue,cashText,type BillEntry} from '../bill-entry'
-const props=defineProps<{context:EngineContext}>()
-const emit=defineEmits<{open:[period:{from:string;to:string}];upload:[]}>()
-interface Period {id:string;from:string;to:string;records:number;newUserRecords:number;activationRecords:number}
-interface Amounts {quantity:string;payable:string;confirmedPayable:string;pendingPayable:string;unpricedRecords?:number}
-interface Summary {byType:{newUser:Amounts;activation:Amounts}}
-const list=ref<Period[]>([]),total=ref(0),page=ref(1),busy=ref(false),error=ref('')
-const summaries=ref<Record<string,Summary>>({}),summaryErrors=ref<Record<string,string>>({}),entries=ref<Record<string,BillEntry[]>>({})
-let generation=0
-async function loadSummary(p:Period,current=generation){try{const r=await props.context.http.get<{summary:Summary;entries:BillEntry[]}>('/workbench',{...props.context.scope,from:p.from,to:p.to,viewVersion:'2'});if(current===generation){summaries.value[p.id]=r.summary;entries.value[p.id]=r.entries;delete summaryErrors.value[p.id]}}catch(e){if(current===generation)summaryErrors.value[p.id]=errorText(e)}}
-async function load(){const current=++generation;busy.value=true;error.value='';summaries.value={};summaryErrors.value={};entries.value={};try{const r=await props.context.http.get<{list:Period[];total:number}>('/workbench/periods',{...props.context.scope,page:page.value});if(current!==generation)return;list.value=r.list;total.value=r.total;await Promise.allSettled(r.list.map(p=>loadSummary(p,current)))}catch(e){if(current===generation)error.value=errorText(e)}finally{if(current===generation)busy.value=false}}
-const amount=(id:string,key:'payable'|'confirmedPayable'|'pendingPayable')=>{const s=summaries.value[id];return s?'¥'+cashText(moneyValue(s.byType.newUser[key])+moneyValue(s.byType.activation[key])):'—'}
-const unpriced=(id:string)=>{const s=summaries.value[id];return (s?.byType.newUser.unpricedRecords??0)+(s?.byType.activation.unpricedRecords??0)}
-const periodTitle=(id:string)=>{const [year,month]=id.split('-');return year+' 年 '+Number(month)+' 月'}
-const pendingCount=(id:string)=>new Set((entries.value[id]??[]).filter(e=>e.ownPayable&&!e.internal&&e.reasonCode&&!e.ready&&e.status!=='confirmed').map(e=>e.factId)).size
-function statusOf(id:string){
- if(summaryErrors.value[id])return {label:'读取失败',cls:'danger'}
- if(!summaries.value[id])return {label:'读取中',cls:''}
- if(pendingCount(id))return {label:'有待处理记录',cls:'warn'}
- if((entries.value[id]??[]).some(e=>e.ready))return {label:'待核对确认',cls:'info'}
- if((entries.value[id]??[]).some(e=>e.ownPayable&&e.status==='confirmed'))return {label:'账单已确认',cls:'ok'}
- return {label:'查看处理结果',cls:''}
+/**
+ * 账期列表（demo viewPeriods）
+ * 结构 1:1 对齐 demo：banner + period-card（title+badge / nums 三指标 / 第X步提示）
+ * 数据：GET /workbench/periods（分页账期）+ 每月 GET /workbench 读取金额与待办
+ */
+import { inject, onMounted, onUnmounted, ref } from 'vue'
+import type { PeriodState } from './composables/usePeriodState'
+import { periodTitle } from './composables/usePeriodState'
+import { errorText } from '../context'
+import {
+  fmtMoney,
+  moneyValue,
+  cashText,
+  type PeriodRow,
+  type WorkbenchView,
+} from './composables/useFinanceApi'
+
+const state = inject<PeriodState>('financeState')!
+const toast = inject<(text: string) => void>('financeToast')!
+
+interface PeriodCard {
+  row: PeriodRow
+  wb: WorkbenchView | null
+  todoCount: number
+  summaryError: string
 }
+
+const cards = ref<PeriodCard[]>([])
+const total = ref(0)
+const page = ref(1)
+const busy = ref(false)
+const loadError = ref('')
+let generation = 0
+
+async function loadSummary(card: PeriodCard, current: number) {
+  try {
+    const wb=await state.api.getWorkbench(card.row.from,card.row.to)
+    if(current!==generation)return
+    card.wb=wb
+    card.todoCount=new Set(wb.entries.filter(e=>e.ownPayable&&!e.ready&&e.status!=='confirmed'&&e.reasonCode).map(e=>e.factId)).size
+    card.summaryError = ''
+  } catch (e) {
+    if (current === generation) card.summaryError = errorText(e)
+  }
+}
+
+async function load() {
+  const current = ++generation
+  busy.value = true
+  loadError.value = ''
+  try {
+    const r = await state.api.getPeriods(page.value)
+    if (current !== generation) return
+    total.value = r.total
+    cards.value = r.list.map((row) => ({ row, wb: null, todoCount: 0, summaryError: '' }))
+    await Promise.allSettled(cards.value.map((c) => loadSummary(c, current)))
+  } catch (e) {
+    if (current === generation) loadError.value = errorText(e)
+  } finally {
+    if (current === generation) busy.value = false
+  }
+}
+
+/** 卡片三指标（拉新 + 拉活合并，null 金额不计） */
+function totalPayable(c: PeriodCard): string {
+  if (!c.wb) return '—'
+  const s = c.wb.summary
+  const sum = moneyValue(s.byType.newUser.payable) + moneyValue(s.byType.activation.payable)
+  return '¥' + cashText(sum)
+}
+
+function totalOrders(c: PeriodCard): string {
+  return c.wb?`${c.wb.summary.byType.newUser.quantity} 单 / ${c.wb.summary.byType.activation.quantity} 个`:'—'
+}
+
+function todoText(c: PeriodCard): string {
+  if (!c.wb) return '—'
+  return `${c.todoCount} 项`
+}
+
+function statusOf(c: PeriodCard): { cls: string; label: string; stepText: string } {
+  if (!c.wb) return {cls:'badge',label:c.summaryError?'读取失败':'读取中',stepText:''}
+  if (c.todoCount > 0) return { cls: 'badge danger', label: '待处理', stepText: '第 2 / 5 步 · 待处理' }
+  const hasReady = c.wb.groups.some((g) => g.ready > 0)
+  if (hasReady) return { cls: 'badge info', label: '待确认', stepText: '第 3 / 5 步 · 核对与确认' }
+  return c.wb.entries.some(e=>e.status==='confirmed')?{cls:'badge info',label:'账单已确认',stepText:'进入后查看实际发放进度'}:{cls:'badge warn',label:'待核对',stepText:'进入查看明细'}
+}
+
+async function open(c: PeriodCard) {
+  await state.openPeriod(c.row.id)
+}
+
 onMounted(load)
-onUnmounted(()=>generation++)
+onUnmounted(() => generation++)
 </script>
-<template><section class="periods-view"><header class="periods-heading"><div><h2>财务账期</h2><p class="muted">按月份查看报表、核对金额和登记线下发放。</p></div><button class="primary" @click="emit('upload')">上传报表</button></header>
-<div class="banner"><div class="grow"><b>从报表到发放，每笔金额有据可查</b><div class="small muted">先预览报表，再确认导入。传错后可在上传记录中撤销并重传。</div></div></div>
-<p v-if="busy&&!list.length" role="status">正在读取账期…</p><div v-if="error" role="alert">{{error}} <button @click="load">重新加载</button></div>
-<div v-else-if="!busy&&!list.length" class="card"><h3>还没有正式导入的报表</h3><p>确认导入后，账期和金额会显示在这里。</p></div>
-<div class="periods-list"><article v-for="p in list" :key="p.id" class="card period-card">
- <div class="period-caption"><h3 class="title">{{periodTitle(p.id)}}</h3><span class="badge" :class="statusOf(p.id).cls">{{statusOf(p.id).label}}</span><div class="small muted">{{p.from}} 至 {{p.to}}</div></div>
- <div class="nums"><div><b>{{amount(p.id,'payable')}}</b><span>成员应付{{unpriced(p.id)?'已算出':''}}</span><small v-if="summaries[p.id]" class="muted">已确认 {{amount(p.id,'confirmedPayable')}}</small></div>
- <div><b>{{summaries[p.id]?pendingCount(p.id)+' 条':'—'}}</b><span>本期待处理账单</span></div>
- <div><b>{{summaries[p.id]?.byType.newUser.quantity??'—'}} 单<span class="source-separator"> / </span>{{summaries[p.id]?.byType.activation.quantity??'—'}} 个</b><span>拉新订单 / 拉活量</span><small class="muted">{{p.records}} 条已识别记录</small></div></div>
- <div class="period-next"><span v-if="summaryErrors[p.id]" role="alert">金额读取失败 <button class="ghost" @click="loadSummary(p)">重试</button></span><span v-else-if="!summaries[p.id]" class="small muted" role="status">正在读取金额…</span><span v-else-if="unpriced(p.id)" class="small muted">另有 {{unpriced(p.id)}} 条待计算</span><button @click="emit('open',p)">查看账单 →</button></div>
-</article></div>
-<footer v-if="total>12"><button :disabled="busy||page===1" @click="page--;load()">上一页</button>第 {{page}} 页<button :disabled="busy||page*12>=total" @click="page++;load()">下一页</button></footer></section></template>
-<style scoped>
-.periods-view{min-width:0}.periods-heading,footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}h2,p{margin:0 0 8px}.period-caption{display:grid;gap:6px}.period-caption .badge{justify-self:start}.period-next{display:grid;gap:8px}.period-next [role=alert]{font-size:12px;color:var(--danger)}.period-card{margin-bottom:14px}.nums{min-width:0}.nums>div{min-width:120px}.period-card .nums b{font-size:22px}.period-card h3{margin:0}.nums small{display:block;font-size:11px;margin-top:6px}.source-separator{display:inline!important;color:var(--ink-soft,#637078);font-weight:400}.period-caption .small{font-size:11px}@media(max-width:600px){.period-card{padding:16px}.nums{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px!important;flex-basis:100%!important}.nums>div{min-width:0}.period-next{width:100%}}
-</style>
+
+<template>
+  <div>
+    <div class="row-actions" style="margin-bottom:16px"><button class="primary" @click="state.openPeriod(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}).slice(0,7)).then(()=>{state.step.value=1})">上传报表</button></div><div class="banner">
+      <div class="grow">
+        <b>按账期工作，而不是面对一屏功能。</b>
+        <div class="small muted">
+          每个账期都是一条有状态的流水线：上传 → 待处理 → 确认 → 放款 → 归档。点击进入「{{ cards[0] ? periodTitle(cards[0].row.id) : '本月' }}」开始。
+        </div>
+      </div>
+    </div>
+
+    <div v-if="busy && !cards.length" class="empty"><span class="spin" /> 正在读取账期…</div>
+    <div v-if="loadError" class="empty" role="alert">
+      {{ loadError }} <button @click="load">重新加载</button>
+    </div>
+
+    <template v-else>
+      <div
+        v-for="(c, i) in cards"
+        :key="c.row.id"
+        class="card period-card rise" role="button" tabindex="0" @keydown.enter="open(c)" @keydown.space.prevent="open(c)"
+        :style="{ '--d': `${i * 60}ms` }"
+        @click="open(c)"
+      >
+        <div>
+          <div class="title">{{ periodTitle(c.row.id) }}</div>
+          <span :class="statusOf(c).cls">{{ statusOf(c).label }}</span>
+        </div>
+        <div class="nums">
+          <div><b>{{ totalPayable(c) }}</b><span>应付合计</span></div>
+          <div><b>{{ todoText(c) }}</b><span>待处理账单</span></div>
+          <div><b>{{ totalOrders(c) }}</b><span>拉新订单 / 拉活量</span></div>
+        </div>
+        <div class="small muted">
+          <template v-if="c.summaryError">金额读取失败 <button class="ghost" @click.stop="loadSummary(c, generation)">重试</button></template>
+          <template v-else-if="!c.wb">正在读取金额…</template>
+          <template v-else>{{ statusOf(c).stepText }}</template>
+        </div>
+      </div>
+
+      <div v-if="!cards.length && !busy" class="card empty">
+        还没有正式导入的报表<br />
+        <span class="small">上传第一份报表后，对应账期会显示在这里。</span>
+      </div>
+
+      <div v-if="total > 12" class="flex" style="justify-content: center; margin-top: 14px">
+        <button :disabled="busy || page === 1" @click="page--; load()">上一页</button>
+        <span class="small muted">第 {{ page }} 页</span>
+        <button :disabled="busy || page * 12 >= total" @click="page++; load()">下一页</button>
+      </div>
+    </template>
+  </div>
+</template>

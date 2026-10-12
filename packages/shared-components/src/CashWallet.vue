@@ -8,6 +8,7 @@ interface Scope{projectId:string;accountId:string;moduleId:string}
 interface Withdrawal{id:string;userId:string;displayName:string;amount:string;status:string;receiverName:string;bankName:string;bankAccount:string;payMethod:string|null;payAccount:string|null;paymentVersion:number;paidBy:string|null;remark:string;createdAt:string;paymentReference:string;paidOn:string;proofName:string}
 interface View{balance:{confirmed:string;held:string;available:string;offset:string;paid:string;processing:string}|null;withdrawals:Withdrawal[];total:number;funding:{amount:string;hash:string};canManage:boolean}
 const props=defineProps<{http:Http;scope:Scope}>()
+const emit=defineEmits<{updated:[]}>()
 const view=ref<View|null>(null),page=ref(1),busy=ref(false),error=ref(''),notice=ref(''),applyOpen=ref(false),fundOpen=ref(false),reference=ref(''),request=ref(createRequestKey())
 const applicant=reactive({amount:'',receiverName:'',payMethod:'wechat',payAccount:''})
 const selected=ref<Withdrawal|null>(null),action=ref(''),reason=ref(''),proof=ref<File|null>(null),ack=ref(false),actionKey=ref(createRequestKey())
@@ -28,7 +29,7 @@ async function exportPayments(){
  const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='待发放单_'+today+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
  notice.value='发放单已导出，实际转账后登记即可。'
 }
-async function load(){view.value=await props.http.get<View>('/finance',{...props.scope,page:page.value})}
+async function load(){view.value=await props.http.get<View>('/finance',{...props.scope,page:page.value});emit('updated')}
 async function run(fn:()=>Promise<unknown>){if(busy.value)return;busy.value=true;error.value='';try{await fn()}catch(e){error.value=typeof e==='object'&&e&&'message'in e?String(e.message):'操作未完成，请重试'}finally{busy.value=false}}
 function openApply(){error.value='';applyOpen.value=true;request.value=createRequestKey()}
 async function apply(){await props.http.post('/finance/withdrawals',{...props.scope,...applicant,requestKey:request.value});applyOpen.value=false;notice.value='提现申请已提交，线下发放后会更新进度。';await load()}

@@ -1,7 +1,7 @@
 /**
  * 财务账期工作流样式
- * 沿用前端交付的 prototypes/finance-period-workflow/index.html 视觉规范，
- * 规则限定在财务组件及其弹层中，避免污染全局。
+ * 1:1 提取自 prototypes/finance-period-workflow/index.html（demo 基底），
+ * 全部规则以 .finance-flow 为作用域前缀，避免污染全局。
  * 颜色/间距/字号与 demo :root 变量保持一致。
  */
 
@@ -32,6 +32,7 @@
 .finance-flow *::before,
 .finance-flow *::after {
   box-sizing: border-box;
+
 }
 
 /* ---------- 基础元素 ---------- */
@@ -671,6 +672,88 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* 弹窗内表格（行级预览等） */
+.finance-flow-modal .dialog table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.finance-flow-modal .dialog th,
+.finance-flow-modal .dialog td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8edee;
+  vertical-align: top;
+}
+.finance-flow-modal .dialog th {
+  font-size: 12px;
+  color: var(--ink-soft, #637078);
+  font-weight: 500;
+}
+.finance-flow-modal .dialog .row-problem {
+  background: #fffaf0;
+}
+.finance-flow-modal .dialog .badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid var(--line, #dce3e5);
+  color: var(--ink-soft, #637078);
+  white-space: nowrap;
+}
+.finance-flow-modal .dialog .badge.ok {
+  background: var(--ok-bg, #eaf6ef);
+  color: var(--ok, #26734d);
+  border-color: #bfe0cd;
+}
+.finance-flow-modal .dialog .badge.warn {
+  background: var(--warn-bg, #fff8e8);
+  color: var(--warn, #8a6d1d);
+  border-color: #ecd9a8;
+}
+.finance-flow-modal .dialog .badge.danger {
+  background: var(--danger-bg, #fff1f1);
+  color: var(--danger, #a02f39);
+  border-color: #e5c3c6;
+}
+.finance-flow-modal .dialog .flex {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.finance-flow-modal .dialog .empty {
+  text-align: center;
+  color: var(--ink-soft, #637078);
+  padding: 20px 10px;
+}
+.finance-flow-modal .dialog .spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line, #dce3e5);
+  border-top-color: var(--primary, #195e62);
+  border-radius: 50%;
+  animation: finance-flow-sp 0.8s linear infinite;
+  display: inline-block;
+}
+.finance-flow-modal .dialog .progress-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--ink-soft, #637078);
+  font-size: 13px;
+}
+.finance-flow-modal .dialog h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.finance-flow-modal .dialog *,
+.finance-flow-modal .dialog *::before,
+.finance-flow-modal .dialog *::after {
+  box-sizing: border-box;
+}
 
 /* ---------- 工具类 ---------- */
 .finance-flow .flex {
@@ -699,21 +782,207 @@
   font-size: 12px;
 }
 
-/* Web 接入：沿用真实账单状态，不以浏览步骤推断已完成或锁定。 */
-.finance-flow{min-width:0;container-type:inline-size}
-.finance-flow button:focus-visible,.finance-flow input:focus-visible,.finance-flow select:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
-.finance-flow .finance-stepper{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:18px 0 24px}
-.finance-flow .finance-stepper .step{display:flex;flex-direction:column;align-items:center;border:0;border-right:1px solid var(--line);border-radius:0;padding:14px 8px;gap:0}
-.finance-flow .finance-stepper .step:last-child{border-right:0}
-.finance-flow .finance-stepper .sub{max-width:100%}
-.finance-flow .review-grid{grid-template-columns:minmax(180px,.75fr) minmax(0,1.55fr) minmax(210px,.9fr)}
-.finance-flow .review-filters{margin:12px 0 16px;justify-content:flex-start}
-.finance-flow .review-filters label{display:grid;gap:6px;min-width:0;flex:1 1 110px}
-.finance-flow .review-filters select{width:100%;min-width:0}
-.finance-flow .todo .body{min-width:0}
-.finance-flow .banner{margin-top:18px;overflow-wrap:anywhere}
-.finance-flow .metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-.finance-flow .work-card{overflow-wrap:anywhere}
-@container(max-width:920px){.finance-flow .review-grid{grid-template-columns:minmax(0,1fr)}.finance-flow .review-grid .reconciliation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}.finance-flow .reconciliation>h3,.finance-flow .reconciliation>p,.finance-flow .reconciliation>button{grid-column:1/-1}}
-@media(max-width:600px){.finance-flow .finance-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.finance-flow .finance-stepper .step{border-bottom:1px solid var(--line)}.finance-flow .finance-stepper .step:last-child{grid-column:1/-1}.finance-flow .review-grid .reconciliation{display:block}.finance-flow .metric-grid{grid-template-columns:1fr}.finance-flow .drop{padding:24px 12px}.finance-flow .card{padding:16px}.finance-flow .fact-header{flex-wrap:wrap}.finance-flow .fact-header>span:last-child{text-align:left;display:flex;flex-wrap:wrap;align-items:center}}
-@media(prefers-reduced-motion:reduce){.finance-flow .spin{animation:none}.finance-flow *{scroll-behavior:auto!important}}
+/* ==================== 动画体系（财务工具感：克制、快速、有指引性） ==================== */
+
+/* --- 1. 步骤内容切换：fadeInUp --- */
+.finance-flow .step-body {
+  animation: finance-flow-rise 0.28s cubic-bezier(0.25, 0.8, 0.35, 1) both;
+}
+@keyframes finance-flow-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- 2. stepper 状态过渡与打勾 pop --- */
+.finance-flow .step {
+  transition: background 0.22s ease, opacity 0.22s ease;
+}
+.finance-flow .step:not(.locked):hover {
+  background: #f4f8f8;
+}
+.finance-flow .step .no {
+  transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease, transform 0.22s ease;
+}
+.finance-flow .step.done .no {
+  animation: finance-flow-pop 0.32s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.finance-flow .step.current .no {
+  box-shadow: 0 0 0 4px rgba(25, 94, 98, 0.12);
+}
+.finance-flow .step .dot {
+  animation: finance-flow-pulse 1.6s ease-in-out infinite;
+}
+@keyframes finance-flow-pop {
+  0% {
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes finance-flow-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.65;
+  }
+}
+
+/* --- 3. 卡片入场（staggered 由 .rise + --d 控制） --- */
+.finance-flow .rise {
+  animation: finance-flow-rise 0.3s cubic-bezier(0.25, 0.8, 0.35, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* --- 4. fact 展开 / banner 入场 --- */
+.finance-flow .fact .detail {
+  animation: finance-flow-fadein 0.22s ease both;
+}
+.finance-flow .banner {
+  animation: finance-flow-fadein 0.25s ease both;
+}
+@keyframes finance-flow-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- 5. 按钮微交互 --- */
+.finance-flow button {
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.06s ease, box-shadow 0.15s ease;
+}
+.finance-flow button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.finance-flow button.primary:not(:disabled) {
+  box-shadow: 0 1px 2px rgba(25, 94, 98, 0.18);
+}
+.finance-flow button.primary:hover:not(:disabled) {
+  box-shadow: 0 3px 10px rgba(25, 94, 98, 0.24);
+}
+
+/* --- 6. 待办完成过渡 --- */
+.finance-flow .todo {
+  transition: opacity 0.3s ease;
+}
+
+/* --- 7. Modal 遮罩淡入 + dialog 上浮 --- */
+.finance-flow-modal {
+  animation: finance-flow-fadein 0.18s ease both;
+}
+.finance-flow-modal .dialog {
+  animation: finance-flow-dialog 0.26s cubic-bezier(0.25, 1.1, 0.4, 1) both;
+}
+@keyframes finance-flow-dialog {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- 8. 确认进度条：过渡 + 流动微光 --- */
+.finance-flow .progress-track {
+  height: 8px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.finance-flow .progress-track > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #2a7d82);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+.finance-flow .progress-track > i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: finance-flow-shimmer 1.3s linear infinite;
+}
+@keyframes finance-flow-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* --- 9. toast 滑入已在上方（finance-flow-slidein） --- */
+
+/* --- 10. 选择卡片（.choice）选中过渡 --- */
+.finance-flow-modal .dialog .choice {
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.06s ease;
+}
+.finance-flow-modal .dialog .choice:active {
+  transform: scale(0.99);
+}
+
+/* --- 11. 操作按钮组（统一右对齐聚合，杜绝满屏飞） --- */
+.finance-flow .row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* --- 12. 弹窗内容滚动区 --- */
+.finance-flow-modal .dialog .scroll {
+  max-height: 46vh;
+  overflow: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+/* --- 13. 减少动态偏好（无障碍） --- */
+@media (prefers-reduced-motion: reduce) {
+  .finance-flow *,
+  .finance-flow-modal .dialog,
+  .finance-flow-toasts .toast {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Actual application containers can be narrower than the viewport. */
+.finance-flow {min-width:0;container-type:inline-size}
+.finance-flow .step {font:inherit;text-align:left;min-width:0;border-radius:0;display:block}
+.finance-flow .stepper {display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.finance-flow .row-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.finance-flow .fact-head {width:100%;border:0;background:transparent;border-radius:0;text-align:left;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:14px 16px;font:inherit}
+.finance-flow .fact-head .small {overflow-wrap:anywhere}
+.finance-flow .num {overflow-wrap:anywhere;white-space:normal}
+.finance-flow .review-grid>* {min-width:0}
+.finance-flow .table-scroll {overflow-x:auto;max-width:100%}
+.finance-flow .check {display:flex;align-items:center;gap:8px}
+.finance-flow .check input {width:18px;min-height:18px}
+@container (max-width:960px){.finance-flow .review-grid{grid-template-columns:1fr}.finance-flow .period-card{flex-wrap:wrap}.finance-flow .period-card .nums{flex-wrap:wrap;gap:16px}}
+@container (max-width:620px){.finance-flow .step{padding:10px 4px;text-align:center}.finance-flow .step .no{margin:0 auto 8px}.finance-flow .step .sub{display:none}.finance-flow .step .name{font-size:12px}.finance-flow .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.finance-flow .period-card .nums>div{min-width:0}.finance-flow .metric strong{font-size:22px}}
+.finance-step-enter-active{animation:finance-flow-fadein .28s ease-out}
+@media(prefers-reduced-motion:reduce){.finance-flow-modal,.finance-flow-modal *,.finance-flow *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
