@@ -1,0 +1,50 @@
+{
+  "roles": [
+    {
+      "passed": true,
+      "role": "leader"
+    },
+    {
+      "passed": true,
+      "role": "creator"
+    },
+    {
+      "passed": true,
+      "role": "independent"
+    },
+    {
+      "passed": true,
+      "role": "admin"
+    },
+    {
+      "passed": true,
+      "role": "finance"
+    },
+    {
+      "passed": true,
+      "role": "operations"
+    }
+  ],
+  "retry": true,
+  "writes": [],
+  "api": "offline-fixtures",
+  "status": "passed",
+  "periodFilter": true,
+  "window": {
+    "pixelRatio": 2,
+    "safeArea": {
+      "top": 20,
+      "left": 0,
+      "right": 375,
+      "bottom": 667,
+      "width": 375,
+      "height": 647
+    },
+    "screenWidth": 375,
+    "screenHeight": 667,
+    "screenTop": 112,
+    "windowWidth": 375,
+    "windowHeight": 555,
+    "statusBarHeight": 20
+  }
+}

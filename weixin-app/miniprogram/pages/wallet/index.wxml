@@ -57,8 +57,7 @@
       <view class="card"><view class="section-title">{{isStaff ? '已确认应付账单' : '个人收益'}}</view>
         <view class="stats-row"><view class="stat"><text class="stat-num">¥{{report.summary.confirmed}}</text><text class="stat-label">已确认金额</text></view><view class="stat" wx:if="{{!isStaff}}"><text class="stat-num">¥{{report.summary.pending}}</text><text class="stat-label">待确认金额</text></view></view>
         <view class="muted">拉新与拉活均已包含 · {{total}} 条明细</view>
-        <button wx:if="{{!isStaff}}" size="mini" data-path="/pages/income/index" bindtap="open">按类型查看收益与计算过程</button>
-        <block wx:else><view class="muted">待核对账单及整份报表在网页版财务页处理。</view><button size="mini" bindtap="web">复制网页版财务地址</button></block>
+        <block wx:if="{{isStaff}}"><view class="muted">待核对账单及整份报表在网页版财务页处理。</view><button size="mini" bindtap="web">复制网页版财务地址</button></block>
       </view>
       <view class="card"><view class="section-title">账单明细</view>
         <view wx:for="{{visibleEntries}}" wx:key="id" class="list-item">

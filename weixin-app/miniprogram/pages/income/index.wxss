@@ -1,4 +1,13 @@
+@import "../../templates/member-summary.wxss";
 /* 收益页：期间快捷切换 + 收益金额语义色 */
+.income-team .summary-overview { margin-top: 24rpx; }
+.income-team .summary-label, .income-team .summary-note { color: rgba(255,255,255,.76); }
+.income-team .summary-members { border-color: rgba(255,255,255,.18); }
+.income-team .summary-days { border-top: 0; margin-top: 0; padding-top: 20rpx; }
+.income-team .summary-total { font-size: 42rpx; }
+.income-team-reward { margin-top: 24rpx; padding-top: 24rpx; border-top: 1rpx solid rgba(255,255,255,.18); }
+.income-team-reward > .summary-total { font-size: 36rpx; }
+.income-period-total { margin-top: 24rpx; }
 .income-quick {
   display: flex;
   gap: 12rpx;

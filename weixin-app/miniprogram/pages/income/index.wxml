@@ -1,4 +1,5 @@
 <import src="../../templates/shared.wxml" />
+<import src="../../templates/member-summary.wxml" />
 <view class="page">
   <view class="row page-heading">
     <view>
@@ -20,8 +21,35 @@
     />
   </view>
   <block wx:if="{{allowed && scopeReady && summary && !error}}">
+    <block wx:if="{{user.role === 'leader'}}">
+      <view wx:if="{{!loading && summaryError}}" class="card summary-error">
+        <text>{{summaryError}}</text><button size="mini" disabled="{{busy}}" bindtap="load">重试</button>
+      </view>
+      <view wx:if="{{memberSummary.team && !loading}}" class="balance-card income-team rise">
+        <view class="balance-label">团队概况 · 累计</view>
+        <view class="summary-overview">
+          <view class="summary-turnover">
+            <view class="summary-label">团队总流水（元）</view>
+            <view class="summary-total">{{memberSummary.team.turnover.total}}</view>
+          </view>
+          <view class="summary-members">
+            <view class="summary-label">团队总成员</view>
+            <view class="summary-count">{{memberSummary.team.memberCount}}<text> 人</text></view>
+          </view>
+        </view>
+        <view class="summary-note">{{memberSummary.team.turnover.note}}</view>
+        <view class="income-team-reward">
+          <view class="summary-label">团队总奖励（元）</view>
+          <view class="summary-total">{{memberSummary.team.reward.total}}</view>
+          <template is="amount-periods" data="{{value:memberSummary.team.reward}}" />
+          <view class="summary-note">本人已确认的团队分成 · 按业绩日期统计</view>
+        </view>
+        <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">查看钱包与提现</button>
+      </view>
+      <button wx:if="{{!loading && summaryError}}" size="mini" data-path="/pages/wallet/index" bindtap="open">查看钱包与提现</button>
+    </block>
     <!-- 本期收益 hero：主数字 + 已确认/待确认副指标 -->
-    <view class="balance-card rise">
+    <view wx:else class="balance-card rise">
       <view class="balance-label">{{isStaff ? '本期内部业绩（元）' : '本期推广收益（元）'}}</view>
       <view class="balance-value">¥{{isStaff ? summary.internalText : summary.receivable}}</view>
       <view class="balance-sub" wx:if="{{isStaff}}">内部业绩仅作统计，不进入提现余额。</view>
@@ -33,6 +61,7 @@
 
     <!-- 期间筛选：快捷月份 + 自定义起止 -->
     <view class="card rise rise-d1">
+      <view wx:if="{{user.role === 'leader'}}" class="section-title">本期收益明细</view>
       <view class="income-quick">
         <view
           class="income-quick-item {{quick === 'this' ? 'income-quick-active' : ''}}"
@@ -67,6 +96,8 @@
         <button size="mini" class="{{group === 'self' ? 'primary' : ''}}" data-field="group" data-value="self" bindtap="filter">本人作品</button>
         <button size="mini" class="{{group === 'team' ? 'primary' : ''}}" data-field="group" data-value="team" bindtap="filter">团队分成</button>
       </view>
+      <view wx:if="{{user.role === 'leader'}}" class="muted income-period-total">已确认 ¥{{summary.confirmedReceivable}} · 待确认 ¥{{summary.pendingReceivable}}</view>
+      <view wx:if="{{user.role === 'leader' && summary.pendingCalculations}}" class="muted">另有 {{summary.pendingCalculations}} 条在核对中，金额尚未计入。</view>
     </view>
 
     <view class="card" wx:if="{{groups.length}}">

@@ -5,6 +5,7 @@ const feedback = require("../../utils/feedback");
 const permissions = require("../../utils/permissions");
 const amount = require("../../utils/amount");
 const nav = require("../../utils/nav");
+const memberSummary = require("../../utils/member-summary");
 const { dateText } = require("../../utils/work-display");
 
 // 与 actions.today() 同口径（UTC+8）的月份区间；当月右端不超过今天
@@ -32,6 +33,8 @@ Page(
       quick: "this",
       restricted: false,
       summary: null,
+      memberSummary: null,
+      summaryError: '',
       records: [],
       groups: [],
       metricType: '',
@@ -44,15 +47,15 @@ Page(
       historyLoading: false,
     },
     async fetch({ scope, user }) {
-      if (!permissions.canFinance(user)) return {restricted:true,summary:null,records:[],groups:[],selected:null};
+      if (!permissions.canFinance(user)) return {restricted:true,summary:null,memberSummary:null,summaryError:'',records:[],groups:[],selected:null};
       const period = { from: this.data.from, to: this.data.to };
       if (period.from > period.to) throw Error('开始日期不能晚于结束日期');
-      const reportResult=await request.get('/core/earnings/mine',{...scope,...period,page:this.data.page,pageSize:20,
+      const [reportResult, teamSummary] = await Promise.all([request.get('/core/earnings/mine',{...scope,...period,page:this.data.page,pageSize:20,
         ...(this.data.metricType?{metricType:this.data.metricType}:{}),
         ...(user.role==='leader' && this.data.group?{group:this.data.group}:{})}).catch(error=>{
         if(error&&error.status===403)return null;throw error;
-      });
-      if (!reportResult) return { restricted: true, summary: null, records: [], groups:[], selected:null };
+      }), memberSummary.load(user, true)]);
+      if (!reportResult) return { restricted: true, summary: null, memberSummary:null, summaryError:'', records: [], groups:[], selected:null };
       const report = reportResult;
       const records = report.list.map(entry => {
         const internal=Number(entry.isInternal)===1, ready=Number(entry.isReady)===1;
@@ -67,6 +70,7 @@ Page(
       const summary = report.summary;
       return {
         restricted: false,
+        ...teamSummary,
         summary: Object.assign({}, summary, {
           receivable: fmt(summary.amount),
           confirmedReceivable: fmt(summary.confirmedAmount),

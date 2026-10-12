@@ -37,7 +37,7 @@ function monthRange(offset) {
 }
 
 function setup(options = {}) {
-  const state = { workbench: [], toasts: [] }
+  const state = { workbench: [], toasts: [], summaryFails: false }
   const thisMonth = monthRange(0)
   const lastMonth = monthRange(-1)
   const entries = options.entries || [
@@ -55,6 +55,12 @@ function setup(options = {}) {
   const h = harness(call => {
     const common = scoped(call)
     if (common !== undefined) return common
+    if (call.path === '/core/member-summary') {
+      if (state.summaryFails) throw Error('统计暂不可用')
+      return {businessDate:'2026-10-12',direct:{total:'12.0000',today:'2.0000',yesterday:'1.0000'},
+        team:{memberCount:12,reward:{total:'320.0000',today:'12.5000',yesterday:'25.0000'},
+          turnover:{total:'15280.5000',today:'280.2500',yesterday:'1020.5000',records:{total:9,today:2,yesterday:3},missing:{total:0,today:0,yesterday:0}}}}
+    }
     if (call.path === '/core/earnings/mine') {
       state.workbench.push(call.data)
       return {list:entries.filter(e=>e.ownReceivable).map((e,i)=>({id:String(i+1),taskName:e.keyword,businessDate:e.date,amount:e.amount,
@@ -193,6 +199,37 @@ test('type/group filters and pagination use the full server summary, never the c
   assert.equal(page.data.total,41);assert.equal(page.data.summary.receivable,'35.00');
   await page.quickRange({currentTarget:{dataset:{q:'prev'}}});assert.equal(state.workbench.at(-1).page,1);
   assert.equal(h.calls.some(c=>c.path==='/modules/zhihu/workbench'),false);
+});
+
+test('leader income keeps cumulative team totals separate from period, type and payout filters',async()=>{
+  const {h,page,state}=await open();
+  assert.equal(h.calls.some(c=>c.path==='/core/member-summary'),false,'creator does not request team totals');
+  h.session({id:'2',role:'leader'});await page.onShow();
+  assert.equal(page.data.memberSummary.team.turnover.total,'¥15280.50');
+  assert.equal(page.data.memberSummary.team.memberCount,12);
+  assert.equal(page.data.memberSummary.team.reward.total,'¥320.00');
+  assert.equal(page.data.memberSummary.team.reward.today,'¥12.50');
+  assert.equal(page.data.memberSummary.team.reward.yesterday,'¥25.00');
+  await page.quickRange({currentTarget:{dataset:{q:'prev'}}});
+  await page.filter({currentTarget:{dataset:{field:'metricType',value:'activation'}}});
+  await page.filter({currentTarget:{dataset:{field:'group',value:'team'}}});
+  assert.equal(state.workbench.at(-1).from,monthRange(-1).from);
+  assert.equal(state.workbench.at(-1).metricType,'activation');
+  assert.equal(page.data.memberSummary.team.turnover.total,'¥15280.50');
+  assert.equal(page.data.summary.receivable,'35.00');
+  for(const call of h.calls.filter(c=>c.path==='/core/member-summary')) assert.equal(Object.keys(call.data).length,0);
+  h.session(CREATOR);await page.onShow();
+  assert.equal(page.data.memberSummary,null,'role change clears private team totals');
+});
+
+test('a failed leader summary clears old totals but preserves income records and can retry',async()=>{
+  const {h,page,state}=await open();h.session({id:'2',role:'leader'});await page.onShow();
+  state.summaryFails=true;await page.load();
+  assert.equal(page.data.memberSummary,null);assert.ok(page.data.summaryError);
+  assert.equal(page.data.error,'');assert.equal(page.data.records.length,2);
+  assert.equal(page.data.summary.confirmedReceivable,'20.00');
+  state.summaryFails=false;await page.load();
+  assert.equal(page.data.summaryError,'');assert.equal(page.data.memberSummary.team.memberCount,12);
 });
 
 test('income detail retains backend quantity, price, correction and current confirmed guidance',async()=>{
