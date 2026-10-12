@@ -1,6 +1,6 @@
 <import src="../../templates/shared.wxml" />
 <view class="page">
-  <view class="row"><view class="title">我的团队</view><button size="mini" bindtap="load" disabled="{{busy || loading}}">刷新</button></view>
+  <view class="row team-heading"><view class="title">我的团队</view><button size="mini" bindtap="load" disabled="{{busy || loading}}">刷新</button></view>
   <template is="status" data="{{error, notice, denied, loading, scopeReady, allowed, busy, guest}}" />
   <block wx:if="{{allowed && affiliation}}">
     <view class="card">

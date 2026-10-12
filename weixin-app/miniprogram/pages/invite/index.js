@@ -19,7 +19,9 @@ Page(
     },
     onShareAppMessage() {
       return {
-        title: "邀请你加入 TIMO 推广平台",
+        title: "TIMO 推广平台｜连接好内容与推广机会",
+        // 固定封面避免微信截取当前页面，把邀请人数或个人记录带给收件人。
+        imageUrl: "/images/share/timo-intro.png",
         path: this.data.code
           ? "/pages/register/index?invite=" + encodeURIComponent(this.data.code)
           : "/pages/home/index",

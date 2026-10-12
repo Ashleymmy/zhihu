@@ -1,11 +1,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const { harness, scoped } = require("./harness.cjs");
 
 /**
  * 邀请好友页（pages/invite）契约：
- *   - 展示 invite/me 的邀请码与统计、invite/rewards 的奖励记录
- *   - 金额两位小数；分享路径携带邀请码
+ *   - 本人可看邀请统计和注册记录；分享封面仅展示平台介绍
+ *   - 分享路径携带邀请码，标题和封面不暴露邀请人的信息
  *   - 注册页支持 URL 参数预填邀请码
  */
 
@@ -48,13 +50,24 @@ test("invite page keeps the share token internal and displays registration recor
   assert.equal(page.data.records[0].timeText, "2026-09-20");
 });
 
-test("invite page share message carries the invite code", async () => {
+test("invite share uses a packaged 5:4 brand cover while preserving registration attribution", async () => {
   const h = setup();
   const page = h.page("invite");
   await page.onShow();
 
   const share = page.onShareAppMessage();
   assert.ok(share.path.includes("/pages/register/index?invite=ABCD1234"));
+  assert.match(share.title, /TIMO.*推广/);
+  assert.doesNotMatch(share.title, /ABCD1234|邀请人数|成功邀请|新人甲/);
+  assert.ok(share.imageUrl.startsWith("/images/"), "Always supply a local cover instead of a page screenshot");
+  const image = fs.readFileSync(path.join(__dirname, "../miniprogram", share.imageUrl));
+  assert.equal(image.subarray(1, 4).toString(), "PNG");
+  assert.equal(image.readUInt32BE(16) / image.readUInt32BE(20), 5 / 4);
+  page.setData({ code: "", usageCount: 999, records: [{ name: "私人邀请记录" }] });
+  const fallback = page.onShareAppMessage();
+  assert.equal(fallback.path, "/pages/home/index");
+  assert.equal(fallback.imageUrl, share.imageUrl);
+  assert.equal(fallback.title, share.title);
 });
 
 test("register page prefills the invite code from the share link", async () => {

@@ -984,6 +984,11 @@ textarea {
   justify-content: space-between;
   gap: 18rpx;
 }
+/* 清除微信 button 的左右 auto 边距，首页和钱包的提现入口均贴右。 */
+.balance-head > button {
+  margin: 0;
+  flex-shrink: 0;
+}
 .balance-sub {
   margin-top: 18rpx;
   font-size: 23rpx;
