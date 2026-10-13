@@ -1,1 +1,4 @@
 /* Shared layout is defined in app.wxss. */
+.withdrawal-rules{font-size:26rpx;line-height:1.6;overflow-wrap:anywhere}
+.rule-line{margin:12rpx 0}
+.withdrawal-totals{margin:20rpx 0;padding:20rpx;background:#edf3f0;border-radius:16rpx;line-height:1.8;font-size:26rpx;overflow-wrap:anywhere}

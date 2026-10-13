@@ -11,6 +11,7 @@ import { assertDuty } from '../core/duties';
 import { ok } from '../utils/response';
 import type { AuthUser } from '../types';
 import { incrRateLimit } from '../utils/rateLimit';
+import {invoiceUploadAllowed} from '../core/finance';
 
 const scope = z.object({ projectId: z.string().regex(/^\d+$/), accountId: z.string().regex(/^\d+$/) });
 const uuid = z.string().uuid();
@@ -40,7 +41,8 @@ miniFilesRouter.post(
   asyncHandler(async (req, res) => {
     const input = scope
       .extend({
-        purpose: z.enum(['report', 'payment-proof', 'composition-xlsx']),
+        purpose: z.enum(['report', 'payment-proof', 'composition-xlsx', 'withdrawal-invoice']),
+        withdrawalId:z.string().regex(/^\d+$/).optional(),
         name: z
           .string()
           .trim()
@@ -50,7 +52,10 @@ miniFilesRouter.post(
       })
       .parse(req.body);
     await assertDataScope(req.user, input.projectId, input.accountId, 'zhihu');
-    if (input.purpose !== 'composition-xlsx') assertDuty(req.user, 'finance');
+    if(input.purpose==='withdrawal-invoice'){
+      if(!input.withdrawalId)throw new AppError(422,42200,'请从提现申请上传发票');
+      await invoiceUploadAllowed(req.user,{...input,moduleId:'zhihu'},input.withdrawalId);
+    }else if (input.purpose !== 'composition-xlsx') assertDuty(req.user, 'finance');
     if (!(await incrRateLimit(`mini:files:${req.user.sub}`, 20, 3600)).allowed)
       throw new AppError(429, 42900, '上传次数过多，请稍后再试');
     await db.query('DELETE FROM mini_uploads WHERE expires_at<NOW(3) LIMIT 100');
@@ -173,6 +178,8 @@ export const attachMiniFile: RequestHandler = asyncHandler(async (req, _res, nex
   if (!wechatContext(req) || req.method !== 'POST' || !req.body?.fileId) return next();
   const purpose = /^\/api\/v1\/core\/finance\/withdrawals\/\d+\/pay$/.test(req.path)
     ? 'payment-proof'
+    : /^\/api\/v1\/core\/finance\/withdrawals\/\d+\/invoice$/.test(req.path)
+      ? 'withdrawal-invoice'
     : ['/api/v1/modules/zhihu/imports', '/api/v1/modules/zhihu/workbench/import'].includes(req.path)
       ? 'report'
       : null;

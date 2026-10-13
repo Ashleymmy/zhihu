@@ -4,7 +4,7 @@ import {CashWallet} from '@zhihu-koc/shared-components'
 import type {PeriodState} from '../composables/usePeriodState'
 import {fmtMoney,moneyValue,cashText} from '../composables/useFinanceApi'
 const state=inject<PeriodState>('financeState')!
-const total=(status:string[])=>cashText(state.withdrawals.value.filter(w=>status.includes(w.status)).reduce((n,w)=>n+moneyValue(w.amount),0n))
+const total=(status:string[])=>cashText(state.withdrawals.value.filter(w=>status.includes(w.status)).reduce((n,w)=>n+moneyValue(w.netAmount??w.amount),0n))
 const paid=computed(()=>total(['paid'])),pending=computed(()=>total(['pending','approved']))
 watch(()=>state.statusKey.value,(status,previous)=>{if(previous==='payout'&&status==='closed')state.gotoStep(5)})
 </script>

@@ -200,6 +200,8 @@ export interface WithdrawalRow {
   userId: string
   displayName: string
   amount: string
+  netAmount?: string
+  feeAmount?: string
   status: 'pending' | 'approved' | 'paid' | 'rejected' | 'cancelled'
   receiverName?: string | null
   bankName?: string | null

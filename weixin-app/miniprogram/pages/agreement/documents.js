@@ -9,7 +9,7 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "最新修改日期：2026年10月3日",
+            "text": "最新修改日期：2026年10月13日",
             "bold": false
           }
         ]
@@ -20,7 +20,7 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "版本生效日期：2026年10月3日",
+            "text": "版本生效日期：随本版本发布生效；提现新规则仅适用于启用后在申请页面明确展示并由用户确认的新申请。",
             "bold": false
           }
         ]
@@ -207,7 +207,7 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "账单需核对确认，款项实际到账且财务核实开放后，符合条件的余额才可申请提现。提现需填写真实收款信息，经审核和实际付款后登记到账记录。申请提交或“批准”不等于已经付款，平台不承诺未经核验的固定收益或到账时点。",
+            "text": "账单需核对确认，款项实际到账且财务核实开放后，符合条件的余额才可申请提现。提现需填写真实收款信息。审核通过不等于已打款，付款进度以实际付款记录为准。",
             "bold": false
           }
         ]
@@ -218,18 +218,28 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "对归属、数据、单价或付款有异议时，请联系业务负责人或运营者核查。必要交易和结算记录按适用要求保留。",
+            "text": "额度与次数：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "最低提现金额为 10 元，单笔不超过可提现余额。同一账号在网站、小程序及不同项目合计每日最多成功受理 1 次申请，按北京时间自然日计算。校验失败不计次，同一申请重试不重复计次；申请受理后撤回或退回仍占用当日次数。",
             "bold": false
           }
         ]
       },
       {
         "id": 20,
-        "kind": "heading-2",
+        "kind": "paragraph",
         "segments": [
           {
             "id": 0,
-            "text": "六、隐私、退出与注销",
+            "text": "手续费与到账金额：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "手续费为申请金额的 1%，从申请金额中扣除，按四舍五入保留到分。例如申请 100 元，余额扣除 100 元，其中手续费 1 元，实际到账 99 元。申请时占用申请总额，未付款而取消或退回时全部释放，不收手续费。历史申请保留提交时的规则，不补扣手续费。",
             "bold": false
           }
         ]
@@ -240,7 +250,12 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "信息处理范围和权利行使方式见隐私协议。您可在“我的”退出当前登录，或在“帮助与隐私”发起共用账号注销。",
+            "text": "小额提现：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "10 元至 500 元（含 500 元），在 3 个工作日内完成审核并结算。",
             "bold": false
           }
         ]
@@ -251,18 +266,28 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "注销前应结清款项、处理进行中业务并移交必要的成员或项目，系统会展示待处理事项。密码验证和再次确认后，资料及登录绑定按隐私协议清除，网站和小程序同时失效，无法恢复。依法应保留的业务、结算及审计记录限制使用并按要求保留。",
+            "text": "大额提现：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "超过 500 元，在 15 个工作日内审核，并在申请月份的次月内完成结算打款，最迟为次月最后一日，无固定打款日。审核跨月不改变结算月份。例如 10 月 1 日和 10 月 31 日申请，均最迟于 11 月 30 日完成结算。月底为休息日时，财务提前安排。",
             "bold": false
           }
         ]
       },
       {
         "id": 23,
-        "kind": "heading-2",
+        "kind": "paragraph",
         "segments": [
           {
             "id": 0,
-            "text": "七、维护与争议",
+            "text": "申请与处理时间：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "全天可提交申请；财务处理时间为工作日 10:00—18:00。工作日依国家法定节假日及调休安排计算，放假日排除，调休补班日计入。提交成功后的下一个工作日计为第 1 日，小额结算及审核期限截至对应工作日 18:00。",
             "bold": false
           }
         ]
@@ -273,7 +298,12 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "平台维护服务安全与稳定；遇到故障、合作方接口异常或内容争议时，将提示并处理，不以临时页面状态替代真实结果。重要的协议或服务变化会适当告知。",
+            "text": "发票：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "团长大额提现需向平台开具发票；达人及独立达人无需提供发票。团长在原提现申请内查看财务提供的开票信息、票面要求和提交期限，并补充发票；补交发票不重新占用余额或次数。发票核验通过后办理付款。需要补充资料时，在原申请展示原因和处理入口。",
             "bold": false
           }
         ]
@@ -284,7 +314,7 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "争议先行协商；无法解决的，依法向有管辖权的人民法院寻求解决。本协议不排除或限制法律赋予您的权利。",
+            "text": "对归属、数据、单价或付款有异议时，请联系业务负责人或运营者核查。必要交易和结算记录按适用要求保留。",
             "bold": false
           }
         ]
@@ -295,13 +325,79 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "八、联系我们",
+            "text": "六、隐私、退出与注销",
             "bold": false
           }
         ]
       },
       {
         "id": 27,
+        "kind": "paragraph",
+        "segments": [
+          {
+            "id": 0,
+            "text": "信息处理范围和权利行使方式见隐私协议。您可在“我的”退出当前登录，或在“帮助与隐私”发起共用账号注销。",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 28,
+        "kind": "paragraph",
+        "segments": [
+          {
+            "id": 0,
+            "text": "注销前应结清款项、处理进行中业务并移交必要的成员或项目，系统会展示待处理事项。密码验证和再次确认后，资料及登录绑定按隐私协议清除，网站和小程序同时失效，无法恢复。依法应保留的业务、结算及审计记录限制使用并按要求保留。",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 29,
+        "kind": "heading-2",
+        "segments": [
+          {
+            "id": 0,
+            "text": "七、维护与争议",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 30,
+        "kind": "paragraph",
+        "segments": [
+          {
+            "id": 0,
+            "text": "平台维护服务安全与稳定；遇到故障、合作方接口异常或内容争议时，将提示并处理，不以临时页面状态替代真实结果。重要的协议或服务变化会适当告知。",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "kind": "paragraph",
+        "segments": [
+          {
+            "id": 0,
+            "text": "争议先行协商；无法解决的，依法向有管辖权的人民法院寻求解决。本协议不排除或限制法律赋予您的权利。",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 32,
+        "kind": "heading-2",
+        "segments": [
+          {
+            "id": 0,
+            "text": "八、联系我们",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 33,
         "kind": "paragraph",
         "segments": [
           {
@@ -322,7 +418,7 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "最新修改日期：2026年10月3日",
+            "text": "最新修改日期：2026年10月13日",
             "bold": false
           }
         ]
@@ -333,7 +429,7 @@ module.exports = {
         "segments": [
           {
             "id": 0,
-            "text": "版本生效日期：2026年10月3日",
+            "text": "版本生效日期：随本版本发布生效。",
             "bold": false
           }
         ]
@@ -462,6 +558,22 @@ module.exports = {
         "segments": [
           {
             "id": 0,
+            "text": "提现规则确认与发票：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "我们记录您申请时确认的规则版本、申请金额、手续费、实际到账金额及处理期限，用于执行提现约定和核查进度。团长大额提现需提交发票文件及票面必要信息，仅用于开票核验、结算和财务留存。达人及独立达人无需提交发票。发票文件仅供申请人本人和有相应项目权限的财务人员访问，不公开分享；补交版本及核验记录为结算核查所需而保留。",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "kind": "paragraph",
+        "segments": [
+          {
+            "id": 0,
             "text": "安全与运行：",
             "bold": true
           },
@@ -473,7 +585,7 @@ module.exports = {
         ]
       },
       {
-        "id": 11,
+        "id": 12,
         "kind": "heading-2",
         "segments": [
           {
@@ -484,7 +596,7 @@ module.exports = {
         ]
       },
       {
-        "id": 12,
+        "id": 13,
         "kind": "paragraph",
         "segments": [
           {
@@ -495,7 +607,7 @@ module.exports = {
         ]
       },
       {
-        "id": 13,
+        "id": 14,
         "kind": "paragraph",
         "segments": [
           {
@@ -506,7 +618,7 @@ module.exports = {
         ]
       },
       {
-        "id": 14,
+        "id": 15,
         "kind": "paragraph",
         "segments": [
           {
@@ -517,7 +629,7 @@ module.exports = {
         ]
       },
       {
-        "id": 15,
+        "id": 16,
         "kind": "heading-2",
         "segments": [
           {
@@ -528,7 +640,7 @@ module.exports = {
         ]
       },
       {
-        "id": 16,
+        "id": 17,
         "kind": "paragraph",
         "segments": [
           {
@@ -544,7 +656,7 @@ module.exports = {
         ]
       },
       {
-        "id": 17,
+        "id": 18,
         "kind": "paragraph",
         "segments": [
           {
@@ -560,7 +672,7 @@ module.exports = {
         ]
       },
       {
-        "id": 18,
+        "id": 19,
         "kind": "paragraph",
         "segments": [
           {
@@ -576,7 +688,7 @@ module.exports = {
         ]
       },
       {
-        "id": 19,
+        "id": 20,
         "kind": "paragraph",
         "segments": [
           {
@@ -587,7 +699,7 @@ module.exports = {
         ]
       },
       {
-        "id": 20,
+        "id": 21,
         "kind": "heading-2",
         "segments": [
           {
@@ -598,7 +710,7 @@ module.exports = {
         ]
       },
       {
-        "id": 21,
+        "id": 22,
         "kind": "paragraph",
         "segments": [
           {
@@ -609,7 +721,7 @@ module.exports = {
         ]
       },
       {
-        "id": 22,
+        "id": 23,
         "kind": "paragraph",
         "segments": [
           {
@@ -620,7 +732,7 @@ module.exports = {
         ]
       },
       {
-        "id": 23,
+        "id": 24,
         "kind": "heading-2",
         "segments": [
           {
@@ -631,7 +743,7 @@ module.exports = {
         ]
       },
       {
-        "id": 24,
+        "id": 25,
         "kind": "paragraph",
         "segments": [
           {
@@ -642,7 +754,7 @@ module.exports = {
         ]
       },
       {
-        "id": 25,
+        "id": 26,
         "kind": "paragraph",
         "segments": [
           {
@@ -658,7 +770,7 @@ module.exports = {
         ]
       },
       {
-        "id": 26,
+        "id": 27,
         "kind": "paragraph",
         "segments": [
           {
@@ -674,7 +786,7 @@ module.exports = {
         ]
       },
       {
-        "id": 27,
+        "id": 28,
         "kind": "heading-2",
         "segments": [
           {
@@ -685,7 +797,7 @@ module.exports = {
         ]
       },
       {
-        "id": 28,
+        "id": 29,
         "kind": "paragraph",
         "segments": [
           {
@@ -696,7 +808,7 @@ module.exports = {
         ]
       },
       {
-        "id": 29,
+        "id": 30,
         "kind": "heading-2",
         "segments": [
           {
@@ -707,7 +819,7 @@ module.exports = {
         ]
       },
       {
-        "id": 30,
+        "id": 31,
         "kind": "paragraph",
         "segments": [
           {
@@ -718,7 +830,7 @@ module.exports = {
         ]
       },
       {
-        "id": 31,
+        "id": 32,
         "kind": "paragraph",
         "segments": [
           {
@@ -729,7 +841,7 @@ module.exports = {
         ]
       },
       {
-        "id": 32,
+        "id": 33,
         "kind": "paragraph",
         "segments": [
           {

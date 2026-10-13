@@ -8,8 +8,8 @@ const request = require('./request')
  * 否则回退到客户端直传（向后兼容）。
  *
  * @param {Object} scope - 作用域 {projectId, accountId}
- * @param {string} purpose - 用途：'report' | 'payment-proof' | 'alliance-xlsx'
- *                           发票（invoice）走提现专用接口，不从这里上传
+ * @param {string} purpose - 用途：'report' | 'payment-proof' | 'alliance-xlsx' | 'withdrawal-invoice'
+ * @param {Object} extra - 发票上传需提供 withdrawalId，由服务端检查本笔申请权限
  * @param {Function} guard - 返回 false 表示页面/项目已变化，立即中断
  * @returns {Promise<string>} 文件 ID
  */
@@ -39,6 +39,7 @@ function limitOf(purpose) {
   return purpose === "composition-xlsx" ? PROOF_BYTES : isXlsx(purpose) ? REPORT_BYTES : PROOF_BYTES
 }
 function limitTextOf(purpose) {
+  if (purpose === 'withdrawal-invoice') return '发票最大 5 MB'
   return purpose === 'composition-xlsx' ? '作品表格最大 5 MB' : isXlsx(purpose) ? '报表最大 10 MB' : '付款凭证最大 5 MB'
 }
 function extensionsOf(purpose) {
@@ -62,7 +63,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function upload(scope, purpose, guard = () => true) {
+async function upload(scope, purpose, guard = () => true, extra = {}) {
   const current = () => {
     if (!guard()) throw contextChanged()
   }
@@ -83,7 +84,7 @@ async function upload(scope, purpose, guard = () => true) {
   const limit = limitOf(purpose)
   if (file.size > limit) throw new Error(limitTextOf(purpose))
 
-  const prepared = await request.post('/core/files/prepare', Object.assign({}, scope, {
+  const prepared = await request.post('/core/files/prepare', Object.assign({}, scope, extra, {
     purpose,
     name: file.name
   }))

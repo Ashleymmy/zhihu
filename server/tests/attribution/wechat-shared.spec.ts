@@ -388,6 +388,26 @@ it('private chunk uploads reject a different owner, scope and content replay', a
       .status,
   ).toBe(403);
 });
+it('leader invoices use the signed mini bridge and remain private to the applicant and finance', async () => {
+  process.env.OPC_WITHDRAWAL_POLICY_ENABLED='1';
+  try {
+    await login('leader');
+    const fullScope={...scope,moduleId:'zhihu'};
+    const [source]=await c.query<mysql.ResultSetHeader>("INSERT INTO opc_income_sources(module_id,project_id,account_id,source_key,business_date,source_version,snapshot_hash,description) VALUES('zhihu',1,?,'invoice-isolation','2026-10-13','1',REPEAT('a',64),'隔离发票验收')",[scope.accountId]);
+    await c.query("INSERT INTO opc_income_entries(source_id,source_version,user_id,amount,target_amount,availability,confirmed_by) VALUES(?,'1',2,1000,1000,'available',1)",[source.insertId]);
+    const quoted=await call('leader','/core/finance/withdrawal-quote','GET',{...fullScope,amount:'600'});expect(quoted.status,JSON.stringify(quoted.body)).toBe(200);
+    const applied=await call('leader','/core/finance/withdrawals','POST',{...fullScope,amount:'600',requestKey:crypto.randomUUID(),policyVersion:quoted.body.data.policyVersion,quoteToken:quoted.body.data.quoteToken});expect(applied.status,JSON.stringify(applied.body)).toBe(201);
+    const id=applied.body.data.id;
+    expect((await call('creator','/core/files/prepare','POST',{...scope,withdrawalId:id,purpose:'withdrawal-invoice',name:'发票.pdf'})).status).toBe(403);
+    const prepared=await call('leader','/core/files/prepare','POST',{...scope,withdrawalId:id,purpose:'withdrawal-invoice',name:'发票.pdf'});expect(prepared.status,JSON.stringify(prepared.body)).toBe(200);
+    const fileId=prepared.body.data.id,bytes=Buffer.from('%PDF-1.4\nprivate synthetic invoice');
+    expect((await call('leader','/core/files/'+fileId+'/upload-chunk','POST',{index:0,totalBytes:bytes.length,base64:bytes.toString('base64')})).status).toBe(200);
+    expect((await call('leader','/core/files/'+fileId+'/finish-upload','POST')).status).toBe(200);
+    const uploaded=await call('leader','/core/finance/withdrawals/'+id+'/invoice','POST',{...fullScope,fileId,expectedVersion:0});expect(uploaded.status,JSON.stringify(uploaded.body)).toBe(200);
+    const downloaded=await call('leader','/core/finance/withdrawals/'+id+'/invoice','GET',fullScope);expect(downloaded.status).toBe(200);expect(downloaded.body.data.base64).toBe(bytes.toString('base64'));
+    expect((await call('creator','/core/finance/withdrawals/'+id+'/invoice','GET',fullScope)).status).toBe(403);
+  } finally {delete process.env.OPC_WITHDRAWAL_POLICY_ENABLED;}
+});
 it('revoked invitation codes cannot register and do not create half-bound users', async () => {
   await c.query(
     'UPDATE member_invitations i JOIN mini_invitation_codes c ON c.invitation_id=i.id SET i.revoked_at=NOW(3) WHERE c.code=?',
