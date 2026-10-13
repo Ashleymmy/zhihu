@@ -36,7 +36,8 @@ function onStepClick(n: 1 | 2 | 3 | 4 | 5) {
         :key="st.n"
         class="step"
         :class="{
-          done: st.n < state.stepOfStatus.value,
+          done: st.n < state.stepOfStatus.value && !state.skippedSteps.value.includes(st.n),
+          skipped: state.skippedSteps.value.includes(st.n),
           current: st.n === state.stepOfStatus.value,
           locked: st.n > state.stepOfStatus.value,
         }"
@@ -45,9 +46,9 @@ function onStepClick(n: 1 | 2 | 3 | 4 | 5) {
         :aria-current="st.n===state.stepOfStatus.value?'step':undefined"
         @click="onStepClick(st.n)"
       >
-        <div class="no">{{ st.n < state.stepOfStatus.value ? '✓' : st.n }}</div>
+        <div class="no">{{ state.skippedSteps.value.includes(st.n) ? '—' : st.n < state.stepOfStatus.value ? '✓' : st.n }}</div>
         <div class="name">{{ st.name }}</div>
-        <div class="sub">{{ st.sub }}</div>
+        <div class="sub">{{ state.skippedSteps.value.includes(st.n) ? (st.n===3?'无成员应付，无需确认':'无待发款项，无需发放') : st.sub }}</div>
         <span v-if="st.n === 2 && state.todoCount.value > 0" class="dot" />
       </button>
     </nav>

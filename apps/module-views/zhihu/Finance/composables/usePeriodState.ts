@@ -6,7 +6,8 @@ export const STEPS=[{n:1 as PeriodStep,name:'上传与识别',sub:'预览后导�
 export function periodRange(id:string){const [y,m]=id.split('-').map(Number),mm=String(m).padStart(2,'0');return {from:`${y}-${mm}-01`,to:`${y}-${mm}-${new Date(y!,m!,0).getDate()}`}}
 export function periodTitle(id:string){const[y,m]=id.split('-');return `${y} 年 ${Number(m)} 月`}
 export function currentPeriodId(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date()).slice(0,7)}
-export function payablePending(wb:WorkbenchView|null){return (wb?.entries??[]).filter(e=>e.ownPayable&&!e.internal&&!['confirmed','excluded'].includes(e.status)&&!e.ready&&!!e.reasonCode)}
+// Internal performance has no member payable, but still requires valid works and attribution.
+export function pendingEntries(wb:WorkbenchView|null){return (wb?.entries??[]).filter(e=>e.ownPayable&&!['confirmed','excluded'].includes(e.status)&&!e.ready&&!!e.reasonCode)}
 export function usePeriodState(context:EngineContext){
  const api=useFinanceApi(context),storage='zhihu.flow.'+context.userId+'.'+context.scope.projectId+'.'+context.scope.accountId
  const view=ref<'periods'|'period'>('periods'),periodId=ref(currentPeriodId()),step=ref<PeriodStep>(1),loading=ref(false),error=ref('')
@@ -18,7 +19,8 @@ export function usePeriodState(context:EngineContext){
  let generation=0,disposed=false,timer:ReturnType<typeof setTimeout>|undefined,importTimer:ReturnType<typeof setTimeout>|undefined
  let attempt:{from:string;to:string;reviewHash:string;key:string}|null=null
  function log(actor:string,text:string){timeline.value.unshift({t:new Date().toLocaleString('zh-CN'),actor,text})}
- const blockedEntries=computed(()=>payablePending(workbench.value))
+ const blockedEntries=computed(()=>pendingEntries(workbench.value))
+ const internalOnly=computed(()=>!!workbench.value?.entries.length&&workbench.value.entries.every(e=>e.internal))
  const todoCount=computed(()=>{const keys=new Set(blockedEntries.value.map(e=>e.factId?'fact:'+e.factId:'keyword:'+e.keyword+':'+e.date));for(const e of exceptions.value)keys.add(e.factId?'fact:'+e.factId:'keyword:'+(e.keyword||e.normalizedJson?.keyword)+':'+e.normalizedJson?.date);for(const o of objections.value)keys.add('fact:'+o.factId);return keys.size})
  const totalRecords=computed(()=>workbench.value?.summary.totalRecords??0)
  const written=computed(()=>totalRecords.value>0||!!workbench.value?.entries.length||exceptions.value.length>0)
@@ -27,6 +29,7 @@ export function usePeriodState(context:EngineContext){
  const hasConfirmed=computed(()=>workbench.value?.entries.some(e=>e.status==='confirmed')??false)
  const statusKey=computed(()=>processingImports.value.some(r=>r.status==='failed')?'failed':importing.value||processingImports.value.length?'processing':!written.value||!workbench.value?.entries.length&&!exceptions.value.length?'upload':todoCount.value?'todo':hasReady.value||confirmation.value?.status==='pending'?'review':moneyValue(funding.amount)>0n||withdrawals.value.some(w=>w.status==='pending'||w.status==='approved')?'payout':'closed')
  const stepOfStatus=computed<PeriodStep>(()=>({upload:1,processing:1,failed:1,todo:2,review:3,payout:4,closed:5})[statusKey.value] as PeriodStep)
+ const skippedSteps=computed<PeriodStep[]>(()=>!internalOnly.value||stepOfStatus.value<=2?[]:[3,...(stepOfStatus.value>4?[4 as PeriodStep]:[])])
  const statusLabel=computed(()=>({upload:'待上传',processing:'报表处理中',failed:'报表处理待恢复',todo:'待处理',review:'待核对确认',payout:'待线下发放',closed:'本轮已处理'})[statusKey.value])
  const statusBadgeClass=computed(()=>({upload:'badge warn',processing:'badge info',failed:'badge danger',todo:'badge danger',review:'badge info',payout:'badge info',closed:'badge ok'})[statusKey.value])
  const closed=computed(()=>statusKey.value==='closed')
@@ -65,6 +68,6 @@ export function usePeriodState(context:EngineContext){
  async function retryConfirmation(){if(!confirmation.value?.jobId)return;confirmation.value=await api.retryConfirm(confirmation.value.jobId);save();await pollConfirmation()}
  async function resumeConfirmation(){try{const saved=JSON.parse(sessionStorage.getItem(storage+'.confirm')||'null');if(saved?.attempt?.from!==periodRange(periodId.value).from)return;attempt=saved.attempt;confirmation.value=saved.progress;if(confirmation.value?.status==='pending'||confirmation.value?.status==='failed')await pollConfirmation()}catch(e){confirmError.value=errorText(e)}}
  onScopeDispose(()=>{disposed=true;generation++;if(timer)clearTimeout(timer);if(importTimer)clearTimeout(importTimer)})
- return {api,context,storage,view,periodId,step,loading,error,workbench,exceptions,revisions,objections,withdrawals,funding,timeline,closed,todoCount,totalRecords,totalPayable,written,statusKey,statusLabel,statusBadgeClass,stepOfStatus,blockedEntries,hasReady,importing,activeImport,processingImports,confirmation,confirmError,confirmBusy,log,loadPeriod,openPeriod,backToPeriods,gotoStep,confirm,pollConfirmation,retryConfirmation}
+ return {api,context,storage,view,periodId,step,loading,error,workbench,exceptions,revisions,objections,withdrawals,funding,timeline,closed,todoCount,totalRecords,totalPayable,written,statusKey,statusLabel,statusBadgeClass,stepOfStatus,blockedEntries,internalOnly,skippedSteps,hasReady,importing,activeImport,processingImports,confirmation,confirmError,confirmBusy,log,loadPeriod,openPeriod,backToPeriods,gotoStep,confirm,pollConfirmation,retryConfirmation}
 }
 export type PeriodState=ReturnType<typeof usePeriodState>

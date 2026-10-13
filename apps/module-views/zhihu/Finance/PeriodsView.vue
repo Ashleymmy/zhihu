@@ -6,7 +6,7 @@
  */
 import { inject, onMounted, onUnmounted, ref } from 'vue'
 import type { PeriodState } from './composables/usePeriodState'
-import { periodTitle } from './composables/usePeriodState'
+import { periodTitle, pendingEntries } from './composables/usePeriodState'
 import { errorText } from '../context'
 import {
   fmtMoney,
@@ -38,7 +38,7 @@ async function loadSummary(card: PeriodCard, current: number) {
     const wb=await state.api.getWorkbench(card.row.from,card.row.to)
     if(current!==generation)return
     card.wb=wb
-    card.todoCount=new Set(wb.entries.filter(e=>e.ownPayable&&!e.ready&&e.status!=='confirmed'&&e.reasonCode).map(e=>e.factId)).size
+    card.todoCount=new Set(pendingEntries(wb).map(e=>e.factId||e.keyword+':'+e.date)).size
     card.summaryError = ''
   } catch (e) {
     if (current === generation) card.summaryError = errorText(e)

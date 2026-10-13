@@ -269,6 +269,10 @@
 .finance-flow .step.done .name {
   color: var(--ok);
 }
+.finance-flow .step.skipped .no,
+.finance-flow .step.skipped .name {
+  color: var(--ink-soft);
+}
 .finance-flow .step.current {
   background: var(--primary-soft);
 }
