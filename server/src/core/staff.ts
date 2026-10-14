@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { generateTemporaryPassword } from '../auth/password-policy';
+import { formatUserId, isReservedUserId } from '../auth/user-id';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { requireDuty } from './duties';
 import { rows, withTransaction } from '../db';
@@ -52,7 +53,7 @@ staffRouter.post(
       })
       .strict()
       .parse(req.body);
-    if (/^TIMO-/i.test(input.username)) throw new AppError(422, 42200, 'TIMO- 开头的用户 ID 由系统分配');
+    if (isReservedUserId(input.username)) throw new AppError(422, 42200, '用户 ID 由系统分配，请换一个登录账号');
     const role = input.role ?? (input.duty === 'operations' ? 'operator' : 'admin');
     assertAllowed(req.user, role);
     const password = generateTemporaryPassword(),
@@ -72,6 +73,7 @@ staffRouter.post(
         'INSERT INTO users(username,password_hash,role,role_id,display_name,admin_duty,must_change_pwd,created_by) VALUES(?,?,?,(SELECT id FROM roles WHERE role_key=?),?,?,1,?)',
         [input.username, hash, role, role, input.displayName, assignedDuty, req.user.sub],
       );
+      formatUserId(r.insertId);
       await writeAudit(
         {
           userId: req.user.sub,

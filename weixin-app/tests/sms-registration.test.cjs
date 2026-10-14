@@ -19,7 +19,7 @@ function setup(overrides = {}) {
     if (c.path.endsWith("/me"))
       return {
         id: "1",
-        username: "TIMO-1",
+        username: "timo000001", userId: "timo000001",
         role: "creator",
         phone: fields.phone,
         phoneVerifiedAt: "2026-10-14",

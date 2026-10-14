@@ -1,6 +1,6 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const {harness,deferred}=require('./harness.cjs');
-const initial={id:'321',userId:'TIMO-321',username:'TIMO-321',role:'creator',displayName:'原昵称',hasPassword:false,phone:'13800000001',phoneVerifiedAt:'2026-10-14'};
+const initial={id:'321',userId:'timo000321',username:'timo000321',role:'creator',displayName:'原昵称',hasPassword:false,phone:'13800000001',phoneVerifiedAt:'2026-10-14'};
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1cAAAAASUVORK5CYII=','base64');
 function setup(extra){
   let user={...initial}, bytes;
@@ -18,7 +18,7 @@ test('nickname selection saves the form value and refreshes cached mine identity
   const h=setup(),p=h.page('profile');await p.onShow();p.openDisplayNameModal();
   await p.submitEdit({detail:{value:{profileValue:'微信所选昵称'}}});
   assert.equal(p.data.showEditModal,false);assert.equal(h.app.globalData.user.displayName,'微信所选昵称');
-  assert.equal(h.app.globalData.user.userId,'TIMO-321');assert.equal(p.canAct(),true);
+  assert.equal(h.app.globalData.user.userId,'timo000321');assert.equal(p.canAct(),true);
   assert.equal(h.storage.get('zk_user').displayName,'微信所选昵称');
   const mine=h.page('mine');await mine.onShow();assert.equal(mine.data.user.displayName,'微信所选昵称');
 });

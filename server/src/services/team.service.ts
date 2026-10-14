@@ -1,4 +1,5 @@
 import { newPasswordSchema, generateTemporaryPassword } from '../auth/password-policy';
+import { formatUserId, isReservedUserId } from '../auth/user-id';
 import { isStaffRole } from '../auth/roles';
 import bcrypt from 'bcryptjs';
 import { ResultSetHeader, RowDataPacket, PoolConnection } from 'mysql2/promise';
@@ -99,7 +100,7 @@ export async function createMember(
   input: { username: string; displayName: string; phone?: string | null; role?: Role; parentId?: string | null },
   ip?: string,
 ) {
-  if (/^TIMO-/i.test(input.username)) throw new AppError(422, 42200, 'TIMO- 开头的用户 ID 由系统分配，请换一个登录账号');
+  if (isReservedUserId(input.username)) throw new AppError(422, 42200, '用户 ID 由系统分配，请换一个登录账号');
   if (isDevDemoAuthUser(user)) {
     return { id: `demo-member-${Date.now()}`, username: input.username, temporaryPassword: 'demo123456', mustChangePwd: true };
   }
@@ -116,6 +117,7 @@ export async function createMember(
       [input.username, hash, role, parentId, input.displayName, input.phone ?? null, user.sub],
     );
     const memberId = String(result.insertId);
+    formatUserId(memberId);
     await openMemberProjects(connection, memberId, role, parentId, user.sub);
     await writeAudit(
       {

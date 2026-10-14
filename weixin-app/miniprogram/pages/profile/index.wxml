@@ -11,7 +11,7 @@
   <template is="status" data="{{error, loading}}" />
   <block wx:if="{{!loading && user}}">
     <view class="card cell-card">
-      <view class="cell" data-text="{{user.userId || 'TIMO-' + user.id}}" bindtap="copy"><text class="cell-label">用户 ID</text><text class="cell-value">{{user.userId || 'TIMO-' + user.id}}</text><text class="cell-arrow">复制</text></view>
+      <view class="cell" data-text="{{user.userId}}" bindtap="copy"><text class="cell-label">用户 ID</text><text class="cell-value">{{user.userId || '—'}}</text><text wx:if="{{user.userId}}" class="cell-arrow">复制</text></view>
       <view class="cell"><text class="cell-label">登录账号</text><text class="cell-value">{{user.username}}</text></view>
       <view class="cell profile-nickname-row" bindtap="openDisplayNameModal">
         <text class="cell-label">昵称</text>

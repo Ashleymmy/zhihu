@@ -1,7 +1,9 @@
 -- IDs are immutable aliases of the existing primary key; old usernames remain usable.
--- Fail if a legacy username occupies someone else's present or future reserved ID.
+-- Fail before deployment if a legacy username conflicts or an ID exceeds six digits.
 CREATE TEMPORARY TABLE user_id_namespace_guard (ok TINYINT NOT NULL CHECK(ok=1));
-INSERT INTO user_id_namespace_guard SELECT 0 FROM users u WHERE u.username REGEXP '^TIMO-[1-9][0-9]*$' AND u.username<>CONCAT('TIMO-',u.id) LIMIT 1;
+INSERT INTO user_id_namespace_guard SELECT 0 FROM users u WHERE u.id<1 OR u.id>999999
+  OR (LOWER(u.username) REGEXP '^timo[0-9]{6}$' AND LOWER(u.username)<>CONCAT('timo',LPAD(u.id,6,'0')))
+  OR (LOWER(u.username) REGEXP '^timo-[1-9][0-9]*$' AND LOWER(u.username)<>CONCAT('timo-',u.id)) LIMIT 1;
 DROP TEMPORARY TABLE user_id_namespace_guard;
 ALTER TABLE users ADD COLUMN password_set TINYINT(1) NOT NULL DEFAULT 1;
 ALTER TABLE users ADD COLUMN avatar_version CHAR(64) NULL;

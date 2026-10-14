@@ -6,6 +6,7 @@ import { AppError } from '../middleware/errors';
 import { requireSmsEnabled, smsSettings } from '../sms/config';
 import { sendRegistrationCode, verifyRegistrationCode, consumeRegistrationCode } from '../sms/registration';
 import { register } from './auth.service';
+import { formatUserId } from '../auth/user-id';
 
 export const smsSignupSchema = z
   .object({
@@ -59,10 +60,10 @@ export async function registerWithSms(
         input.phone,
       ]);
       if (other) throw new AppError(409, 40920, '该手机号已有账号，请登录原账号');
-      await c.query('UPDATE users SET username=?,password_set=0 WHERE id=?', ['TIMO-' + id, id]);
+      await c.query('UPDATE users SET username=?,password_set=0 WHERE id=?', [formatUserId(id), id]);
       await consumeRegistrationCode(c, proof, id);
     },
     identity,
   );
-  return { ...result, username: 'TIMO-' + result.id };
+  return { ...result, username: formatUserId(result.id) };
 }

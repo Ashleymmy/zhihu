@@ -9,7 +9,7 @@
       ><input
         data-name="username"
         value="{{username}}"
-        placeholder="用户 ID（TIMO-…）或原登录账号"
+        placeholder="用户 ID（如 timo123456）或原登录账号"
         placeholder-class="ph"
         bindinput="input"
     /></view>

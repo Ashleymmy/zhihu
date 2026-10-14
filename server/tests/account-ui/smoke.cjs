@@ -77,7 +77,12 @@ async function shot(page, name) {
         await page.waitForURL((u) => !u.pathname.endsWith('/login'));
         await page.goto(base + '/account/security');
         await page.getByText('用户 ID：', { exact: false }).waitFor();
+        assert.match(await page.locator('.page-header').innerText(), /用户 ID：timo\d{6}/);
         await shot(page, role + '-security-' + width);
+        await page.goto(base + '/me');
+        await page.getByText('用户 ID：', { exact: false }).waitFor();
+        assert.match(await page.locator('.page-header').innerText(), /用户 ID：timo\d{6}/);
+        await shot(page, role + '-me-' + width);
         await context.close();
       }
       const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' }),
@@ -94,6 +99,7 @@ async function shot(page, name) {
       await page.locator('button[type=submit]').click();
       await page.waitForURL('**/account/security');
       await page.getByRole('button', { name: '稍后设置', exact: true }).waitFor();
+      assert.match(await page.locator('.page-header').innerText(), /用户 ID：timo\d{6}/);
       await shot(page, 'initial-password-' + width);
       await page.locator('input[autocomplete=new-password]').nth(0).fill('weakword');
       await page.locator('input[autocomplete=new-password]').nth(1).fill('weakword');

@@ -181,7 +181,7 @@ async function submit() {
               <small>验证码 5 分钟内有效，由阿里云短信服务及通信运营商发送，仅用于验证手机号。</small>
             </template>
             <template v-else>
-              <div><label for="username">用户 ID / 原登录账号</label><input id="username" v-model.trim="username" autocomplete="username" maxlength="64" placeholder="TIMO-… 或原登录账号" required /></div>
+              <div><label for="username">用户 ID / 原登录账号</label><input id="username" v-model.trim="username" autocomplete="username" maxlength="64" placeholder="如 timo123456 或原登录账号" required /></div>
               <div><label for="password">密码</label><input id="password" v-model="password" type="password" autocomplete="current-password" maxlength="128" placeholder="请输入密码" required /></div>
             </template>
             <template v-if="registering">

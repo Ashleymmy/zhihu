@@ -37,7 +37,7 @@ onMounted(load)
         <article class="panel" style="padding: 24px;">
           <p class="section-index quiet">02 / 基本资料</p>
           <div v-if="profile" class="profile-grid">
-            <div class="profile-item"><span>用户 ID</span><strong>{{ profile.userId || 'TIMO-' + profile.id }}</strong></div>
+            <div class="profile-item"><span>用户 ID</span><strong>{{ profile.userId || '—' }}</strong></div>
             <div class="profile-item"><span>登录账号</span><strong>{{ profile.username }}</strong></div>
             <div class="profile-item"><span>显示名</span><strong>{{ profile.displayName }}</strong></div>
             <div class="profile-item"><span>角色</span><strong>{{ roleLabels[profile.role] ?? profile.role }}</strong></div>

@@ -1,4 +1,5 @@
 import { newPasswordSchema } from '../auth/password-policy';
+import { formatUserId, isReservedUserId, parseUserId } from '../auth/user-id';
 import bcrypt from 'bcryptjs';
 import { openMemberProjects } from './member-onboarding.service';
 import { ResultSetHeader, RowDataPacket, type PoolConnection } from 'mysql2/promise';
@@ -43,7 +44,7 @@ interface UserRow extends RowDataPacket {
 
 const publicUser = (user: UserRow, role: Role) => ({
   id: String(user.id),
-  userId: 'TIMO-' + user.id,
+  userId: formatUserId(user.id),
   hasPassword: user.password_set !== 0,
   username: user.username,
   displayName: user.display_name,
@@ -92,7 +93,7 @@ export async function register(
   onCreated?: (connection: PoolConnection, id: string) => Promise<void>,
   rateLimitIdentity?: string,
 ) {
-  if (/^TIMO-/i.test(input.username)) throw new AppError(422, 42200, '用户 ID 由系统分配');
+  if (isReservedUserId(input.username)) throw new AppError(422, 42200, '用户 ID 由系统分配');
   const limit = await incrRateLimit(`register:ip:${rateLimitIdentity ?? ip ?? 'unknown'}`, 5, 3600);
   if (!limit.allowed) throw new AppError(429, 42903, '注册请求过于频繁，请 1 小时后再试');
   const [existing] = await rows<UserRow>('SELECT id FROM users WHERE username = ? LIMIT 1', [input.username]);
@@ -114,6 +115,7 @@ export async function register(
         ],
       );
       const id = String(result.insertId);
+      formatUserId(id);
       if (invitation) await consumeInvitation(connection, invitation, id);
       await openMemberProjects(
         connection,
@@ -279,12 +281,12 @@ export async function loginVerifiedUser(
   };
 }
 
-/** The TIMO- namespace is reserved at all account creation entry points. */
+/** Fixed IDs and their previous aliases share the same immutable account. */
 export async function passwordLoginUser(identifier: string): Promise<UserRow | undefined> {
-  const match = /^TIMO-([1-9]\d*)$/i.exec(identifier);
+  const id = parseUserId(identifier);
   const [user] = await rows<UserRow>(
-    match ? 'SELECT * FROM users WHERE id=? LIMIT 1' : 'SELECT * FROM users WHERE username=? LIMIT 1',
-    [match ? match[1] : identifier],
+    id ? 'SELECT * FROM users WHERE id=? LIMIT 1' : 'SELECT * FROM users WHERE username=? LIMIT 1',
+    [id ?? identifier],
   );
   return user;
 }
