@@ -3,6 +3,7 @@ const request = require("../../utils/request");
 const actions = require("../../utils/actions");
 const keyword = require("../../utils/keyword-actions");
 const composition = require("../../utils/composition");
+const storyLink = require("../../utils/story-link");
 const {upload} = require("../../utils/upload");
 const base = "/modules/zhihu";
 const followup=require("../../utils/task-followup");
@@ -62,6 +63,7 @@ Page(
       editLandingUrl: "",
       editMappingIndex: -1,
       editTaskIndex: -1,
+      linkPasting: false,
     },
     async fetch({ user, scope }) {
       const [options, result] = await Promise.all([
@@ -147,6 +149,7 @@ Page(
       const item = this.data.filteredList[e.currentTarget.dataset.index],
         name = e.currentTarget.dataset.action;
       if (!item || !keyword.flags(this.data.user, item).includes(name)) return;
+      this._storyEditSession = (this._storyEditSession || 0) + 1;
       this.setData({
         selected: item,
         actionName: name,
@@ -181,6 +184,13 @@ Page(
     },
     close() {
       if (!this.data.busy) this.setData({ selected: null, error: "" });
+    },
+    pasteStoryUrl(e) {
+      const field = e.currentTarget.dataset.name;
+      if (!['editLandingUrl', 'editNovelUrl'].includes(field)) return;
+      const selected = this.data.selected, value = this.data[field], session = this._storyEditSession;
+      return storyLink.paste(this, () => this.data.selected === selected && this._storyEditSession === session && this.data[field] === value,
+        url => this.setData({ [field]: url }));
     },
     toggleBatchMode(e) {
       this.setData({ batchMode: e.detail.value, batchItems: [] });
@@ -238,6 +248,7 @@ Page(
     },
     batchChooseContentType(e) {const i=Number(e.currentTarget.dataset.index);const rows=[...this.data.batchItems];rows[i]={...rows[i],contentTypeIndex:Number(e.detail.value)};this.setData({batchItems:rows});},
     async runAction() {
+      if (this.data.linkPasting) return;
       const item = this.data.selected,
         name = this.data.actionName;
       if (!item) return;
@@ -259,19 +270,19 @@ Page(
           payload = Object.assign({}, scope);
         if (name === "novel") {
           path = "/keywords/" + item.id + "/novel";
-          payload.novel = {title:this.data.editNovelTitle.trim(),url:this.data.editNovelUrl.trim()};
-          if(payload.novel.url && !actions.publicUrl(payload.novel.url))throw new Error("请填写有效的小说原文链接");
+          payload.novel = {title:this.data.editNovelTitle.trim(),url:storyLink.prepare(this.data.editNovelUrl, true)};
+          this.setData({editNovelUrl:payload.novel.url});
         } else if (["edit-retry","copy-retry","delete"].includes(name)) {
           path = "/keywords/" + item.id + "/" + (name === "delete" ? "delete-failed" : name);
           if(name !== "delete") {
-            payload.novel = {title:this.data.editNovelTitle.trim(),url:this.data.editNovelUrl.trim()};
-            if(payload.novel.url && !actions.publicUrl(payload.novel.url))throw new Error("请填写有效的小说原文链接");
+            payload.novel = {title:this.data.editNovelTitle.trim(),url:storyLink.prepare(this.data.editNovelUrl, true)};
             payload.keyword = this.data.editKeyword.trim();
             if(!payload.keyword) throw new Error("请填写关键词");
             const task=this.data.options.tasks[this.data.editTaskIndex],mapping=this.data.options.mappings[this.data.editMappingIndex];
             if(!task||!mapping)throw new Error('请选择任务和渠道');
-            if(!actions.publicUrl(this.data.editLandingUrl.trim()))throw new Error('请填写有效的推广内容链接');
-            Object.assign(payload,{taskId:String(task.id),mappingId:String(mapping.id),landingUrl:this.data.editLandingUrl.trim(),popularizeType:0});
+            const landingUrl = storyLink.prepare(this.data.editLandingUrl);
+            Object.assign(payload,{taskId:String(task.id),mappingId:String(mapping.id),landingUrl,popularizeType:0});
+            this.setData({editLandingUrl:landingUrl,editNovelUrl:payload.novel.url});
           }
         } else if (["claim", "distribute", "retry-upstream"].includes(name)) {
           path = "/keywords/" + item.id + "/" + name;

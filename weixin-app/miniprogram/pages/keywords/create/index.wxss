@@ -43,6 +43,7 @@
 .field-row { display: flex; align-items: center; gap: 6rpx; margin-bottom: 12rpx; }
 .field-req { color: var(--clay, #d05a43); font-size: 26rpx; }
 .field-label { font-size: 26rpx; color: #444; }
+.link-paste { width: auto; flex: none; margin: 0 0 0 auto; padding: 0 20rpx; font-size: 26rpx; min-height: 88rpx; line-height: 88rpx; color: #214239; background: #edf3f0; }
 
 .kw-input {
   width: 100%;

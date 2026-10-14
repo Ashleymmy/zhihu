@@ -274,15 +274,15 @@
         </view>
         <view class="kw-field"><text class="kw-label">推广任务</text><picker range="{{options.tasks}}" range-key="name" value="{{editTaskIndex}}" bindchange="chooseEditTask"><view class="kw-picker-row">{{editTaskIndex >= 0 ? options.tasks[editTaskIndex].name : '请选择任务'}} ▾</view></picker></view>
         <view class="kw-field"><text class="kw-label">渠道</text><picker range="{{options.mappings}}" range-key="channelName" value="{{editMappingIndex}}" bindchange="chooseEditMapping"><view class="kw-picker-row">{{editMappingIndex >= 0 ? options.mappings[editMappingIndex].channelName : '请选择渠道'}} ▾</view></picker></view>
-        <view class="kw-field"><text class="kw-label">推广内容链接</text><input data-name="editLandingUrl" value="{{editLandingUrl}}" maxlength="1024" bindinput="input" class="kw-input" /></view>
+        <view class="kw-field"><view class="link-label"><text class="kw-label">推广内容链接</text><button size="mini" class="link-paste" data-name="editLandingUrl" bindtap="pasteStoryUrl" disabled="{{busy || linkPasting}}">粘贴链接</button></view><input data-name="editLandingUrl" value="{{editLandingUrl}}" maxlength="-1" placeholder="粘贴小说链接或分享文本" bindinput="input" disabled="{{busy}}" class="kw-input" /></view>
         <view class="kw-field"><text class="kw-label">小说原名（选填）</text><input data-name="editNovelTitle" value="{{editNovelTitle}}" maxlength="128" bindinput="input" class="kw-input" /></view>
-        <view class="kw-field"><text class="kw-label">小说原文链接（选填）</text><input data-name="editNovelUrl" value="{{editNovelUrl}}" maxlength="1024" placeholder="留空则使用上方推广内容链接" bindinput="input" class="kw-input" /></view>
+        <view class="kw-field"><view class="link-label"><text class="kw-label">小说原文链接（选填）</text><button size="mini" class="link-paste" data-name="editNovelUrl" bindtap="pasteStoryUrl" disabled="{{busy || linkPasting}}">粘贴链接</button></view><input data-name="editNovelUrl" value="{{editNovelUrl}}" maxlength="-1" placeholder="留空则使用上方推广内容链接" bindinput="input" disabled="{{busy}}" class="kw-input" /></view>
         <text class="muted">已填入上次信息，以上内容都可以修改。提交后自动发送知乎。</text>
         <view class="muted" wx:if="{{actionName === 'copy-retry'}}">原词已有使用记录或已停用，本次创建新词；原归属及作品记录保留。</view>
       </view>
       <view wx:elif="{{actionName === 'novel'}}">
         <view class="kw-field"><text class="kw-label">小说原名</text><input data-name="editNovelTitle" value="{{editNovelTitle}}" maxlength="128" placeholder="填写对应小说的原始书名" bindinput="input" class="kw-input" /></view>
-        <view class="kw-field"><text class="kw-label">小说原文链接</text><input data-name="editNovelUrl" value="{{editNovelUrl}}" maxlength="1024" placeholder="粘贴可阅读原文的链接" bindinput="input" class="kw-input" /></view>
+        <view class="kw-field"><view class="link-label"><text class="kw-label">小说原文链接</text><button size="mini" class="link-paste" data-name="editNovelUrl" bindtap="pasteStoryUrl" disabled="{{busy || linkPasting}}">粘贴链接</button></view><input data-name="editNovelUrl" value="{{editNovelUrl}}" maxlength="-1" placeholder="粘贴小说链接或分享文本" bindinput="input" disabled="{{busy}}" class="kw-input" /></view>
         <text class="muted">保存后，使用该关键词的成员可查看和复制原文链接。</text>
       </view>
       <view wx:elif="{{actionName === 'delete'}}">
@@ -292,7 +292,7 @@
       <view wx:else class="muted">确认{{actionLabel}}该关键词？</view>
 
       <view class="error" wx:if="{{error}}">{{error}}</view>
-      <button class="primary" disabled="{{busy}}" loading="{{busy}}" bindtap="runAction">确认{{actionLabel}}</button>
+      <button class="primary" disabled="{{busy || linkPasting}}" loading="{{busy}}" bindtap="runAction">确认{{actionLabel}}</button>
     </scroll-view>
   </view>
 </view>

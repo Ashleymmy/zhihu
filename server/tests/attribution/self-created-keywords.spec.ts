@@ -195,6 +195,34 @@ it('failed-keyword edit and copy preserve novel metadata',async()=>{
   expect(plan.novel_title).toBe('失败原名');expect(plan.novel_url).toBe('https://example.com/novel');
 });
 
+it('preserves the first submitted full URL through HTTP, storage, list copy and upstream payload for each creating role',async()=>{
+  const {pushPlan}=await import('../../src/modules/zhihu/jobs/pushPlan');
+  const client=await import('../../src/modules/zhihu/zhihu/client');
+  const upstream=vi.spyOn(client,'zhihuPost');
+  const complete='https://soia.zhihu.com/km_paid_content/share?is_delivery=true&source=e9f03bea58b4524092f6cb42207b6a5f&package=zhihushare0812&channel_id=67154024128158&appkey=2400&ustkn=1&is_share_data=true&fallback_url=zhvip%3A%2F%2Ftab%2Fhome&mst=OYNl35gg5oQoWF0q4lkGqe1g0Ju9Qezjl';
+  for(const who of [direct,team,leader,admin]) for(const landingUrl of [complete,complete.padEnd(1024,'x')]) {
+    actor=who;const payload={...scope,...input(),landingUrl,requestKey:key()};
+    const first=await request(app).post('/keywords').send(payload);
+    expect(first.status,JSON.stringify(first.body)).toBe(201);
+    const [[stored]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[first.body.data.planId]);
+    expect(stored.landing_url).toBe(landingUrl);
+    upstream.mockResolvedValueOnce({plan_id:'isolated-upstream-'+first.body.data.planId});
+    await pushPlan({planId:first.body.data.planId,...scope});
+    expect(upstream).toHaveBeenLastCalledWith('/alliance/api/popularize_plan',expect.objectContaining({content_url:landingUrl}));
+    const [[synced]]=await c.query<RowDataPacket[]>('SELECT sync_status FROM plans WHERE id=?',[first.body.data.planId]);
+    expect(synced.sync_status).toBe('synced');
+    const listed=(await resources.listKeywords(who,scope,1,25,payload.keyword)).list[0];
+    expect(listed.landing_url).toBe(landingUrl);expect(listed.novel_url).toBe(landingUrl);
+    const repeated=await request(app).post('/keywords').send(payload);
+    expect(repeated.body.data).toEqual(first.body.data);
+  }
+  upstream.mockRestore();
+  actor=direct;const payload={...scope,...input(),landingUrl:complete.padEnd(1025,'x'),requestKey:key()};
+  expect((await request(app).post('/keywords').send(payload)).status).toBe(422);
+  const [[count]]=await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM plans WHERE keyword=?',[payload.keyword]);
+  expect(count.n).toBe(0);
+});
+
 it('rejects truncated share links without creating records and repairs existing ones in place with the full URL',async()=>{
   const complete='https://soia.zhihu.com/km_paid_content/share?is_delivery=true&source=e9f03bea58b4524092f6cb42207b6a5f&package=zhihushare0812&channel_id=67154024128158&appkey=2400&ustkn=1&is_share_data=true&fallback_url=zhvip%3A%2F%2Ftab%2Fhome&mst=fixture-complete-story-reference';
   const truncated=complete.slice(0,140), payload=input('手机分享完整性验证');

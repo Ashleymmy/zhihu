@@ -1,6 +1,7 @@
 <import src="../../../templates/shared.wxml" />
 <view class="page">
-  <template is="status" data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}" />
+  <template is="status" data="{{error: scopeReady ? '' : error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest}}" />
+  <view wx:if="{{scopeReady && error}}" class="error">{{error}}</view>
   <block wx:if="{{allowed && scopeReady}}">
     <view wx:if="{{options.tasks.length > 1 || options.mappings.length > 1}}" class="picker-bar">
       <view class="picker-item" wx:if="{{options.tasks.length > 1}}">
@@ -39,12 +40,13 @@
         <view class="field-row" style="margin-top:24rpx">
           <text class="field-req">*</text>
           <text class="field-label">小说原文链接</text>
+          <button size="mini" class="link-paste" data-index="{{index}}" bindtap="pasteUrl" disabled="{{busy || linkPasting}}">粘贴链接</button>
         </view>
         <input
           class="kw-input"
-          placeholder="请输入小说原文链接"
+          placeholder="粘贴小说链接或分享文本"
           value="{{item.landingUrl}}"
-          maxlength="1024"
+          maxlength="-1"
           data-index="{{index}}"
           bindinput="inputUrl"
           disabled="{{busy}}"
@@ -55,6 +57,6 @@
 
   <view class="bottom-bar">
     <button class="btn-add" bindtap="addItem" disabled="{{busy || !allowed}}">+ 新增</button>
-    <button class="btn-confirm primary" bindtap="confirm" loading="{{busy}}" disabled="{{busy || !allowed}}">确认</button>
+    <button class="btn-confirm primary" bindtap="confirm" loading="{{busy}}" disabled="{{busy || linkPasting || !allowed}}">确认</button>
   </view>
 </view>

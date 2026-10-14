@@ -12,6 +12,7 @@ function setup() {
   if(call.path.endsWith('/attribution-options'))return{tasks:[{id:'1'}],channels:[{id:'2',name:'渠道'}],mappings:[],users:[]};
   if(call.path.endsWith('/novel')){Object.assign(word,{novelTitle:call.data.novel.title,novelUrl:call.data.novel.url});return{id:'9'}}
   if(call.path.endsWith('/keywords'))return call.method==='POST'?{id:'10'}:{list:[word],total:1};
+  if(call.path.endsWith('/edit-retry'))return{id:'9'};
   throw Error('Unexpected '+call.path);
  });h.session(user);return {h,word};
 }
@@ -59,5 +60,98 @@ test('pasting a complete mobile share URL keeps parameters beyond the native 140
  await page.confirm();const sent=h.calls.find(c=>c.method==='POST');
  assert.equal(sent.data.landingUrl,url);
  assert.equal(new URL(sent.data.landingUrl).searchParams.get('mst'),'fixture-complete-story-reference');
- assert.equal(maximum,1024);
+ assert.equal(maximum,-1);
+});
+
+const share='https://soia.zhihu.com/km_paid_content/share?is_delivery=true&source=e9f03bea58b4524092f6cb42207b6a5f&package=zhihushare0812&channel_id=67154024128158&appkey=2400&ustkn=1&is_share_data=true&fallback_url=zhvip%3A%2F%2Ftab%2Fhome&mst=OYNl35gg5oQoWF0q4lkGqe1g0Ju9Qezjl';
+const inputEvent=(value,index=0)=>({currentTarget:{dataset:{index}},detail:{value}});
+test('the actual signed cloud bridge serializes the complete URL unchanged for creation and retry',async()=>{
+ const {createBridge}=require('../cloudfunctions/opc-bridge/bridge');
+ const forwarded=[];
+ const bridge=createBridge({context:()=>({APPID:'wx22b91776ccf37354',OPENID:'isolated-review'}),secret:'isolated_cloud_bridge_secret_long_enough',
+  check:async()=>({errCode:0,result:{suggest:'pass'}}),send:async(_target,payload)=>{forwarded.push(JSON.parse(payload).data);return{code:0,statusCode:200}}});
+ for(const path of ['/modules/zhihu/keywords','/modules/zhihu/keywords/9/edit-retry']) {
+  const result=await bridge({path,method:'POST',data:{keyword:'完整链接',landingUrl:share,novel:{url:share}}});
+  assert.equal(result.statusCode,200);
+ }
+ assert.equal(forwarded.length,2);
+ for(const data of forwarded){assert.equal(data.landingUrl,share);assert.equal(data.novel.url,share);}
+});
+
+test('first creation reads the complete clipboard even with share text longer than 1024 and preserves opaque parameters',async()=>{
+ for(const mode of ['button','native']) {
+  const {h}=setup();h.wx.navigateBack=()=>{};
+  const text='推荐小说'.repeat(300)+'\n【'+share+'】';
+  h.wx.getClipboardData=({success})=>success({data:text});
+  const page=h.page('keywords/create');await page.onShow();
+  page.inputKeyword(inputEvent('首次创建完整链接'));
+  if(mode==='button')await page.pasteUrl(inputEvent(''));else page.inputUrl(inputEvent(text));
+  await page.confirm();
+  const sent=h.calls.filter(c=>c.method==='POST');assert.equal(sent.length,1);
+  assert.equal(sent[0].data.landingUrl,share);assert.equal(page.data.items[0].landingUrl,share);
+ }
+});
+
+test('overlong URL is never clipped; native and clipboard entry retain it and do not send a request',async()=>{
+ for(const mode of ['button','native']) {
+  const {h}=setup();const page=h.page('keywords/create');await page.onShow();
+  const url=share+'&extra='+('x'.repeat(1200));
+  h.wx.getClipboardData=({success})=>success({data:url});page.inputKeyword(inputEvent('超过上限'));
+  if(mode==='button')await page.pasteUrl(inputEvent(''));else page.inputUrl(inputEvent(url));
+  await page.confirm();assert.equal(page.data.items[0].landingUrl,url);
+  assert.equal(h.calls.filter(c=>c.method==='POST').length,0);assert.match(page.data.error,/1024/);
+ }
+});
+
+test('clipboard failure or ambiguous contents preserves the current input and permits manual paste',async()=>{
+ for(const value of [null,share+' https://example.com/another']) {
+  const {h}=setup();const page=h.page('keywords/create');await page.onShow();
+  page.inputUrl(inputEvent('https://example.com/original'));
+  h.wx.getClipboardData=({success,fail})=>value===null?fail({errMsg:'denied'}):success({data:value});
+  await page.pasteUrl(inputEvent(''));assert.equal(page.data.items[0].landingUrl,'https://example.com/original');
+  assert(page.data.error);assert.equal(page.data.linkPasting,false);
+ }
+});
+
+test('late clipboard callbacks cannot overwrite typing, a removed row, a hidden page, or another session',async()=>{
+ for(const change of ['typing','remove','hide','session']) {
+  const {h}=setup();const page=h.page('keywords/create');await page.onShow();
+  page.inputKeyword(inputEvent('保护输入'));page.inputUrl(inputEvent('https://example.com/old'));
+  let callback;h.wx.getClipboardData=({success})=>{callback=success};
+  const pending=page.pasteUrl(inputEvent(''));
+  await page.confirm();assert.equal(h.calls.filter(c=>c.method==='POST').length,0);
+  if(change==='typing')page.inputUrl(inputEvent('https://example.com/new'));
+  if(change==='remove'){page.addItem();page.removeItem(inputEvent(''));}
+  if(change==='hide')page.onHide();
+  if(change==='session')h.session({id:'4',role:'creator'},'new-token');
+  const before=page.data.items[0].landingUrl;callback({data:share});await pending;
+  assert.equal(page.data.items[0].landingUrl,before);assert.equal(page.data.linkPasting,false);
+ }
+});
+
+test('edit retry sends exactly the full pasted link and metadata editing uses the same extraction',async()=>{
+ const {h,word}=setup();Object.assign(word,{canEditFailed:1,taskId:'1',mappingId:'2'});
+ const page=h.page('keywords');await page.onShow();
+ page.data.options.mappings=[{id:'2',channelName:'渠道'}];
+ h.wx.getClipboardData=({success})=>success({data:'小说链接：'+share+'。'});
+ page.choose({currentTarget:{dataset:{index:0,action:'edit-retry'}}});
+ await page.pasteStoryUrl({currentTarget:{dataset:{name:'editLandingUrl'}}});
+ await page.runAction();const sent=h.calls.find(c=>c.path.endsWith('/edit-retry'));
+ assert.equal(sent.data.landingUrl,share);assert.equal(sent.data.keyword,word.keyword);
+ page.choose({currentTarget:{dataset:{index:0,action:'novel'}}});
+ page.setData({editNovelUrl:'小说链接：'+share+'。'});await page.runAction();
+ assert.equal(h.calls.find(c=>c.path.endsWith('/novel')).data.novel.url,share);page.onHide();
+});
+
+test('the editor ignores clipboard results after selection changes and all novel inputs have no native cutoff',async()=>{
+ const {h}=setup();const page=h.page('keywords');await page.onShow();
+ page.choose({currentTarget:{dataset:{index:0,action:'novel'}}});
+ let callback;h.wx.getClipboardData=({success})=>{callback=success};
+ const pending=page.pasteStoryUrl({currentTarget:{dataset:{name:'editNovelUrl'}}});
+ page.close();page.choose({currentTarget:{dataset:{index:0,action:'novel'}}});
+ const original=page.data.editNovelUrl;callback({data:share});await pending;
+ assert.equal(page.data.editNovelUrl,original);page.onHide();
+ const template=fs.readFileSync(path.join(__dirname,'../miniprogram/pages/keywords/index.wxml'),'utf8');
+ const inputs=template.match(/<input\b[^>]*data-name="edit(?:Landing|Novel)Url"[^>]*\/>/g);
+ assert.equal(inputs.length,3);for(const input of inputs)assert.match(input,/maxlength="-1"/);
 });
