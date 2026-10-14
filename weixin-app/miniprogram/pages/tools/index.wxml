@@ -11,6 +11,7 @@
       wx:for="{{tools}}"
       wx:key="key"
       data-key="{{item.key}}"
+      hover-class="press"
       bindtap="openTool"
     >
       <view class="row channel-head">

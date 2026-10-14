@@ -13,4 +13,7 @@
 @import "../../templates/member-summary.wxss";
 
 .user-id { font-size: 24rpx; word-break: break-all; margin-top: 10rpx; }
-.id-copy { font-size: 22rpx; margin-left: 10rpx; color: var(--brand); }
+/* 品牌带内资料头白化；复制入口用品牌金提示可点 */
+.id-copy { font-size: 22rpx; margin-left: 10rpx; color: #ffe9ad; }
+.profile-head .profile-name { color: #fff; }
+.profile-head .muted { color: rgba(255, 255, 255, 0.72); }

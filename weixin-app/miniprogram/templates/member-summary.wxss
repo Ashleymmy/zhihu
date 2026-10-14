@@ -1,15 +1,15 @@
-.member-summary { color: #214239; }
-.summary-label { display: block; color: #64756f; font-size: 25rpx; }
+.member-summary { color: var(--forest); }
+.summary-label { display: block; color: var(--ink-soft); font-size: 25rpx; }
 .summary-total { font-size: 46rpx; font-weight: 650; margin-top: 12rpx; line-height: 1.3; overflow-wrap: anywhere; word-break: break-all; }
 .summary-overview { display: flex; gap: 24rpx; align-items: flex-start; }
 .summary-turnover { flex: 1; min-width: 0; }
-.summary-members { flex: 0 0 164rpx; padding-left: 20rpx; border-left: 1rpx solid #e9efec; }
+.summary-members { flex: 0 0 164rpx; padding-left: 20rpx; border-left: 1rpx solid var(--line); }
 .summary-count { margin-top: 16rpx; font-size: 38rpx; font-weight: 600; word-break: break-all; }
 .summary-count text { font-size: 24rpx; font-weight: 400; }
-.summary-days { display: flex; gap: 24rpx; padding-top: 24rpx; margin-top: 24rpx; border-top: 1rpx solid #e9efec; }
+.summary-days { display: flex; gap: 24rpx; padding-top: 24rpx; margin-top: 24rpx; border-top: 1rpx solid var(--line); }
 .summary-days > view { flex: 1; min-width: 0; }
 .summary-day-value { display: block; margin-top: 8rpx; font-size: 29rpx; font-weight: 600; overflow-wrap: anywhere; word-break: break-all; }
-.summary-note { color: #73817b; font-size: 22rpx; line-height: 1.6; margin-top: 20rpx; }
+.summary-note { color: var(--ink-soft); font-size: 22rpx; line-height: 1.6; margin-top: 20rpx; }
 .summary-error { display: flex; gap: 20rpx; align-items: center; font-size: 26rpx; }
 .summary-error text { flex: 1; }
 .summary-error button { margin: 0; flex-shrink: 0; }

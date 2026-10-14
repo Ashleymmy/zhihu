@@ -1,0 +1,2 @@
+/* 工具页：标题位于品牌带内，白化处理；卡片样式沿用全局 channel-grid */
+.page > .title { color: #fff; }

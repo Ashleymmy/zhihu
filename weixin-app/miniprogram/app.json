@@ -32,9 +32,9 @@
   "window": {
     "backgroundColor": "#f5f6f5",
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarBackgroundColor": "#17352e",
     "navigationBarTitleText": "TIMO",
-    "navigationBarTextStyle": "black"
+    "navigationBarTextStyle": "white"
   },
   "tabBar": {
     "color": "#9aa8a2",
