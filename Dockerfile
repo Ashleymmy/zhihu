@@ -13,6 +13,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml turbo.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
+COPY weixin-app/docs/用户协议.md weixin-app/docs/隐私协议.md ./weixin-app/docs/
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm build

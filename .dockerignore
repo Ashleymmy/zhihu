@@ -22,6 +22,9 @@ prototypes
 *.png
 *.md
 !README.md
+!weixin-app/docs/
+!weixin-app/docs/用户协议.md
+!weixin-app/docs/隐私协议.md
 .env
 .env.*
 !.env.docker.example
