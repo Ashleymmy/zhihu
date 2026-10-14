@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "绑定账号",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
   "usingComponents": {
     "confirm-sheet": "/components/confirm-sheet/index"
   }
