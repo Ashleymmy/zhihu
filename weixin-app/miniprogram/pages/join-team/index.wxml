@@ -17,7 +17,7 @@
       <input value="{{query}}" bindinput="searchLeader" placeholder="搜索团长名字或账号" maxlength="64" />
       <scroll-view scroll-y class="leader-list">
         <view wx:for="{{filteredLeaders}}" wx:key="id" class="leader {{selected.id === item.id ? 'chosen' : ''}}" data-id="{{item.id}}" bindtap="pickLeader">
-          <view>{{item.displayName}}</view><view class="muted">{{item.username}} · {{item.memberCount}} 位成员 {{selected.id === item.id ? '✓' : ''}}</view>
+          <view>{{item.displayName}}</view><view class="muted">{{item.username}} {{selected.id === item.id ? '✓' : ''}}</view>
         </view>
         <view wx:if="{{!filteredLeaders.length}}" class="muted">没有匹配的团长，可刷新后重新搜索。</view>
       </scroll-view>
