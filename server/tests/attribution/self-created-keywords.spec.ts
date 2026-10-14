@@ -194,6 +194,28 @@ it('failed-keyword edit and copy preserve novel metadata',async()=>{
   [[plan]]=await c.query<RowDataPacket[]>('SELECT * FROM plans WHERE id=?',[copied.planId]);
   expect(plan.novel_title).toBe('失败原名');expect(plan.novel_url).toBe('https://example.com/novel');
 });
+
+it('rejects truncated share links without creating records and repairs existing ones in place with the full URL',async()=>{
+  const complete='https://soia.zhihu.com/km_paid_content/share?is_delivery=true&source=e9f03bea58b4524092f6cb42207b6a5f&package=zhihushare0812&channel_id=67154024128158&appkey=2400&ustkn=1&is_share_data=true&fallback_url=zhvip%3A%2F%2Ftab%2Fhome&mst=fixture-complete-story-reference';
+  const truncated=complete.slice(0,140), payload=input('手机分享完整性验证');
+  actor=direct;
+  const rejected=await request(app).post('/keywords').send({...scope,...payload,landingUrl:truncated,requestKey:key()});
+  expect(rejected.status).toBe(422);expect(rejected.body.message).toContain('分享链接不完整');
+  const [[count]]=await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM plans WHERE keyword=?',[payload.keyword]);
+  expect(count.n).toBe(0);
+  const created=await resources.createKeyword(direct,scope,key(),{...payload,landingUrl:complete});
+  await c.query("UPDATE plans SET sync_status='failed',sync_error='知乎接口失败（HTTP 400 / code 400402）：知乎返回：错误URL',landing_url=? WHERE id=?",[truncated,created.planId]);
+  const before=await binding(created.id);
+  expect((await resources.listKeywords(direct,scope,1,25,payload.keyword)).list[0].sync_error).toContain('分享链接不完整');
+  await expect(resources.retryKeyword(admin,scope,created.id,key())).rejects.toThrow('分享链接不完整');
+  await expect(resources.editFailedKeyword(direct,scope,created.id,key(),payload.keyword)).rejects.toThrow('分享链接不完整');
+  await expect(resources.editFailedKeyword(other,scope,created.id,key(),payload.keyword,{landingUrl:complete})).rejects.toThrow();
+  expect((await resources.listKeywords(other,scope,1,25,payload.keyword)).total).toBe(0);
+  await resources.editFailedKeyword(direct,scope,created.id,key(),payload.keyword,{landingUrl:complete});
+  const [[saved]]=await c.query<RowDataPacket[]>('SELECT landing_url,sync_status FROM plans WHERE id=?',[created.planId]);
+  expect(saved).toMatchObject({landing_url:complete,sync_status:'local'});
+  expect(await binding(created.id)).toEqual(before);
+});
 it('parallel creators cannot create or use the same keyword twice; existing legacy plans also reserve their words', async () => {
   const data = input();
   const result = await Promise.allSettled([

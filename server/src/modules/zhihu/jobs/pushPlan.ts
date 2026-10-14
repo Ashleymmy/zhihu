@@ -3,6 +3,7 @@ import { db, rows } from '../../../db';
 import { zhihuPost, zhihuSyncErrorDetail } from '../zhihu/client';
 import { PLAN_UPDATE_UNSUPPORTED_ERROR } from '../zhihu/allianceVersionPolicy';
 import { synchronizeKeywords } from '../attribution/keyword-readiness';
+import { isTruncatedShareUrl, TRUNCATED_SHARE_URL_MESSAGE } from '../zhihu/shareUrl';
 
 export interface PlanPayloadInput {
   zhihu_task_id: string;
@@ -70,8 +71,6 @@ export async function pushPlan(data: Record<string, unknown>) {
     [id, plan.keyword],
   );
   if (claimed.affectedRows === 0) return;
-  const body = buildPlanPayload(plan);
-
   try {
     // 联测账号使用显式账号配置的本地适配器，绝不访问知乎上游。
     if (Number(plan.simulation_mode) === 1) {
@@ -86,6 +85,15 @@ export async function pushPlan(data: Record<string, unknown>) {
       );
       return;
     }
+    // An old queued record cannot be repaired by retrying the missing token.
+    if (isTruncatedShareUrl(plan.landing_url)) {
+      await db.query(
+        "UPDATE plans SET sync_status = 'failed', sync_error = ? WHERE id = ? AND keyword = ? AND sync_status = 'syncing'",
+        [TRUNCATED_SHARE_URL_MESSAGE, id, plan.keyword],
+      );
+      return;
+    }
+    const body = buildPlanPayload(plan);
     const response = await zhihuPost('/alliance/api/popularize_plan', body);
     const planId = upstreamId(response);
     if (!planId?.trim()) throw new Error('知乎未返回有效的计划 ID');

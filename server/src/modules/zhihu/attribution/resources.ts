@@ -20,6 +20,7 @@ import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
 import { bindingStartDay, recomputeStartDateFacts } from './activation-date';
 import { rateFor } from '../../../core/rates';
+import { assertCompleteShareUrl, isTruncatedShareUrl, TRUNCATED_SHARE_URL_MESSAGE } from '../zhihu/shareUrl';
 export { synchronizeKeywords } from './keyword-readiness';
 
 async function simulationScope(c: PoolConnection, scope: Scope) {
@@ -91,11 +92,12 @@ export async function retryKeyword(user: AuthUser, scope: Scope, id: string, key
   const result = await mutate(user, scope, 'keyword.retry-upstream', key, { id }, async (c) => {
     const word = await keywordLock(c, scope, id);
     if (word.lifecycle_status === 'archived') fail('错误记录已删除', 409);
-    const [plan] = await select(c, 'SELECT sync_status,zhihu_plan_id,sync_error FROM plans WHERE id=? FOR UPDATE', [
+    const [plan] = await select(c, 'SELECT sync_status,zhihu_plan_id,sync_error,landing_url FROM plans WHERE id=? FOR UPDATE', [
       word.plan_id,
     ]);
     if (word.used_ever_at || plan.zhihu_plan_id || plan.sync_status !== 'failed')
       fail('仅可重试尚未成功创建的失败计划', 409);
+    assertCompleteShareUrl(String(plan.landing_url));
     if (String(plan.sync_error ?? '').includes('请更换关键词'))
       fail('请根据上游提示创建新关键词，不能重复提交此词', 409);
     await c.query("UPDATE plans SET sync_status='local',sync_error=NULL WHERE id=?", [word.plan_id]);
@@ -136,6 +138,7 @@ async function keywordFields(c: PoolConnection, user: AuthUser, scope: Scope, wo
     WHERE m.id=? AND m.project_id=? AND m.account_id=? AND m.canonical_id IS NULL AND ch.is_enabled=1`,[mappingId,scope.projectId,scope.accountId]);
   if(!task||!mapping) fail('请选择当前项目中可用的任务和渠道');
   const landingUrl=patch.landingUrl ?? String(plan.landing_url);
+  assertCompleteShareUrl(landingUrl);
   try { const url=new URL(landingUrl);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error(); } catch { fail('请填写有效的推广内容链接'); }
   return {taskId,mappingId,zhihuTaskId:String(task.zhihu_task_id),channelId:String(mapping.zhihu_channel_id),landingUrl,popularizeType:patch.popularizeType??Number(plan.popularize_type)};
 }
@@ -283,6 +286,7 @@ export async function createKeyword(
   const keyword = keywordText(input.keyword);
   const novel = novelSchema.parse(input.novel ?? {});
   const result = await mutate(user, scope, 'keyword.create', key, input, async (c) => {
+    assertCompleteShareUrl(input.landingUrl);
     await assertKeywordFree(c, keyword);
     const mappingId = input.mappingId ?? await ensurePoolMapping(c,user,scope,input.channelId ?? '');
     const [task] = await select(c, 'SELECT * FROM tasks WHERE id=? AND project_id=?', [input.taskId, scope.projectId]);
@@ -451,7 +455,9 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       word.can_delete_failed = Number(canFix);
       word.can_edit_failed = Number(canFix && !Number(word.has_usage_history) && word.lifecycle_status !== 'retired' && word.release_status !== 'requested');
       word.can_copy_failed = Number(canFix && (Number(word.has_usage_history) === 1 || word.lifecycle_status === 'retired'));
-      word.sync_error = word.sync_status === 'failed' ? keywordFailureMessage(word.sync_error) : null;
+      word.sync_error = word.sync_status === 'failed'
+        ? isTruncatedShareUrl(word.landing_url) ? TRUNCATED_SHARE_URL_MESSAGE : keywordFailureMessage(word.sync_error)
+        : null;
       if (Number(word.ownership_conflict) && word.sync_status !== 'failed') word.sync_error = '关键词历史作品归属与当前使用人不一致，请联系管理员核对，暂不可新增使用';
       word.usage_ready = Number(!Number(word.ownership_conflict) && !stopped.length && !word.read_only && Number(word.upstream_ready) === 1 && !!word.binding_id && !word.released_at && !word.stop_new_use_at && word.release_status !== 'requested' && ['reserved','assigned','active'].includes(String(word.lifecycle_status)));
       word.allocation_ready = Number(Number(word.allocation_ready) === 1 && !stopped.length && !word.read_only && !word.binding_id && word.lifecycle_status === 'available' && word.plan_status === 'active'

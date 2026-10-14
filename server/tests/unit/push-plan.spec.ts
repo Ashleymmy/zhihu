@@ -3,6 +3,7 @@ import { publicPlanSyncError } from '../../src/modules/zhihu/services/plans.serv
 import { buildPlanPayload, pushPlan } from '../../src/modules/zhihu/jobs/pushPlan';
 import type { PlanPayloadInput } from '../../src/modules/zhihu/jobs/pushPlan';
 import { PLAN_UPDATE_UNSUPPORTED_ERROR } from '../../src/modules/zhihu/zhihu/allianceVersionPolicy';
+import { TRUNCATED_SHARE_URL_MESSAGE } from '../../src/modules/zhihu/zhihu/shareUrl';
 
 const mocks = vi.hoisted(() => ({
   dbQuery: vi.fn(),
@@ -141,6 +142,17 @@ describe('知乎推广计划同步竞态保护', () => {
       expect.stringContaining("WHERE id = ? AND keyword = ? AND sync_status = 'syncing'"),
       ['upstream-1', '1', '新关键词'],
     );
+  });
+
+  it('does not send a truncated legacy share link upstream or keep retrying it', async () => {
+    const url='https://soia.zhihu.com/km_paid_content/share?is_delivery=true&source=e9f03bea58b4524092f6cb42207b6a5f&package=zhihushare0812&channel_id=6715';
+    expect(url.length).toBe(140);
+    mocks.rows.mockResolvedValue([{...plan,landing_url:url}]);
+    mocks.dbQuery.mockResolvedValue([{affectedRows:1}]);
+    await pushPlan({planId:'1'});
+    expect(mocks.zhihuPost).not.toHaveBeenCalled();
+    expect(mocks.dbQuery).toHaveBeenLastCalledWith(expect.stringContaining("AND sync_status = 'syncing'"),[TRUNCATED_SHARE_URL_MESSAGE,'1','新关键词']);
+    expect(publicPlanSyncError(TRUNCATED_SHARE_URL_MESSAGE)).toBe(TRUNCATED_SHARE_URL_MESSAGE);
   });
 
   it('失败结果不覆盖已换关键词或已完成的计划', async () => {

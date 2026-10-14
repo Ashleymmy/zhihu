@@ -14,6 +14,7 @@ import { scopeFilter } from '../../../utils/scopeFilter';
 import { writeAudit } from '../../../services/audit.service';
 import { config } from '../config';
 import { compositionPlanScope } from './composition-access';
+import { assertCompleteShareUrl, TRUNCATED_SHARE_URL_MESSAGE } from '../zhihu/shareUrl';
 import {
   checkDevDemoKeyword,
   createDevDemoPlan,
@@ -57,6 +58,7 @@ export interface PlanInput {
 }
 
 const safePlanSyncMessages = new Set([
+  TRUNCATED_SHARE_URL_MESSAGE,
   '系统时间校验失败，请稍后重试',
   '签名校验失败，请检查服务端配置',
   '该关键词已被绑定，请换一个词',
@@ -210,6 +212,7 @@ export async function getPlan(user: AuthUser, id: string) {
 }
 
 export async function createPlan(user: AuthUser, input: PlanInput, ip?: string) {
+  assertCompleteShareUrl(input.landingUrl);
   if (isDevDemoAuthUser(user)) return createDevDemoPlan(user, input as unknown as Record<string, unknown>);
 
   if (!isStaffRole(user.role) || !input.ownerId || input.ownerId === user.sub) {
@@ -281,6 +284,7 @@ export async function updatePlan(
     bindings.push(patch.keyword);
   }
   if (patch.landingUrl !== undefined) {
+    assertCompleteShareUrl(patch.landingUrl);
     fields.push('landing_url = ?');
     bindings.push(patch.landingUrl);
   }
