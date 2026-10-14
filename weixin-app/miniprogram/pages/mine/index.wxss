@@ -11,3 +11,6 @@
   flex-wrap: wrap;
 }
 @import "../../templates/member-summary.wxss";
+
+.user-id { font-size: 24rpx; word-break: break-all; margin-top: 10rpx; }
+.id-copy { font-size: 22rpx; margin-left: 10rpx; color: var(--brand); }

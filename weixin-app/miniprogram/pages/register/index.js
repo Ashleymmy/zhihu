@@ -1,10 +1,14 @@
 const auth = require("../../utils/auth");
 const consent = require("../../utils/consent");
+const countdown = require("../../utils/sms-countdown");
 const invitation = require("../../utils/invitation");
 Page({
   data: {
-    username: "",
-    password: "",
+    phone: "",
+    smsCode: "",
+    sendingCode: false,
+    cooldown: 0,
+    codeNotice: "",
     inviteCode: "",
     displayName: "",
     agreed: false,
@@ -25,8 +29,9 @@ Page({
     try {
       const policy = await auth.registrationPolicy(this.data.inviteCode);
       if (this._disposed || revision !== this._policyRevision) return;
-      if (policy.registrationMode !== "account" || policy.smsRequired !== false)
+      if (policy.registrationMode !== "sms" || policy.smsRequired !== true)
         throw new Error("注册服务尚未更新，请稍后重试");
+      if (!policy.smsEnabled) throw new Error("短信注册暂不可用，请稍后重试；已有账号可直接登录");
       this.setData({ policyReady: true });
     } catch (e) {
       if (!this._disposed && revision === this._policyRevision)
@@ -36,39 +41,52 @@ Page({
         this.setData({ policyLoading: false });
     }
   },
-  onUnload() {
-    this._disposed = true;
-  },
+  onShow() { countdown.start(this); },
+  onHide() { countdown.stop(this); },
+  onUnload() { this._disposed = true; countdown.stop(this); },
   input(e) {
     const name = e.currentTarget.dataset.name;
     if (
-      !["username", "password", "displayName"].includes(name) ||
-      this.data.busy
+      !["phone", "smsCode", "displayName"].includes(name) ||
+      this.data.busy || this.data.sendingCode
     )
       return;
+    if (name === "phone") this.setData({ smsCode: "", codeNotice: "" });
     this.setData({ [name]: e.detail.value });
   },
+  validPhone() {
+    if (!consent.ensure(this)) return false;
+    if (!this.data.policyReady) { this.setData({ error: "短信注册尚未就绪，请重试" }); return false; }
+    if (!/^1\d{10}$/.test(this.data.phone.trim())) { this.setData({ error: "请输入正确的 11 位手机号" }); return false; }
+    return true;
+  },
+  async sendCode() {
+    if (this.data.busy || this.data.sendingCode || this.data.cooldown || !this.validPhone()) return;
+    const phone = this.data.phone.trim();
+    this.setData({ sendingCode: true, error: "", smsCode: "", codeNotice: "" });
+    try {
+      const result = await auth.sendRegistrationCode(phone, this.data.inviteCode);
+      if (this._disposed) return;
+      countdown.sent(this, result);
+      if (phone === this.data.phone.trim()) this.setData({ codeNotice: "验证码已发送，5 分钟内有效。" });
+    } catch (e) {
+      if (!this._disposed) this.setData({ error: e.message || "发送失败，请重试" });
+    } finally { if (!this._disposed) this.setData({ sendingCode: false }); }
+  },
   async submit() {
-    if (this.data.busy || !consent.ensure(this)) return;
-    if (!this.data.policyReady)
-      return this.setData({ error: "注册规则尚未加载，请重试" });
-    const username = this.data.username.trim();
-    if (!/^[a-zA-Z][a-zA-Z0-9_-]{2,31}$/.test(username))
-      return this.setData({
-        error: "账号为 3–32 位，以字母开头，可使用字母、数字、下划线或短横线",
-      });
-    if (this.data.password.length < 8)
-      return this.setData({ error: "密码至少 8 位" });
+    if (this.data.busy || this.data.sendingCode || !this.validPhone()) return;
+    if (!/^\d{6}$/.test(this.data.smsCode.trim())) return this.setData({ error: "请输入 6 位短信验证码" });
     this.setData({ busy: true, error: "" });
     try {
       const user = await auth.register(
-        username,
-        this.data.password,
+        this.data.phone.trim(),
+        this.data.smsCode.trim(),
         this.data.inviteCode,
         this.data.displayName.trim(),
       );
       if (!this._disposed) {
-        this.setData({ password: "" });
+        countdown.stop(this);
+        this.setData({ smsCode: "" });
         if (user) wx.reLaunch({ url: auth.entryPath(user) });
       }
     } catch (e) {

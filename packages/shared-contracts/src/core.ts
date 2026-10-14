@@ -19,14 +19,18 @@ export interface LoginReq {
 }
 
 /** 公开注册不接受角色、归属或权限字段。 */
-export interface RegisterReq extends LoginReq {
+export interface RegisterReq {
+  smsCode: string
   invitationToken?: string
   displayName?: string
-  phone?: string
+  phone: string
 }
-export interface RegisterResp { id: string; username: string }
+export interface RegisterResp extends LoginResp { id: string; username: string }
 
 export interface AuthUser {
+  userId?: string
+  hasPassword?: boolean
+  avatarVersion?: string | null
   phoneVerifiedAt?: string | null
   adminDuty?: 'all' | 'operations' | 'finance';
   id: string

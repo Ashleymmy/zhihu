@@ -113,13 +113,27 @@ it('closes a core-only account without optional project tables or profile column
   const user = await fresh();
   const [columns] = await conn.query<RowDataPacket[]>('SHOW COLUMNS FROM users');
   expect(columns.map((c) => c.Field)).not.toContain('zhihu_uid');
+  const hash = 'a'.repeat(64);
+  await conn.query('INSERT INTO user_avatars(user_id,mime_type,content,content_hash) VALUES(?,?,?,?)', [
+    user.id,
+    'image/png',
+    Buffer.from('private-avatar'),
+    hash,
+  ]);
+  await conn.query('UPDATE users SET avatar_version=? WHERE id=?', [hash, user.id]);
   const status = await request(app).get('/api/v1/core/account-privacy/closure').set(user.headers);
   expect(status.status, JSON.stringify(status.body)).toBe(200);
   expect(status.body.data.canClose).toBe(true);
   expect((await close(user)).status).toBe(200);
-  const [[row]] = await conn.query<RowDataPacket[]>('SELECT is_active,closed_at FROM users WHERE id=?', [user.id]);
+  const [[row]] = await conn.query<RowDataPacket[]>('SELECT is_active,closed_at,avatar_version FROM users WHERE id=?', [
+    user.id,
+  ]);
   expect(row.is_active).toBe(0);
   expect(row.closed_at).toBeTruthy();
+  expect(row.avatar_version).toBeNull();
+  expect((await conn.query<RowDataPacket[]>('SELECT user_id FROM user_avatars WHERE user_id=?', [user.id]))[0]).toEqual(
+    [],
+  );
 });
 it('changes a core-only member role through the real platform route', async () => {
   const manager = await fresh('developer'),

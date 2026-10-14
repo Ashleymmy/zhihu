@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isApiError } from '@zhihu-koc/shared-services/core'
 import { apis, useAuthStore } from '../stores/auth'
@@ -10,7 +10,6 @@ const auth = useAuthStore(),
 const registering = computed(() => route.name === 'register')
 const username = ref(''),
   password = ref(''),
-  confirmPassword = ref(''),
   displayName = ref(''),
   phone = ref('')
 const submitting = ref(false),
@@ -42,56 +41,73 @@ watch(registering, () => {
     return
   }
   password.value = ''
-  confirmPassword.value = ''
 })
-async function submit() {
-  if (submitting.value) return
+const smsCode = ref(''), loginMode = ref<'password' | 'sms'>('password'), smsEnabled = ref(false)
+const policyReady = ref(false), policyLoading = ref(false), sendingCode = ref(false), cooldown = ref(0), codeNotice = ref(''), agreed = ref(false)
+let timer: ReturnType<typeof setInterval> | undefined, retryAt = 0, policyVersion = 0, disposed = false
+const tick = () => { cooldown.value = Math.max(0, Math.ceil((retryAt-Date.now())/1000)); if (!cooldown.value) clearInterval(timer) }
+onUnmounted(() => { disposed = true; ++policyVersion; ++invitationVersion; clearInterval(timer) })
+watch(phone, () => { smsCode.value = ''; codeNotice.value = '' })
+async function loadPolicy() {
+  const version = ++policyVersion
+  policyReady.value = false; policyLoading.value = true
+  try {
+    if (registering.value) {
+      const result = await apis.auth.registrationPolicy(invitationToken.value || undefined)
+      if (version !== policyVersion) return
+      policyReady.value = result.registrationMode === 'sms' && result.smsRequired && result.smsEnabled
+      if (!policyReady.value) errorMessage.value = '短信注册暂不可用，请稍后重试；已有账号可直接登录'
+    } else {
+      const result = await apis.auth.smsPolicy()
+      if (version !== policyVersion) return
+      smsEnabled.value = result.smsLoginEnabled
+    }
+  } catch (e: any) { if(version === policyVersion) errorMessage.value = e.message || '读取失败，请重试' }
+  finally { if(version === policyVersion) policyLoading.value = false }
+}
+watch([registering, invitationToken], () => { smsCode.value = ''; password.value = ''; errorMessage.value = ''; void loadPolicy() }, {immediate:true})
+async function sendCode() {
+  if (sendingCode.value || submitting.value || cooldown.value) return
   errorMessage.value = ''
-  if (registering.value && invitationToken.value && !invitation.value) {
-    errorMessage.value = invitationError.value || '正在核验邀请链接，请稍候'
-    return
+  if (registering.value && !agreed.value) { errorMessage.value = '请先阅读并同意用户协议与隐私协议'; return }
+  if (!/^1\d{10}$/.test(phone.value)) { errorMessage.value = '请输入正确的 11 位手机号'; return }
+  if (registering.value && !policyReady.value) return
+  const number = phone.value, wasRegistering = registering.value
+  sendingCode.value = true; smsCode.value = ''; codeNotice.value = ''
+  try {
+    const result = wasRegistering ? await apis.auth.sendRegistrationCode(number, invitationToken.value || undefined) : await apis.auth.sendLoginCode(number)
+    if (disposed) return
+    retryAt = Date.now() + Math.max(60,result.retryAfterSeconds || 60)*1000
+    clearInterval(timer); tick(); timer = setInterval(tick,1000)
+    if(number === phone.value && wasRegistering === registering.value) codeNotice.value = '验证码已发送，5 分钟内有效'
+  } catch(e:any) { errorMessage.value = e.message || '发送失败，请重试' }
+  finally { sendingCode.value = false }
+}
+async function afterLogin() {
+  const user = auth.user
+  if (user?.hasPassword === false && !localStorage.getItem('timo-password-later-' + user.id)) {
+    await router.replace({ name: 'account-security' }); return
   }
-  if (registering.value && password.value !== confirmPassword.value) {
-    errorMessage.value = '两次输入的密码不一致'
-    return
+  await router.replace(invitationToken.value && !registering.value ? {name:'invitation',hash:route.hash} : safeRedirect(route.query.redirect))
+}
+async function submit() {
+  if (submitting.value || sendingCode.value) return
+  errorMessage.value = ''
+  if (registering.value && (!policyReady.value || !agreed.value || (invitationToken.value && !invitation.value))) {
+    errorMessage.value = !agreed.value ? '请先阅读并同意用户协议与隐私协议' : invitationError.value || '短信注册尚未就绪，请重试'; return
   }
-  if (
-    registering.value &&
-    new TextEncoder().encode(password.value).length > 72
-  ) {
-    errorMessage.value = '密码不能超过 72 个字节，请减少字符数量'
-    return
+  if ((registering.value || loginMode.value === 'sms') && (!/^1\d{10}$/.test(phone.value) || !/^\d{6}$/.test(smsCode.value))) {
+    errorMessage.value = '请输入正确手机号和 6 位验证码'; return
   }
   submitting.value = true
   try {
-    if (registering.value) {
-      await auth.register({
-        username: username.value,
-        password: password.value,
-        displayName: displayName.value,
-        ...(phone.value ? { phone: phone.value } : {}),
-        ...(invitationToken.value ? { invitationToken: invitationToken.value } : {}),
-      })
-      await router.replace({
-        name: 'login',
-        query: {
-          registered: '1',
-          redirect: safeRedirect(route.query.redirect),
-        },
-      })
-    } else {
-      await auth.login(username.value, password.value)
-      await router.replace(invitationToken.value ? {name:'invitation',hash:route.hash} : safeRedirect(route.query.redirect))
-    }
-  } catch (error) {
-    errorMessage.value = isApiError(error)
-      ? error.message
-      : error instanceof Error
-        ? error.message
-        : '操作失败，请重试'
-  } finally {
-    submitting.value = false
-  }
+    if (registering.value) await auth.register({ phone: phone.value, smsCode: smsCode.value, displayName: displayName.value, ...(invitationToken.value ? {invitationToken: invitationToken.value} : {}) })
+    else if (loginMode.value === 'sms') await auth.smsLogin(phone.value, smsCode.value)
+    else await auth.login(username.value, password.value)
+    password.value = ''; smsCode.value = ''
+    await afterLogin()
+  } catch(e:any) { errorMessage.value = e.message || '操作失败，请重试' }
+  finally { submitting.value = false }
 }
 </script>
 
@@ -134,7 +150,7 @@ async function submit() {
             {{
               registering
                 ? '注册达人账号，开始管理你的业务与收益。'
-                : '使用账号密码登录，自动进入你有权限的工作台。'
+                : '使用账号密码或手机验证码登录。'
             }}
           </p>
         </div>
@@ -153,80 +169,26 @@ async function submit() {
           <template v-else-if="invitation"><strong>{{ invitation.inviterName }} 邀请你注册</strong><p>角色：达人 · {{ invitation.teamName ? '加入团队：' + invitation.teamName : '独立达人' }}</p><small>注册后自动开通知乎；加入团队后同时开通团长已有项目。</small></template>
         </div>
         <form @submit.prevent="submit">
-          <div
-            class="form-grid"
-            style="grid-template-columns: 1fr; margin-top: 32px"
-          >
-            <div>
-              <label for="username">用户名</label>
-              <input
-                id="username"
-                v-model.trim="username"
-                type="text"
-                autocomplete="username"
-                :minlength="registering ? 3 : 1"
-                maxlength="64"
-                :pattern="registering ? '[a-zA-Z0-9_\\-]+' : undefined"
-                :placeholder="
-                  registering
-                    ? '3–64 位字母、数字、下划线或短横线'
-                    : '请输入用户名'
-                "
-                required
-              />
+          <div class="form-grid" style="grid-template-columns:1fr;margin-top:24px">
+            <div v-if="!registering && smsEnabled" class="auth-modes">
+              <button type="button" :aria-pressed="loginMode==='password'" :disabled="submitting || sendingCode" @click="loginMode='password';errorMessage=''">账号密码登录</button>
+              <button type="button" :aria-pressed="loginMode==='sms'" :disabled="submitting || sendingCode" @click="loginMode='sms';errorMessage=''">手机号验证码登录</button>
             </div>
-            <div>
-              <label for="password">密码</label>
-              <input
-                id="password"
-                v-model="password"
-                type="password"
-                :autocomplete="
-                  registering ? 'new-password' : 'current-password'
-                "
-                :minlength="registering ? 8 : 1"
-                :maxlength="registering ? 72 : 128"
-                :placeholder="
-                  registering ? '请输入至少 8 位密码' : '请输入密码'
-                "
-                required
-              />
-            </div>
+            <template v-if="registering || loginMode==='sms'">
+              <div><label for="phone">手机号</label><input id="phone" v-model.trim="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" pattern="1[0-9]{10}" :disabled="submitting || sendingCode" placeholder="请输入手机号" required /></div>
+              <div><label for="sms-code">短信验证码</label><div class="sms-code-row"><input id="sms-code" v-model.trim="smsCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="6 位验证码" required /><button type="button" :disabled="sendingCode || submitting || cooldown>0 || (registering && !policyReady)" @click="sendCode">{{sendingCode?'正在发送…':cooldown>0?cooldown+' 秒后重发':'获取验证码'}}</button></div></div>
+              <p v-if="codeNotice" role="status">{{codeNotice}}</p>
+              <small>验证码 5 分钟内有效，由阿里云短信服务及通信运营商发送，仅用于验证手机号。</small>
+            </template>
+            <template v-else>
+              <div><label for="username">用户 ID / 原登录账号</label><input id="username" v-model.trim="username" autocomplete="username" maxlength="64" placeholder="TIMO-… 或原登录账号" required /></div>
+              <div><label for="password">密码</label><input id="password" v-model="password" type="password" autocomplete="current-password" maxlength="128" placeholder="请输入密码" required /></div>
+            </template>
             <template v-if="registering">
-              <div>
-                <label for="confirm-password">确认密码</label
-                ><input
-                  id="confirm-password"
-                  v-model="confirmPassword"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="请再次输入密码"
-                  required
-                />
-              </div>
-              <div>
-                <label for="display-name">昵称</label
-                ><input
-                  id="display-name"
-                  v-model.trim="displayName"
-                  autocomplete="nickname"
-                  maxlength="64"
-                  placeholder="请输入昵称"
-                  required
-                />
-              </div>
-              <div>
-                <label for="phone">手机号（选填）</label
-                ><input
-                  id="phone"
-                  v-model.trim="phone"
-                  type="tel"
-                  autocomplete="tel"
-                  maxlength="20"
-                  pattern="\+?[0-9 \-]{6,20}"
-                  placeholder="请输入手机号"
-                />
-              </div>
+              <div><label for="display-name">昵称（选填）</label><input id="display-name" v-model.trim="displayName" autocomplete="nickname" maxlength="64" placeholder="可在登录后完善" /></div>
+              <p>验证后自动分配用户 ID，登录后可设置密码，也可继续使用验证码登录。</p>
+              <label class="agreement-consent"><input v-model="agreed" type="checkbox" />我已阅读并同意<router-link to="/agreements/user" target="_blank">用户协议</router-link>和<router-link to="/agreements/privacy" target="_blank">隐私协议</router-link></label>
+              <p v-if="!policyReady" role="status">{{policyLoading?'正在读取注册规则…':'注册暂不可用'}} <button v-if="!policyLoading" type="button" @click="loadPolicy">重试</button></p>
             </template>
           </div>
 
@@ -248,10 +210,10 @@ async function submit() {
           <button
             type="submit"
             class="access-action primary-action"
-            :disabled="submitting || (registering && !!invitationToken && !invitation)"
+            :disabled="submitting || sendingCode || (registering && (!policyReady || (!!invitationToken && !invitation)))"
             style="margin-top: 24px"
           >
-            {{ submitting ? '提交中...' : registering ? '注册' : '登录' }}
+            {{ submitting ? '提交中...' : registering ? '注册并登录' : '登录' }}
           </button>
         </form>
 
@@ -334,6 +296,16 @@ async function submit() {
 </template>
 
 <style scoped>
+.access-card input:not([type=checkbox]) { min-height:44px; box-sizing:border-box; padding:10px 12px; font:inherit }
+.auth-modes { display:flex; gap:8px; flex-wrap:wrap }
+.auth-modes button { flex:1; min-height:40px }
+.auth-modes button[aria-pressed=true] { background:#214239; color:white }
+.sms-code-row { display:flex; gap:8px }
+.sms-code-row input { width:0; flex:1; min-width:0 }
+.sms-code-row button { flex-shrink:0; padding:8px }
+.agreement-consent { display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:13px }
+.agreement-consent input { width:16px; min-height:16px }
+
 .invitation-note { margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--paper);line-height:1.6 }
 .invitation-note p { margin:8px 0 }
 .invitation-note [role=alert] { color:#964639 }

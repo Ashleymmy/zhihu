@@ -48,7 +48,18 @@ export const useAuthStore = defineStore('auth', () => {
     initialized.value = true
   }
   async function register(input: RegisterReq): Promise<void> {
-    await apis.auth.register(input)
+    const result = await apis.auth.register(input)
+    http.tokens.set(result.token)
+    await validateSession()
+    initialized.value = true
+  }
+  async function smsLogin(phone: string, smsCode: string): Promise<void> {
+    user.value = null
+    http.tokens.set(null)
+    const result = await apis.auth.smsLogin(phone, smsCode)
+    http.tokens.set(result.token)
+    await validateSession()
+    initialized.value = true
   }
   async function restore(): Promise<void> {
     if (initialized.value) return
@@ -61,10 +72,13 @@ export const useAuthStore = defineStore('auth', () => {
     })()
     return restoreTask
   }
-  async function logout(): Promise<void> {
-    await apis.auth.logout().catch(() => undefined)
+  function clearSession(): void {
     http.tokens.set(null)
     user.value = null
   }
-  return { user, initialized, loggedIn, login, register, restore, validateSession, logout }
+  async function logout(): Promise<void> {
+    await apis.auth.logout().catch(() => undefined)
+    clearSession()
+  }
+  return { user, initialized, loggedIn, login, smsLogin, register, restore, validateSession, logout, clearSession }
 })

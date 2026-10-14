@@ -3,7 +3,7 @@
   <role-nav user="{{user}}" active="password" />
   <view class="row page-heading"
     ><view
-      ><view class="title">修改密码</view
+      ><view class="title">{{user.hasPassword === false ? '设置登录密码' : '修改密码'}}</view
       ></view
     ><button size="mini" disabled="{{busy || loading}}" bindtap="load"
       >刷新</button
@@ -16,10 +16,10 @@
   <block wx:if="{{allowed && scopeReady}}">
     <view class="card"
       ><text class="muted"
-        >{{user.mustChangePwd ? '首次使用临时密码，请先设置新密码。' :
+        >{{user.hasPassword === false ? '可使用用户 ID 和密码登录，也可继续使用手机验证码。' : user.mustChangePwd ? '首次使用临时密码，请先设置新密码。' :
         '修改密码后需重新登录。'}}</text
       >
-      <view class="field"
+      <view class="field" wx:if="{{user.hasPassword !== false}}"
         ><text class="field-label">原密码</text
         ><input
           password
@@ -29,10 +29,10 @@
           bindinput="input"
       /></view>
       <view class="field"
-        ><text class="field-label">新密码（8–128 位）</text
+        ><text class="field-label">新密码（8–16 位，包含字母和数字）</text
         ><input
           password
-          maxlength="128"
+          maxlength="16"
           data-name="newPassword"
           value="{{newPassword}}"
           bindinput="input"
@@ -41,7 +41,7 @@
         ><text class="field-label">再次输入新密码</text
         ><input
           password
-          maxlength="128"
+          maxlength="16"
           data-name="confirmPassword"
           value="{{confirmPassword}}"
           bindinput="input"
@@ -53,6 +53,7 @@
         bindtap="submit"
         >保存密码</button
       >
+      <button wx:if="{{user.hasPassword === false}}" class="text-button" disabled="{{busy}}" bindtap="later">稍后设置</button>
       <button class="text-button" disabled="{{busy}}" bindtap="logout"
         >退出登录</button
       ></view

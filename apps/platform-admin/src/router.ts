@@ -17,6 +17,7 @@ export function createAppRouter(
   const router = createRouter({
     history,
     routes: [
+      {path:'/agreements/:type(user|privacy)',name:'agreement',component:()=>import('./views/AgreementView.vue'),meta:{requiresAuth:false,title:'协议'}},
       { path: '/invite', name: 'invitation', component: () => import('./views/InvitationView.vue'), meta: { requiresAuth: false, title: '团队邀请' } },
       {
         path: '/login',
@@ -55,6 +56,7 @@ export function createAppRouter(
     workspace.projectId.value = ''
   }
   router.beforeEach(async (to) => {
+    if (to.name === 'agreement') return true
     const auth = useAuthStore()
     if (!auth.initialized) await auth.restore()
     else if (auth.loggedIn) await auth.validateSession().catch(() => undefined)

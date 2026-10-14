@@ -41,7 +41,7 @@ afterAll(async () => {
   if (conn) await conn.end();
   if (container) await container.stop({ remove: true, removeVolumes: true });
 }, 30000);
-it('registers a creator and rejects escalation, duplicates, stale roles and disabled accounts', async () => {
+it('rejects password signup while preserving legacy login, current roles and disabled-account protection', async () => {
   const endpoint = '/api/v1/core/auth/register';
   for (const fields of [
     { role: 'admin' },
@@ -57,24 +57,30 @@ it('registers a creator and rejects escalation, duplicates, stale roles and disa
           .send({ username: 'invalid_account', password, ...fields })
       ).status,
     ).toBe(422);
-  const created = await request(app).post(endpoint).send({ username: 'new_creator', password });
-  expect(created.status).toBe(201);
+  // Legacy fixture, not a public registration bypass. SMS signup is covered by sms-registration.spec.ts.
+  await (await import('../../src/services/auth.service')).register({ username: 'new_creator', password });
   const [users] = await conn.query<mysql.RowDataPacket[]>('SELECT * FROM users WHERE username=?', ['new_creator']);
   expect(users[0]).toMatchObject({ role: 'creator', parent_id: null, is_active: 1, must_change_pwd: 0 });
   expect(users[0].password_hash).not.toBe(password);
   expect(users[0].role_id).toBeTruthy();
-  expect((await request(app).post(endpoint).send({ username: 'new_creator', password })).status).toBe(409);
+  expect((await request(app).post(endpoint).send({ username: 'new_creator', password })).status).toBe(422);
   const agent = request.agent(app).set(clientHeaders);
   const logged = await agent.post('/api/v1/core/auth/login').send({ username: 'new_creator', password });
   expect(logged.status).toBe(200);
   const auth = 'Bearer ' + logged.body.data.token;
   expect(logged.body.data.user.role).toBe('creator');
   expect((await agent.post('/api/v1/core/auth/refresh')).status).toBe(200);
-  expect((await request(app).get('/api/v1/core/team/members').set(clientHeaders).set('Authorization', auth)).status).toBe(403);
+  expect(
+    (await request(app).get('/api/v1/core/team/members').set(clientHeaders).set('Authorization', auth)).status,
+  ).toBe(403);
   await conn.query("UPDATE users SET role='leader' WHERE username='new_creator'");
-  expect((await request(app).get('/api/v1/core/auth/me').set(clientHeaders).set('Authorization', auth)).body.data.role).toBe('leader');
+  expect(
+    (await request(app).get('/api/v1/core/auth/me').set(clientHeaders).set('Authorization', auth)).body.data.role,
+  ).toBe('leader');
   await conn.query("UPDATE users SET is_active=0 WHERE username='new_creator'");
-  expect((await request(app).get('/api/v1/core/projects').set(clientHeaders).set('Authorization', auth)).status).toBe(401);
+  expect((await request(app).get('/api/v1/core/projects').set(clientHeaders).set('Authorization', auth)).status).toBe(
+    401,
+  );
 });
 it('preserves deep links through the unified entry', async () => {
   for (const role of ['admin', 'leader', 'creator'])
@@ -83,7 +89,7 @@ it('preserves deep links through the unified entry', async () => {
     );
 });
 
-it('handles simultaneous duplicates and limits registration attempts', async () => {
+it('rejects concurrent legacy signup payloads without creating accounts', async () => {
   const { deleteRateLimit } = await import('../../src/utils/rateLimit');
   await deleteRateLimit('register:ip:127.0.0.1');
   await deleteRateLimit('register:ip:::ffff:127.0.0.1');
@@ -91,23 +97,23 @@ it('handles simultaneous duplicates and limits registration attempts', async () 
   const attempts = await Promise.all(
     [1, 2].map(() => request(app).post(endpoint).send({ username: 'concurrent_creator', password })),
   );
-  expect(attempts.map((result) => result.status).sort()).toEqual([201, 409]);
+  expect(attempts.map((result) => result.status).sort()).toEqual([422, 422]);
   const [accounts] = await conn.query<mysql.RowDataPacket[]>('SELECT COUNT(*) AS total FROM users WHERE username=?', [
     'concurrent_creator',
   ]);
-  expect(accounts[0].total).toBe(1);
-  for (let i = 0; i < 3; i++)
-    expect((await request(app).post(endpoint).send({ username: 'concurrent_creator', password })).status).toBe(409);
-  expect((await request(app).post(endpoint).send({ username: 'rate_limited', password })).status).toBe(429);
+  expect(accounts[0].total).toBe(0);
+  expect(
+    (await request(app).post('/api/v1/auth/register').send({ username: 'concurrent_creator', password })).status,
+  ).toBe(422);
 });
 
 it.skipIf(!process.env.OPC_PLAYWRIGHT_MODULE)(
-  'registers in the browser and follows current account roles through one entry',
+  'logs in with a legacy account and follows current account roles through one entry',
   async () => {
     const { createRequire } = await import('node:module');
     const { mkdir } = await import('node:fs/promises');
     const path = await import('node:path');
-    const { chromium } = createRequire(path.resolve(process.cwd(), "package.json"))(process.env.OPC_PLAYWRIGHT_MODULE!);
+    const { chromium } = createRequire(path.resolve(process.cwd(), 'package.json'))(process.env.OPC_PLAYWRIGHT_MODULE!);
     const { deleteRateLimit } = await import('../../src/utils/rateLimit');
     await deleteRateLimit('register:ip:127.0.0.1');
     await deleteRateLimit('register:ip:::ffff:127.0.0.1');
@@ -122,24 +128,12 @@ it.skipIf(!process.env.OPC_PLAYWRIGHT_MODULE)(
       await page.route('**/*', (route: any) =>
         new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort(),
       );
-      await page.goto(base + '/app/register');
-      await page.getByLabel('用户名', { exact: true }).fill('browser-creator');
-      await page.getByLabel('密码', { exact: true }).fill(password);
-      await page.getByLabel('确认密码', { exact: true }).fill('different_password');
-      await page.getByLabel('昵称', { exact: true }).fill('浏览器测试账号');
-      expect(await page.locator('#username').evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
-      await page.locator('button[type=submit]').click();
-      await page.getByRole('alert').filter({ hasText: '两次输入的密码不一致' }).waitFor();
+      await (await import('../../src/services/auth.service')).register({ username: 'browser-creator', password });
       const out = path.resolve(process.cwd(), '../.opc-work/unified-ui');
       await mkdir(out, { recursive: true });
-      await page.setViewportSize({ width: 390, height: 844 });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-      await page.screenshot({ path: path.join(out, 'register-mobile.png'), fullPage: true });
-      await page.getByLabel('确认密码', { exact: true }).fill(password);
-      await page.locator('button[type=submit]').click();
-      await page.waitForURL('**/app/login?**');
-      await page.getByRole('status').filter({ hasText: '注册成功' }).waitFor();
-      await page.getByLabel('密码', { exact: true }).fill(password);
+      await page.goto(base + '/app/login');
+      await page.locator('#username').fill('browser-creator');
+      await page.locator('#password').fill(password);
       await page.locator('button[type=submit]').click();
       await page.waitForURL('**/app/dashboard');
       await page.setViewportSize({ width: 1440, height: 1000 });
@@ -156,9 +150,7 @@ it.skipIf(!process.env.OPC_PLAYWRIGHT_MODULE)(
         expect(await page.locator('.studio-nav').getByText('团队与成员', { exact: true }).count()).toBe(
           role === 'creator' ? 0 : 1,
         );
-        expect(await page.locator('.studio-nav').getByText('数据库状态', { exact: true }).count()).toBe(
-          0,
-        );
+        expect(await page.locator('.studio-nav').getByText('数据库状态', { exact: true }).count()).toBe(0);
         await page
           .locator('.studio-nav')
           .getByText(role === 'creator' ? '个人资料' : '团队与成员', { exact: true })

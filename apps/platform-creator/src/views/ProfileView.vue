@@ -8,11 +8,6 @@ const profile = ref<MeResp | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-const pwdForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
-const pwdSubmitting = ref(false)
-const pwdMessage = ref('')
-const pwdError = ref('')
-
 const roleLabels: Record<string, string> = { admin: '管理员', leader: '团长', creator: '达人' }
 
 async function load() {
@@ -20,21 +15,6 @@ async function load() {
   try { profile.value = await apis.auth.me() }
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
-}
-
-async function submitPassword() {
-  pwdError.value = ''
-  pwdMessage.value = ''
-  if (!pwdForm.value.oldPassword || !pwdForm.value.newPassword) { pwdError.value = '请填写完整的密码信息'; return }
-  if (pwdForm.value.newPassword.length < 8) { pwdError.value = '新密码至少 8 位'; return }
-  if (pwdForm.value.newPassword !== pwdForm.value.confirm) { pwdError.value = '两次输入的新密码不一致'; return }
-  pwdSubmitting.value = true
-  try {
-    await apis.auth.changePassword({ oldPassword: pwdForm.value.oldPassword, newPassword: pwdForm.value.newPassword })
-    pwdMessage.value = '密码已更新。'
-    pwdForm.value = { oldPassword: '', newPassword: '', confirm: '' }
-  } catch (e: any) { pwdError.value = e?.message ?? String(e) }
-  finally { pwdSubmitting.value = false }
 }
 
 onMounted(load)
@@ -57,7 +37,8 @@ onMounted(load)
         <article class="panel" style="padding: 24px;">
           <p class="section-index quiet">02 / 基本资料</p>
           <div v-if="profile" class="profile-grid">
-            <div class="profile-item"><span>用户名</span><strong>{{ profile.username }}</strong></div>
+            <div class="profile-item"><span>用户 ID</span><strong>{{ profile.userId || 'TIMO-' + profile.id }}</strong></div>
+            <div class="profile-item"><span>登录账号</span><strong>{{ profile.username }}</strong></div>
             <div class="profile-item"><span>显示名</span><strong>{{ profile.displayName }}</strong></div>
             <div class="profile-item"><span>角色</span><strong>{{ roleLabels[profile.role] ?? profile.role }}</strong></div>
             <div class="profile-item"><span>手机号</span><strong>{{ profile.phone ?? '未绑定' }}</strong></div>
@@ -72,18 +53,9 @@ onMounted(load)
 
       <aside class="workspace-rail">
         <p class="section-index quiet">03 / 登录安全</p>
-        <h2 class="workspace-title" style="font-size: 22px;">修改密码</h2>
-        <form class="rail-form" @submit.prevent="submitPassword">
-          <label>当前密码</label>
-          <input v-model="pwdForm.oldPassword" type="password" autocomplete="current-password" />
-          <label>新密码</label>
-          <input v-model="pwdForm.newPassword" type="password" autocomplete="new-password" placeholder="至少 8 位" />
-          <label>确认新密码</label>
-          <input v-model="pwdForm.confirm" type="password" autocomplete="new-password" />
-          <p v-if="pwdError" style="margin: 0; color: var(--clay-deep); font-size: 13px;">{{ pwdError }}</p>
-          <p v-if="pwdMessage" style="margin: 0; color: var(--moss); font-size: 13px;">{{ pwdMessage }}</p>
-          <button type="submit" class="primary-action" :disabled="pwdSubmitting">{{ pwdSubmitting ? '提交中...' : '更新密码' }}</button>
-        </form>
+        <h2 class="workspace-title" style="font-size:22px">登录与安全</h2>
+        <p>管理登录密码与手机号验证。</p>
+        <router-link class="primary-action" to="/account/security">{{profile?.hasPassword === false ? '设置登录密码' : '账号安全'}}</router-link>
       </aside>
     </section>
   </div>

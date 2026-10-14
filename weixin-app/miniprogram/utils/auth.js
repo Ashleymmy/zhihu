@@ -4,8 +4,11 @@ const TOKEN_KEY = "zk_access_token";
 const USER_KEY = "zk_user";
 let revision = 0;
 let pending = null;
+let profileRevision = 0;
 function clear() {
   revision++;
+  profileRevision++;
+  require("./avatar").clear();
   pending = null;
   wx.removeStorageSync(TOKEN_KEY);
   wx.removeStorageSync(USER_KEY);
@@ -71,14 +74,14 @@ async function verifyPhone(phone, password, smsCode) {
   if (version !== revision) throw new Error("登录已变化，请重新进入个人信息");
   return store(user);
 }
-async function register(username, password, inviteCode, displayName) {
+async function register(phone, smsCode, inviteCode, displayName) {
   clear();
   const version = revision;
   const result = await request.send("/core/auth/register", {
     method: "POST",
     data: {
-      username,
-      password,
+      phone,
+      smsCode,
       ...(inviteCode ? { inviteCode } : {}),
       displayName: displayName || "",
     },
@@ -136,18 +139,40 @@ function ensure() {
   );
   return task;
 }
+function cacheProfile(user, version) {
+  if (version !== revision) throw new Error("登录已变化，请重新进入个人信息");
+  const current = getApp().globalData.user;
+  if (!current || String(current.id) !== String(user.id)) throw new Error("登录已变化，请重新进入个人信息");
+  Object.assign(current, user);
+  wx.setStorageSync(USER_KEY, current);
+  return current;
+}
+async function profile() {
+  const version = revision, generation = profileRevision;
+  const user = await request.get("/core/auth/profile");
+  if (version !== revision) throw new Error("登录已变化，请重新进入个人信息");
+  return generation === profileRevision ? cacheProfile(user, version) : getApp().globalData.user;
+}
+async function updateProfile(data, path = "/core/auth/profile") {
+  const version = revision;
+  profileRevision++;
+  const user = await request.post(path, data);
+  return cacheProfile(user, version);
+}
 async function logout() {
   const ending = request.post("/core/auth/logout").catch(() => {});
   clear();
   await ending;
 }
 function entryPath(user) {
-  if (user.mustChangePwd) return "/pages/password/index";
+  if (user.mustChangePwd || (user.hasPassword === false && !wx.getStorageSync("zk_password_later_" + user.id))) return "/pages/password/index";
   return user.role === "admin" && user.adminDuty === "finance"
     ? "/pages/wallet/index"
     : "/pages/home/index";
 }
 module.exports = {
+  profile,
+  updateProfile,
   bindingStatus: () => request.get("/core/auth/binding-status"),
   sendBindingCode: (username, password, phone, authenticated = false) =>
     request.send(

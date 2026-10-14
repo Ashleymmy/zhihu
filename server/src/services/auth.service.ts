@@ -1,3 +1,4 @@
+import { newPasswordSchema } from '../auth/password-policy';
 import bcrypt from 'bcryptjs';
 import { openMemberProjects } from './member-onboarding.service';
 import { ResultSetHeader, RowDataPacket, type PoolConnection } from 'mysql2/promise';
@@ -34,18 +35,23 @@ interface UserRow extends RowDataPacket {
   display_name: string;
   phone: string | null;
   phone_verified_at?: Date | null;
+  avatar_version?: string | null;
+  password_set?: number;
   is_active: number;
   must_change_pwd: number;
 }
 
 const publicUser = (user: UserRow, role: Role) => ({
   id: String(user.id),
+  userId: 'TIMO-' + user.id,
+  hasPassword: user.password_set !== 0,
   username: user.username,
   displayName: user.display_name,
   role,
   adminDuty: effectiveDuty({ role, adminDuty: user.admin_duty }),
   parentId: user.parent_id ? String(user.parent_id) : null,
   phone: user.phone,
+  avatarVersion: user.avatar_version ?? null,
   phoneVerifiedAt: user.phone_verified_at ?? null,
   permissions: permissionsFor(role),
 });
@@ -86,6 +92,7 @@ export async function register(
   onCreated?: (connection: PoolConnection, id: string) => Promise<void>,
   rateLimitIdentity?: string,
 ) {
+  if (/^TIMO-/i.test(input.username)) throw new AppError(422, 42200, '用户 ID 由系统分配');
   const limit = await incrRateLimit(`register:ip:${rateLimitIdentity ?? ip ?? 'unknown'}`, 5, 3600);
   if (!limit.allowed) throw new AppError(429, 42903, '注册请求过于频繁，请 1 小时后再试');
   const [existing] = await rows<UserRow>('SELECT id FROM users WHERE username = ? LIMIT 1', [input.username]);
@@ -108,7 +115,12 @@ export async function register(
       );
       const id = String(result.insertId);
       if (invitation) await consumeInvitation(connection, invitation, id);
-      await openMemberProjects(connection, id, 'creator', invitation?.team_leader_id ? String(invitation.team_leader_id) : null);
+      await openMemberProjects(
+        connection,
+        id,
+        'creator',
+        invitation?.team_leader_id ? String(invitation.team_leader_id) : null,
+      );
       if (onCreated) await onCreated(connection, id);
       await writeAudit({ userId: id, action: 'auth.register', resourceType: 'user', resourceId: id, ip }, connection);
       return id;
@@ -133,8 +145,8 @@ export async function login(username: string, password: string, ip?: string, cli
   const ipCheck = await incrRateLimit(ipKey, 20, 300);
   if (!ipCheck.allowed) throw new AppError(429, 42903, '登录请求过于频繁，请 5 分钟后再试');
 
-  const [user] = await rows<UserRow>('SELECT * FROM users WHERE username = ? LIMIT 1', [username]);
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+  const user = await passwordLoginUser(username);
+  if (!user || user.password_set === 0 || !(await bcrypt.compare(password, user.password_hash))) {
     const userKey = `login:user:${username}`;
     const userCheck = await incrRateLimit(userKey, 5, 900);
     if (!userCheck.allowed) throw new AppError(429, 42903, '登录失败次数过多，请 15 分钟后再试');
@@ -203,10 +215,12 @@ export async function logout(auth: AuthUser, refreshToken: string | null, ip?: s
 }
 
 export async function changePassword(auth: AuthUser, oldPassword: string, newPassword: string, ip?: string) {
+  newPasswordSchema.parse(newPassword);
   if (isDevDemoAuthUser(auth)) return;
 
   const [user] = await rows<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [auth.sub]);
-  if (!user || !(await bcrypt.compare(oldPassword, user.password_hash))) throw new AppError(422, 42202, '原密码不正确');
+  if (!user || user.password_set === 0 || !(await bcrypt.compare(oldPassword, user.password_hash)))
+    throw new AppError(422, 42202, '原密码不正确');
   if (await bcrypt.compare(newPassword, user.password_hash)) throw new AppError(422, 42203, '新密码不能与原密码相同');
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await withTransaction(async (connection) => {
@@ -257,5 +271,41 @@ export async function loginVerifiedUser(
     await writeAudit({ userId, action: 'auth.wechat_login', resourceType: 'user', resourceId: userId, ip }, c);
   });
   // A cloud invocation has no refresh cookie; re-enter via the verified WeChat identity after expiry.
-  return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd) };
+  return {
+    token,
+    user: publicUser(user, role),
+    mustChangePwd: Boolean(user.must_change_pwd),
+    ...(client.type === 'mini' ? {} : { refresh: session }),
+  };
+}
+
+/** The TIMO- namespace is reserved at all account creation entry points. */
+export async function passwordLoginUser(identifier: string): Promise<UserRow | undefined> {
+  const match = /^TIMO-([1-9]\d*)$/i.exec(identifier);
+  const [user] = await rows<UserRow>(
+    match ? 'SELECT * FROM users WHERE id=? LIMIT 1' : 'SELECT * FROM users WHERE username=? LIMIT 1',
+    [match ? match[1] : identifier],
+  );
+  return user;
+}
+
+export async function setInitialPassword(auth: AuthUser, newPassword: string, ip?: string) {
+  newPasswordSchema.parse(newPassword);
+  const hash = await bcrypt.hash(newPassword, 12);
+  await withTransaction(async (c) => {
+    const [[user]] = await c.query<UserRow[]>('SELECT * FROM users WHERE id=? FOR UPDATE', [auth.sub]);
+    if (!user?.is_active || !user.phone_verified_at) throw new AppError(403, 40320, '请先通过手机号验证码登录');
+    if (user.password_set !== 0) throw new AppError(409, 40920, '已设置登录密码，请使用修改密码功能');
+    await c.query('UPDATE users SET password_hash=?,password_set=1,must_change_pwd=0 WHERE id=?', [hash, auth.sub]);
+    for (const table of ['login_sessions', 'token_sessions'])
+      await c.query(
+        `UPDATE ${table} SET revoked_at=NOW(3),revoke_reason='password_set' WHERE user_id=? AND revoked_at IS NULL`,
+        [auth.sub],
+      );
+    await writeAudit(
+      { userId: auth.sub, action: 'auth.password_set', resourceType: 'user', resourceId: auth.sub, ip },
+      c,
+    );
+  });
+  await revocationStore.revokeUser(auth.sub);
 }

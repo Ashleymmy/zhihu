@@ -1,5 +1,5 @@
+import { newPasswordSchema, generateTemporaryPassword } from '../auth/password-policy';
 import { isStaffRole } from '../auth/roles';
-import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { ResultSetHeader, RowDataPacket, PoolConnection } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
@@ -99,6 +99,7 @@ export async function createMember(
   input: { username: string; displayName: string; phone?: string | null; role?: Role; parentId?: string | null },
   ip?: string,
 ) {
+  if (/^TIMO-/i.test(input.username)) throw new AppError(422, 42200, 'TIMO- 开头的用户 ID 由系统分配，请换一个登录账号');
   if (isDevDemoAuthUser(user)) {
     return { id: `demo-member-${Date.now()}`, username: input.username, temporaryPassword: 'demo123456', mustChangePwd: true };
   }
@@ -106,7 +107,7 @@ export async function createMember(
   const role: Role = isStaffRole(user.role) ? (input.role ?? 'creator') : 'creator';
   if (!['leader','creator'].includes(role)) throw new AppError(403,40301,'管理账号请通过角色管理创建');
   const parentId = await resolveParentId(user, role, input.parentId);
-  const temporaryPassword = crypto.randomBytes(9).toString('base64url');
+  const temporaryPassword = generateTemporaryPassword();
   const hash = await bcrypt.hash(temporaryPassword, 12);
   const id = await withTransaction(async (connection) => {
     const [result] = await connection.query<ResultSetHeader>(
@@ -169,12 +170,13 @@ export async function resetPassword(user: AuthUser, id: string, ip?: string, cus
 
   await target(user, id);
   // 自定义密码时不再强制下次登录修改；留空则生成临时密码并强制修改
-  const temporaryPassword = customPassword ?? crypto.randomBytes(9).toString('base64url');
+  if (customPassword) newPasswordSchema.parse(customPassword);
+  const temporaryPassword = customPassword ?? generateTemporaryPassword();
   const hash = await bcrypt.hash(temporaryPassword, 12);
   const mustChangePwd = customPassword ? 0 : 1;
   await withTransaction(async (connection) => {
     await target(user,id,connection);
-    await connection.query('UPDATE users SET password_hash = ?, must_change_pwd = ? WHERE id = ?', [hash, mustChangePwd, id]);
+    await connection.query('UPDATE users SET password_hash = ?, password_set=1, must_change_pwd = ? WHERE id = ?', [hash, mustChangePwd, id]);
     await connection.query("UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='password_reset' WHERE user_id=? AND revoked_at IS NULL",[id]);
     await connection.query("UPDATE token_sessions SET revoked_at=NOW(3),revoke_reason='password_reset' WHERE user_id=? AND revoked_at IS NULL",[id]);
     await writeAudit(

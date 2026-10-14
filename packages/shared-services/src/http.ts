@@ -128,7 +128,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
     } catch (raw: any) {
       const status: number | undefined = raw?.response?.status
       const isRefreshCall = config.url === REFRESH_PATH
-      const isPublicAuthCall = ['/auth/login', '/auth/register'].includes(config.url ?? '')
+      const isPublicAuthCall = ['/auth/login', '/auth/register', '/auth/registration-code', '/auth/registration-policy', '/auth/login-code', '/auth/sms-login', '/auth/sms-policy'].includes(config.url ?? '')
 
       if (status === 401 && !retried && !isRefreshCall && !isPublicAuthCall) {
         const refreshed = await refresh()

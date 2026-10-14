@@ -1,6 +1,7 @@
 const screen = require("../../utils/screen");
 const auth = require("../../utils/auth");
 const permissions = require("../../utils/permissions");
+const avatar = require("../../utils/avatar");
 const memberSummary = require("../../utils/member-summary");
 const ICONS = {
   "join-team": { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
@@ -17,6 +18,7 @@ Page(
     scoped: false,
     data: {
       menus: [],
+      avatarSrc: avatar.fallback,
       memberSummary: null, summaryError: '',
     },
     async fetch({ user }) {
@@ -34,10 +36,13 @@ Page(
         });
       menus.push({
         key: "password",
-        label: "修改密码",
+        label: user.hasPassword === false ? "设置登录密码" : "修改密码",
         path: "/pages/password/index",
       });
+      let avatarSrc = avatar.fallback;
+      try { const profile = await auth.profile(); avatarSrc = await avatar.display(profile, () => this.canAct()); } catch (_) { /* Earnings remain available if profile refresh fails. */ }
       return {
+        avatarSrc,
         ...await memberSummary.load(user),
         menus: menus.map((item) =>
           Object.assign(

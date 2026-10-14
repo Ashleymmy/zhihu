@@ -19,6 +19,7 @@ Page({
     fromProfile: false,
     registeredPhone: false,
     ready: false,
+    needsPassword: true,
   },
   ...consent.methods,
   async onLoad(options = {}) {
@@ -39,7 +40,8 @@ Page({
           return;
         }
         this.setData({
-          username: profile.username,
+          username: profile.userId || profile.username,
+          needsPassword: profile.hasPassword !== false,
           phone: profile.phone || "",
           registeredPhone: !!profile.phone,
         });
@@ -83,7 +85,7 @@ Page({
     let error = "";
     if (!this.data.ready) error = "短信验证暂不可用，请稍后重新进入";
     else if (!this.data.username.trim()) error = "请输入平台登录账号";
-    else if (!this.data.password) error = "请输入当前账号密码";
+    else if (this.data.needsPassword && !this.data.password) error = "请输入当前账号密码";
     else if (!/^1\d{10}$/.test(this.data.phone.trim()))
       error = "请输入正确的 11 位手机号";
     if (error) this.setData({ error });

@@ -39,10 +39,19 @@ import type {
 import type { HttpClient } from './http'
 export function createAuthApi(http: HttpClient) {
   return {
+    registrationPolicy: (invitationToken?: string) => http.get<{smsRequired: boolean; smsEnabled: boolean; registrationMode: string}>('/auth/registration-policy', invitationToken ? {invitationToken} : {}),
+    sendRegistrationCode: (phone: string, invitationToken?: string) => http.post<{retryAfterSeconds: number}>('/auth/registration-code', {phone, ...(invitationToken ? {invitationToken} : {})}),
+    smsPolicy: () => http.get<{smsLoginEnabled: boolean}>('/auth/sms-policy'),
+    sendLoginCode: (phone: string) => http.post<{retryAfterSeconds: number}>('/auth/login-code', {phone}),
+    smsLogin: (phone: string, smsCode: string) => http.post<LoginResp>('/auth/sms-login', {phone, smsCode}),
+    sendPhoneCode: (phone: string, password: string) => http.post<{retryAfterSeconds: number}>('/auth/phone-code', {phone, password}),
+    verifyPhone: (phone: string, password: string, smsCode: string) => http.post<MeResp>('/auth/verify-phone', {phone, password, smsCode}),
+    setPassword: (newPassword: string) => http.post<void>('/auth/set-password', {newPassword}),
     register: (data: RegisterReq) => http.post<RegisterResp>('/auth/register', data),
     invitation: (token: string) => http.post<{ inviterName: string; teamName: string | null; role: string; expiresAt: string }>('/auth/invitation', { token }),
     login: (data: LoginReq) => http.post<LoginResp>('/auth/login', data),
     refresh: () => http.post<RefreshResp>('/auth/refresh'),
+    avatar: () => http.get<{base64:string;mimeType:string;avatarVersion:string}|null>('/auth/avatar'),
     me: () => http.get<MeResp>('/auth/me'),
     logout: () => http.post<void>('/auth/logout'),
     changePassword: (data: ChangePasswordReq) => http.post<void>('/auth/change-password', data),

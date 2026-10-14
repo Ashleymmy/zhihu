@@ -96,11 +96,11 @@ export async function closeAccount(auth: AuthUser, password: string, runtime: Mo
     for (const provider of providers) await provider.erasePersonalData(c, auth.sub);
     await c.query(
       `UPDATE users SET username=?,display_name='已注销用户',password_hash=?,email=NULL,
-      phone=NULL,phone_verified_at=NULL,parent_id=NULL,mcn_account_id=NULL,
+      phone=NULL,phone_verified_at=NULL,avatar_version=NULL,parent_id=NULL,mcn_account_id=NULL,
       is_active=0,must_change_pwd=0,last_login_at=NULL,closed_at=NOW(3) WHERE id=?`,
       ['closed_' + randomBytes(20).toString('hex'), unusablePassword, auth.sub],
     );
-    for (const table of ['wechat_identities', 'wechat_profiles', 'mini_uploads', 'project_members'])
+    for (const table of ['user_avatars', 'wechat_identities', 'wechat_profiles', 'mini_uploads', 'project_members'])
       await c.query(`DELETE FROM ${table} WHERE user_id=?`, [auth.sub]);
     await c.query('DELETE FROM token_sessions WHERE user_id=?', [auth.sub]);
     await c.query('DELETE FROM login_sessions WHERE user_id=?', [auth.sub]);

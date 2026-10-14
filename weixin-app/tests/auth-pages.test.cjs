@@ -23,8 +23,8 @@ function setup() {
       return { bound: false, currentWechat: false };
     if (c.path === "/core/auth/registration-policy")
       return {
-        registrationMode: "account",
-        smsRequired: false,
+        registrationMode: "sms",
+        smsRequired: true,
         smsEnabled: true,
       };
     if (c.path.endsWith("-code")) return { retryAfterSeconds: 60 };
@@ -74,7 +74,7 @@ test("password and WeChat login both enforce consent; unbound quick login stays 
   await p.wechatLogin();
   assert.ok(!h.navigation.includes("/pages/bind/index"));
   assert.equal(p.data.mode, "password");
-  assert.match(p.data.error, /先使用账号密码登录/);
+  assert.match(p.data.error, /先使用账号密码或手机验证码登录/);
 });
 test("password is default and a single toggle switches back and clears secrets", async () => {
   const h = setup(),
@@ -90,25 +90,13 @@ test("password is default and a single toggle switches back and clears secrets",
   assert.equal(p.data.mode, "password");
   assert.equal(p.data.smsCode, "");
 });
-test("registration validates account and password without requiring phone, SMS or invite", async () => {
-  const h = setup(),
-    p = h.page("register");
-  await p.onLoad();
-  p.setData({ ...fields, agreed: true, username: "12" });
-  await p.submit();
-  assert.match(p.data.error, /账号/);
-  p.setData({ username: "new_creator", password: "short" });
-  await p.submit();
-  assert.match(p.data.error, /至少 8/);
-  p.setData({ password: fields.password, smsCode: "", phone: "" });
-  await p.submit();
-  const sent = h.calls.find((c) => c.path.endsWith("/register"));
-  assert.equal(sent.data.inviteCode, undefined);
-  assert.equal(sent.data.smsCode, undefined);
-  assert.equal(sent.data.phone, undefined);
-  assert.equal(sent.data.username, "new_creator");
-  assert.ok(h.navigation.includes("/pages/home/index"));
+test("registration validates phone and code without requiring username or password", async()=>{
+  const h=setup(),p=h.page("register");await p.onLoad();p.setData({...fields,agreed:true,phone:'12'});await p.submit();assert.match(p.data.error,/手机号/);
+  p.setData({phone:user.phone,smsCode:''});await p.submit();assert.match(p.data.error,/验证码/);
+  p.setData({smsCode:'123456'});await p.submit();const sent=h.calls.find(c=>c.path.endsWith('/register'));
+  assert.equal(sent.data.phone,user.phone);assert.equal(sent.data.password,undefined);assert.equal(sent.data.username,undefined);
 });
+
 test("public binding needs password and fresh phone code and submits only binding fields", async () => {
   const h = setup(),
     p = h.page("bind");
@@ -161,7 +149,7 @@ test("profile offers explicit social binding without an invitation-code form", a
     path.join(__dirname, "../miniprogram/pages/profile/index.wxml"),
     "utf8",
   );
-  assert.match(source, /社交账号绑定/);
+  assert.match(source, /微信快捷登录/);
   assert.doesNotMatch(source, /填写邀请码|showInviteModal/);
 });
 test("all primary auth actions have visual consent state and clickable agreement explanation", () => {

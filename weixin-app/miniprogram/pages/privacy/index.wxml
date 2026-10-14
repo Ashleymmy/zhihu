@@ -10,7 +10,7 @@
     <view class="section-title">协议与个人资料</view>
     <button data-type="user" bindtap="agreement">用户协议</button>
     <button data-type="privacy" bindtap="agreement">隐私协议</button>
-    <view class="muted">可在“我的 → 个人信息”修改昵称或清空备用联系方式。手机号验证为可选；需要解除手机号或微信绑定时，可联系上述邮箱核验处理。</view>
+    <view class="muted">可在“我的 → 个人信息”修改头像、昵称或清空备用联系方式。新账号通过手机号验证注册，旧账号可稍后验证；需要更换手机号或微信登录账号时，可联系上述邮箱核验处理。</view>
   </view>
   <view class="card" wx:if="{{user}}">
     <view class="section-title">注销账号</view>
@@ -22,7 +22,11 @@
       <view wx:for="{{status.blockers}}" wx:key="*this" class="closure-item">· {{item}}</view>
       <view class="muted">需要协助请通过上方邮箱联系我们。</view>
     </block>
-    <block wx:if="{{status && status.canClose}}">
+    <view wx:if="{{status && status.canClose && user.hasPassword === false}}">
+      <view class="muted">注销需使用登录密码确认身份。请先设置密码，重新登录后返回这里继续注销。</view>
+      <button bindtap="setPassword">设置登录密码</button>
+    </view>
+    <block wx:if="{{status && status.canClose && user.hasPassword !== false}}">
       <input password maxlength="128" value="{{password}}" bindinput="input" placeholder="输入当前平台账号密码确认身份" disabled="{{busy}}" />
       <checkbox-group bindchange="acknowledge"><label class="closure-check"><checkbox value="yes" checked="{{acknowledged}}" disabled="{{busy}}" />我已了解两端账号同时注销及数据处理范围</label></checkbox-group>
       <button class="close-account" bindtap="closeAccount" disabled="{{busy || loading || !password || !acknowledged}}" loading="{{busy}}">注销共用账号</button>

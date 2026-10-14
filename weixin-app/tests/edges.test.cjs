@@ -106,7 +106,7 @@ test("navigating away during a batch prevents the next composition write", async
   assert.equal(page._hidden,true);
 });
 test("password change clears session and routes back to login", async () => {
-  const h = harness(() => null);
+  const h = harness(c => c.path === "/core/auth/profile" ? { id: "3", role: "creator", mustChangePwd: true } : null);
   h.session({ id: "3", role: "creator", mustChangePwd: true });
   const page = h.page("password");
   await page.onShow();
@@ -116,7 +116,7 @@ test("password change clears session and routes back to login", async () => {
     confirmPassword: "updated123",
   });
   await page.submit();
-  assert.equal(h.calls[0].path, "/core/auth/change-password");
+  assert.ok(h.calls.some(c => c.path === "/core/auth/change-password"));
   assert.equal(h.storage.has("zk_access_token"), false);
   assert.equal(page.data.newPassword, "");
   assert.equal(h.navigation.at(-1), "/pages/login/index");

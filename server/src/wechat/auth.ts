@@ -6,15 +6,16 @@ import { rows, withTransaction } from '../db';
 import { asyncHandler, AppError } from '../middleware/errors';
 import { requireAuth } from '../auth/middleware';
 import { clientIdentity } from '../auth/clientIdentity';
-import { register, loginVerifiedUser, me } from '../services/auth.service';
+import { loginVerifiedUser, me, passwordLoginUser } from '../services/auth.service';
 import { writeAudit } from '../services/audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 import { ok } from '../utils/response';
 import { requireWechatContext, wechatClientId } from './context';
 import { resolveInvitationCode } from './invitations';
-import { smsSettings, requireSmsEnabled } from '../sms/config';
-import { sendRegistrationCode, verifyRegistrationCode, consumeRegistrationCode } from '../sms/registration';
+import { smsSignupSchema, registrationPolicy, sendSignupCode, registerWithSms } from '../services/sms-signup.service';
 import { smsAuthRouter } from './sms-auth';
+
+import { saveAvatar, ownAvatar, AVATAR_MAX_BYTES } from '../services/user-avatar.service';
 
 export const wechatAuthRouter = Router();
 wechatAuthRouter.use((req, _res, next) => {
@@ -38,10 +39,8 @@ wechatAuthRouter.post(
       !(await incrRateLimit(`wechat:login:${input.username}`, 20, 300)).allowed
     )
       throw new AppError(429, 42903, '登录请求过于频繁，请稍后再试');
-    const [user] = await rows<RowDataPacket>('SELECT id,password_hash,is_active FROM users WHERE username=?', [
-      input.username,
-    ]);
-    if (!user || !(await bcrypt.compare(input.password, user.password_hash)))
+    const user = await passwordLoginUser(input.username);
+    if (!user || user.password_set === 0 || !(await bcrypt.compare(input.password, user.password_hash)))
       throw new AppError(401, 40102, '网站账号或密码错误');
     if (!user.is_active) throw new AppError(403, 40302, '账号已停用');
     res.locals.miniVerifiedUserId = String(user.id);
@@ -63,34 +62,13 @@ wechatAuthRouter.post(
     ok(res, await loginVerifiedUser(String(link.user_id), clientIdentity(req), req.ip));
   }),
 );
-const signup = z
-  .object({
-    phone: z.string().regex(/^1\d{10}$/),
-    smsCode: z.string().regex(/^\d{6}$/),
-    password: z
-      .string()
-      .min(8)
-      .max(72)
-      .refine((p) => Buffer.byteLength(p) <= 72),
-    displayName: z.string().trim().max(64).default(''),
+const signup = smsSignupSchema
+  .extend({
     inviteCode: z
       .string()
       .trim()
       .regex(/^[A-Z2-9]{8}$/)
       .optional(),
-  })
-  .strict();
-// Account registration does not claim ownership of a phone number. The existing
-// phone + OTP contract remains available to older, already-uploaded clients.
-const accountSignup = signup
-  .omit({ phone: true, smsCode: true })
-  .extend({
-    username: z
-      .string()
-      .trim()
-      .min(3)
-      .max(32)
-      .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/),
   })
   .strict();
 wechatAuthRouter.get(
@@ -103,13 +81,7 @@ wechatAuthRouter.get(
       .optional()
       .parse(req.query.inviteCode);
     const invitationToken = code ? await resolveInvitationCode(code) : undefined;
-    let smsEnabled = false;
-    try {
-      smsEnabled = smsSettings(invitationToken).enabled;
-    } catch {
-      /* SMS cannot block account registration. */
-    }
-    ok(res, { registrationMode: 'account', smsRequired: false, smsEnabled });
+    ok(res, registrationPolicy(invitationToken));
   }),
 );
 wechatAuthRouter.post(
@@ -128,53 +100,16 @@ wechatAuthRouter.post(
       .parse(req.body);
     // Validate invitation and existing accounts before spending an SMS. Never consume an invitation here.
     const invitationToken = input.inviteCode ? await resolveInvitationCode(input.inviteCode) : undefined;
-    requireSmsEnabled(invitationToken);
-    const [existing] = await rows<RowDataPacket>('SELECT id FROM users WHERE username=? OR phone=? LIMIT 1', [
-      input.phone,
-      input.phone,
-    ]);
-    if (existing) throw new AppError(409, 40920, '该手机号已有账号，请登录原账号');
-    ok(res, await sendRegistrationCode(input.phone, wechatClientId(identity), invitationToken));
+    ok(res, await sendSignupCode(input.phone, wechatClientId(identity), invitationToken));
   }),
 );
 wechatAuthRouter.post(
   '/register',
   asyncHandler(async (req, res) => {
-    const input = z.union([accountSignup, signup]).parse(req.body),
-      identity = requireWechatContext(req),
-      address = `wechat:${wechatClientId(identity)}`;
+    const input = signup.parse(req.body),
+      identity = requireWechatContext(req);
     const invitationToken = input.inviteCode ? await resolveInvitationCode(input.inviteCode) : undefined;
-    if ('username' in input) {
-      const result = await register(
-        { username: input.username, password: input.password, displayName: input.displayName, invitationToken },
-        req.ip,
-        undefined,
-        address,
-      );
-      res.locals.miniVerifiedUserId = result.id;
-      return ok(res, await loginVerifiedUser(result.id, clientIdentity(req), req.ip), 201);
-    }
-    requireSmsEnabled(invitationToken);
-    const proof = await verifyRegistrationCode(input.phone, wechatClientId(identity), input.smsCode, invitationToken);
-    const result = await register(
-      {
-        username: input.phone,
-        phone: input.phone,
-        password: input.password,
-        displayName: input.displayName || input.phone,
-        invitationToken,
-      },
-      req.ip,
-      async (c, id) => {
-        const [[other]] = await c.query<RowDataPacket[]>('SELECT id FROM users WHERE id<>? AND phone=? LIMIT 1', [
-          id,
-          input.phone,
-        ]);
-        if (other) throw new AppError(409, 40920, '该手机号已有账号，请登录原账号');
-        await consumeRegistrationCode(c, proof, id);
-      },
-      address,
-    );
+    const result = await registerWithSms(input, wechatClientId(identity), req.ip, invitationToken);
     res.locals.miniVerifiedUserId = result.id;
     ok(res, await loginVerifiedUser(result.id, clientIdentity(req), req.ip), 201);
   }),
@@ -223,5 +158,32 @@ wechatAuthRouter.get(
   asyncHandler(async (req, res) => {
     const [profile] = await rows<RowDataPacket>('SELECT contact FROM wechat_profiles WHERE user_id=?', [req.user.sub]);
     ok(res, { ...(await me(req.user)), contact: profile?.contact ?? '' });
+  }),
+);
+
+wechatAuthRouter.post(
+  '/avatar',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const input = z
+      .object({
+        base64: z
+          .string()
+          .min(1)
+          .max(Math.ceil(AVATAR_MAX_BYTES / 3) * 4),
+      })
+      .strict()
+      .parse(req.body);
+    await saveAvatar(req.user.sub, input.base64);
+    ok(res, await me(req.user));
+  }),
+);
+wechatAuthRouter.get(
+  '/avatar',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    z.object({}).strict().parse(req.query);
+    res.set('Cache-Control', 'no-store');
+    ok(res, await ownAvatar(req.user.sub));
   }),
 );

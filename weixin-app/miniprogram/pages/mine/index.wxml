@@ -12,13 +12,13 @@
     <text class="cell-arrow">›</text>
   </view>
   <view class="profile-head" wx:elif="{{user}}" bindtap="openProfile">
-    <image class="avatar" src="/images/avatar.png" mode="aspectFill" />
+    <image class="avatar" src="{{avatarSrc}}" mode="aspectFill" />
     <view class="profile-info">
       <view class="profile-name-row">
         <text class="profile-name">{{user.displayName || user.username}}</text>
         <text class="badge">{{roleLabel}}</text>
       </view>
-      <text class="muted">@{{user.username}}</text>
+      <view class="muted user-id" catchtap="copy" data-text="{{user.userId || 'TIMO-' + user.id}}">ID：{{user.userId || 'TIMO-' + user.id}} <text class="id-copy">复制</text></view>
     </view>
   </view>
   <!-- 我的页游客态由资料头承担，不再重复展示登录引导卡 -->

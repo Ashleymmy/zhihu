@@ -24,7 +24,11 @@ function call(name: string, path: string, data: Record<string, unknown> = {}, to
   const raw = JSON.stringify({
     ...identity(name),
     path: '/core/auth/' + path,
-    contentSafety:{version:1,digest:contentDigest('/core/auth/'+path,method,data),traceIds:['isolated-pass']},
+    contentSafety: {
+      version: 1,
+      digest: contentDigest('/core/auth/' + path, method, data),
+      traceIds: ['isolated-pass'],
+    },
     method,
     data,
     ...(token ? { token } : {}),
@@ -61,11 +65,13 @@ async function person(verified = true, bound = true) {
 type Person = Awaited<ReturnType<typeof person>>;
 const provider = async () => vi.mocked((await import('../../src/sms/aliyun')).sendAccountSms);
 
-it('new account can defer phone verification until profile, then SMS-login without changing account or binding', async () => {
+it('legacy account can defer phone verification until profile, then SMS-login without changing account or binding', async () => {
   const name = 'deferred_profile',
     phone = '13877771234';
-  const r = await call(name, 'register', { username: name, password });
-  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  const fixture = await person(false, false);
+  await c.query('UPDATE users SET username=?,phone=NULL WHERE id=?', [name, fixture.id]);
+  const r = await call(name, 'login', { username: name, password });
+  expect(r.status).toBe(200);
   const id = r.body.data.user.id,
     token = r.body.data.token;
   expect(r.body.data.user.phone).toBeNull();
@@ -367,6 +373,22 @@ it('profile binding targets the authenticated account, preserves its session and
   expect((await call(p.name, 'bind-code', { username: other.name, password, phone: other.phone })).status).toBe(409);
   const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM wechat_identities WHERE user_id=?', [p.id]);
   expect(count.n).toBe(1);
+});
+it('passwordless members can optionally enable WeChat with a fresh code for their verified phone', async () => {
+  const p = await person(true, false);
+  await c.query('UPDATE users SET password_set=0 WHERE id=?', [p.id]);
+  const logged = await login(p, await send(p));
+  expect(logged.status).toBe(200);
+  const token = logged.body.data.token;
+  await c.query('DELETE FROM sms_registration_challenges');
+  await c.query('DELETE FROM sms_registration_limits');
+  expect((await call(p.name, 'bind-current-code', { phone: p.phone })).status).toBe(401);
+  expect((await call(p.name, 'bind-current-code', { phone: '13700000000' }, token)).status).toBe(401);
+  expect((await call(p.name, 'bind-current-code', { phone: p.phone }, token)).status).toBe(200);
+  const smsCode = (await provider()).mock.calls.at(-1)![1];
+  expect((await call(p.name, 'bind-current', { phone: p.phone, smsCode }, token)).status).toBe(200);
+  expect((await call(p.name, 'bind-current', { phone: p.phone, smsCode }, token)).status).toBe(422);
+  expect((await call(p.name, 'wechat-login')).body.data.user.id).toBe(p.id);
 });
 it('a binding conflict arising after delivery leaves proof and account untouched', async () => {
   const p = await person(false, false),

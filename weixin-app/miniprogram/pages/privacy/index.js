@@ -48,6 +48,9 @@ Page({
   copyContact() {
     wx.setClipboardData({ data: this.data.supportEmail });
   },
+  setPassword() {
+    wx.navigateTo({ url: "/pages/password/index" });
+  },
   async closeAccount() {
     if (
       this.data.busy ||

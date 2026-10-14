@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { randomBytes } from 'node:crypto';
+import { generateTemporaryPassword } from '../auth/password-policy';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { requireDuty } from './duties';
 import { rows, withTransaction } from '../db';
@@ -52,9 +52,10 @@ staffRouter.post(
       })
       .strict()
       .parse(req.body);
+    if (/^TIMO-/i.test(input.username)) throw new AppError(422, 42200, 'TIMO- 开头的用户 ID 由系统分配');
     const role = input.role ?? (input.duty === 'operations' ? 'operator' : 'admin');
     assertAllowed(req.user, role);
-    const password = randomBytes(12).toString('base64url'),
+    const password = generateTemporaryPassword(),
       hash = await bcrypt.hash(password, 12);
     const id = await withTransaction(async (c) => {
       const [[actor]] = await c.query<RowDataPacket[]>(

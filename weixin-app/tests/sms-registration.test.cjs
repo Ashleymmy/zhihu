@@ -2,14 +2,14 @@ const test = require("node:test"),
   assert = require("node:assert/strict");
 const { harness, deferred } = require("./harness.cjs");
 const fields = {
-  username: "new_creator",
-  password: "Account_test_123",
+  phone: "13800000001",
+  smsCode: "123456",
   agreed: true,
 };
 const policy = {
-  registrationMode: "account",
-  smsRequired: false,
-  smsEnabled: false,
+  registrationMode: "sms",
+  smsRequired: true,
+  smsEnabled: true,
 };
 function setup(overrides = {}) {
   return harness((c) => {
@@ -19,15 +19,16 @@ function setup(overrides = {}) {
     if (c.path.endsWith("/me"))
       return {
         id: "1",
-        username: fields.username,
+        username: "TIMO-1",
         role: "creator",
-        phone: null,
-        phoneVerifiedAt: null,
+        phone: fields.phone,
+        phoneVerifiedAt: "2026-10-14",
+        hasPassword: false,
       };
     return {};
   });
 }
-test("hidden invitation is preserved through account registration without claiming a phone", async () => {
+test("hidden invitation survives verified phone registration without a password", async () => {
   const h = setup(),
     p = h.page("register");
   await p.onLoad({ invite: "abcdefgh" });
@@ -35,13 +36,14 @@ test("hidden invitation is preserved through account registration without claimi
   await p.submit();
   const sent = h.calls.find((c) => c.path.endsWith("/register"));
   assert.equal(sent.data.inviteCode, "ABCDEFGH");
-  assert.equal(sent.data.username, fields.username);
-  assert.equal(sent.data.phone, undefined);
-  assert.equal(sent.data.smsCode, undefined);
+  assert.equal(sent.data.username, undefined);
+  assert.equal(sent.data.password, undefined);
+  assert.equal(sent.data.phone, fields.phone);
+  assert.equal(sent.data.smsCode, fields.smsCode);
   assert.equal(h.load("utils/invitation").get(), "");
-  assert.equal(h.storage.get("zk_user").phoneVerifiedAt, null);
+  assert.equal(h.storage.get("zk_user").phoneVerifiedAt, "2026-10-14");
 });
-test("no invitation and unavailable SMS still allow registration with no SMS or captcha request", async () => {
+test("no invitation registers a creator and offers password setup after first login", async () => {
   const h = setup(),
     p = h.page("register");
   await p.onLoad();
@@ -52,7 +54,7 @@ test("no invitation and unavailable SMS still allow registration with no SMS or 
     undefined,
   );
   assert.ok(h.calls.every((c) => !/captcha|-code$/.test(c.path)));
-  assert.ok(h.navigation.includes("/pages/home/index"));
+  assert.ok(h.navigation.includes("/pages/password/index"));
 });
 test("invalid invitation is not silently converted into independent registration", async () => {
   const h = setup({
@@ -101,20 +103,20 @@ test("consent and duplicate click prevention still protect account registration"
   await first;
   assert.equal(h.calls.filter((c) => c.path.endsWith("/register")).length, 1);
 });
-test("duplicate username errors preserve input and do not report successful registration", async () => {
+test("duplicate phone errors preserve input and do not report successful registration", async () => {
   const h = setup({
       "/core/auth/register": () => ({
         http: 409,
-        body: { code: 40901, message: "用户名已被使用" },
+        body: { code: 40901, message: "该手机号已有账号，请登录原账号" },
       }),
     }),
     p = h.page("register");
   await p.onLoad();
   p.setData(fields);
   await p.submit();
-  assert.match(p.data.error, /已被使用/);
+  assert.match(p.data.error, /已有账号/);
   assert.equal(p.data.busy, false);
-  assert.equal(p.data.username, fields.username);
+  assert.equal(p.data.phone, fields.phone);
   assert.equal(h.navigation.length, 0);
 });
 test("new and legacy invitation links and QR scenes survive login/register navigation", async () => {
@@ -149,4 +151,17 @@ test("stale registration policy cannot overwrite a newer retry", async () => {
   old.resolve({ smsRequired: true });
   await first;
   assert.equal(p.data.policyReady, true);
+});
+
+test("disabled SMS blocks signup and sending; phone edits clear stale codes", async () => {
+  const h = setup({"/core/auth/registration-policy":()=>({...policy,smsEnabled:false})}), p=h.page("register");
+  await p.onLoad();p.setData(fields);await p.sendCode();await p.submit();
+  assert.equal(p.data.policyReady,false);assert.ok(!h.calls.some(c=>c.path.endsWith('/register') || c.path.endsWith('-code')));
+  p.input({currentTarget:{dataset:{name:'phone'}},detail:{value:'13900000001'}});assert.equal(p.data.smsCode,'');
+});
+test("sending is consent gated, deduplicated and starts a resend cooldown", async () => {
+  const pending=deferred(),h=setup({"/core/auth/registration-code":()=>pending.promise}),p=h.page("register");
+  await p.onLoad();p.setData({...fields,agreed:false});await p.sendCode();assert.equal(p.data.consentOpen,true);
+  p.confirmConsent();const first=p.sendCode();await p.sendCode();pending.resolve({retryAfterSeconds:60});await first;
+  assert.equal(h.calls.filter(c=>c.path.endsWith('-code')).length,1);assert.equal(p.data.cooldown,60);p.onUnload();
 });

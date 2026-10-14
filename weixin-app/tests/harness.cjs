@@ -87,7 +87,12 @@ function harness(handler = () => ({})) {
     Promise.reject(new Error("chooseMessageFile 未在测试中注入"));
   wx.arrayBufferToBase64 = (buffer) =>
     Buffer.from(buffer).toString("base64");
+  wx.env = {USER_DATA_PATH:"/local-test"};
   wx.getFileSystemManager = () => ({
+    access({path,success,fail}) { files.has(path) ? success({}) : fail({}); },
+    writeFile({filePath,data,encoding,success}) { files.set(filePath,Buffer.from(data,encoding));success({}); },
+    unlink({filePath}) { files.delete(filePath); },
+    readdir({dirPath,success}) {success({files:[...files.keys()].filter(p=>p.startsWith(dirPath+"/")).map(p=>p.slice(dirPath.length+1))});},
     readFile({ filePath, success, fail }) {
       const content = files.get(filePath);
       if (!content) {

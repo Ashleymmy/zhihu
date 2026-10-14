@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { createHmac } from 'node:crypto';
+import { Router, type Request, type Response } from 'express';
+import { createHmac, createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
@@ -7,7 +7,7 @@ import { db, withTransaction } from '../db';
 import { asyncHandler, AppError } from '../middleware/errors';
 import { requireAuth } from '../auth/middleware';
 import { clientIdentity } from '../auth/clientIdentity';
-import { loginVerifiedUser, me } from '../services/auth.service';
+import { loginVerifiedUser, me, passwordLoginUser } from '../services/auth.service';
 import { writeAudit } from '../services/audit.service';
 import { incrRateLimit } from '../utils/rateLimit';
 import { ok } from '../utils/response';
@@ -64,8 +64,8 @@ async function passwordVerified(id: string, number: string, value: string) {
 }
 
 export const smsAuthRouter = Router();
-const bindingInput = z.object({ phone, password });
-const publicBindingInput = bindingInput.extend({ username: z.string().trim().min(1).max(64) });
+const bindingInput = z.object({ phone, password: z.string().max(128).default('') });
+const publicBindingInput = bindingInput.extend({ password, username: z.string().trim().min(1).max(64) });
 function canBind(user: RowDataPacket, number: string) {
   if (!user.is_active || user.must_change_pwd) throw new AppError(403, 40320, '请先使用账号密码登录并完成密码设置');
   if (user.phone && user.phone !== number)
@@ -93,11 +93,15 @@ async function bindingUser(
     !(await incrRateLimit(`wechat:bind-client:${wechatClientId(identity)}`, 20, 300)).allowed
   )
     throw new AppError(429, 42920, '操作过于频繁，请 5 分钟后重试');
-  const [[user]] = await db.query<RowDataPacket[]>(
-    id ? 'SELECT * FROM users WHERE id=?' : 'SELECT * FROM users WHERE username=?',
-    [key],
-  );
-  if (!user || !(await bcrypt.compare(input.password, user.password_hash)))
+  const user = id
+    ? (await db.query<RowDataPacket[]>('SELECT * FROM users WHERE id=?', [id]))[0][0]
+    : await passwordLoginUser(key);
+  if (
+    !user ||
+    (user.password_set === 0
+      ? !id || !user.phone_verified_at || user.phone !== input.phone
+      : !(await bcrypt.compare(input.password, user.password_hash)))
+  )
     throw new AppError(401, 40102, '账号或密码错误');
   verified?.(String(user.id));
   canBind(user, input.phone);
@@ -188,91 +192,119 @@ for (const authenticated of [false, true]) {
     }),
   );
 }
-smsAuthRouter.get(
-  '/sms-policy',
-  asyncHandler(async (_req, res) => {
-    res.set('Cache-Control', 'no-store');
-    ok(res, { smsLoginEnabled: smsSettings().loginEnabled });
-  }),
-);
-smsAuthRouter.post(
-  '/login-code',
-  asyncHandler(async (req, res) => {
-    requireAccountSmsEnabled();
-    const input = z.object({ phone }).strict().parse(req.body),
-      identity = requireWechatContext(req);
-    const user = loginEligible(await phoneUser(input.phone), input.phone);
-    ok(res, await sendAccountCode(input.phone, wechatClientId(identity), 'login', subject(user)));
-  }),
-);
-smsAuthRouter.post(
-  '/sms-login',
-  asyncHandler(async (req, res) => {
-    requireAccountSmsEnabled();
-    const input = z.object({ phone, smsCode: code }).strict().parse(req.body),
-      identity = requireWechatContext(req);
-    const user = loginEligible(await phoneUser(input.phone), input.phone),
-      guard = subject(user);
-    const proof = await verifyAccountCode(input.phone, wechatClientId(identity), input.smsCode, 'login', guard);
-    const result = await loginVerifiedUser(
-      String(user.id),
-      clientIdentity(req),
-      req.ip,
-      user.password_hash,
-      async (c) => {
-        const current = loginEligible(await lockedUser(c, String(user.id)), input.phone);
-        if (subject(current) !== guard) throw unavailable();
-        // Consumption and session creation commit together; a replay can never issue another session.
-        await consumeAccountCode(c, proof);
-        await writeAudit(
-          { userId: String(user.id), action: 'auth.sms_login', resourceType: 'user', resourceId: String(user.id) },
-          c,
-        );
-      },
-    );
-    res.locals.miniVerifiedUserId = String(user.id);
-    ok(res, result);
-  }),
-);
-smsAuthRouter.post(
-  '/phone-code',
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    requireAccountSmsEnabled();
-    const input = z.object({ phone, password }).strict().parse(req.body),
-      identity = requireWechatContext(req);
-    const user = await passwordVerified(req.user.sub, input.phone, input.password);
-    ok(res, await sendAccountCode(input.phone, wechatClientId(identity), 'phone_verify', subject(user)));
-  }),
-);
-smsAuthRouter.post(
-  '/verify-phone',
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    requireAccountSmsEnabled();
-    const input = z.object({ phone, password, smsCode: code }).strict().parse(req.body),
-      identity = requireWechatContext(req);
-    const user = await passwordVerified(req.user.sub, input.phone, input.password),
-      guard = subject(user);
-    const proof = await verifyAccountCode(input.phone, wechatClientId(identity), input.smsCode, 'phone_verify', guard);
-    try {
-      await withTransaction(async (c) => {
-        const current = await lockedUser(c, req.user.sub);
-        canVerify(current, input.phone);
-        if (subject(current) !== guard) throw new AppError(409, 40920, '账号信息已变化，请重新验证');
-        await availablePhone(c, req.user.sub, input.phone);
-        await consumeAccountCode(c, proof);
-        await c.query('UPDATE users SET phone=?,phone_verified_at=NOW(3) WHERE id=?', [input.phone, req.user.sub]);
-        await writeAudit(
-          { userId: req.user.sub, action: 'auth.phone_verified', resourceType: 'user', resourceId: req.user.sub },
-          c,
-        );
-      });
-    } catch (error) {
-      if ((error as { code?: string }).code === 'ER_DUP_ENTRY')
-        throw new AppError(409, 40920, '该手机号已被其他账号验证，请联系管理员核对');
-      throw error;
-    }
-    ok(res, await me(req.user));
-  }),
-);
+
+function accountSmsIdentity(req: Request) {
+  const client = clientIdentity(req);
+  return client.type === 'mini'
+    ? client.id
+    : createHash('sha256')
+        .update('web-account-sms:' + client.id)
+        .digest('hex');
+}
+export function createAccountSmsRouter(
+  completeLogin: (req: Request, res: Response, result: Awaited<ReturnType<typeof loginVerifiedUser>>) => void,
+) {
+  const router = Router();
+  router.use(
+    asyncHandler(async (req, _res, next) => {
+      if (
+        ['/login-code', '/phone-code'].includes(req.path) &&
+        clientIdentity(req).type !== 'mini' &&
+        !(await incrRateLimit(`web-account-sms:${req.ip}`, 10, 3600)).allowed
+      )
+        throw new AppError(429, 42920, '验证码发送过于频繁，请稍后再试');
+      next();
+    }),
+  );
+  router.get(
+    '/sms-policy',
+    asyncHandler(async (_req, res) => {
+      res.set('Cache-Control', 'no-store');
+      ok(res, { smsLoginEnabled: smsSettings().loginEnabled });
+    }),
+  );
+  router.post(
+    '/login-code',
+    asyncHandler(async (req, res) => {
+      requireAccountSmsEnabled();
+      const input = z.object({ phone }).strict().parse(req.body),
+        identity = accountSmsIdentity(req);
+      const user = loginEligible(await phoneUser(input.phone), input.phone);
+      ok(res, await sendAccountCode(input.phone, identity, 'login', subject(user)));
+    }),
+  );
+  router.post(
+    '/sms-login',
+    asyncHandler(async (req, res) => {
+      requireAccountSmsEnabled();
+      const input = z.object({ phone, smsCode: code }).strict().parse(req.body),
+        identity = accountSmsIdentity(req);
+      const user = loginEligible(await phoneUser(input.phone), input.phone),
+        guard = subject(user);
+      const proof = await verifyAccountCode(input.phone, identity, input.smsCode, 'login', guard);
+      const result = await loginVerifiedUser(
+        String(user.id),
+        clientIdentity(req),
+        req.ip,
+        user.password_hash,
+        async (c) => {
+          const current = loginEligible(await lockedUser(c, String(user.id)), input.phone);
+          if (subject(current) !== guard) throw unavailable();
+          // Consumption and session creation commit together; a replay can never issue another session.
+          await consumeAccountCode(c, proof);
+          await writeAudit(
+            { userId: String(user.id), action: 'auth.sms_login', resourceType: 'user', resourceId: String(user.id) },
+            c,
+          );
+        },
+      );
+      res.locals.miniVerifiedUserId = String(user.id);
+      completeLogin(req, res, result);
+    }),
+  );
+  router.post(
+    '/phone-code',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      requireAccountSmsEnabled();
+      const input = z.object({ phone, password }).strict().parse(req.body),
+        identity = accountSmsIdentity(req);
+      const user = await passwordVerified(req.user.sub, input.phone, input.password);
+      ok(res, await sendAccountCode(input.phone, identity, 'phone_verify', subject(user)));
+    }),
+  );
+  router.post(
+    '/verify-phone',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      requireAccountSmsEnabled();
+      const input = z.object({ phone, password, smsCode: code }).strict().parse(req.body),
+        identity = accountSmsIdentity(req);
+      const user = await passwordVerified(req.user.sub, input.phone, input.password),
+        guard = subject(user);
+      const proof = await verifyAccountCode(input.phone, identity, input.smsCode, 'phone_verify', guard);
+      try {
+        await withTransaction(async (c) => {
+          const current = await lockedUser(c, req.user.sub);
+          canVerify(current, input.phone);
+          if (subject(current) !== guard) throw new AppError(409, 40920, '账号信息已变化，请重新验证');
+          await availablePhone(c, req.user.sub, input.phone);
+          await consumeAccountCode(c, proof);
+          await c.query('UPDATE users SET phone=?,phone_verified_at=NOW(3) WHERE id=?', [input.phone, req.user.sub]);
+          await writeAudit(
+            { userId: req.user.sub, action: 'auth.phone_verified', resourceType: 'user', resourceId: req.user.sub },
+            c,
+          );
+        });
+      } catch (error) {
+        if ((error as { code?: string }).code === 'ER_DUP_ENTRY')
+          throw new AppError(409, 40920, '该手机号已被其他账号验证，请联系管理员核对');
+        throw error;
+      }
+      ok(res, await me(req.user));
+    }),
+  );
+
+  return router;
+}
+smsAuthRouter.use(createAccountSmsRouter((_req, res, result) => ok(res, result)));

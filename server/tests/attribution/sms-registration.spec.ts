@@ -8,7 +8,10 @@ import request from 'supertest';
 import type { Express } from 'express';
 import type { AuthUser } from '../../src/types';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
-vi.mock('../../src/sms/aliyun', () => ({ sendRegistrationSms: vi.fn(async () => undefined) }));
+vi.mock('../../src/sms/aliyun', () => ({
+  sendRegistrationSms: vi.fn(async () => undefined),
+  sendAccountSms: vi.fn(async () => undefined),
+}));
 let container: StartedMySqlContainer, c: Connection, app: Express, pool: typeof import('../../src/db').db;
 let invitationId: string,
   inviteCode = 'ABCDEFGH',
@@ -17,8 +20,15 @@ const appId = 'wx0000000000000001',
   secret = 'isolated_sms_bridge_secret_longer_than_32';
 const actor = { sub: '1', role: 'leader', adminDuty: 'all', username: 'smsleader', parentId: null } as AuthUser;
 const identity = (name: string) => ({ appId, openId: 'sms_test_wechat_identity_' + name });
-function call(name: string, path: string, method = 'POST', data: Record<string, unknown> = {}) {
-  const raw = JSON.stringify({ ...identity(name), path, method, data, contentSafety:{version:1,digest:contentDigest(path,method,data),traceIds:["isolated-pass"]} });
+function call(name: string, path: string, method = 'POST', data: Record<string, unknown> = {}, token?: string) {
+  const raw = JSON.stringify({
+    ...identity(name),
+    path,
+    method,
+    data,
+    ...(token ? { token } : {}),
+    contentSafety: { version: 1, digest: contentDigest(path, method, data), traceIds: ['isolated-pass'] },
+  });
   const time = String(Date.now()),
     nonce = crypto.randomBytes(16).toString('hex');
   const signature = crypto.createHmac('sha256', secret).update(`${time}\n${nonce}\n${raw}`).digest('hex');
@@ -47,7 +57,6 @@ async function send(person: ReturnType<typeof fresh>) {
 function signup(person: ReturnType<typeof fresh>, smsCode?: string, selectedInviteCode = inviteCode) {
   return call(person.name, '/core/auth/register', 'POST', {
     phone: person.phone,
-    password: 'Sms_test_password_123',
     inviteCode: selectedInviteCode,
     ...(smsCode ? { smsCode } : {}),
   });
@@ -117,8 +126,8 @@ afterAll(async () => {
 it('defaults off and never exposes signing settings; malformed configuration fails closed', async () => {
   delete process.env.SMS_REGISTRATION_ENABLED;
   expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toEqual({
-    registrationMode: 'account',
-    smsRequired: false,
+    registrationMode: 'sms',
+    smsRequired: true,
     smsEnabled: false,
   });
   expect(
@@ -126,15 +135,15 @@ it('defaults off and never exposes signing settings; malformed configuration fai
   ).toBe(503);
   process.env.SMS_REGISTRATION_ENABLED = 'typo';
   expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toMatchObject({
-    registrationMode: 'account',
-    smsRequired: false,
+    registrationMode: 'sms',
+    smsRequired: true,
     smsEnabled: false,
   });
   process.env.SMS_REGISTRATION_ENABLED = '1';
   process.env.SMS_SIGN_NAME = '';
   expect((await call('policy', '/core/auth/registration-policy', 'GET')).body.data).toMatchObject({
-    registrationMode: 'account',
-    smsRequired: false,
+    registrationMode: 'sms',
+    smsRequired: true,
     smsEnabled: false,
   });
   expect(await provider()).not.toHaveBeenCalled();
@@ -169,7 +178,7 @@ it('only returns TTL; stores hashes, requires OTP even for old clients and prese
     invitationId,
   ]);
   expect(after.used_count).toBe(before[0][0].used_count);
-  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [p.phone]);
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE phone=?', [p.phone]);
   expect(count.n).toBe(0);
 });
 it('registers one unified, verified account without automatically binding WeChat with the correct leader and consumes once', async () => {
@@ -180,7 +189,7 @@ it('registers one unified, verified account without automatically binding WeChat
   expect(r.body.data.user.phoneVerifiedAt).toBeTruthy();
   expect(r.body.data.user.parentId).toBe('1');
   const [[row]] = await c.query<RowDataPacket[]>(
-    'SELECT u.phone_verified_at,w.open_id,i.user_id FROM users u LEFT JOIN wechat_identities w ON w.user_id=u.id JOIN member_invitation_uses i ON i.user_id=u.id WHERE u.username=?',
+    'SELECT u.phone_verified_at,w.open_id,i.user_id FROM users u LEFT JOIN wechat_identities w ON w.user_id=u.id JOIN member_invitation_uses i ON i.user_id=u.id WHERE u.phone=?',
     [p.phone],
   );
   expect(row.phone_verified_at).toBeTruthy();
@@ -236,7 +245,7 @@ it('concurrent registration consumes one invitation and produces one member', as
     code = await send(p);
   const results = await Promise.all([signup(p, code), signup(p, code)]);
   expect(results.filter((r) => r.status === 201)).toHaveLength(1);
-  const [[row]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [p.phone]);
+  const [[row]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE phone=?', [p.phone]);
   expect(row.n).toBe(1);
 });
 it('registration preserves an existing WeChat binding and does not switch its owner', async () => {
@@ -261,7 +270,6 @@ it('no invitation registers a verified independent creator with no WeChat link o
   const smsCode = (await provider()).mock.calls.at(-1)![1];
   const r = await call(p.name, '/core/auth/register', 'POST', {
     phone: p.phone,
-    password: 'Sms_test_password_123',
     smsCode,
   });
   expect(r.status, JSON.stringify(r.body)).toBe(201);
@@ -341,8 +349,8 @@ it('pilot policy uses validated invitations and does not permit non-pilot unveri
   process.env.SMS_REGISTRATION_ENABLED = '0';
   process.env.SMS_REGISTRATION_PILOT_INVITATIONS = record.token_hash;
   expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode })).body.data).toEqual({
-    registrationMode: 'account',
-    smsRequired: false,
+    registrationMode: 'sms',
+    smsRequired: true,
     smsEnabled: true,
   });
   expect(
@@ -353,7 +361,7 @@ it('pilot policy uses validated invitations and does not permit non-pilot unveri
         smsRequired: true,
       })
     ).body.data,
-  ).toEqual({ registrationMode: 'account', smsRequired: false, smsEnabled: false });
+  ).toEqual({ registrationMode: 'sms', smsRequired: true, smsEnabled: false });
   expect((await call(pilot.name, '/core/auth/registration-policy', 'GET', { inviteCode: 'ZZZZZZZZ' })).status).toBe(
     422,
   );
@@ -399,7 +407,7 @@ it('removing a pilot denies pending proof verification; global enable still requ
   expect(
     (await call(outsider.name, '/core/auth/registration-policy', 'GET', { smsRequired: true, smsEnabled: false })).body
       .data,
-  ).toEqual({ registrationMode: 'account', smsRequired: false, smsEnabled: true });
+  ).toEqual({ registrationMode: 'sms', smsRequired: true, smsEnabled: true });
   expect((await signup(outsider)).status).toBe(422);
   expect((await signup(pilot, code)).status).toBe(201);
 });
@@ -437,7 +445,7 @@ it('invitation revoked after delivery cannot register or consume verification', 
   await c.query('UPDATE member_invitations SET revoked_at=NOW(3) WHERE id=?', [invitationId]);
   try {
     expect((await signup(p, code)).status).toBe(422);
-    const [[row]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [p.phone]);
+    const [[row]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE phone=?', [p.phone]);
     expect(row.n).toBe(0);
   } finally {
     await c.query('UPDATE member_invitations SET revoked_at=NULL WHERE id=?', [invitationId]);
@@ -445,84 +453,141 @@ it('invitation revoked after delivery cannot register or consume verification', 
   expect((await signup(p, code)).status).toBe(201);
 });
 
-it('account registration succeeds even with unavailable SMS and is usable on Web and mini without a phone or WeChat binding', async () => {
-  process.env.SMS_REGISTRATION_ENABLED = 'typo';
-  process.env.SMS_SIGN_NAME = '';
-  const p = fresh(),
-    username = 'account_' + p.name,
-    password = 'Account_test_password_123';
-  const r = await call(p.name, '/core/auth/register', 'POST', { username, password });
-  expect(r.status, JSON.stringify(r.body)).toBe(201);
-  expect(r.body.data.user).toMatchObject({
-    username,
-    phone: null,
-    phoneVerifiedAt: null,
-    role: 'creator',
-    parentId: null,
-  });
-  expect((await call(p.name, '/core/auth/login', 'POST', { username, password })).status).toBe(200);
-  const web = await (
-    await import('../../src/services/auth.service')
-  ).login(username, password, 'isolated', { type: 'web', id: crypto.randomUUID() });
-  expect(web.user.id).toBe(r.body.data.user.id);
-  for (const table of ['member_invitation_uses', 'wechat_identities']) {
-    const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM ' + table + ' WHERE user_id=?', [
-      web.user.id,
-    ]);
-    expect(count.n).toBe(0);
-  }
-  expect(await provider()).not.toHaveBeenCalled();
-});
-it('account registration consumes hidden invitation once and rejects concurrent duplicate names', async () => {
-  const p = fresh(),
-    username = 'account_' + p.name;
-  const input = { username, password: 'Account_test_password_123', inviteCode };
-  const results = await Promise.all([
-    call(p.name, '/core/auth/register', 'POST', input),
-    call(p.name, '/core/auth/register', 'POST', input),
-  ]);
-  expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
-  const [[row]] = await c.query<RowDataPacket[]>(
-    'SELECT id,parent_id,phone,phone_verified_at FROM users WHERE username=?',
-    [username],
+it('migration blocks legacy usernames occupying another present or future fixed ID', async () => {
+  const sql = await (await import('node:fs/promises')).readFile('schema/extensions/019_user_avatars.sql', 'utf8');
+  const guard = sql
+    .slice(sql.indexOf('CREATE TEMPORARY'), sql.indexOf('ALTER TABLE'))
+    .split(';')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const [insert] = await c.query<mysql.ResultSetHeader>(
+    "INSERT INTO users(username,password_hash,role,display_name) VALUES('TIMO-99999999','unused','creator','ID conflict fixture')",
   );
-  expect(String(row.parent_id)).toBe('1');
-  expect(row.phone).toBeNull();
-  expect(row.phone_verified_at).toBeNull();
-  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM member_invitation_uses WHERE user_id=?', [
-    row.id,
-  ]);
-  expect(count.n).toBe(1);
-  expect(await provider()).not.toHaveBeenCalled();
+  await c.query(guard[0]);
+  try {
+    await expect(c.query(guard[1])).rejects.toMatchObject({ code: 'ER_CHECK_CONSTRAINT_VIOLATED' });
+    await c.query("UPDATE users SET username=CONCAT('TIMO-',id) WHERE id=?", [insert.insertId]);
+    await c.query(guard[1]);
+  } finally {
+    await c.query(guard[2]);
+    await c.query('DELETE FROM users WHERE id=?', [insert.insertId]);
+  }
 });
-it('account registration does not silently ignore invalid invitations or accept forged phone verification and roles', async () => {
+it('rejects username/password signup bypasses on both Web aliases and mini', async () => {
+  process.env.SMS_REGISTRATION_ENABLED = '0';
+  const data = { username: 'bypass', password: 'Password123' };
+  expect((await call('bypass', '/core/auth/register', 'POST', data)).status).toBe(422);
+  for (const path of ['/api/v1/auth/register', '/api/v1/core/auth/register'])
+    expect((await request(app).post(path).set('X-Client-Id', crypto.randomUUID()).send(data)).status).toBe(422);
+});
+it('assigns fixed IDs, enforces initial password strength and preserves legacy password login', async () => {
   const p = fresh(),
-    input = { username: 'account_' + p.name, password: 'Account_test_password_123' };
-  for (const extra of [
-    { inviteCode: 'ZZZZZZZZ' },
-    { phone: p.phone },
-    { smsCode: '123456' },
-    { phoneVerifiedAt: '2026-10-03' },
-    { role: 'admin' },
-  ])
-    expect((await call(p.name, '/core/auth/register', 'POST', { ...input, ...extra })).status).toBe(422);
-  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE username=?', [input.username]);
+    r = await signup(p, await send(p)),
+    user = r.body.data.user,
+    token = r.body.data.token;
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  expect(user).toMatchObject({ userId: 'TIMO-' + user.id, username: 'TIMO-' + user.id, hasPassword: false });
+  for (const newPassword of ['12345678', 'abcdefgh', 'Ab12345', 'Ab1234567890123456', 'Abc12345!', '中文abc123'])
+    expect((await call(p.name, '/core/auth/set-password', 'POST', { newPassword }, token)).status).toBe(422);
+  expect((await call(p.name, '/core/auth/set-password', 'POST', { newPassword: 'abcd1234' })).status).toBe(401);
+  expect((await call(p.name, '/core/auth/set-password', 'POST', { newPassword: 'abcd1234' }, token)).status).toBe(200);
+  expect((await call(p.name, '/core/auth/me', 'GET', {}, token)).status).toBe(401);
+  const login = await call(p.name, '/core/auth/login', 'POST', { username: user.userId, password: 'abcd1234' });
+  expect(login.status, JSON.stringify(login.body)).toBe(200);
+  expect(login.body.data.user).toMatchObject({ id: user.id, userId: user.userId, hasPassword: true });
+  expect(
+    (await call(p.name, '/core/auth/set-password', 'POST', { newPassword: 'Changed123' }, login.body.data.token))
+      .status,
+  ).toBe(409);
+  expect(
+    (await call(p.name, '/core/auth/profile', 'POST', { displayName: '新昵称' }, login.body.data.token)).body.data
+      .userId,
+  ).toBe(user.userId);
+  expect((await call(p.name, '/core/auth/profile', 'POST', { id: '999' }, login.body.data.token)).status).toBe(422);
+  const bcrypt = (await import('bcryptjs')).default,
+    oldPassword = 'Legacy_symbols_and_more_than16!';
+  const [insert] = await c.query<any>(
+    "INSERT INTO users(username,password_hash,role,display_name,must_change_pwd) VALUES(?,?,'creator','旧账号',0)",
+    ['old_' + p.name, await bcrypt.hash(oldPassword, 4)],
+  );
+  for (const username of ['old_' + p.name, 'TIMO-' + insert.insertId]) {
+    const old = await call('old_' + p.name, '/core/auth/login', 'POST', { username, password: oldPassword });
+    expect(old.status).toBe(200);
+    expect(old.body.data.user.id).toBe(String(insert.insertId));
+  }
+});
+it('Web registers by SMS, issues private refresh cookie and reuses that account for SMS login', async () => {
+  const p = fresh(),
+    client = crypto.randomUUID();
+  process.env.SMS_LOGIN_ENABLED = '1';
+  const web = (path: string, data: object) =>
+    request(app)
+      .post('/api/v1/core/auth/' + path)
+      .set('X-Client-Id', client)
+      .send(data);
+  expect((await web('registration-code', { phone: p.phone })).status).toBe(200);
+  const code = (await provider()).mock.calls.at(-1)![1];
+  expect(
+    (
+      await request(app)
+        .post('/api/v1/core/auth/register')
+        .set('X-Client-Id', crypto.randomUUID())
+        .send({ phone: p.phone, smsCode: code })
+    ).status,
+  ).toBe(422);
+  const r = await web('register', { phone: p.phone, smsCode: code });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  expect(r.headers['set-cookie'][0]).toContain('HttpOnly');
+  expect(r.body.data.refresh).toBeUndefined();
+  expect(r.body.data.user.hasPassword).toBe(false);
+  expect((await web('register', { phone: p.phone, smsCode: code })).status).toBe(422);
+  await c.query('UPDATE sms_registration_challenges SET created_at=DATE_SUB(NOW(3),INTERVAL 61 SECOND)');
+  await c.query('DELETE FROM sms_registration_limits WHERE expires_at<TIMESTAMPADD(SECOND,130,NOW(3))');
+  expect((await web('login-code', { phone: p.phone })).status).toBe(200);
+  const sms = vi.mocked((await import('../../src/sms/aliyun')).sendAccountSms).mock.calls.at(-1)![1];
+  const login = await web('sms-login', { phone: p.phone, smsCode: sms });
+  expect(login.status, JSON.stringify(login.body)).toBe(200);
+  expect(login.body.data.user.id).toBe(r.body.data.user.id);
+  expect(login.headers['set-cookie'][0]).toContain('HttpOnly');
+  expect(login.body.data.refresh).toBeUndefined();
+  expect((await web('sms-login', { phone: p.phone, smsCode: sms })).status).toBe(422);
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM wechat_identities WHERE user_id=?', [
+    r.body.data.user.id,
+  ]);
   expect(count.n).toBe(0);
 });
-it('new account names cannot reserve an unverified phone number', async () => {
-  for (const username of ['13900009001', 'ab', 'name with spaces'])
-    expect(
-      (await call(fresh().name, '/core/auth/register', 'POST', { username, password: 'Account_test_password_123' }))
-        .status,
-    ).toBe(422);
-});
-it('account signup retains registration rate limits when SMS is deferred', async () => {
-  const p = fresh();
-  for (let n = 0; n < 6; n++) {
-    const r = await call(p.name, '/core/auth/register', 'POST', {
-      username: 'limited_' + p.name + '_' + n,
-      password: 'Account_test_password_123',
-    });
-    expect(r.status).toBe(n < 5 ? 201 : 429);
-  }
+it('persists private avatar bytes with fixed ID and refuses anonymous or foreign user writes/reads', async () => {
+  const a = fresh(),
+    b = fresh(),
+    ar = await signup(a, await send(a)),
+    br = await signup(b, await send(b));
+  const token = ar.body.data.token,
+    other = br.body.data.token;
+  const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1cAAAAASUVORK5CYII=';
+  expect((await call(a.name, '/core/auth/avatar', 'POST', { base64 })).status).toBe(401);
+  expect((await call(a.name, '/core/auth/avatar', 'GET', {})).status).toBe(401);
+  for (const data of [
+    { base64, userId: br.body.data.user.id },
+    { base64: Buffer.from('<svg></svg>').toString('base64') },
+    { base64: base64.slice(0, -4) },
+    { base64: 'A'.repeat(350000) },
+  ])
+    expect((await call(a.name, '/core/auth/avatar', 'POST', data, token)).status).toBe(422);
+  const saved = await call(a.name, '/core/auth/avatar', 'POST', { base64 }, token);
+  expect(saved.status).toBe(200);
+  expect(saved.body.data.userId).toBe(ar.body.data.user.userId);
+  expect((await call(a.name, '/core/auth/avatar', 'GET', {}, token)).body.data.base64).toBe(base64);
+  expect((await call(b.name, '/core/auth/avatar', 'GET', {}, other)).body.data).toBeNull();
+  expect((await call(b.name, '/core/auth/avatar', 'GET', { userId: ar.body.data.user.id }, other)).status).toBe(422);
+  expect((await call(a.name, '/core/auth/me', 'GET', {}, token)).body.data.avatarVersion).toBe(
+    saved.body.data.avatarVersion,
+  );
+  expect((await call(a.name, '/core/auth/set-password', 'POST', { newPassword: 'Password123' }, token)).status).toBe(
+    200,
+  );
+  const again = await call(a.name, '/core/auth/login', 'POST', {
+    username: ar.body.data.user.userId,
+    password: 'Password123',
+  });
+  expect((await call(a.name, '/core/auth/avatar', 'GET', {}, again.body.data.token)).body.data.base64).toBe(base64);
 });

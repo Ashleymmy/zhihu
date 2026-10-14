@@ -291,6 +291,7 @@ describe('管理角色层级', () => {
     expect((await me(second)).status).toBe(200);
   });
   it('改密和管理员重置会撤销所有设备及刷新令牌', async () => {
+    const resetPassword = 'Reset123456';
     const a = await login('creator'),
       b = await login('creator', device(true)),
       admin = await login('admin');
@@ -300,20 +301,20 @@ describe('管理角色层级', () => {
           .post('/team/members/5/reset-password')
           .set(headers(admin.device))
           .auth(admin.token, { type: 'bearer' })
-          .send({ password })
+          .send({ password: resetPassword })
       ).status,
     ).toBe(200);
     expect((await me(a)).status).toBe(401);
     expect((await me(b)).status).toBe(401);
     expect((await refresh(a)).status).toBe(401);
-    const current = await login('creator');
+    const current = await login('creator', device(), resetPassword);
     expect(
       (
         await request(app)
           .post('/auth/change-password')
           .set(headers(current.device))
           .auth(current.token, { type: 'bearer' })
-          .send({ oldPassword: password, newPassword: password + '_new' })
+          .send({ oldPassword: resetPassword, newPassword: 'Changed123456' })
       ).status,
     ).toBe(200);
     expect((await me(current)).status).toBe(401);
