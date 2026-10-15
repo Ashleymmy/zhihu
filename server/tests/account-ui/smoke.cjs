@@ -71,6 +71,8 @@ async function shot(page, name) {
         const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' }),
           page = await context.newPage();
         await page.goto(base + '/login');
+        await shot(page, role + '-phone-login-' + width);
+        await page.getByRole('button', {name:'使用原账号登录',exact:true}).click();
         await page.locator('#username').fill(role);
         await page.locator('#password').fill('Legacy_password_more_than16!');
         await page.locator('button[type=submit]').click();
@@ -109,6 +111,14 @@ async function shot(page, name) {
       await page.locator('input[autocomplete=new-password]').nth(1).fill('abc12345');
       await page.getByRole('button', { name: '保存密码并重新登录', exact: true }).click();
       await page.waitForURL('**/login?passwordChanged=1');
+      await page.locator('#username').fill(phone);
+      await page.locator('#password').fill('abc12345');
+      await shot(page, 'phone-password-' + width);
+      await page.locator('button[type=submit]').click();
+      await page.waitForURL((u) => !u.pathname.endsWith('/login'));
+      if (width === 375) await page.locator('.menu-toggle').click();
+      await page.getByRole('button', {name:'退出登录',exact:true}).click();
+      await page.waitForURL('**/login');
       messages.splice(0, messages.length);
       host.send('reset-limits');
       await wait((m) => m.reset);
@@ -123,7 +133,7 @@ async function shot(page, name) {
       await context.close();
     }
     console.log(
-      'ACCOUNT_WEB_UI_PASS 375/1440: 3 legacy roles, registration, first password, strength rejection, SMS relogin',
+      'ACCOUNT_WEB_UI_PASS 375/1440: 3 legacy roles, registration, first password, strength rejection, verified phone/password relogin, SMS relogin',
     );
   } finally {
     await browser?.close();

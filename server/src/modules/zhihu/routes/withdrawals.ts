@@ -1,4 +1,5 @@
 import { legacyFinanceReadOnly } from '../services/legacy-finance-access';
+import { requireWithdrawalApplication } from '../../../core/withdrawal-channel';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -60,6 +61,7 @@ withdrawalsRouter.get(
 /** 成员/团长提交提现申请（自动风控标记） */
 withdrawalsRouter.post(
   '/',
+  requireWithdrawalApplication,
   sensitiveWriteLimit,
   requirePermission('withdraw.apply'),
   validateBody(create),

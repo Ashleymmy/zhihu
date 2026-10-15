@@ -1,5 +1,6 @@
 import { ownAvatar } from '../services/user-avatar.service';
 import { newPasswordSchema } from '../auth/password-policy';
+import { passwordLoginSchema } from '../auth/password-login';
 import { createAccountSmsRouter } from '../wechat/sms-auth';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
@@ -24,7 +25,7 @@ import { smsSignupSchema, registrationPolicy, sendSignupCode, registerWithSms } 
 import { clientIdentity } from '../auth/clientIdentity';
 import { invitationPreview } from '../services/invitations.service';
 
-const loginSchema = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(128) });
+const loginSchema = passwordLoginSchema;
 const invitationSchema = z
   .string()
   .regex(/^[a-zA-Z0-9_-]{43}$/)
@@ -126,6 +127,7 @@ authRouter.post(
       req.body.password,
       req.ip,
       clientIdentity(req),
+      req.body.loginMethod,
     );
     setRefreshCookie(req, res, session);
     ok(res, result);

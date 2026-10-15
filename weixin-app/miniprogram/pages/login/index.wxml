@@ -3,13 +3,15 @@
   <view class="login-logo">T</view>
   <view class="login-title">欢迎来到 TIMO</view>
   <view class="login-sub">多渠道 OPC 业务平台</view>
-  <view class="auth-mode-header"><text class="auth-mode-label">{{mode==='password' ? '账号密码登录' : '短信验证码登录'}}</text><button wx:if="{{smsLoginEnabled}}" class="auth-mode-switch" bindtap="toggleMode" disabled="{{busy || sendingCode}}">{{mode==='password' ? '切换短信验证登录' : '切换账号密码登录'}} ↗</button></view>
+  <view class="auth-mode-header"><text class="auth-mode-label">{{mode==='password' ? (legacyLogin ? '原账号密码登录' : '手机号密码登录') : '短信验证码登录'}}</text><button wx:if="{{smsLoginEnabled}}" class="auth-mode-switch" bindtap="toggleMode" disabled="{{busy || sendingCode}}">{{mode==='password' ? '切换短信验证登录' : '切换密码登录'}} ↗</button></view>
   <view class="login-form" wx:if="{{mode==='password'}}">
     <view class="input-row"
       ><input
         data-name="username"
         value="{{username}}"
-        placeholder="用户 ID（如 timo123456）或原登录账号"
+        type="{{legacyLogin ? 'text' : 'number'}}"
+        maxlength="{{legacyLogin ? 64 : 11}}"
+        placeholder="{{legacyLogin ? '请输入原登录账号' : '请输入已验证的手机号'}}"
         placeholder-class="ph"
         bindinput="input"
     /></view>
@@ -23,6 +25,8 @@
         bindinput="input"
         bindconfirm="submit"
     /></view>
+    <button class="auth-mode-switch" disabled="{{busy || sendingCode}}" bindtap="toggleLegacyLogin">{{legacyLogin ? '返回手机号登录' : '使用原账号登录'}}</button>
+    <view class="muted sms-help" wx:if="{{legacyLogin}}">尚未验证手机号的旧账号可先登录，再到个人信息中验证手机号。</view>
   </view>
   <view class="login-form" wx:else>
     <view class="input-row"><input data-name="phone" value="{{phone}}" type="number" maxlength="11" placeholder="请输入已验证的手机号" bindinput="input" /></view>

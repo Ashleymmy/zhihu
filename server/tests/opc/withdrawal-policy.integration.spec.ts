@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import mysql from 'mysql2/promise';
@@ -73,6 +74,9 @@ beforeAll(async () => {
     DB_PASS: target.password,
     OPC_MODULES: '',
     OPC_WITHDRAWAL_POLICY_ENABLED: '1',
+    WECHAT_APP_ID: 'wx0000000000000001',
+    WECHAT_BRIDGE_SECRET: 'isolated_withdrawal_bridge_secret_long_enough',
+    MINI_CONTENT_SAFETY_REQUIRED: '0',
     QUEUE_DRIVER: 'memory',
   });
   delete process.env.DEV_DEMO_AUTH;
@@ -435,4 +439,42 @@ it('filters overdue requests before pagination without broadening access', async
   expect(queue.withdrawals[0]).toMatchObject({ id: entry.id, attention: 'overdue' });
   expect((await get(12, '', { ...scope, attention: 'overdue' })).body.data.total).toBe(0);
   expect((await get(4, '', { ...scope, attention: 'overdue' })).status).toBe(403);
+});
+
+
+it('pauses applications for every mini account/version while preserving Web applications and mini history', async () => {
+  const { issueRefreshSession } = await import('../../src/auth/tokenSessions');
+  const { signToken } = await import('../../src/auth/jwt');
+  const { wechatClientId } = await import('../../src/wechat/context');
+  const identity = {appId:'wx0000000000000001',openId:'isolated_withdrawal_user12'};
+  const session = await issueRefreshSession('12',{type:'mini',id:wechatClientId(identity)});
+  const token = await signToken({...actors[11],id:'12',sessionId:session.familyId});
+  const mini = (method: string, suffix: string, data: object) => {
+    const raw = JSON.stringify({...identity,token,method,path:'/core/finance'+suffix,data});
+    const time=String(Date.now()),nonce=crypto.randomBytes(16).toString('hex');
+    return request(app).post('/api/v1/mini/bridge').set({
+      'Content-Type':'application/json','X-Bridge-Time':time,'X-Bridge-Nonce':nonce,
+      'X-Bridge-Signature':crypto.createHmac('sha256',process.env.WECHAT_BRIDGE_SECRET!).update(`${time}\n${nonce}\n${raw}`).digest('hex'),
+    }).send(raw);
+  };
+  const before = (await get(12,'')).body.data.balance;
+  for (const amount of ['0.01','10','100','600']) {
+    const quoted = await mini('GET','/withdrawal-quote',{...scope,amount});
+    expect(quoted.status,quoted.text).toBe(403);expect(quoted.body.code).toBe(40330);
+    const applied = await mini('POST','/withdrawals',{...scope,amount,requestKey:crypto.randomUUID()});
+    expect(applied.status,applied.text).toBe(403);expect(applied.body.message).toContain('暂不受理');
+  }
+  expect((await get(12,'')).body.data.balance).toEqual(before);
+  const entry = await apply(12,'100');
+  const history = await mini('GET','',scope);
+  expect(history.status,history.text).toBe(200);
+  expect(history.body.data.withdrawals.some((r:any)=>r.id===entry.id)).toBe(true);
+  expect((await mini('GET','',{...scope,projectId:'999'})).status).toBe(403);
+  const cancelled = await mini('POST','/withdrawals/'+entry.id+'/review',{...scope,action:'cancel'});
+  expect(cancelled.status,cancelled.text).toBe(200);
+  expect((await get(12,'')).body.data.balance).toEqual(before);
+  // A mini token cannot claim to be a Web client to bypass the channel pause.
+  const forged = await request(app).post(path+'/withdrawals').set('Authorization','Bearer '+token)
+    .set('X-Client-Id',wechatClientId(identity)).send(entry.body);
+  expect(forged.status).toBe(401);
 });

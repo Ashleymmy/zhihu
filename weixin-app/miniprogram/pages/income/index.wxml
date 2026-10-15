@@ -44,9 +44,9 @@
           <template is="amount-periods" data="{{value:memberSummary.team.reward}}" />
           <view class="summary-note">本人已确认的团队分成 · 按业绩日期统计</view>
         </view>
-        <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">查看钱包与提现</button>
+        <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">查看收入与余额</button>
       </view>
-      <button wx:if="{{!loading && summaryError}}" size="mini" data-path="/pages/wallet/index" bindtap="open">查看钱包与提现</button>
+      <button wx:if="{{!loading && summaryError}}" size="mini" data-path="/pages/wallet/index" bindtap="open">查看收入与余额</button>
     </block>
     <!-- 本期收益 hero：主数字 + 已确认/待确认副指标 -->
     <view wx:else class="balance-card rise">
@@ -56,7 +56,7 @@
       <view class="balance-sub" wx:else>已确认 ¥{{summary.confirmedReceivable}} · 待确认 ¥{{summary.pendingReceivable}}</view>
       <view class="balance-sub">{{from}} 至 {{to}}</view>
       <view class="balance-sub" wx:if="{{summary.pendingCalculations}}">另有 {{summary.pendingCalculations}} 条在核对中，金额尚未计入。</view>
-      <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">{{isStaff ? '查看财务账单' : '查看钱包与提现'}}</button>
+      <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">{{isStaff ? '查看财务账单' : '查看收入与余额'}}</button>
     </view>
 
     <!-- 期间筛选：快捷月份 + 自定义起止 -->

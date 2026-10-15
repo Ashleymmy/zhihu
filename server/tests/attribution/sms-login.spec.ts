@@ -420,3 +420,34 @@ it('binding proof expires when password or phone changes, and verification codes
       .status,
   ).toBe(422);
 });
+
+
+it('phone password login on Web and mini resolves only the verified owner, even with a colliding old username', async () => {
+  const owner = await person(true, false), legacy = await person(false, false);
+  await c.query('UPDATE users SET username=?,phone=? WHERE id=?', [owner.phone, owner.phone, legacy.id]);
+  const web = (username: string, loginMethod: string, suppliedPassword = password) => request(app)
+    .post('/api/v1/core/auth/login').set('X-Client-Id', 'phone-login-web-client')
+    .send({username,password:suppliedPassword,loginMethod});
+  for (const method of ['phone','username']) {
+    const expected = method === 'phone' ? owner.id : legacy.id;
+    const w = await web(owner.phone, method);
+    expect(w.status, w.text).toBe(200); expect(w.body.data.user.id).toBe(expected);
+    const m = await call(owner.name,'login',{username:owner.phone,password,loginMethod:method});
+    expect(m.status,m.text).toBe(200); expect(m.body.data.user.id).toBe(expected);
+  }
+  expect((await web(owner.phone,'phone','Wrong12345')).status).toBe(401);
+  expect((await web('timo000001','phone')).status).toBe(422);
+  await c.query('UPDATE users SET phone_verified_at=NULL WHERE id=?',[owner.id]);
+  expect((await web(owner.phone,'phone')).status).toBe(401);
+  expect((await call(owner.name,'login',{username:owner.phone,password,loginMethod:'phone'})).status).toBe(401);
+  // Never fall back to the numeric legacy username, even if its password matches.
+  expect((await web(owner.phone,'username')).body.data.user.id).toBe(legacy.id);
+  await c.query('UPDATE users SET phone_verified_at=NOW(3),password_set=0 WHERE id=?',[owner.id]);
+  expect((await web(owner.phone,'phone')).status).toBe(401);
+  expect((await call(owner.name,'login',{username:owner.phone,password,loginMethod:'phone'})).status).toBe(401);
+  await c.query('UPDATE users SET password_set=1,is_active=0 WHERE id=?',[owner.id]);
+  expect((await web(owner.phone,'phone')).status).toBe(403);
+  expect((await call(owner.name,'login',{username:owner.phone,password,loginMethod:'phone'})).status).toBe(403);
+  const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM wechat_identities WHERE user_id=?',[owner.id]);
+  expect(count.n).toBe(0);
+});

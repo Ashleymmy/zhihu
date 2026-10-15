@@ -5,28 +5,16 @@ const actions = require("../../utils/actions");
 const feedback = require("../../utils/feedback");
 const amount = require("../../utils/amount");
 const { upload } = require("../../utils/upload");
-const empty = () => ({
-  amount: "",
-  receiverName: "",
-  bankName: "",
-  bankAccount: "",
-});
 Page(
   screen("withdrawals", {
     pageSize: 25,
     infinite: true,
     data: {
       view: null,
-      policy: null,
-      quote: null,
-      rulesOpen: false,
-      rulesAccepted: false,
       attention: 'all',
       invoiceItem: null,
       invoiceInstructions: "",
       invoiceReason: "",
-      applyOpen: false,
-      form: empty(),
       selected: null,
       reviewAction: "",
       reason: "",
@@ -35,8 +23,6 @@ Page(
       paymentForm: { reference: "", paidOn: actions.today(), acknowledged: false },
     },
     async fetch({ scope }) {
-      const policy = await request.get('/core/finance/withdrawal-policy');
-      if (this.canAct()) this.setData({policy});
       const view = await request.get(
         "/core/finance",
         Object.assign({}, scope, { moduleId: "zhihu", page: this.data.page, attention:this.data.attention }),
@@ -58,8 +44,8 @@ Page(
           canPay: item.status === 'approved' && (!item.invoiceRequired || item.invoiceStatus === 'accepted'),
         }),
       );
-      if(view.balance){const cents=amount.units(view.balance.available,2);view.balance.availableDisplay=String(cents/BigInt(100))+'.'+String(cents%BigInt(100)).padStart(2,'0');view.canWithdraw=cents>=BigInt((view.withdrawalPolicy||policy).enabled?1000:1);}
-      return { view, policy:view.withdrawalPolicy || policy, total: view.total };
+      if(view.balance){const cents=amount.units(view.balance.available,2);view.balance.availableDisplay=String(cents/BigInt(100))+'.'+String(cents%BigInt(100)).padStart(2,'0');}
+      return { view, total: view.total };
     },
     // 触底加载：合并嵌套在 view.withdrawals 里的列表，余额等汇总字段不重刷
     merge(result) {
@@ -72,77 +58,14 @@ Page(
         total: result.total,
       });
     },
-    openApply() {
-      if (
-        this.canAct() &&
-        !this.data.busy &&
-        this.data.view &&
-        !this.data.view.canManage
-      )
-        this.setData({ applyOpen: true, form: empty(), quote:null,rulesAccepted:false,error: "" });
-    },
     close() {
       if (!this.data.busy)
-        this.setData({ applyOpen: false, selected: null, payment: null, invoiceItem:null,proofFileId: "", error: "" });
+        this.setData({ selected: null, payment: null, invoiceItem: null, proofFileId: "", error: "" });
     },
-    // 「全部提现」快捷填入当前可提现余额
-    fillAll() {
-      const available = this.data.view && this.data.view.balance
-        ? this.data.view.balance.available
-        : "";
-      if (available) {const cents=amount.units(available,2);this.setData({ "form.amount":String(cents/BigInt(100))+'.'+String(cents%BigInt(100)).padStart(2,'0'),quote:null,rulesAccepted:false });}
-    },
-    amountInput(e) { if(this.data.busy)return; this.setData({'form.amount':e.detail.value,quote:null,rulesAccepted:false}); },
-    toggleRules(){this.setData({rulesOpen:!this.data.rulesOpen});},
-    async filterAttention(e){if(this.data.busy||this.data.loading)return;this.setData({attention:e.currentTarget.dataset.value,page:1});await this.load();},
-    acceptRules(e){this.setData({rulesAccepted:e.detail.value.includes('yes')});},
-    async previewAmount(){
-      await this.action(async({scope})=>{
-        const value=this.data.form.amount.trim();
-        if(!actions.money(value))throw new Error('请输入金额，最多两位小数');
-        const quote=await request.get('/core/finance/withdrawal-quote',{...scope,moduleId:'zhihu',amount:value});
-        if(this.canAct())this.setData({quote:{...quote,amount:amount.money(quote.amount),feeAmount:amount.money(quote.feeAmount),netAmount:amount.money(quote.netAmount)},rulesAccepted:false});
-      },'');
-    },
-    async apply() {
-      if(this.data.policy&&this.data.policy.enabled&&!this.data.quote){await this.previewAmount();return;}
-      if (
-        await this.action(async ({ user, scope }) => {
-          if (!["leader", "creator"].includes(user.role) || !this.data.view)
-            throw new Error("当前账号不可申请提现");
-          const form = Object.keys(this.data.form).reduce((value, key) => {
-            value[key] = this.data.form[key].trim();
-            return value;
-          }, {});
-          if (!actions.money(form.amount))
-            throw new Error("金额须大于零，最多两位小数");
-          if (amount.units(form.amount) > amount.units(this.data.view.balance.available))
-            throw new Error("申请金额超过可提现余额");
-          if (!form.receiverName || !form.bankName || !form.bankAccount)
-            throw new Error("请完整填写收款资料");
-          if(this.data.policy&&this.data.policy.enabled){
-            if(!this.data.rulesAccepted)throw new Error('请核对费用、到账金额和提现规则');
-            if(!this.data.quote||amount.units(form.amount)!==amount.units(this.data.quote.amount))throw new Error('金额已修改，请重新核对');
-            form.policyVersion=this.data.quote.policyVersion;form.quoteToken=this.data.quote.quoteToken;
-          }
-          try { await actions.post(
-            this,
-            "/core/finance/withdrawals",
-            Object.assign({}, scope, { moduleId: "zhihu" }, form),
-          ); } catch(error) {
-            if(Number(error.code)===40910){
-              if(this.canAct())this.setData({quote:null,rulesAccepted:false});
-              const policy=await request.get('/core/finance/withdrawal-policy');
-              if(this.canAct())this.setData({policy});
-              throw new Error('提现规则或日期已更新，请重新核对到账金额并确认');
-            }
-            throw error;
-          }
-        }, "提现申请已提交")
-      ) {
-        this.setData({ applyOpen: false, form: empty(), page: 1 });
-        await this.load();
-      }
+    async filterAttention(e) {
+      if (this.data.busy || this.data.loading) return;
+      this.setData({ attention: e.currentTarget.dataset.value, page: 1 });
+      await this.load();
     },
     choose(e) {
       if (!this.canAct() || this.data.busy) return;
@@ -171,7 +94,7 @@ Page(
           title: reviewAction === "cancel" ? "撤回提现申请" : "退回提现申请",
           message:
             reviewAction === "cancel"
-              ? "撤回后释放未付款的占用金额。按新规则受理的申请仍计入今日次数，明天可再次申请。"
+              ? "撤回后释放未付款的占用金额。小程序暂不受理新申请，请确认后撤回。"
               : "退回后释放未付款的占用金额。按新规则受理的申请仍计入今日次数。",
           confirmText: reviewAction === "cancel" ? "确认撤回" : "确认退回",
           danger: true,
