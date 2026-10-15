@@ -39,6 +39,8 @@ async function main() {
       page.setDefaultTimeout(20000); page.on('pageerror', error => errors.push(error.message));
       await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
       await page.goto(base + '/app/login');
+      const legacyLogin = page.getByRole('button', { name: '使用原账号登录', exact: true });
+      await legacyLogin.click();
       await page.locator('input[autocomplete="username"]').fill(username);
       await page.locator('input[type="password"]').fill(password);
       const logging = page.waitForResponse(r => r.url().endsWith('/core/auth/login'));

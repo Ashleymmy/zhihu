@@ -237,6 +237,20 @@ it('handles every canonical role including operator/developer without granting p
     expect((await login(name)).body.data.user.role).toBe(name);
   expect((await call('operator', '/core/projects', 'POST', { name: 'not allowed' })).status).toBe(403);
 });
+it('hides work statistics and unit prices from mini members and operators at the signed bridge boundary', async () => {
+  for (const name of ['admin', 'developer', 'leader', 'creator', 'operator']) {
+    await login(name);
+    const summary = await call(name, '/modules/zhihu/home-summary', 'GET', scope);
+    expect(summary.status, JSON.stringify(summary.body)).toBe(200);
+    expect(summary.body.data.works).toBe(['admin', 'developer'].includes(name) ? 0 : null);
+    const options = await call(name, '/modules/zhihu/attribution-options', 'GET', scope);
+    expect(options.status, JSON.stringify(options.body)).toBe(200);
+    if (!['admin', 'developer'].includes(name)) {
+      expect(options.body.data.currentNewUserPrice).toBeUndefined();
+      expect(options.body.data.tasks.every((task: { unitPrice: unknown }) => task.unitPrice === null)).toBe(true);
+    }
+  }
+});
 let invitedId: string, inviteCode: string;
 it('a mini invitation registers the same website creator, leader provenance, and no bonus ledger entries', async () => {
   const invite = await call('leader', '/modules/zhihu/invite/me');
