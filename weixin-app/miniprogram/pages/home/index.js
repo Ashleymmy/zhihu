@@ -67,7 +67,7 @@ const BANNERS = [
     key: "income",
     image: "/images/banners/banner-2.png",
     title: "收益与提现",
-    subtitle: "账单确认、款项到账并开放后可申请提现",
+    subtitle: "查看收益、余额和历史提现进度",
     path: "/pages/income/index",
   },
   {

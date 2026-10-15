@@ -94,7 +94,7 @@
           ><view class="balance-label">可提现金额（元）</view
           ><view class="balance-value">¥{{balance.available}}</view></view
         ><button size="mini" data-path="/pages/wallet/index" bindtap="open"
-          >去提现</button
+          >查看余额</button
         ></view
       ><view class="balance-sub"
         >待开放 ¥{{balance.held}} · 处理中 ¥{{balance.processing}} · 已到账

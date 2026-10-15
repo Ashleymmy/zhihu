@@ -39,7 +39,7 @@ function menus(user) {
   const labels = {
     keywords: isAdmin(user) ? "关键词管理" : "我的关键词",
     works: "作品记录",
-    wallet: isAdmin(user) ? "财务账单" : "收入与提现",
+    wallet: isAdmin(user) ? "财务账单" : "收入与余额",
     reports: "报表与异常",
     team: "团队成员",
     "join-team": "我的团队 / 申请入团",

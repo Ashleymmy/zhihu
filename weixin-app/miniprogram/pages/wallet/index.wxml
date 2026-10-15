@@ -21,7 +21,7 @@
           size="mini"
           data-path="/pages/withdrawals/index"
           bindtap="open"
-          >去提现</button
+          >提现记录</button
         ></view
       ><view class="balance-sub"
         >待开放 ¥{{view.balance.held}} · 处理中 ¥{{view.balance.processing}} ·
