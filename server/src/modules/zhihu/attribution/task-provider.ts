@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AuthUser } from '../../../types';
-import { isStaffRole } from '../../../auth/roles';
-import { dutyAllows } from '../../../core/duties';
+import { canViewWorkStatistics, isStaffRole } from '../../../auth/roles';
+import { canViewUnitPrices, dutyAllows } from '../../../core/duties';
 import type { ModuleTaskProvider, TaskAction, TaskDetail, TaskItem, TaskScope } from '../../../core/contracts';
 import { withTransaction } from '../../../db';
 import { AppError } from '../../../middleware/errors';
@@ -326,7 +326,7 @@ function taskItem(word: RecordRow, user: AuthUser, scope: TaskScope, options: Op
     leader: word.leader_id ? String(word.leader_name || person(user, options, word.leader_id)) : undefined,
     next: { actor, text, ...(primary ? { action: primary } : {}) },
     metrics: [
-      { label: '已交作品', value: String(word.composition_count ?? 0) + ' 篇' },
+      ...(canViewWorkStatistics(user.role) ? [{ label: '已交作品', value: String(word.composition_count ?? 0) + ' 篇' }] : []),
       ...(Array.isArray(word.task_rules) ? word.task_rules : []),
     ],
   };
@@ -380,34 +380,21 @@ async function enrichWorks(user: AuthUser, words: RecordRow[]) {
   }
 }
 async function enrichRules(scope: TaskScope, user: AuthUser, words: RecordRow[]) {
-  if (isStaffRole(user.role)) return;
   await withTransaction(async (c) => {
     const cache = new Map<string, { label: string; value: string }[]>();
     for (const word of words) {
       const rules: { label: string; value: string }[] = [];
-      if (Number(word.allocation_ready))
+      if (!isStaffRole(user.role) && Number(word.allocation_ready))
         rules.push({
           label: '领取规则',
           value: Number(word.priority_ended) ? '团长、独立达人可领取' : '创建后 30 分钟内团长优先',
         });
-      if (!word.task_id) {
+      if (!canViewUnitPrices(user) || !word.task_id || !word.executor_id || word.path_type === 'reserved') {
         word.task_rules = rules;
         continue;
       }
-      const mine = String(word.executor_id) === user.sub || String(word.leader_id) === user.sub;
-      if (!mine && !Number(word.allocation_ready)) {
-        word.task_rules = rules;
-        continue;
-      }
-      const binding: RecordRow =
-        mine && word.path_type !== 'reserved'
-          ? word
-          : {
-              ...word,
-              path_type: user.role === 'leader' ? 'leader_self' : 'direct_creator',
-              leader_id: user.role === 'leader' ? user.sub : null,
-              executor_id: user.sub,
-            };
+      // Management sees the actual executor's rate, never a rate quoted for the viewer.
+      const binding = word;
       const cacheKey = [word.task_id, binding.path_type, binding.leader_id, binding.executor_id].join(':');
       let prices = cache.get(cacheKey);
       if (!prices) {
@@ -418,14 +405,14 @@ async function enrichRules(scope: TaskScope, user: AuthUser, words: RecordRow[])
               type === 'new_user'
                 ? await quote(c, scope, String(word.task_id), binding, businessDay(), '1')
                 : (await quoteActivation(c, scope, binding, businessDay(), '1', null)).obligations;
-            const own = obligations.find((o) => o.payeeId === user.sub);
+            const own = obligations.find((o) => o.payeeId === String(word.executor_id));
             if (own) {
               const value = money(own.unitPrice);
               if (value < 0n) throw new AppError(409, 40901, 'PRICE_CONFLICT');
               prices.push({
                 label:
                   (type === 'activation' ? '当前拉活' : '当前拉新') +
-                  (binding.path_type === 'team_creator' && user.role === 'leader' ? '分成' : '单价'),
+                  '单价',
                 value: moneyText(value) + ' 元/' + (type === 'activation' ? '个' : '单'),
               });
             }

@@ -36,7 +36,9 @@ const admin = user('1', 'admin'),
   independent = user('4', 'creator'),
   ops = user('5', 'admin', 'operations'),
   finance = user('6', 'admin', 'finance'),
-  stranger = user('7', 'creator');
+  stranger = user('7', 'creator'),
+  developer = user('8', 'developer'),
+  operator = user('9', 'operator');
 const headers: Record<string, Record<string, string>> = {};
 const q = async (sql: string, args: unknown[] = []) => (await c.query<mysql.RowDataPacket[]>(sql, args))[0];
 let mappingId = '',
@@ -71,7 +73,7 @@ beforeAll(async () => {
   });
   await runOpcMigrations(target, ['zhihu']);
   c = await mysql.createConnection(target);
-  for (const actor of [admin, leader, creator, independent, ops, finance, stranger])
+  for (const actor of [admin, leader, creator, independent, ops, finance, stranger, developer, operator])
     await c.query(
       'INSERT INTO users(id,username,password_hash,role,display_name,admin_duty,parent_id) VALUES(?,?,?,?,?,?,?)',
       [actor.sub, actor.username, 'unused', actor.role, actor.displayName, actor.adminDuty, actor.parentId],
@@ -131,7 +133,7 @@ beforeAll(async () => {
   app = createCoreApp(runtime);
   const { signToken } = await import('../../src/auth/jwt'),
     { issueRefreshSession } = await import('../../src/auth/tokenSessions');
-  for (const actor of [admin, leader, creator, independent, ops, finance, stranger]) {
+  for (const actor of [admin, leader, creator, independent, ops, finance, stranger, developer, operator]) {
     const client = 'task-zhihu-client-' + actor.sub,
       session = await issueRefreshSession(actor.sub, { type: 'web', id: client });
     headers[actor.sub] = {
@@ -174,12 +176,31 @@ it('returns usable halls and own/team tasks with names, novel context and immedi
   const hall = (await list(independent, 'available')).body.data.groups[0].list;
   expect(hall.some((t: { id: string }) => t.id === availableId)).toBe(true);
   expect(hall.some((t: { id: string }) => t.id === failedId || t.id === assignedId)).toBe(false);
-  expect(hall.find((t: { id: string }) => t.id === availableId).metrics).toEqual(
-    expect.arrayContaining([
-      { label: '当前拉新单价', value: '8.0000 元/单' },
-      { label: '当前拉活单价', value: '1.2000 元/个' },
-    ]),
-  );
+  expect(hall.find((t: { id: string }) => t.id === availableId).metrics.map((m: {label:string}) => m.label)).toEqual(['领取规则']);
+});
+it('limits task counts and rates to management on lists and details while retaining duty restrictions', async () => {
+  for (const actor of [leader, creator, independent, operator]) {
+    const response = await list(actor, actor === independent ? 'available' : 'owned');
+    expect(response.status, response.text).toBe(200);
+    for (const group of response.body.data.groups) for (const task of group.list) {
+      expect(task.metrics.every((m: {label:string}) => !/已交作品|单价|分成/.test(m.label))).toBe(true);
+      const r = await detail(task.id, actor);
+      expect(r.status, r.text).toBe(200);
+      expect(r.body.data.metrics.every((m: {label:string}) => !/已交作品|单价|分成/.test(m.label))).toBe(true);
+    }
+  }
+  for (const actor of [admin, developer]) {
+    const r = await detail(assignedId, actor);
+    expect(r.status, r.text).toBe(200);
+    expect(r.body.data.metrics).toEqual(expect.arrayContaining([
+      {label:'已交作品',value:'0 篇'},
+      {label:'当前拉新单价',value:'8.0000 元/单'},
+      {label:'当前拉活单价',value:'1.2000 元/个'},
+    ]));
+  }
+  const r = await detail(assignedId, ops);
+  expect(r.body.data.metrics).toContainEqual({label:'已交作品',value:'0 篇'});
+  expect(r.body.data.metrics.some((m: {label:string}) => /单价|分成/.test(m.label))).toBe(false);
 });
 it('rejects nonmember, other creator, finance and conflicting actions at HTTP boundary', async () => {
   expect((await list(stranger)).body.data.groups).toHaveLength(0);
@@ -273,7 +294,6 @@ it('shows automatic work checks, scoped historical evidence, separate activity q
   const d = (await detail(assignedId, creator)).body.data;
   expect(d.metrics).toEqual(
     expect.arrayContaining([
-      { label: '已交作品', value: '1 篇' },
       { label: '本月拉新', value: '3 单' },
       { label: '本月拉活', value: '5 个' },
     ]),
@@ -289,7 +309,8 @@ it('shows automatic work checks, scoped historical evidence, separate activity q
   const failed = (await detail(assignedId, creator)).body.data;
   expect(failed.status.key).toBe('work-failed');
   expect(failed.next.action.key).toBe('works');
-  expect(failed.metrics[0]).toEqual({ label: '已交作品', value: '1 篇' });
+  expect(failed.metrics.some((m: {label:string}) => m.label === '已交作品')).toBe(false);
+  expect((await detail(assignedId, admin)).body.data.metrics).toContainEqual({ label: '已交作品', value: '1 篇' });
 });
 it('assigns report-only historical usage inline and recalculates without a second upload', async () => {
   const date = (await import('../../src/modules/zhihu/attribution/domain')).businessDay(),

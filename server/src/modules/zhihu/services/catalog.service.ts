@@ -3,6 +3,7 @@ import { db, rows, withTransaction } from '../../../db';
 import { enqueue } from '../queue';
 import { AppError } from '../../../middleware/errors';
 import { AuthUser } from '../../../types';
+import { canViewUnitPrices } from '../../../core/duties';
 import { pageOffset } from '../../../utils/pagination';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { writeAudit } from '../../../services/audit.service';
@@ -67,7 +68,10 @@ export async function requestChannelSync(user: AuthUser) {
   return { jobId: String(job.id), status: 'queued' };
 }
 export async function listTasks(user: AuthUser, query: Record<string, unknown>) {
-  if (isDevDemoAuthUser(user)) return listDevDemoTasks(query);
+  if (isDevDemoAuthUser(user)) {
+    const result = listDevDemoTasks(query);
+    return { ...result, list: result.list.map(task => ({ ...task, unitPrice: canViewUnitPrices(user) ? task.unitPrice : null })) };
+  }
 
   const page = Number(query.page ?? 1),
     pageSize = Number(query.pageSize ?? 20);
@@ -88,14 +92,22 @@ export async function listTasks(user: AuthUser, query: Record<string, unknown>) 
     pageSize,
     pageOffset(page, pageSize),
   ]);
-  return { list, total: Number(count?.total ?? 0), page, pageSize };
+  return { list: list.map(task => visibleTask(user, task)), total: Number(count?.total ?? 0), page, pageSize };
+}
+function visibleTask(user: AuthUser, task: RowDataPacket) {
+  if (canViewUnitPrices(user)) return task;
+  const { raw_json: _raw, ...visible } = task;
+  return { ...visible, unit_price: null };
 }
 export async function getTask(user: AuthUser, id: string) {
-  if (isDevDemoAuthUser(user) || isDevDemoEnabled()) return getDevDemoTask(id);
+  if (isDevDemoAuthUser(user) || isDevDemoEnabled()) {
+    const task = getDevDemoTask(id);
+    return { ...task, unitPrice: canViewUnitPrices(user) ? task.unitPrice : null };
+  }
 
   const [task] = await rows<RowDataPacket>('SELECT * FROM tasks WHERE id=? OR zhihu_task_id=? LIMIT 1', [id, id]);
   if (!task) throw new AppError(404, 40401, '推广任务不存在');
-  return task;
+  return visibleTask(user, task);
 }
 export async function requestTaskSync(user: AuthUser, channelId?: string) {
   if (isDevDemoAuthUser(user)) return { jobId: 'dev-demo-tasks', status: 'queued' };

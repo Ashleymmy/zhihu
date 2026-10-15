@@ -16,6 +16,8 @@ export const isRole = (value: unknown): value is Role =>
   value === 'developer' || value === 'admin' || value === 'operator' || value === 'leader' || value === 'creator';
 
 export const isStaffRole = (role: unknown): boolean => role === 'developer' || role === 'admin' || role === 'operator';
+/** Submitted-work statistics are management-only, including on member read APIs. */
+export const canViewWorkStatistics = (role: unknown): boolean => role === 'developer' || role === 'admin';
 export const roleLevel: Record<Role, number> = { developer: 50, admin: 40, operator: 30, leader: 20, creator: 10 };
 export const effectiveDuty = (user: { role: Role; adminDuty?: string }) =>
   user.role === 'developer' ? 'all' : user.role === 'operator' ? 'operations' : (user.adminDuty ?? 'all');

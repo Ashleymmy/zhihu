@@ -19,7 +19,7 @@ import { processResolvedNames } from './automatic-repair';
 import { teamLeader } from './relationships';
 import { canEditNovel, novelSchema, type NovelInput } from './novel';
 import { bindingStartDay, recomputeStartDateFacts } from './activation-date';
-import { rateFor } from '../../../core/rates';
+import { canViewUnitPrices } from '../../../core/duties';
 import { assertCompleteShareUrl, isTruncatedShareUrl, TRUNCATED_SHARE_URL_MESSAGE } from '../zhihu/shareUrl';
 export { synchronizeKeywords } from './keyword-readiness';
 
@@ -192,7 +192,7 @@ export async function options(user: AuthUser, scope: Scope) {
   await authorize(user, scope);
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
-    const tasks = await select(c, `SELECT CAST(id AS CHAR) id,name,zhihu_task_id,${isStaffRole(user.role)&&!dutyAllows(user,'finance')?'NULL unit_price':'unit_price'},settle_type,status,start_time,end_time,synced_at FROM tasks WHERE project_id=? ORDER BY id`, [
+    const tasks = await select(c, `SELECT CAST(id AS CHAR) id,name,zhihu_task_id,${canViewUnitPrices(user)?'unit_price':'NULL unit_price'},settle_type,status,start_time,end_time,synced_at FROM tasks WHERE project_id=? ORDER BY id`, [
       scope.projectId,
     ]);
     const channels = await select(c, 'SELECT CAST(id AS CHAR) id,name,zhihu_channel_id,generation,synced_at FROM channels WHERE project_id=? AND is_enabled=1', [
@@ -219,10 +219,7 @@ export async function options(user: AuthUser, scope: Scope) {
     }
     const [actor] = await select(c, 'SELECT parent_id FROM users WHERE id=?', [user.sub]);
     const [parent] = actor?.parent_id ? await select(c, 'SELECT role FROM users WHERE id=?', [actor.parent_id]) : [];
-    let currentNewUserPrice:string|null=null;
-    if(user.role==='creator')try{currentNewUserPrice=await rateFor(c,{projectId:scope.projectId,moduleId:'zhihu',metricType:'new_user',ruleCode:'creator',date:businessDay()});}
-    catch(error){if(!(error instanceof Error&&error.message==='RATE_OVERLAP'))throw error;}
-    return { tasks, channels, mappings, users, ...(user.role==='creator'?{currentNewUserPrice}:{}), hasTeamLeader: parent?.role === 'leader', integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
+    return { tasks, channels, mappings, users, hasTeamLeader: parent?.role === 'leader', integrationMode: await simulationScope(c,scope) ? 'simulation' : 'upstream' };
   });
 }
 export async function createMapping(

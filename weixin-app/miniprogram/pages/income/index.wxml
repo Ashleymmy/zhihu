@@ -130,7 +130,7 @@
           <view class="row"><text class="section-title">计算明细</text><button size="mini" bindtap="closeDetail">收起</button></view>
           <view>执行人：{{item.performerName || '本人'}}</view>
           <view>数量：{{item.quantity === null ? '待核对' : item.quantity}}{{item.quantityUnit}}</view>
-          <view>{{item.earningGroup === 'team' ? '我的分成单价' : '适用单价'}}：{{item.priceText}}／{{item.quantityUnit}}</view>
+          <view wx:if="{{(user.role === 'admin' || user.role === 'developer') && item.unitPrice != null}}">{{item.earningGroup === 'team' ? '我的分成单价' : '适用单价'}}：{{item.priceText}}／{{item.quantityUnit}}</view>
           <view>计算金额：{{item.calculationText}}</view>
           <view>本次应得：{{item.amountText}}</view>
           <block wx:if="{{item.status !== 'internal'}}"><view>已确认：{{item.confirmedText}}</view><view>待确认差额：{{item.pendingText}}</view></block>

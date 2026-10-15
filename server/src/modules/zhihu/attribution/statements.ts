@@ -8,7 +8,7 @@ import { audit, authorize, bindingLock, insert, json, mutate, ownBinding, select
 import type { AttributionSnapshot } from './facts';
 import type { Obligation } from './pricing';
 import { assertNewRoute } from './routing';
-import { assertDuty } from '../../../core/duties';
+import { assertDuty, canViewUnitPrices } from '../../../core/duties';
 import { assertKeywordReady } from './keyword-usability';
 import { blockIncome } from '../../../core/finance';
 import { refreshUnconfirmedKeyword } from './automatic-repair';
@@ -351,6 +351,10 @@ export async function listStatements(user: AuthUser, scope: Scope, page: number,
       `SELECT CAST(id AS CHAR) id,CAST(fact_id AS CHAR) fact_id,CAST(revision_id AS CHAR) revision_id,relation_type,payer_kind,CAST(payer_id AS CHAR) payer_id,CAST(payee_id AS CHAR) payee_id,entry_kind,CAST(amount AS CHAR) amount,CAST(target_amount AS CHAR) target_amount,CAST(previous_entry_id AS CHAR) previous_entry_id,snapshot_json,input_hash,status,confirmed_at FROM zh_statement_entries WHERE ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
       [...args, pageSize, (page - 1) * pageSize],
     );
+    if (!canViewUnitPrices(user)) for (const row of list) {
+      const snapshot = json<{ obligation?: Record<string, unknown> }>(row.snapshot_json);
+      row.snapshot_json = { ...snapshot, ...(snapshot.obligation ? { obligation: { ...snapshot.obligation, unitPrice: null } } : {}) };
+    }
     return { list, total: Number(total.total), page, pageSize };
   });
 }

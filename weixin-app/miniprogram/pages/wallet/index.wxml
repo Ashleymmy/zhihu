@@ -64,7 +64,7 @@
           <view class="row"><text class="item-title">{{item.taskName}}</text><text class="amount-income">{{item.amountText}}</text></view>
           <view class="muted">{{item.businessDate}} · {{item.metricLabel}} · {{item.statusText}}</view><view class="muted" wx:if="{{isStaff}}">{{item.payeeName}}</view><view wx:if="{{item.reason}}" class="notice">{{item.reason}}</view>
           <button size="mini" data-id="{{item.id}}" bindtap="inspect">查看明细</button>
-          <view wx:if="{{detail.id === item.id}}" class="notice"><view>数量：{{item.quantity === null ? '待核对' : item.quantity}}{{item.quantity === null ? '' : item.quantityUnit}}</view><view>适用单价：{{item.priceText}}</view><view>金额：{{item.amountText}}</view><block wx:if="{{!isStaff}}"><view>已确认：{{item.confirmedText}}</view><view>待确认：{{item.pendingText}}</view></block><view wx:if="{{item.nextAction}}">{{item.nextAction}}</view></view>
+          <view wx:if="{{detail.id === item.id}}" class="notice"><view>数量：{{item.quantity === null ? '待核对' : item.quantity}}{{item.quantity === null ? '' : item.quantityUnit}}</view><view wx:if="{{(user.role === 'admin' || user.role === 'developer') && item.unitPrice != null}}">适用单价：{{item.priceText}}</view><view>金额：{{item.amountText}}</view><block wx:if="{{!isStaff}}"><view>已确认：{{item.confirmedText}}</view><view>待确认：{{item.pendingText}}</view></block><view wx:if="{{item.nextAction}}">{{item.nextAction}}</view></view>
         </view>
         <state-view wx:if="{{!visibleEntries.length}}" text="本期没有账单，可切换日期或刷新查看。" />
       </view>

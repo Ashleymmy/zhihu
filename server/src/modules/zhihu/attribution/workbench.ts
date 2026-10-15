@@ -4,7 +4,7 @@ import type {AuthUser} from '../../../types';
 import {withTransaction} from '../../../db';
 import {authorize,select,json,audit} from './store';
 import {businessDay,day,digest,fail,money,moneyText,type Scope} from './domain';
-import {assertDuty,dutyAllows} from '../../../core/duties';
+import {assertDuty,dutyAllows,canViewUnitPrices} from '../../../core/duties';
 import {ownershipHistorySql,unconfirmedFactSql} from './keyword-usability';
 import {parseReport,assertReportWriteEnabled,type MetricType,type ReportKind,type SourceRow} from './report';
 import {reasonText} from './reasons';
@@ -196,6 +196,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
       AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?
       AND (? IS NULL OR IF(b.report_kind='activation','activation','new_user')=?)
     GROUP BY b.id,b.file_name,j.status ORDER BY b.id`,[scope.projectId,scope.accountId,period.from,period.to,period.metricType??null,period.metricType??null]):[];
+  if (!canViewUnitPrices(user)) for (const entry of entries) delete entry.calculation;
   return{period,entries,groups,teamPerformance,processingImports:processingImports.map(r=>({id:String(r.id),fileName:String(r.fileName),status:String(r.status),pendingRows:Number(r.pendingRows)})),reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:stats.new_user.records,totalRecords:rows.filter(r=>r.snapshot_json).length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:byType.new_user.receivable,confirmedReceivable:byType.new_user.confirmedReceivable,pendingReceivable:byType.new_user.pendingReceivable,payable:byType.new_user.payable,confirmedPayable:byType.new_user.confirmedPayable,pendingPayable:byType.new_user.pendingPayable,retained:byType.new_user.receivable,byType,staffAmount:isStaffRole(user.role)?moneyText(staffTotal):'0.0000'},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
  };
  return connection?read(connection):withTransaction(read);

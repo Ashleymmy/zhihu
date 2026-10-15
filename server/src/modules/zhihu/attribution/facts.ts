@@ -17,7 +17,7 @@ import { assertNewRoute, assertEngineWritable } from './routing';
 import { factTodoReasons, reasonText } from './reasons';
 import { resolvedNames } from './matching';
 import { agencyCheck } from './agency';
-import { assertDuty, dutyAllows } from '../../../core/duties';
+import { assertDuty, dutyAllows, canViewUnitPrices } from '../../../core/duties';
 import { reportComparison } from './report-comparison';
 import { projectEarnings } from './earning-lines';
 import { ownershipHistorySql, unconfirmedFactSql } from './keyword-usability';
@@ -725,7 +725,7 @@ export function projectSnapshot(user: AuthUser, snapshot: AttributionSnapshot) {
     keyword: snapshot.keyword,
     orders: snapshot.orders,
     search: snapshot.search,
-    obligations,
+    obligations: obligations.map(o => canViewUnitPrices(user) ? o : { ...o, unitPrice: null }),
   };
   if (isStaffRole(user.role)) {
     result.settlement=snapshot.settlement??null;
