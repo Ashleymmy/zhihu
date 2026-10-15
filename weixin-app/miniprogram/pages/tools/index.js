@@ -8,12 +8,12 @@ const TOOLS = [
   { key: "cover", iconImg: "/images/icons/cover.png", name: "封面制作", desc: "快速生成封面图", enabled: false },
   { key: "clip", iconImg: "/images/icons/clip.png", name: "视频剪辑", desc: "在线剪辑素材", enabled: false },
   {
-    key: "wallet",
+    key: "income",
     iconImg: "/images/icons/data.png",
     name: "数据查询",
     desc: "查询账号收入数据",
     enabled: true,
-    path: "/pages/wallet/index",
+    path: "/pages/income/index",
   },
 ].map((tool) =>
   Object.assign({ tint: "#e9f0ed", fg: "#214239" }, tool),

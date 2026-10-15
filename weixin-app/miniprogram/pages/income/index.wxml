@@ -44,19 +44,16 @@
           <template is="amount-periods" data="{{value:memberSummary.team.reward}}" />
           <view class="summary-note">本人已确认的团队分成 · 按业绩日期统计</view>
         </view>
-        <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">查看收入与余额</button>
       </view>
-      <button wx:if="{{!loading && summaryError}}" size="mini" data-path="/pages/wallet/index" bindtap="open">查看收入与余额</button>
     </block>
     <!-- 本期收益 hero：主数字 + 已确认/待确认副指标 -->
     <view wx:else class="balance-card rise">
       <view class="balance-label">{{isStaff ? '本期内部业绩（元）' : '本期推广收益（元）'}}</view>
       <view class="balance-value">¥{{isStaff ? summary.internalText : summary.receivable}}</view>
-      <view class="balance-sub" wx:if="{{isStaff}}">内部业绩仅作统计，不进入提现余额。</view>
+      <view class="balance-sub" wx:if="{{isStaff}}">内部业绩仅作统计，不计入个人收益。</view>
       <view class="balance-sub" wx:else>已确认 ¥{{summary.confirmedReceivable}} · 待确认 ¥{{summary.pendingReceivable}}</view>
       <view class="balance-sub">{{from}} 至 {{to}}</view>
       <view class="balance-sub" wx:if="{{summary.pendingCalculations}}">另有 {{summary.pendingCalculations}} 条在核对中，金额尚未计入。</view>
-      <button class="income-wallet" size="mini" data-path="/pages/wallet/index" bindtap="open">{{isStaff ? '查看财务账单' : '查看收入与余额'}}</button>
     </view>
 
     <!-- 期间筛选：快捷月份 + 自定义起止 -->
@@ -105,7 +102,7 @@
       <view class="list-item" wx:for="{{groups}}" wx:key="key" data-field="metricType" data-value="{{item.metricType}}" bindtap="filter">
         <view class="row"><text>{{item.metricLabel}} · {{item.quantity}}{{item.quantityUnit}}</text><text>{{item.amountText}} ›</text></view>
       </view>
-      <view class="muted" wx:if="{{isStaff}}">内部业绩 ¥{{summary.internalText}}，不计入可提现收益。</view>
+      <view class="muted" wx:if="{{isStaff}}">内部业绩 ¥{{summary.internalText}}，不计入个人收益。</view>
     </view>
 
     <!-- 推广任务奖励：真实结算记录，带确认状态 -->
@@ -134,7 +131,7 @@
           <view>计算金额：{{item.calculationText}}</view>
           <view>本次应得：{{item.amountText}}</view>
           <block wx:if="{{item.status !== 'internal'}}"><view>已确认：{{item.confirmedText}}</view><view>待确认差额：{{item.pendingText}}</view></block>
-          <view wx:else class="muted">内部业绩仅作统计，不进入提现余额。</view>
+          <view wx:else class="muted">内部业绩仅作统计，不计入个人收益。</view>
           <view class="notice" wx:if="{{item.nextText}}">{{item.nextText}}</view>
           <button wx:if="{{!isStaff || user.adminDuty !== 'finance'}}" size="mini" bindtap="keyword">查看关键词与作品</button>
           <view class="section-title">确认及更正记录</view>
@@ -149,9 +146,9 @@
       </view>
       <state-view
         wx:if="{{!records.length}}"
-        text="{{isStaff ? '当前范围没有内部业绩记录，可查看财务账单。' : '当前范围还没有收益记录，可先查看关键词和作品进度。'}}"
-        guide-text="{{isStaff ? '查看财务账单' : '去看关键词'}}"
-        guide-path="{{isStaff ? '/pages/wallet/index' : '/pages/keywords/index'}}"
+        text="{{isStaff ? '当前范围没有内部业绩记录，可切换日期或查看业务数据。' : '当前范围还没有收益记录，可先查看关键词和作品进度。'}}"
+        guide-text="{{isStaff ? '查看业务数据' : '去看关键词'}}"
+        guide-path="{{isStaff ? '/pages/work-data/index' : '/pages/keywords/index'}}"
       />
       <template is="pager" data="{{total,page,loading,busy,pageSize:20}}" />
     </view>

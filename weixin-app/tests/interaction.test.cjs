@@ -5,7 +5,7 @@ const { harness, scoped } = require('./harness.cjs')
 /**
  * 全局交互基建（阶段1）的行为契约：
  *   - screen.js：下拉刷新重置页码并收起动画、触底加载合并去重、到底不再请求、失败回滚页码
- *   - works/withdrawals/keywords 三个列表页的合并策略（默认 list / 嵌套 view.withdrawals / 页签过滤）
+ *   - works/keywords 列表页的合并策略（默认 list / 页签过滤）
  *   - 危险操作必须经 confirm 确认；取消则不发请求
  *   - 操作成功后发成功 toast
  */
@@ -133,77 +133,6 @@ test('works onPullDownRefresh reloads page 1 and always stops the refresh animat
   assert.equal(stopped, 1)
   assert.equal(page.data.page, 1)
   assert.equal(state.gets.at(-1), 1)
-})
-
-// ---------- withdrawals 页：嵌套 view.withdrawals 合并 + 危险确认 ----------
-
-function withdrawalsSetup(pages, total, user) {
-  const state = { gets: [], posts: [] }
-  const h = harness(call => {
-    const common = scoped(call)
-    if (common !== undefined) return common
-    if (call.path === '/core/finance' && call.method === 'GET') {
-      state.gets.push(call.data.page)
-      return {
-        balance: { available: '100.00', held: '0', processing: '0', paid: '0', offset: '0' },
-        withdrawals: (pages[call.data.page] || []).map(w => Object.assign({}, w)),
-        total,
-        canManage: false,
-      }
-    }
-    if (call.path.indexOf('/core/finance/withdrawals/') === 0 && call.method === 'POST') {
-      state.posts.push(call.data)
-      return { ok: true }
-    }
-    return {}
-  })
-  h.session(user)
-  return { h, state }
-}
-
-const CREATOR = { id: '3', role: 'creator' }
-const wd = (id, status) => ({ id, amount: '10.00', status, userId: '3', displayName: '达人', receiverName: '张某', bankName: '招行', createdAt: '2026-09-01' })
-
-test('withdrawals onReachBottom merges nested view.withdrawals', async () => {
-  const { h, state } = withdrawalsSetup(
-    { 1: [wd('w1', 'paid')], 2: [wd('w2', 'paid')] },
-    50,
-    CREATOR,
-  )
-  const page = h.page('withdrawals')
-  await page.onShow()
-  assert.equal(page.data.view.withdrawals.length, 1)
-
-  await page.onReachBottom()
-
-  assert.deepEqual(state.gets, [1, 2])
-  assert.deepEqual(page.data.view.withdrawals.map(i => i.id), ['w1', 'w2'])
-  assert.equal(page.data.total, 50)
-})
-
-test('withdrawals cancel does not post when the confirm sheet is cancelled', async () => {
-  const { h, state } = withdrawalsSetup({ 1: [wd('w1', 'pending')] }, 25, CREATOR)
-  h.wx.showModal = () => Promise.resolve({ confirm: false })
-  const page = h.page('withdrawals')
-  await page.onShow()
-  page.choose({ currentTarget: { dataset: { index: 0, action: 'cancel' } } })
-
-  await page.review()
-
-  assert.equal(state.posts.length, 0, '取消确认后不得发出撤回请求')
-})
-
-test('withdrawals cancel posts after confirmation', async () => {
-  const { h, state } = withdrawalsSetup({ 1: [wd('w1', 'pending')] }, 25, CREATOR)
-  const page = h.page('withdrawals')
-  await page.onShow()
-  page.choose({ currentTarget: { dataset: { index: 0, action: 'cancel' } } })
-
-  await page.review()
-
-  assert.equal(state.posts.length, 1)
-  assert.equal(state.posts[0].action, 'cancel')
-  assert.ok(state.posts[0].requestKey, '写操作必须带请求键')
 })
 
 // ---------- works: edit existing work, no manual approval step ----------

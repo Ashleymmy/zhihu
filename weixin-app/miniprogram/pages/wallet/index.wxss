@@ -1,4 +1,0 @@
-/* Shared layout is defined in app.wxss. */
-.entry-sub {
-  margin-top: 6rpx;
-}
