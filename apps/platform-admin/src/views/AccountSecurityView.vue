@@ -50,7 +50,7 @@ async function verifyPhone(){
 <template><section class="page-stack"><header class="page-header"><div><h1>账号安全</h1><p>用户 ID：{{auth.user?.userId || '—'}}</p></div></header>
 <form class="security-form panel" @submit.prevent="submit">
   <h2>{{initial?'设置登录密码':'修改登录密码'}}</h2>
-  <p v-if="initial">设置后可使用用户 ID 和密码登录。也可以稍后设置，继续使用手机验证码登录。</p>
+  <p v-if="initial">设置后可使用已验证的手机号和密码登录。也可以稍后设置，继续使用手机验证码登录。</p>
   <p v-else-if="auth.user?.mustChangePwd">当前使用临时密码，请先设置你自己的密码。</p>
   <p>密码为 8–16 位，需包含字母和数字，不强制大小写。保存后需重新登录。</p>
   <p v-if="error" role="alert" class="error">{{error}}</p>

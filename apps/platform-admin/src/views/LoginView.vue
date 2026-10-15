@@ -43,6 +43,12 @@ watch(registering, () => {
   password.value = ''
 })
 const smsCode = ref(''), loginMode = ref<'password' | 'sms'>('password'), smsEnabled = ref(false)
+const legacyLogin = ref(false)
+function toggleLegacyLogin() {
+  if (submitting.value || sendingCode.value) return
+  legacyLogin.value = !legacyLogin.value
+  username.value = ''; password.value = ''; errorMessage.value = ''
+}
 const policyReady = ref(false), policyLoading = ref(false), sendingCode = ref(false), cooldown = ref(0), codeNotice = ref(''), agreed = ref(false)
 let timer: ReturnType<typeof setInterval> | undefined, retryAt = 0, policyVersion = 0, disposed = false
 const tick = () => { cooldown.value = Math.max(0, Math.ceil((retryAt-Date.now())/1000)); if (!cooldown.value) clearInterval(timer) }
@@ -99,11 +105,14 @@ async function submit() {
   if ((registering.value || loginMode.value === 'sms') && (!/^1\d{10}$/.test(phone.value) || !/^\d{6}$/.test(smsCode.value))) {
     errorMessage.value = '请输入正确手机号和 6 位验证码'; return
   }
+  if (!registering.value && loginMode.value === 'password' && !legacyLogin.value && !/^1\d{10}$/.test(username.value)) {
+    errorMessage.value = '请输入正确的 11 位手机号；旧账号可选择原账号登录'; return
+  }
   submitting.value = true
   try {
     if (registering.value) await auth.register({ phone: phone.value, smsCode: smsCode.value, displayName: displayName.value, ...(invitationToken.value ? {invitationToken: invitationToken.value} : {}) })
     else if (loginMode.value === 'sms') await auth.smsLogin(phone.value, smsCode.value)
-    else await auth.login(username.value, password.value)
+    else await auth.login(username.value, password.value, legacyLogin.value ? 'username' : 'phone')
     password.value = ''; smsCode.value = ''
     await afterLogin()
   } catch(e:any) { errorMessage.value = e.message || '操作失败，请重试' }
@@ -150,7 +159,7 @@ async function submit() {
             {{
               registering
                 ? '注册达人账号，开始管理你的业务与收益。'
-                : '使用账号密码或手机验证码登录。'
+                : '使用手机号和密码，或手机验证码登录。'
             }}
           </p>
         </div>
@@ -171,7 +180,7 @@ async function submit() {
         <form @submit.prevent="submit">
           <div class="form-grid" style="grid-template-columns:1fr;margin-top:24px">
             <div v-if="!registering && smsEnabled" class="auth-modes">
-              <button type="button" :aria-pressed="loginMode==='password'" :disabled="submitting || sendingCode" @click="loginMode='password';errorMessage=''">账号密码登录</button>
+              <button type="button" :aria-pressed="loginMode==='password'" :disabled="submitting || sendingCode" @click="loginMode='password';errorMessage=''">手机号密码登录</button>
               <button type="button" :aria-pressed="loginMode==='sms'" :disabled="submitting || sendingCode" @click="loginMode='sms';errorMessage=''">手机号验证码登录</button>
             </div>
             <template v-if="registering || loginMode==='sms'">
@@ -181,8 +190,10 @@ async function submit() {
               <small>验证码 5 分钟内有效，由阿里云短信服务及通信运营商发送，仅用于验证手机号。</small>
             </template>
             <template v-else>
-              <div><label for="username">用户 ID / 原登录账号</label><input id="username" v-model.trim="username" autocomplete="username" maxlength="64" placeholder="如 timo123456 或原登录账号" required /></div>
+              <div><label for="username">{{legacyLogin ? '原登录账号' : '手机号'}}</label><input id="username" v-model.trim="username" :type="legacyLogin ? 'text' : 'tel'" :inputmode="legacyLogin ? 'text' : 'numeric'" autocomplete="username" :maxlength="legacyLogin ? 64 : 11" :pattern="legacyLogin ? undefined : '1[0-9]{10}'" :placeholder="legacyLogin ? '请输入原登录账号' : '请输入已验证的手机号'" required /></div>
               <div><label for="password">密码</label><input id="password" v-model="password" type="password" autocomplete="current-password" maxlength="128" placeholder="请输入密码" required /></div>
+              <button type="button" class="legacy-login-switch" :disabled="submitting || sendingCode" @click="toggleLegacyLogin">{{legacyLogin ? '返回手机号登录' : '使用原账号登录'}}</button>
+              <small v-if="legacyLogin">尚未验证手机号的旧账号可先登录，再到个人信息中验证手机号。</small>
             </template>
             <template v-if="registering">
               <div><label for="display-name">昵称（选填）</label><input id="display-name" v-model.trim="displayName" autocomplete="nickname" maxlength="64" placeholder="可在登录后完善" /></div>

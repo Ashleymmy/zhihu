@@ -169,3 +169,17 @@ test("all primary auth actions have visual consent state and clickable agreement
   assert.match(consent, /我已确认并阅读/);
   assert.match(consent, /取消/);
 });
+
+
+test("password login defaults to verified phone and explicitly separates old usernames", async () => {
+  const h = setup(), p = h.page("login");
+  await p.onLoad();
+  p.setData({agreed:true,username:"timo000100",password:"Test12345"});
+  await p.submit(); assert.match(p.data.error,/手机号/);
+  assert(!h.calls.some(c=>c.path.endsWith("/login")));
+  p.setData({username:user.phone}); await p.submit();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.find(c=>c.path.endsWith("/login")).data)),{username:user.phone,password:"Test12345",loginMethod:"phone"});
+  p.toggleLegacyLogin(); assert.equal(p.data.password,""); assert.equal(p.data.username,"");
+  p.setData({username:"legacy",password:"Test12345"}); await p.submit();
+  assert.equal(h.calls.findLast(c=>c.path.endsWith("/login")).data.loginMethod,"username");
+});

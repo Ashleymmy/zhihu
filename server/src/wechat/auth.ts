@@ -7,6 +7,7 @@ import { asyncHandler, AppError } from '../middleware/errors';
 import { requireAuth } from '../auth/middleware';
 import { clientIdentity } from '../auth/clientIdentity';
 import { loginVerifiedUser, me, passwordLoginUser } from '../services/auth.service';
+import { passwordLoginSchema, passwordLoginProof } from '../auth/password-login';
 import { writeAudit } from '../services/audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 import { ok } from '../utils/response';
@@ -26,7 +27,7 @@ wechatAuthRouter.use((req, _res, next) => {
     next(e);
   }
 });
-const credentials = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(128) });
+const credentials = passwordLoginSchema;
 wechatAuthRouter.use(smsAuthRouter);
 wechatAuthRouter.post(
   '/login',
@@ -39,14 +40,15 @@ wechatAuthRouter.post(
       !(await incrRateLimit(`wechat:login:${input.username}`, 20, 300)).allowed
     )
       throw new AppError(429, 42903, '登录请求过于频繁，请稍后再试');
-    const user = await passwordLoginUser(input.username);
+    const user = await passwordLoginUser(input.username, input.loginMethod);
     if (!user || user.password_set === 0 || !(await bcrypt.compare(input.password, user.password_hash)))
-      throw new AppError(401, 40102, '网站账号或密码错误');
+      throw new AppError(401, 40102, input.loginMethod === 'phone' ? '手机号或密码错误；未设置密码可使用验证码登录' : '原账号或密码错误');
     if (!user.is_active) throw new AppError(403, 40302, '账号已停用');
     res.locals.miniVerifiedUserId = String(user.id);
     // Platform login does not authorize a persistent WeChat binding.
     await deleteRateLimit(`wechat:login:${input.username}`);
-    ok(res, await loginVerifiedUser(String(user.id), clientIdentity(req), req.ip, user.password_hash));
+    ok(res, await loginVerifiedUser(String(user.id), clientIdentity(req), req.ip, user.password_hash,
+      passwordLoginProof(String(user.id), input.username, input.loginMethod)));
   }),
 );
 wechatAuthRouter.post(

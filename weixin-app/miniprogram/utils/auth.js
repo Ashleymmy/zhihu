@@ -26,12 +26,12 @@ function store(user) {
   getApp().globalData.user = user;
   return user;
 }
-async function login(username, password) {
+async function login(username, password, loginMethod) {
   clear();
   const version = revision;
   const result = await request.send("/core/auth/login", {
     method: "POST",
-    data: { username, password },
+    data: { username, password, ...(loginMethod ? { loginMethod } : {}) },
     auth: false,
   });
   if (version !== revision) throw new Error("登录已取消，请重试");

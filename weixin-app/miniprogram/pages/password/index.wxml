@@ -16,7 +16,7 @@
   <block wx:if="{{allowed && scopeReady}}">
     <view class="card"
       ><text class="muted"
-        >{{user.hasPassword === false ? '可使用用户 ID 和密码登录，也可继续使用手机验证码。' : user.mustChangePwd ? '首次使用临时密码，请先设置新密码。' :
+        >{{user.hasPassword === false ? '可使用已验证的手机号和密码登录，也可继续使用手机验证码。' : user.mustChangePwd ? '首次使用临时密码，请先设置新密码。' :
         '修改密码后需重新登录。'}}</text
       >
       <view class="field" wx:if="{{user.hasPassword !== false}}"

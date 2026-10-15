@@ -62,7 +62,7 @@ test("disabled or failed policy retains password login without SMS requests", as
     await p.onLoad();
     mode(p);
     assert.equal(p.data.mode, "password");
-    p.setData({ username: "legacy", password: "fixture", agreed: true });
+    p.setData({ legacyLogin: true, username: "legacy", password: "fixture", agreed: true });
     await p.submit();
     assert.ok(h.calls.some((c) => c.path.endsWith("/login")));
     assert.ok(!h.calls.some((c) => c.path.endsWith("/sms-login")));

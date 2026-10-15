@@ -38,10 +38,10 @@ export const useAuthStore = defineStore('auth', () => {
     })()
     return validationTask
   }
-  async function login(username: string, password: string): Promise<void> {
+  async function login(username: string, password: string, loginMethod?: 'phone' | 'username'): Promise<void> {
     user.value = null
     http.tokens.set(null)
-    const result = await apis.auth.login({ username, password })
+    const result = await apis.auth.login({ username, password, ...(loginMethod ? {loginMethod} : {}) })
     http.tokens.set(result.token)
     // /me provides current role and permissions; never infer these from local storage or the URL.
     await validateSession()

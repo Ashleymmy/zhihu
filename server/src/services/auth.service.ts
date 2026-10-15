@@ -1,5 +1,6 @@
 import { newPasswordSchema } from '../auth/password-policy';
 import { formatUserId, isReservedUserId, parseUserId } from '../auth/user-id';
+import { passwordLoginProof, type PasswordLoginMethod } from '../auth/password-login';
 import bcrypt from 'bcryptjs';
 import { openMemberProjects } from './member-onboarding.service';
 import { ResultSetHeader, RowDataPacket, type PoolConnection } from 'mysql2/promise';
@@ -135,8 +136,8 @@ export async function register(
   }
 }
 
-export async function login(username: string, password: string, ip?: string, client?: ClientIdentity) {
-  const demoUser = devDemoLoginUser(username, password);
+export async function login(username: string, password: string, ip?: string, client?: ClientIdentity, loginMethod?: PasswordLoginMethod) {
+  const demoUser = loginMethod === 'phone' ? null : devDemoLoginUser(username, password);
   if (demoUser) {
     const token = await signToken(devDemoTokenUser(demoUser));
     const refresh = issueDevDemoRefreshSession(demoUser.id);
@@ -147,12 +148,12 @@ export async function login(username: string, password: string, ip?: string, cli
   const ipCheck = await incrRateLimit(ipKey, 20, 300);
   if (!ipCheck.allowed) throw new AppError(429, 42903, '登录请求过于频繁，请 5 分钟后再试');
 
-  const user = await passwordLoginUser(username);
+  const user = await passwordLoginUser(username, loginMethod);
   if (!user || user.password_set === 0 || !(await bcrypt.compare(password, user.password_hash))) {
     const userKey = `login:user:${username}`;
     const userCheck = await incrRateLimit(userKey, 5, 900);
     if (!userCheck.allowed) throw new AppError(429, 42903, '登录失败次数过多，请 15 分钟后再试');
-    throw new AppError(401, 40102, '用户名或密码错误');
+    throw new AppError(401, 40102, loginMethod === 'phone' ? '手机号或密码错误；未设置密码可使用验证码登录' : '原账号或密码错误');
   }
   if (!user.is_active) throw new AppError(403, 40302, '账号已停用');
   const role = await requireKnownRole(user, ip);
@@ -161,7 +162,7 @@ export async function login(username: string, password: string, ip?: string, cli
   await deleteRateLimit(userKey);
 
   if (!client) throw new AppError(401, 40106, '客户端标识缺失，请刷新页面后重新登录');
-  const refresh = await issueRefreshSession(String(user.id), client, user.password_hash);
+  const refresh = await issueRefreshSession(String(user.id), client, user.password_hash, passwordLoginProof(String(user.id), username, loginMethod));
   const token = await issueAccessToken(user, role, refresh.familyId);
   await withTransaction(async (connection) => {
     await connection.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
@@ -281,8 +282,18 @@ export async function loginVerifiedUser(
   };
 }
 
-/** Fixed IDs and their previous aliases share the same immutable account. */
-export async function passwordLoginUser(identifier: string): Promise<UserRow | undefined> {
+/** Explicit phone and legacy username modes never fall back to each other. */
+export async function passwordLoginUser(identifier: string, method?: PasswordLoginMethod): Promise<UserRow | undefined> {
+  if (method === 'phone') {
+    if (!/^1\d{10}$/.test(identifier)) return undefined;
+    const [user] = await rows<UserRow>('SELECT * FROM users WHERE phone=? AND phone_verified_at IS NOT NULL LIMIT 1', [identifier]);
+    return user;
+  }
+  if (method === 'username') {
+    const [user] = await rows<UserRow>('SELECT * FROM users WHERE username=? LIMIT 1', [identifier]);
+    return user;
+  }
+  // Older clients and binding flows retain their original identifier semantics.
   const id = parseUserId(identifier);
   const [user] = await rows<UserRow>(
     id ? 'SELECT * FROM users WHERE id=? LIMIT 1' : 'SELECT * FROM users WHERE username=? LIMIT 1',

@@ -9,6 +9,7 @@ Page({
     busy: false,
     error: "",
     mode: "password",
+    legacyLogin: false,
     phone: "",
     smsCode: "",
     sendingCode: false,
@@ -64,6 +65,10 @@ Page({
         dataset: { mode: this.data.mode === "password" ? "sms" : "password" },
       },
     });
+  },
+  toggleLegacyLogin() {
+    if (this.data.busy || this.data.sendingCode) return;
+    this.setData({ legacyLogin: !this.data.legacyLogin, username: "", password: "", error: "" });
   },
   async sendCode() {
     if (
@@ -145,8 +150,12 @@ Page({
       }
       return;
     }
+    if (!this.data.legacyLogin && !/^1\d{10}$/.test(this.data.username.trim())) {
+      this.setData({ error: "请输入正确的 11 位手机号；旧账号可选择原账号登录" });
+      return;
+    }
     if (!this.data.username.trim() || !this.data.password) {
-      this.setData({ error: "请输入账号和密码" });
+      this.setData({ error: this.data.legacyLogin ? "请输入原账号和密码" : "请输入手机号和密码" });
       return;
     }
     this.setData({ busy: true, error: "" });
@@ -154,6 +163,7 @@ Page({
       const user = await auth.login(
         this.data.username.trim(),
         this.data.password,
+        this.data.legacyLogin ? "username" : "phone",
       );
       this.setData({ password: "" });
       if (user) wx.reLaunch({ url: auth.entryPath(user) });

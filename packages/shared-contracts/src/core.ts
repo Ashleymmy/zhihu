@@ -16,6 +16,7 @@ export interface PageResp<T> {
 export interface LoginReq {
   username: string
   password: string
+  loginMethod?: 'phone' | 'username'
 }
 
 /** 公开注册不接受角色、归属或权限字段。 */
