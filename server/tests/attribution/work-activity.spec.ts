@@ -329,15 +329,20 @@ describe('successful daily registrations and Excel export',()=>{
   const rejected=await save(team,group,'2026-10-10 12:00:00');
   const [[row]]=await c.query<RowDataPacket[]>('SELECT promo_url FROM compositions WHERE id=?',[rejected]);
   await c.query("INSERT INTO zh_evidence(binding_id,work_url,description,status,submitted_by) VALUES(?,?,?,'rejected',?)",[group.bindingId,row.promo_url,'核验不通过',team.sub]);
+  const failedPlan=await keyword(team);await save(team,failedPlan,'2026-10-10 12:00:00');await c.query("UPDATE plans SET sync_status='failed' WHERE id=?",[failedPlan.planId]);
+  const disputed=await keyword(team),disputedId=await save(team,disputed,'2026-10-10 12:00:00');
+  await c.query("UPDATE zh_keyword_bindings SET verification_status='disputed' WHERE id=?",[disputed.bindingId]);
+  const [[disputedWork]]=await c.query<RowDataPacket[]>('SELECT promo_url FROM compositions WHERE id=?',[disputedId]);
+  await c.query("INSERT INTO zh_evidence(binding_id,work_url,description,status,submitted_by) VALUES(?,?,?,'pending',?)",[disputed.bindingId,disputedWork.promo_url,'归属争议',team.sub]);
   await save(team,group,'2026-10-09 23:59:59');await save(team,group,'2026-10-13 00:00:00');
   await save(leader,await keyword(leader),'2026-10-10 12:00:00');await save(direct,await keyword(direct),'2026-10-10 12:00:00');
  },90000);
- const get=(extra:Record<string,unknown>={},suffix='')=>request(app).get('/core/work-registrations'+suffix).query({...scope,...dates,moduleId:'zhihu',...extra});
+ const get=(extra:Record<string,unknown>={},suffix='')=>request(app).get('/core/work-registrations'+suffix).query({...scope,...dates,moduleId:'zhihu',ownerId:team.sub,...extra});
  const excel=(extra:Record<string,unknown>={})=>get(extra,'/export').buffer(true).parse((res,done)=>{const chunks:Buffer[]=[];res.on('data',chunk=>chunks.push(Buffer.from(chunk)));res.on('end',()=>done(null,Buffer.concat(chunks)));res.on('error',done);});
  it('uses receipt validity and China registration dates consistently; exports every page and intact text links',async()=>{
-  actor=team;const summary=await get();expect(summary.status,JSON.stringify(summary.body)).toBe(200);expect(summary.body.data.total).toBe(28);
+  actor=admin;const summary=await get();expect(summary.status,JSON.stringify(summary.body)).toBe(200);expect(summary.body.data.total).toBe(28);
   expect(summary.body.data.daily).toEqual([{date:'2026-10-12',count:27},{date:'2026-10-11',count:0},{date:'2026-10-10',count:1}]);
-  const list=await request(app).get('/activity/workbench/works').query({...scope,...dates,successfulOnly:'1',pageSize:25});expect(list.body.data.total).toBe(28);expect(list.body.data.list).toHaveLength(25);
+  const list=await request(app).get('/activity/workbench/works').query({...scope,...dates,ownerId:team.sub,successfulOnly:'1',pageSize:25});expect(list.body.data.total).toBe(28);expect(list.body.data.list).toHaveLength(25);
   const exported=await excel();expect(exported.status).toBe(200);expect(exported.headers['content-type']).toContain('spreadsheetml.sheet');
   const workbook=XLSX.read(exported.body,{type:'buffer'});expect(workbook.SheetNames).toEqual(['每日汇总','作品明细']);
   const sheet=workbook.Sheets['作品明细'],rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(sheet);expect(rows).toHaveLength(28);expect(rows.every(row=>row['登记状态']==='成功登记')).toBe(true);
@@ -347,15 +352,15 @@ describe('successful daily registrations and Excel export',()=>{
   expect((await get({search:'keep-the-entire-tail'})).body.data.total).toBe(1);
   expect((await get({from:'2026-10-11',to:'2026-10-11'})).body.data.daily).toEqual([{date:'2026-10-11',count:0}]);
  });
- it('enforces creator/team/project scope for summaries and downloadable files',async()=>{
-  actor=team;expect((await get({view:'all',ownerId:direct.sub})).body.data.total).toBe(0);
-  const empty=XLSX.read((await excel({ownerId:direct.sub})).body,{type:'buffer'});expect(XLSX.utils.sheet_to_json(empty.Sheets['作品明细'])).toEqual([]);
-  actor=leader;expect((await get({view:'team'})).body.data.total).toBe(28);expect((await get({view:'self'})).body.data.total).toBe(1);
-  for(const adminDuty of ['all','finance','operations'] as const){actor={...admin,adminDuty};expect((await get()).body.data.total).toBe(30);}
-  for(const suffix of ['','/export']){actor=team;expect((await get({projectId:'999'},suffix)).status).toBe(403);expect((await get({accountId:'999'},suffix)).status).toBe(403);expect((await get({from:'2026-02-30'},suffix)).status).toBe(422);expect((await get({from:'2026-10-13'},suffix)).status).toBe(422);}
+ it('preserves management-only statistics and rejects cross-project downloads',async()=>{
+  for(const member of [team,leader,direct,user('1','operator')]){actor=member;for(const suffix of ['','/export'])expect((await get({},suffix)).status).toBe(403);await expect(activity.workRegistrations(scope,actor,{...dates,successfulOnly:true},false)).rejects.toMatchObject({httpStatus:403});}
+  actor=admin;const empty=XLSX.read((await excel({ownerId:'6'})).body,{type:'buffer'});expect(XLSX.utils.sheet_to_json(empty.Sheets['作品明细'])).toEqual([]);
+  for(const adminDuty of ['all','finance','operations'] as const){actor={...admin,adminDuty};expect((await get({ownerId:undefined})).body.data.total).toBe(30);}
+  actor={...admin,role:'developer'};expect((await get({ownerId:undefined})).body.data.total).toBe(30);
+  for(const suffix of ['','/export']){actor=admin;expect((await get({projectId:'999'},suffix)).status).toBe(403);expect((await get({accountId:'999'},suffix)).status).toBe(403);expect((await get({from:'2026-02-30'},suffix)).status).toBe(422);expect((await get({from:'2026-10-13'},suffix)).status).toBe(422);}
  });
  it('successful retries retain original registration date and do not duplicate a record',async()=>{
-  actor=team;await c.query("UPDATE compositions SET sync_status='synced',updated_at=NOW() WHERE id=?",[retryId]);
+  actor=admin;await c.query("UPDATE compositions SET sync_status='synced',updated_at=NOW() WHERE id=?",[retryId]);
   expect((await get()).body.data.total).toBe(29);expect((await get({from:'2026-10-10',to:'2026-10-10'})).body.data.total).toBe(2);
   await c.query("UPDATE compositions SET title='再次编辑',updated_at=NOW() WHERE id=?",[retryId]);expect((await get()).body.data.total).toBe(29);
  });

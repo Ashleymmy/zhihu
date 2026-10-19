@@ -9,6 +9,7 @@ const props=defineProps<{context:EngineContext;filters?:Record<string,string>;he
 interface Work extends WorkStatus{id:string;bindingId:string|null;planId:string;keyword:string;workUrl:string;description:string;verificationStatus:string;executorId:string;executorName:string;reason:string;compositionId:string|null;canEdit?:boolean;createdAt:string}
 const selected=ref<Work|null>(null)
 const canOperate=()=>props.context.adminDuty!=='finance'
+const showStats=computed(()=>['admin','developer'].includes(props.context.authRole??props.context.role))
 let generation=0
 const list=ref<Work[]>([]),page=ref(1),total=ref(0),busy=ref(false),error=ref('')
 const search=ref(''),appliedSearch=ref('')
@@ -38,7 +39,7 @@ onUnmounted(()=>{generation++;if(poll)clearInterval(poll)})
     <div class="section-heading"><div><h2>{{heading || '作品记录'}}</h2><p>查看已提交的作品及核验结果。</p></div><div class="engine-actions"><router-link v-if="canOperate()" class="engine-action-link" to="/modules/zhihu/works">登记推广作品</router-link><button :disabled="busy" @click="refresh">刷新</button></div></div>
     <form class="work-search" role="search" aria-label="搜索作品" @submit.prevent="findWorks"><label class="search-field">搜索作品<input v-model="search" type="search" maxlength="200" placeholder="关键词、作品名称、提交人或链接" /></label><label>登记开始日期<input v-model="from" type="date" /></label><label>登记结束日期<input v-model="to" type="date" /></label><label class="success-filter"><input v-model="successfulOnly" type="checkbox" />仅成功登记（排除失败、退回及无效记录）</label><div class="engine-actions"><button type="submit" :disabled="busy">搜索</button><button type="button" :disabled="busy" @click="period(false)">今天</button><button type="button" :disabled="busy" @click="period(true)">本月</button><button type="button" :disabled="busy" @click="clearSearch">清空筛选</button></div></form>
     <p class="cell-note">按首次登记时间统计（北京时间），修改和重试不重复计数。成功登记表示收到提交回执，审核状态单独展示。</p>
-    <WorkRegistrationReport :http="context.coreHttp" :query="reportQuery" :revision="reportRevision" @day="chooseDay" />
+    <WorkRegistrationReport v-if="showStats" :http="context.coreHttp" :query="reportQuery" :revision="reportRevision" @day="chooseDay" />
     <p v-if="!error" class="work-count" role="status">{{busy?'正在读取作品…':`共 ${total} 条作品${appliedSearch?'符合搜索条件':''}`}}</p>
     <p v-if="error" role="alert" class="engine-error">{{error}}</p>
     <div class="engine-table works-table"><table>
@@ -58,7 +59,7 @@ onUnmounted(()=>{generation++;if(poll)clearInterval(poll)})
 </template>
 
 <style scoped>
-.work-search{margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:end}.work-search label{min-width:0}.work-search .search-field{flex:1 1 300px}.work-search .success-filter{display:flex;align-items:center;gap:8px;flex-basis:100%;font-size:13px}.success-filter input{width:auto}.work-count{font-size:13px;margin:12px 0 0}
+.work-search{margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:end}.work-search label{min-width:0}.work-search .search-field{flex:1 1 300px}.work-search .success-filter{display:flex;flex-direction:row;align-items:center;gap:8px;flex-basis:100%;font-size:13px}.success-filter input{width:auto;flex:none}.work-count{font-size:13px;margin:12px 0 0}
 .engine-action-link{display:inline-flex;align-items:center;min-height:40px;padding:0 15px;border-radius:8px;background:#195e62;color:#fff;text-decoration:none}
 .engine-action-link:hover{background:#124b4e}
 @media(max-width:700px){.work-card .works-table table{min-width:0}.works-table table,.works-table tbody,.works-table tr,.works-table td{display:block}.works-table thead{display:none}.works-table tr{padding:12px 0;border-bottom:1px solid var(--line,#dce3e5)}.work-card .works-table td{border:0;padding:6px 0;white-space:normal;overflow-wrap:anywhere}.works-table td::before{content:attr(data-label);display:block;font-size:12px;color:var(--ink-soft,#637078);margin-bottom:4px}.work-card .works-table td .cell-note{max-width:100%}}

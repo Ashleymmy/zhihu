@@ -2,6 +2,7 @@ import type { Connection, RowDataPacket, ResultSetHeader } from 'mysql2/promise'
 
 // Only called by review-host against a disposable testcontainer.
 export async function seedWorkRegistrations(c: Connection) {
+  for (const role of ['operator','developer']) await c.query('INSERT INTO users(username,password_hash,role,display_name,is_active,must_change_pwd) SELECT ?,password_hash,?,?,1,0 FROM users WHERE username=?',['review_'+role,role,role,'review_ops']);
   const [[task]] = await c.query<RowDataPacket[]>('SELECT * FROM tasks ORDER BY id LIMIT 1');
   const [[channel]] = await c.query<RowDataPacket[]>('SELECT * FROM channels ORDER BY id LIMIT 1');
   for (const owner of [2, 3, 5]) {

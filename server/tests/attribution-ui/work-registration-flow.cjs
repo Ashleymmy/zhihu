@@ -45,6 +45,8 @@ async function main() {
     for (const [role, username, password, count] of [
       ['admin', 'admin', 'Admin123456!', 6],
       ['operations', 'review_ops', 'Review123456', 6],
+      ['developer', 'review_developer', 'Review123456', 6],
+      ['operator', 'review_operator', 'Review123456', 6],
       ['leader', 'leader_wang', 'Review123456', 4],
       ['creator', 'creator_li', 'Review123456', 2],
       ['independent', 'creator_chen', 'Review123456', 2],
@@ -74,13 +76,14 @@ async function main() {
       const form = page.getByRole('search', { name: '搜索作品' }),
         report = page.getByRole('region', { name: '每日作品登记统计' });
       await form.waitFor();
+      const canSeeStats=['admin','operations','developer'].includes(role);
       assert.equal(await form.getByRole('checkbox').isChecked(), true);
       const apply = async (from, to) => {
         await form.getByLabel('登记开始日期').fill(from);
         await form.getByLabel('登记结束日期').fill(to);
         const response = page.waitForResponse(
           (r) =>
-            r.url().includes('/core/work-registrations?') &&
+            r.url().includes(canSeeStats?'/core/work-registrations?':'/workbench/works?') &&
             new URL(r.url()).searchParams.get('from') === from &&
             new URL(r.url()).searchParams.get('to') === to,
         );
@@ -90,6 +93,12 @@ async function main() {
         return (await r.json()).data;
       };
       assert.equal((await apply('2026-10-10', '2026-10-12')).total, count);
+      if(!canSeeStats){
+        assert.equal(await report.count(),0);
+        assert.equal(await page.getByRole('button',{name:'导出 Excel（含回传链接）'}).count(),0);
+        for(const width of [1440,375]){await page.setViewportSize({width,height:1050});if((await page.locator('.studio-app').getAttribute('data-menu-open'))==='true')await page.locator('.menu-toggle').click();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(out,role+'-'+width+'.png'),fullPage:true,animations:'disabled'});}
+        assert.deepEqual(errors,[]);results.push({role,dateFilter:true,statisticsAndExportHidden:true,widths:[1440,375]});await context.close();continue;
+      }
       await report.getByText(`所选范围共 ${count} 条成功登记的作品`, { exact: true }).waitFor();
       await report.getByRole('button', { name: '2026-10-11，0 条作品，查看明细', exact: true }).waitFor();
       const downloaded = page.waitForEvent('download');
@@ -117,6 +126,7 @@ async function main() {
           fullPage: true,
           animations: 'disabled',
         });
+        await page.screenshot({path:path.join(out,role+'-viewport-'+width+'.png'),animations:'disabled'});
       }
       await report.getByRole('button', { name: '2026-10-11，0 条作品，查看明细', exact: true }).click();
       await report.getByText('所选范围共 0 条成功登记的作品', { exact: true }).waitFor();
@@ -142,7 +152,7 @@ async function main() {
       await context.close();
     }
     fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ status: 'passed', results }, null, 2));
-    console.log('作品日期、成功筛选、逐日明细与 Excel 六角色验收通过');
+    console.log('作品日期、成功筛选、逐日明细与 Excel 八角色验收通过');
   } finally {
     await browser?.close();
     if (host.connected) {

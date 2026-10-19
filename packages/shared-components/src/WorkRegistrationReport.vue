@@ -15,7 +15,7 @@ const daily = ref<{ date: string; count: number }[]>([]),
   busy = ref(false),
   exporting = ref(false),
   error = ref("");
-let generation = 0;
+let generation = 0, disposed = false;
 const message = (e: unknown) =>
   e && typeof e === "object" && "message" in e
     ? String(e.message)
@@ -43,7 +43,7 @@ async function load() {
 watch(() => JSON.stringify([props.query, props.revision]), load, {
   immediate: true,
 });
-onBeforeUnmount(() => generation++);
+onBeforeUnmount(() => { generation++; disposed = true; });
 async function download() {
   if (exporting.value || busy.value) return;
   const key = JSON.stringify(props.query);
@@ -53,7 +53,7 @@ async function download() {
     const blob = await props.http.getBlob(
       "/work-registrations/export?" + new URLSearchParams(props.query),
     );
-    if (key !== JSON.stringify(props.query)) return;
+    if (disposed || key !== JSON.stringify(props.query)) return;
     const url = URL.createObjectURL(blob),
       link = document.createElement("a");
     link.href = url;
@@ -89,7 +89,7 @@ async function download() {
       {{ error }} <button type="button" @click="load">重试</button>
     </p>
     <details v-if="!busy && !error" open>
-      <summary>每日数量 · 点击日期查看作品</summary>
+      <summary>每日数量 · 点击日期查看作品（未列日期为 0 条）</summary>
       <div class="daily-list">
         <button
           v-for="day in daily"

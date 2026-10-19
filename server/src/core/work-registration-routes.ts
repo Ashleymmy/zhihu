@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { AppError, asyncHandler } from '../middleware/errors';
 import { ok } from '../utils/response';
 import { assertDataScope } from './accounts';
+import { canViewWorkStatistics } from '../auth/roles';
 import type { ModuleRuntime } from './module-runtime';
 import type { WorkRegistrationReport } from './contracts';
 
@@ -87,6 +88,7 @@ export function createWorkRegistrationRouter(runtime: ModuleRuntime) {
     router.get(
       path,
       asyncHandler(async (req, res) => {
+        if (!canViewWorkStatistics(req.user.role)) throw new AppError(403, 40300, '仅管理员和开发者可查看作品统计及导出');
         const q = query.parse(req.query);
         await assertDataScope(req.user, q.projectId, q.accountId, q.moduleId);
         const module = runtime.get(q.moduleId);

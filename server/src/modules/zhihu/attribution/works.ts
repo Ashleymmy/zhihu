@@ -178,6 +178,7 @@ export async function workDetail(user: AuthUser, scope: Scope, id: string) {
 }
 // The same authorized, de-duplicated query feeds the list, daily counts and full export.
 export async function workRegistrations(scope: Scope, user: AuthUser, filters: WorkRegistrationFilter, includeRows: boolean): Promise<WorkRegistrationReport> {
+  if (!canViewWorkStatistics(user.role)) throw new AppError(403, 40300, '仅管理员和开发者可查看作品统计及导出');
   await authorize(user, scope);
   return withTransaction(async c => {
     const { query, args } = filteredQuery(user, scope, filters);
