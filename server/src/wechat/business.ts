@@ -10,6 +10,7 @@ import { insertComposition } from '../modules/zhihu/services/compositions.servic
 import { enqueue } from '../modules/zhihu/queue';
 import { mutate, select, audit, authorize } from '../modules/zhihu/attribution/store';
 import { assertDuty } from '../core/duties';
+import { canViewWorkStatistics } from '../auth/roles';
 import { overview } from '../modules/zhihu/attribution/workbench';
 import { listKeywords } from '../modules/zhihu/attribution/resources';
 import { insertEvidence } from '../modules/zhihu/attribution/statements';
@@ -101,7 +102,7 @@ miniBusinessRouter.get(
       todayReceivable,
       todayPayable,
       keywords: keywords.total,
-      works: works.total,
+      works: canViewWorkStatistics(req.user.role) ? works.total : null,
       pendingReview: null,
       ongoing: null,
     });

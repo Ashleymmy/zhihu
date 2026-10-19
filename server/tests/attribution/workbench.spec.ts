@@ -127,9 +127,9 @@ describe('简化工作台完整资金流程',()=>{
   const l=await workbench.overview(leader,scope,{from:day,to:day});expect(l.groups.some(g=>g.payeeId===solo.sub)).toBe(false);
   expect(l.entries.length).toBeGreaterThan(0);
   expect(l.entries.every(e=>e.payeeId===leader.sub)).toBe(true);
-  expect(new Set(l.entries.map(e=>e.calculation?.unitPrice))).toEqual(new Set(['0.5000','8.5000']));
-  expect(l.entries.every(e=>e.calculation?.beforeRiskAmount===e.amount)).toBe(true);
-  expect((await workbench.overview(a,scope,{from:day,to:day})).entries.every(e=>e.calculation?.unitPrice==='8.0000')).toBe(true);
+  expect(l.entries.every(e=>!e.calculation)).toBe(true);
+  expect(l.entries.every(e=>e.amount!==null)).toBe(true);
+  expect((await workbench.overview(a,scope,{from:day,to:day})).entries.every(e=>!e.calculation)).toBe(true);
   expect(l.groups.map(g=>g.payeeId)).toEqual([leader.sub]);
   expect(l.summary.payable).toBe(l.summary.receivable);
   expect(l.teamPerformance).toEqual([
@@ -246,7 +246,7 @@ describe('简化工作台完整资金流程',()=>{
    }
   }
   const rows=(await get(leader,'/api/v1/core/earnings/mine',{from:day,to:day})).body.data.list;
-  expect(rows.filter((r:{earningGroup:string})=>r.earningGroup==='team').every((r:{unitPrice:string})=>['0.5000'].includes(r.unitPrice))).toBe(true);
+  expect(rows.filter((r:{earningGroup:string})=>r.earningGroup==='team').every((r:{unitPrice:string|null})=>r.unitPrice===null)).toBe(true);
   expect((await get(ops,'/api/v1/core/earnings/mine',{from:day,to:day})).status).toBe(403);
   expect((await q('SELECT COUNT(*) n FROM opc_earning_lines WHERE confirmed_at IS NOT NULL'))[0].n).toBeGreaterThan(0);
  });
@@ -276,13 +276,13 @@ it('旧来源列表和明细向团长只返回本人净分成，达人及岗位�
  const response=await get(leader,path('/attributions/'+fact.id+'/trace'),scope);expect(response.status,response.text).toBe(200);
  expect(response.body.data.revisions).toEqual([]);
  for(const row of response.body.data.results){
-  expect(row.obligations).toHaveLength(1);expect(row.obligations[0]).toMatchObject({payeeId:leader.sub,relation:'leader_override',unitPrice:'0.5000'});
+  expect(row.obligations).toHaveLength(1);expect(row.obligations[0]).toMatchObject({payeeId:leader.sub,relation:'leader_override',unitPrice:null});
   expect(row.teamMargin).toBe(row.obligations[0].amount);
   expect(row.obligations.some((o:{payeeId:string})=>o.payeeId===a.sub)).toBe(false);
  }
  const list=await get(leader,path('/attributions'),{...scope,page:1,pageSize:100});expect(list.status).toBe(200);
  expect(list.body.data.list.flatMap((r:{obligations:{payeeId:string}[]})=>r.obligations).every((o:{payeeId:string})=>o.payeeId===leader.sub)).toBe(true);
- const own=await get(a,path('/attributions/'+fact.id+'/trace'),scope);expect(own.status).toBe(200);expect(own.body.data.results[0].obligations[0].unitPrice).toBe('8.0000');
+ const own=await get(a,path('/attributions/'+fact.id+'/trace'),scope);expect(own.status).toBe(200);expect(own.body.data.results[0].obligations[0].unitPrice).toBeNull();
  for(const actor of [b,other,ops])expect((await get(actor,path('/attributions/'+fact.id+'/trace'),scope)).status).toBe(403);
 });
 it('同样计算结果重算后仍可提现，原确认账和资金逐行不变',async()=>{
@@ -310,6 +310,6 @@ it('成员报价旧接口全部停用且保留历史表，运营和未登录读�
  expect((await request(app).get(path('/price-agreements')).query(scope)).status).toBe(401);
  for(const suffix of ['/price-agreements','/price-versions/1/publish'])for(const actor of [admin,leader])expect((await post(actor,path(suffix),{...scope,requestKey:key()})).status).toBe(410);
  expect(await q('SELECT * FROM zh_price_agreements ORDER BY id')).toEqual(agreements);expect(await q('SELECT * FROM zh_price_versions ORDER BY id')).toEqual(versions);
- const mine=await get(a,path('/attribution-options'),scope);expect(mine.body.data.currentNewUserPrice).toBe('8.0000');
+ const mine=await get(a,path('/attribution-options'),scope);expect(mine.body.data.currentNewUserPrice).toBeUndefined();
  for(const actor of [leader,ops])expect((await get(actor,path('/attribution-options'),scope)).body.data).not.toHaveProperty('currentNewUserPrice');
 });

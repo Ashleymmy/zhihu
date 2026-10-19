@@ -64,7 +64,7 @@
       <text class="stat-num">{{summary.keywordCount}}</text>
       <text class="stat-label">可见关键词</text>
     </view>
-    <view class="stat" data-path="/pages/works/index" hover-class="press" bindtap="open">
+    <view wx:if="{{user.role === 'admin' || user.role === 'developer'}}" class="stat" data-path="/pages/works/index" hover-class="press" bindtap="open">
       <text class="stat-num {{summary.workCount > 0 ? 'text-sun' : ''}}">{{summary.workCount}}</text>
       <text class="stat-label">作品登记</text>
     </view>

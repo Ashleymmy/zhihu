@@ -1,5 +1,5 @@
 import type { AuthUser } from '../../../types';
-import { isStaffRole } from '../../../auth/roles';
+import { canViewWorkStatistics, isStaffRole } from '../../../auth/roles';
 import { withTransaction } from '../../../db';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { planAccountSql } from '../services/plan-account';
@@ -243,8 +243,10 @@ export async function workActivity(user: AuthUser, scope: Scope, filters: WorkFi
       (page - 1) * pageSize,
     ]);
     return {
-      summary: counts(summary),
-      list: list.map((row) => ({ id: String(row.id), name: String(row.name), role: String(row.role), ...counts(row) })),
+      summary: canViewWorkStatistics(user.role) ? counts(summary) : null,
+      list: list.map((row) => ({ id: String(row.id), name: String(row.name), role: String(row.role),
+        ...(canViewWorkStatistics(user.role) ? counts(row) : {}),
+      })),
       total: Number(total.total),
       page,
       pageSize,

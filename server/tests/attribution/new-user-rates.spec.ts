@@ -182,7 +182,7 @@ it('角色价迁移 CLI 预览只读、失败回滚、执行可重入，已确�
  expect(await q("SELECT * FROM zh_metric_facts WHERE metric_type='activation' ORDER BY id")).toEqual(activationBefore);
  expect(await q('SELECT * FROM opc_income_sources ORDER BY id')).toEqual(originalSources);expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(originalCash);
  const migrated=(await facts.trace(admin,scope,pendingId)).results[0];expect((migrated.obligations as {relation:string;amount:string}[]).map(o=>[o.relation,o.amount])).toEqual([['agency_creator','96.0000'],['leader_override','6.0000']]);
- const own=(await facts.trace(leader,scope,confirmedId)).results[0];expect(own.obligations).toMatchObject([{payeeId:'2',unitPrice:'2.0000',amount:'20.0000'}]);expect(own.obligations).toHaveLength(1);
+ const own=(await facts.trace(leader,scope,confirmedId)).results[0];expect(own.obligations).toMatchObject([{payeeId:'2',unitPrice:null,amount:'20.0000'}]);expect(own.obligations).toHaveLength(1);
  await expect(facts.trace(direct,scope,confirmedId)).rejects.toThrow('无权');
  const {migrateRolePrices}=await import('../../src/modules/zhihu/attribution/role-price-migration');
  await expect(migrateRolePrices({...admin,adminDuty:'operations'},scope,true)).rejects.toThrow('财务权限');

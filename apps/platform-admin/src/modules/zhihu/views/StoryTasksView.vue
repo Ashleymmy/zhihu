@@ -72,12 +72,12 @@ onMounted(load)
       <div v-else-if="!tasks.length" class="empty-panel"><span>暂无推广任务。任务由管理员从知乎侧同步。</span></div>
       <div v-else class="responsive-table">
         <table>
-          <thead><tr><th>任务名称</th><th>知乎任务号</th><th>单价</th><th>开始</th><th>结束</th><th>状态</th><th>同步时间</th></tr></thead>
+          <thead><tr><th>任务名称</th><th>知乎任务号</th><th v-if="tasks.some(t => t.unitPrice != null)">单价</th><th>开始</th><th>结束</th><th>状态</th><th>同步时间</th></tr></thead>
           <tbody>
             <tr v-for="t in tasks" :key="t.id">
               <td><strong>{{ t.name }}</strong></td>
               <td style="font-family: var(--font-mono); font-size: 12px;">{{ t.zhihuTaskId }}</td>
-              <td style="font-family: var(--font-mono); font-size: 12px;">{{ t.unitPrice != null ? `¥${t.unitPrice}` : '—' }}</td>
+              <td v-if="tasks.some(t => t.unitPrice != null)" style="font-family: var(--font-mono); font-size: 12px;">{{ t.unitPrice != null ? `¥${t.unitPrice}` : '—' }}</td>
               <td style="font-size: 13px;">{{ fmtTime(t.startTime) }}</td>
               <td style="font-size: 13px;">{{ fmtTime(t.endTime) }}</td>
               <td><span class="status-badge draft">{{ t.status ?? '未知' }}</span></td>

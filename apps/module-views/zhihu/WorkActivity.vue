@@ -39,6 +39,7 @@ const views = computed(() => [
           : { key: "all", label: "项目全部" },
       ]),
 ]);
+const showStats = computed(() => ['admin', 'developer'].includes(props.context.role));
 const metrics = [
   { key: "registered", label: "登记作品", result: "" },
   { key: "submitted", label: "已提交知乎", result: "submitted" },
@@ -114,7 +115,7 @@ async function showWorks(result = "", member?: Member) {
 <template>
   <section>
     <div class="section-heading">
-      <p>按登记时间统计知乎业务作品，修改和重试不重复计数。</p>
+      <p>{{ showStats ? "按登记时间统计知乎业务作品，修改和重试不重复计数。" : "按日期查看自己或团队的作品。" }}</p>
       <button :disabled="busy" @click="load">刷新数据</button>
     </div>
     <nav class="work-tabs" aria-label="数据范围">
@@ -134,13 +135,14 @@ async function showWorks(result = "", member?: Member) {
     </div>
     <p v-if="error" role="alert" class="engine-error">{{ error }}</p>
     <p v-if="busy" role="status">正在统计作品…</p>
-    <div v-if="summary" class="activity-metrics">
+    <div v-if="showStats && summary" class="activity-metrics">
       <button v-for="m in metrics" :key="m.key" @click="showWorks(m.result)">
         <span>{{ m.label }}</span
         ><strong>{{ summary[m.key] }}</strong
         ><small>{{ m.result === "failed" ? "查看原因" : "查看作品" }} →</small>
       </button>
     </div>
+    <button v-if="!showStats" @click="showWorks()">查看作品</button>
     <p class="engine-note">
       已提交知乎不代表审核通过，审核结果在作品详情中查看。
     </p>
@@ -152,10 +154,10 @@ async function showWorks(result = "", member?: Member) {
           <thead>
             <tr>
               <th>成员</th>
-              <th>登记作品</th>
-              <th>已提交知乎</th>
-              <th>提交失败</th>
-              <th>待提交</th>
+              <th v-if="showStats">登记作品</th>
+              <th v-if="showStats">已提交知乎</th>
+              <th v-if="showStats">提交失败</th>
+              <th v-if="showStats">待提交</th>
             </tr>
           </thead>
           <tbody>
@@ -165,10 +167,10 @@ async function showWorks(result = "", member?: Member) {
                   {{ m.name }} →
                 </button>
               </td>
-              <td>{{ m.registered }}</td>
-              <td>{{ m.submitted }}</td>
-              <td>{{ m.failed }}</td>
-              <td>{{ m.pending }}</td>
+              <td v-if="showStats">{{ m.registered }}</td>
+              <td v-if="showStats">{{ m.submitted }}</td>
+              <td v-if="showStats">{{ m.failed }}</td>
+              <td v-if="showStats">{{ m.pending }}</td>
             </tr>
           </tbody>
         </table>

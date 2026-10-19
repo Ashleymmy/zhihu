@@ -168,12 +168,14 @@ beforeAll(async () => {
 }, 90000);
 it('self/team counts distinguish failures and use inclusive China-date boundaries', async () => {
   const own = await activity.workActivity(team, scope, { ...period, view: 'self' }, 1, 25);
-  expect(own.summary).toEqual({ registered: 3, submitted: 1, failed: 1, pending: 1 });
-  expect((await activity.workActivity(leader, scope, { ...period, view: 'self' }, 1, 25)).summary.registered).toBe(1);
+  expect(own.summary).toBeNull();
+  expect(own.list.every(row => !('registered' in row) && !('submitted' in row))).toBe(true);
+  expect((await activity.workActivity(admin, scope, { ...period, ownerId: team.sub }, 1, 25)).summary).toEqual({ registered: 3, submitted: 1, failed: 1, pending: 1 });
+  expect((await activity.workActivity(leader, scope, { ...period, view: 'self' }, 1, 25)).summary).toBeNull();
   const group = await activity.workActivity(leader, scope, { ...period, view: 'team' }, 1, 25);
   expect(group.summary).toEqual(own.summary);
   expect(group.list.map((x) => String(x.id))).toEqual(['3', '6']);
-  expect(group.list[1].registered).toBe(0);
+  expect(group.list[1]).not.toHaveProperty('registered');
 });
 it('project totals equal member totals and result/member drilldown totals', async () => {
   const all = await activity.workActivity(admin, scope, { ...period, view: 'all' }, 1, 25);
@@ -185,7 +187,7 @@ it('project totals equal member totals and result/member drilldown totals', asyn
     ).toBe(m.registered);
   for (const result of ['submitted', 'failed', 'pending'] as const)
     expect((await activity.listWorks(admin, scope, 1, 25, { ...period, registeredOnly: true, result })).total).toBe(
-      all.summary[result],
+      all.summary![result],
     );
 });
 it('pagination preserves totals and produces distinct records', async () => {
@@ -200,8 +202,8 @@ it('pagination preserves totals and produces distinct records', async () => {
   expect(new Set([...first.list, ...next.list].map((x) => x.composition_id)).size).toBe(3);
 });
 it('forged filters cannot expand role visibility', async () => {
-  expect((await activity.workActivity(team, scope, { ...period, view: 'all' }, 1, 25)).summary.registered).toBe(3);
-  expect((await activity.workActivity(leader, scope, { ...period, ownerId: '4' }, 1, 25)).summary.registered).toBe(0);
+  expect((await activity.workActivity(team, scope, { ...period, view: 'all' }, 1, 25)).summary).toBeNull();
+  expect((await activity.workActivity(leader, scope, { ...period, ownerId: '4' }, 1, 25)).list).toEqual([]);
   expect((await activity.listWorks(team, scope, 1, 25, { ownerId: '4' })).total).toBe(0);
   for (const actor of [team, leader])
     await expect(activity.workDetail(actor, scope, 'composition:' + ids[4])).rejects.toMatchObject({ httpStatus: 404 });
@@ -236,16 +238,16 @@ it('duplicate linked evidence never inflates workload', async () => {
   const data = await activity.listWorks(team, scope, 1, 25, { ...period, registeredOnly: true });
   expect(data.total).toBe(3);
   expect(data.list.filter((x) => String(x.composition_id) === ids[0])).toHaveLength(1);
-  expect((await activity.workActivity(team, scope, period, 1, 25)).summary.registered).toBe(3);
+  expect((await activity.workActivity(admin, scope, { ...period, ownerId: team.sub }, 1, 25)).summary!.registered).toBe(3);
   expect(String((await activity.workDetail(team, scope, 'composition:' + ids[0])).composition_id)).toBe(ids[0]);
 });
 it('editing and retrying do not increment registered count', async () => {
-  const before = await activity.workActivity(team, scope, period, 1, 25);
+  const before = await activity.workActivity(admin, scope, { ...period, ownerId: team.sub }, 1, 25);
   await c.query("UPDATE compositions SET sync_status='synced',updated_at=NOW(),title='已修正' WHERE id=?", [ids[1]]);
-  const after = await activity.workActivity(team, scope, period, 1, 25);
-  expect(after.summary.registered).toBe(before.summary.registered);
-  expect(after.summary.failed).toBe(0);
-  expect(after.summary.submitted).toBe(2);
+  const after = await activity.workActivity(admin, scope, { ...period, ownerId: team.sub }, 1, 25);
+  expect(after.summary!.registered).toBe(before.summary!.registered);
+  expect(after.summary!.failed).toBe(0);
+  expect(after.summary!.submitted).toBe(2);
 });
 it('routes reject invalid dates, reversed range and malformed identifiers', async () => {
   actor = admin;

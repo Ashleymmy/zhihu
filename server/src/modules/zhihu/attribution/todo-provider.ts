@@ -1,6 +1,6 @@
 import type { ModuleTodoProvider, TodoItem, DashboardMetric } from '../../../core/contracts';
 import { dutyAllows } from '../../../core/duties';
-import { isStaffRole } from '../../../auth/roles';
+import { canViewWorkStatistics, isStaffRole } from '../../../auth/roles';
 import { withTransaction } from '../../../db';
 import { authorize, select } from './store';
 import { overview } from './workbench';
@@ -54,11 +54,11 @@ export const zhihuTodoProvider: ModuleTodoProvider = {
         [scope.accountId, scope.projectId]));
         push('data.resolve', issues.total, '数据待核对', '运营', '处理数据问题', link('/data-issues'));
       }
-      const performance = await workActivity(user, scope, { from: scope.from, to: scope.to, view: 'self' }, 1, 1);
-      metrics.push({ key: 'works.self', label: '我的作品', value: String(performance.summary.registered), unit: '篇', path: link('/works', '&view=self' + periodQuery) });
-      if (user.role === 'leader' || isStaffRole(user.role)) {
+      if (canViewWorkStatistics(user.role)) {
+        const performance = await workActivity(user, scope, { from: scope.from, to: scope.to, view: 'self' }, 1, 1);
+        metrics.push({ key: 'works.self', label: '我的作品', value: String(performance.summary!.registered), unit: '篇', path: link('/works', '&view=self' + periodQuery) });
         const team = await workActivity(user, scope, { from: scope.from, to: scope.to, view: 'team' }, 1, 1);
-        metrics.push({ key: 'works.team', label: user.role === 'leader' ? '团队作品' : '成员作品', value: String(team.summary.registered), unit: '篇', path: link('/works', '&view=team' + periodQuery) });
+        metrics.push({ key: 'works.team', label: '成员作品', value: String(team.summary!.registered), unit: '篇', path: link('/works', '&view=team' + periodQuery) });
       }
     }
     if (!isStaffRole(user.role) || dutyAllows(user, 'finance')) {

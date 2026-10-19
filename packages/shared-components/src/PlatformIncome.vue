@@ -393,13 +393,13 @@ function close() {
         </p>
         <div class="income-calculation">
           <span>本人收益</span><strong>{{ money(selected.amount) }}</strong>
-          <p v-if="selected.unitPrice !== null">
+          <p v-if="['admin', 'developer'].includes(w.role.value) && selected.unitPrice != null">
             {{ selected.quantity }}{{ selected.quantityUnit }} × ¥{{
               selected.unitPrice
             }}
             = {{ money(selected.calculationAmount) }}
           </p>
-          <p v-else>单价尚在核对，完成后自动更新。</p>
+          <p v-else-if="['admin', 'developer'].includes(w.role.value)">单价尚在核对，完成后自动更新。</p>
         </div>
         <p>
           已确认 {{ money(selected.confirmedAmount) }} · 待确认

@@ -2,7 +2,7 @@ import {previewWorkbenchImport,commitWorkbenchImport} from '../attribution/workb
 import {confirmationStatus,retryConfirmation} from '../attribution/confirmation-jobs';
 import {raiseObjection,replyObjection,listObjections} from '../attribution/objections';
 import {previewImportWithdrawal,withdrawImport} from '../attribution/import-withdrawal';
-import { isStaffRole } from '../../../auth/roles';
+import { canViewWorkStatistics, isStaffRole } from '../../../auth/roles';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -156,7 +156,11 @@ attributionRouter.get(
       .merge(pagingSchema)
       .extend({ search: z.string().max(128).default(''), view: z.enum(['all','available','owned','ongoing','registered','retired']).default('all') })
       .parse(req.query);
-    ok(res, await resource.listKeywords(req.user, query, query.page, query.pageSize, query.search, query.view));
+    const result = await resource.listKeywords(req.user, query, query.page, query.pageSize, query.search, query.view);
+    ok(res, { ...result, list: result.list.map(row => ({ ...row,
+      hasCompositions: Number(row.composition_count) > 0,
+      composition_count: canViewWorkStatistics(req.user.role) ? row.composition_count : null,
+    })) });
   }),
 );
 attributionRouter.post(

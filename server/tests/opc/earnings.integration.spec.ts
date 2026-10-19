@@ -167,12 +167,13 @@ it('无项目模块表时聚合两个项目，SQL 只返回本人明细和数量
   expect(own.status, own.text).toBe(200);
   expect(own.body.data.summary.amount).toBe('40.0000');
   expect(own.body.data.groups).toHaveLength(2);
+  expect(own.body.data.list.every((line: {unitPrice: unknown;calculationAmount: unknown}) => line.unitPrice === null && line.calculationAmount === null)).toBe(true);
   expect(own.body.data.list.every((l: { ruleCode: string }) => l.ruleCode === 'creator')).toBe(true);
   const team = await get('3');
   expect(team.body.data.summary.amount).toBe('1.0000');
   expect(team.body.data.list).toHaveLength(1);
   expect(team.body.data.list[0]).toMatchObject({
-    unitPrice: '0.5000',
+    unitPrice: null,
     amount: '1.0000',
     earningGroup: 'team',
     quantity: '2',
@@ -383,7 +384,7 @@ it('风险排除说明不当作未处理，后续业务阻断仍覆盖当前就�
   expect(await read()).toMatchObject({
     isReady: 1,
     amount: '0.0000',
-    calculationAmount: '16.0000',
+    calculationAmount: null,
     reason: '本次推广不计费',
   });
   expect((await read()).confirmedAt).toBeTruthy();

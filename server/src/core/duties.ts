@@ -1,11 +1,12 @@
 import type { RequestHandler } from 'express';
 import type { AuthUser } from '../types';
 import { AppError } from '../middleware/errors';
-import { effectiveDuty, isStaffRole } from '../auth/roles';
+import { canViewWorkStatistics, effectiveDuty, isStaffRole } from '../auth/roles';
 export type AdminDuty='all'|'operations'|'finance';
 export function dutyAllows(user:AuthUser,area:'operations'|'finance'|'staff'){
  return isStaffRole(user.role)&&(effectiveDuty(user)==='all'||area!=='staff'&&effectiveDuty(user)===area);
 }
+export const canViewUnitPrices = (user: AuthUser): boolean => canViewWorkStatistics(user.role) && dutyAllows(user, 'finance');
 export function assertDuty(user:AuthUser,area:'operations'|'finance'|'staff'){
  if(!dutyAllows(user,area))throw new AppError(403,40301,area==='finance'?'这里需要财务权限':area==='staff'?'只有完整管理员可以管理岗位权限':'此操作需要运营权限');
 }

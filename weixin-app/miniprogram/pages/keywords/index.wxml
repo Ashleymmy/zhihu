@@ -61,7 +61,7 @@
       </view>
       <view class="kw-card-meta text-sun" wx:if="{{item.releaseStatus === 'requested'}}">已申请释放，等待运营审核</view>
       <view class="kw-card-meta text-clay" wx:if="{{item.syncError}}">{{item.syncError}}</view>
-      <view class="kw-card-meta" wx:if="{{item.compositionCount}}">已登记作品 {{item.compositionCount}} 条；提交结果请查看“作品记录”。</view>
+      <view class="kw-card-meta" wx:if="{{(user.role === 'admin' || user.role === 'developer') && item.compositionCount}}">已登记作品 {{item.compositionCount}} 条；提交结果请查看“作品记录”。</view>
       <button size="mini" class="btn-action" data-id="{{item.id}}" bindtap="followup" disabled="{{busy || loading}}">查看进度与作品</button>
       <view wx:if="{{followupRecord.recordId === item.id}}" class="notice">
         <view>{{followupRecord.status.label}} · {{followupRecord.next.actor}}：{{followupRecord.next.text}}</view>
