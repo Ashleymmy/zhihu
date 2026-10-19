@@ -53,15 +53,15 @@ const http: WorkspaceHttp = {
 html,
 body {
   margin: 0;
-  background: #f7f8f6;
-  color: #243438;
+  background: #faf9f5;
+  color: #2b2b29;
   font-family: system-ui, sans-serif;
 }
 main {
   padding: 28px;
 }
 main button {
-  background: #195e62;
+  background: #141413;
   color: #fff;
   border: 0;
   border-radius: 8px;

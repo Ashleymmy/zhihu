@@ -29,7 +29,7 @@ defineProps<{
 }
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 6px 6px 0 rgba(32, 41, 35, 0.13);
+  box-shadow: var(--shadow-float);
 }
 .stat-card__label {
   font-size: 12px;

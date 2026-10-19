@@ -942,7 +942,7 @@ onMounted(() => run(load));
   color: inherit;
 }
 .members-page button.primary-action {
-  background: #195e62;
+  background: #141413;
   color: white;
 }
 .members-page button:disabled {
@@ -955,7 +955,7 @@ onMounted(() => run(load));
   flex-wrap: wrap;
 }
 .member-tabs [aria-pressed="true"] {
-  background: #195e62;
+  background: #141413;
   color: white;
 }
 .member-filters {
@@ -1020,14 +1020,14 @@ onMounted(() => run(load));
   display: inline-block;
   padding: 3px 8px;
   border-radius: 5px;
-  background: #e3efea;
-  color: #23544a;
+  background: #f0eee6;
+  color: #141413;
   margin-top: 8px;
   font-size: 12px;
 }
 .member-status.disabled {
-  background: #f2e7e4;
-  color: #8c413b;
+  background: #f6e1dc;
+  color: #b4402e;
 }
 .member-pagination {
   display: flex;
@@ -1047,12 +1047,12 @@ onMounted(() => run(load));
 }
 .member-error,
 .danger {
-  color: #a02f39 !important;
+  color: #b4402e !important;
 }
 .secret-note {
   padding: 16px;
-  border: 1px solid #d7c38c;
-  background: #fbf4df;
+  border: 1px solid #ead9b4;
+  background: #f5ead3;
   overflow-wrap: anywhere;
 }
 .edit-pair {
@@ -1078,7 +1078,7 @@ onMounted(() => run(load));
   gap: 8px;
 }
 .permission-tags span {
-  background: #e8efec;
+  background: #f0eee6;
   padding: 6px 10px;
   border-radius: 5px;
   font-size: 12px;

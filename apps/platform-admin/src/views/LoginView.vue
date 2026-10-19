@@ -208,8 +208,8 @@ async function submit() {
             style="
               margin: 16px 0 0;
               padding: 10px 14px;
-              background: #f1ded9;
-              color: #964639;
+              background: #f6e1dc;
+              color: #b4402e;
               font-size: 13px;
               border-radius: var(--radius);
             "
@@ -310,7 +310,7 @@ async function submit() {
 .access-card input:not([type=checkbox]) { min-height:44px; box-sizing:border-box; padding:10px 12px; font:inherit }
 .auth-modes { display:flex; gap:8px; flex-wrap:wrap }
 .auth-modes button { flex:1; min-height:40px }
-.auth-modes button[aria-pressed=true] { background:#214239; color:white }
+.auth-modes button[aria-pressed=true] { background:#3d3d3a; color:white }
 .sms-code-row { display:flex; gap:8px }
 .sms-code-row input { width:0; flex:1; min-width:0 }
 .sms-code-row button { flex-shrink:0; padding:8px }
@@ -319,7 +319,7 @@ async function submit() {
 
 .invitation-note { margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--paper);line-height:1.6 }
 .invitation-note p { margin:8px 0 }
-.invitation-note [role=alert] { color:#964639 }
+.invitation-note [role=alert] { color:#b4402e }
 .auth-switch {
   margin-top: 20px;
   text-align: center;
@@ -333,8 +333,8 @@ async function submit() {
 .auth-success {
   padding: 12px;
   margin-top: 20px;
-  background: #e2eee7;
-  color: #245c3b;
+  background: #e3efe5;
+  color: #2f7d4f;
   border-radius: 4px;
 }
 </style>

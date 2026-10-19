@@ -122,8 +122,8 @@ onMounted(load)
       <button type="button" class="row-action" :disabled="loading" @click="load">{{ team ? '刷新团队' : '刷新团长列表' }}</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="submitMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ submitMessage }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="submitMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e8e6dc; font-size: 13px; color: var(--moss);">{{ submitMessage }}</div>
 
     <section class="workspace-grid" :class="{ 'team-only': !!team }">
       <div class="min-w-0">
@@ -251,7 +251,7 @@ onMounted(load)
 }
 .team-meta { display: grid; flex: 1; min-width: 0; }
 .team-meta strong { font-size: 14px; }
-.team-meta small { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
+.team-meta small { color: #87867f; font-family: var(--font-mono); font-size: 12px; }
 .affiliation-detail { color: var(--ink-soft); font-size: 13px; line-height: 1.8; }
 .affiliation-detail p { margin: 10px 0; }
 .team-meta small { overflow-wrap: anywhere; }
@@ -294,7 +294,7 @@ onMounted(load)
 .leader-option:last-child { border-bottom: 0; }
 .leader-option:hover { background: var(--paper-deep); }
 .leader-option strong { font-size: 12px; font-weight: 500; }
-.leader-meta { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
+.leader-meta { color: #87867f; font-family: var(--font-mono); font-size: 12px; }
 
 .leader-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 13px; }
 </style>

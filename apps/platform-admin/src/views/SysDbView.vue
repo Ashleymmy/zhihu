@@ -48,15 +48,15 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="cleanupResult" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ cleanupResult }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="cleanupResult" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e8e6dc; font-size: 13px; color: var(--moss);">{{ cleanupResult }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
         <article class="panel" style="padding: 22px; margin-bottom: 18px;">
           <p class="section-index quiet">体积分布</p>
           <div style="margin-top: 12px;">
-            <BarChart :items="tables.map(t => ({ label: t.tableName, value: t.dataMb, hint: ' MB' }))" color="#20292f" :max-items="8" />
+            <BarChart :items="tables.map(t => ({ label: t.tableName, value: t.dataMb, hint: ' MB' }))" color="#2b2b29" :max-items="8" />
           </div>
         </article>
 

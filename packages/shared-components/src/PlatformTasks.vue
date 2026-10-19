@@ -565,8 +565,8 @@ async function copy(value: string) {
 }
 .task-error {
   padding: 14px;
-  background: #fff1ed;
-  border: 1px solid #d6ada1;
+  background: #f6e1dc;
+  border: 1px solid #ecc9c0;
   border-radius: 8px;
 }
 .task-error p {
@@ -606,7 +606,7 @@ async function copy(value: string) {
 .task-progress li {
   padding: 0 0 20px 25px;
   margin-left: 7px;
-  border-left: 2px solid #d6dcda;
+  border-left: 2px solid #d6d3c7;
   position: relative;
 }
 .task-progress li:last-child {
@@ -620,16 +620,16 @@ async function copy(value: string) {
   border-radius: 50%;
   left: -7px;
   top: 3px;
-  background: #b9c0bd;
+  background: #b0aea5;
 }
 .task-progress li.done::before {
-  background: #308268;
+  background: #2f7d4f;
 }
 .task-progress li.current::before {
-  background: #c58b2b;
+  background: #a86a12;
 }
 .task-progress li.current strong {
-  color: #99620b;
+  color: #a86a12;
 }
 .task-progress strong,
 .task-progress span {
@@ -667,8 +667,8 @@ async function copy(value: string) {
   margin-top: 3px;
 }
 .task-actions .task-primary {
-  background: #195e62;
-  border-color: #195e62;
+  background: #141413;
+  border-color: #141413;
   color: #fff;
 }
 @media (max-width: 600px) {

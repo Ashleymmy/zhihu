@@ -75,5 +75,5 @@ async function verifyPhone(){
 </details>
 </section></template>
 <style scoped>
-.security-form{max-width:520px;padding:24px;display:grid;gap:20px}.security-form label,.phone-form{display:grid;gap:8px}.phone-form{gap:16px}.security-form input{min-height:44px;min-width:0;box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--line,#ccc);border-radius:8px;background:var(--paper,#fff);color:inherit}.security-form p,.security-form h2{margin:0;line-height:1.6}.error{color:#a02f39}.code-row{display:flex;gap:8px}.code-row input{flex:1;width:0}.code-row button{flex-shrink:0}.security-form summary{cursor:pointer}
+.security-form{max-width:520px;padding:24px;display:grid;gap:20px}.security-form label,.phone-form{display:grid;gap:8px}.phone-form{gap:16px}.security-form input{min-height:44px;min-width:0;box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--line,#d6d3c7);border-radius:8px;background:var(--paper,#fff);color:inherit}.security-form p,.security-form h2{margin:0;line-height:1.6}.error{color:#b4402e}.code-row{display:flex;gap:8px}.code-row input{flex:1;width:0}.code-row button{flex-shrink:0}.security-form summary{cursor:pointer}
 </style>

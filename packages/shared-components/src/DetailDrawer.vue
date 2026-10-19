@@ -44,14 +44,14 @@ onBeforeUnmount(() => dialog.value?.close());
   max-height: 100dvh;
   padding: 0;
   border: 0;
-  border-left: 1px solid var(--line, #dce3e5);
-  color: var(--ink, #243438);
+  border-left: 1px solid var(--line, #e8e6dc);
+  color: var(--ink, #2b2b29);
   background: var(--paper, #fff);
-  box-shadow: -16px 0 48px #10252720;
+  box-shadow: -16px 0 48px #2b2b2920;
   overflow: auto;
 }
 .detail-drawer::backdrop {
-  background: #10252760;
+  background: #2b2b2960;
 }
 header {
   display: flex;
@@ -59,7 +59,7 @@ header {
   gap: 16px;
   justify-content: space-between;
   padding: 22px 24px;
-  border-bottom: 1px solid var(--line, #dce3e5);
+  border-bottom: 1px solid var(--line, #e8e6dc);
   position: sticky;
   top: 0;
   background: var(--paper, #fff);
@@ -84,7 +84,7 @@ header button {
   cursor: pointer;
 }
 header button:focus-visible {
-  outline: 3px solid #195e62;
+  outline: 3px solid #141413;
   outline-offset: 2px;
 }
 .drawer-body {

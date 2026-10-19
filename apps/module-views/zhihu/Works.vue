@@ -44,8 +44,8 @@ onUnmounted(()=>{generation++;if(poll)clearInterval(poll)})
 
 <style scoped>
 .work-search{margin-top:20px}.work-search label{flex:0 1 440px;min-width:0}.work-count{font-size:13px;margin:12px 0 0}
-.engine-action-link{display:inline-flex;align-items:center;min-height:40px;padding:0 15px;border-radius:8px;background:#195e62;color:#fff;text-decoration:none}
-.engine-action-link:hover{background:#124b4e}
-@media(max-width:700px){.work-card .works-table table{min-width:0}.works-table table,.works-table tbody,.works-table tr,.works-table td{display:block}.works-table thead{display:none}.works-table tr{padding:12px 0;border-bottom:1px solid var(--line,#dce3e5)}.work-card .works-table td{border:0;padding:6px 0;white-space:normal;overflow-wrap:anywhere}.works-table td::before{content:attr(data-label);display:block;font-size:12px;color:var(--ink-soft,#637078);margin-bottom:4px}.work-card .works-table td .cell-note{max-width:100%}}
+.engine-action-link{display:inline-flex;align-items:center;min-height:40px;padding:0 15px;border-radius:8px;background:#141413;color:#fff;text-decoration:none}
+.engine-action-link:hover{background:#141413}
+@media(max-width:700px){.work-card .works-table table{min-width:0}.works-table table,.works-table tbody,.works-table tr,.works-table td{display:block}.works-table thead{display:none}.works-table tr{padding:12px 0;border-bottom:1px solid var(--line,#e8e6dc)}.work-card .works-table td{border:0;padding:6px 0;white-space:normal;overflow-wrap:anywhere}.works-table td::before{content:attr(data-label);display:block;font-size:12px;color:var(--ink-soft,#6f6e68);margin-bottom:4px}.work-card .works-table td .cell-note{max-width:100%}}
 </style>
 

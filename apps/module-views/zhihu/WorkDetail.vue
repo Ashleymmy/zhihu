@@ -155,7 +155,7 @@ h3 {
   margin: 0 0 8px;
 }
 .work-result {
-  background: #eef4f1;
+  background: #f5f3ec;
   padding: 16px;
   border-radius: 8px;
 }
@@ -172,11 +172,11 @@ h3 {
 .work-detail dd {
   padding: 12px 0;
   margin: 0;
-  border-bottom: 1px solid var(--line, #ddd);
+  border-bottom: 1px solid var(--line, #e8e6dc);
   overflow-wrap: anywhere;
 }
 .work-detail dt {
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 .work-url {
   overflow-wrap: anywhere;
@@ -188,6 +188,6 @@ h3 {
 }
 .dialog-actions a {
   padding: 10px;
-  color: #195e62;
+  color: #141413;
 }
 </style>

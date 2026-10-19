@@ -89,7 +89,7 @@ onMounted(()=>run(async()=>{}))
 
 <style scoped>
 .novel-edit{margin-top:8px;font-size:13px;padding:5px 8px}
-.keyword-failures{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;padding:12px 16px;background:#fff1ed;color:#964639;border-radius:8px}
+.keyword-failures{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;padding:12px 16px;background:#f6e1dc;color:#b4402e;border-radius:8px}
 .engine-table table{width:100%;min-width:760px;table-layout:fixed}
 .engine-table th:first-child{width:38%}.engine-table th:nth-child(2){width:15%}.engine-table th:nth-child(3){width:25%}
 .engine-table th,.engine-table td{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
@@ -99,9 +99,9 @@ onMounted(()=>run(async()=>{}))
  .engine-table table,.engine-table tbody{display:block;width:100%;min-width:0!important}
  .engine-table thead{display:none}
  .engine-table tbody{display:grid;gap:12px}
- .engine-table tr{display:block;border:1px solid var(--line,#dce3e5);border-radius:10px;padding:10px;min-width:0}
+ .engine-table tr{display:block;border:1px solid var(--line,#e8e6dc);border-radius:10px;padding:10px;min-width:0}
  .engine-table td{display:block;width:100%!important;box-sizing:border-box;border:0;padding:6px 0;min-width:0}
- .engine-table td[data-label]::before{content:attr(data-label);display:block;font-size:12px;color:var(--ink-soft,#637078);margin-bottom:4px}
+ .engine-table td[data-label]::before{content:attr(data-label);display:block;font-size:12px;color:var(--ink-soft,#6f6e68);margin-bottom:4px}
  .engine-table td:last-child{text-align:left;padding-right:0}
  .engine-table td:last-child .engine-actions{justify-content:flex-start}
  .engine-table td:last-child details{text-align:left}

@@ -25,5 +25,5 @@ async function save(decision:'accepted'|'excluded'){
  </DetailDrawer>
 </template>
 <style scoped>
-.risk-form{display:grid;gap:16px;overflow-wrap:anywhere}.risk-form p{margin:0}.risk-form label{display:grid;gap:8px}.risk-form textarea{width:100%;box-sizing:border-box;padding:10px;font:inherit;border:1px solid var(--line,#dce3e5);border-radius:8px}.risk-actions{display:flex;flex-wrap:wrap;gap:10px}.risk-actions button{min-height:44px;padding:10px 14px;border:1px solid var(--line,#dce3e5);border-radius:8px;font:inherit;cursor:pointer}.risk-actions .primary{background:#195e62;color:#fff;border-color:#195e62}.risk-actions button:disabled{opacity:.5;cursor:wait}.risk-error{color:#a02f39}
+.risk-form{display:grid;gap:16px;overflow-wrap:anywhere}.risk-form p{margin:0}.risk-form label{display:grid;gap:8px}.risk-form textarea{width:100%;box-sizing:border-box;padding:10px;font:inherit;border:1px solid var(--line,#e8e6dc);border-radius:8px}.risk-actions{display:flex;flex-wrap:wrap;gap:10px}.risk-actions button{min-height:44px;padding:10px 14px;border:1px solid var(--line,#e8e6dc);border-radius:8px;font:inherit;cursor:pointer}.risk-actions .primary{background:#141413;color:#fff;border-color:#141413}.risk-actions button:disabled{opacity:.5;cursor:wait}.risk-error{color:#b4402e}
 </style>

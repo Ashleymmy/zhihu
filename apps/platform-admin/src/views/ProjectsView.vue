@@ -126,8 +126,8 @@ onMounted(load)
       v-if="error"
       style="
         padding: 12px 16px;
-        background: #f1ded9;
-        color: #964639;
+        background: #f6e1dc;
+        color: #b4402e;
         font-size: 13px;
         border-radius: var(--radius);
         border: 1px solid var(--clay);
@@ -276,7 +276,7 @@ onMounted(load)
           z-index: 80;
           display: grid;
           place-content: center;
-          background: rgba(33, 33, 33, 0.4);
+          background: rgba(20, 20, 19, 0.4);
           backdrop-filter: blur(2px);
         "
         @click.self="showCreate = false"

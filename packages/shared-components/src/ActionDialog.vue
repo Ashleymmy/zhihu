@@ -48,14 +48,14 @@ onBeforeUnmount(() => dialog.value?.close());
   max-height: calc(100dvh - 48px);
   overflow: auto;
   padding: 0;
-  color: var(--ink, #243438);
+  color: var(--ink, #2b2b29);
   background: var(--paper, #fff);
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 14px;
-  box-shadow: 0 24px 80px #0003;
+  box-shadow: 0 24px 80px #14141333;
 }
 .action-dialog::backdrop {
-  background: #10252770;
+  background: #2b2b2970;
 }
 .action-dialog-wide {
   width: min(880px, calc(100vw - 32px));
@@ -65,7 +65,7 @@ onBeforeUnmount(() => dialog.value?.close());
   width: 18px;
   min-height: 18px;
   flex: 0 0 18px;
-  accent-color: #195e62;
+  accent-color: #141413;
 }
 header {
   display: flex;
@@ -73,7 +73,7 @@ header {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--line, #dce3e5);
+  border-bottom: 1px solid var(--line, #e8e6dc);
 }
 h2 {
   margin: 0;
@@ -115,7 +115,7 @@ h2 {
   box-sizing: border-box;
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 8px;
   background: var(--paper, #fff);
   color: inherit;
@@ -124,14 +124,14 @@ h2 {
   min-height: 42px;
   padding: 8px 14px;
   border-radius: 7px;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   color: inherit;
   background: var(--paper, #fff);
   cursor: pointer;
 }
 .action-dialog :deep(button.primary) {
-  background: #195e62;
-  border-color: #195e62;
+  background: #141413;
+  border-color: #141413;
   color: white;
 }
 .action-dialog :deep(button:disabled) {
@@ -145,11 +145,11 @@ h2 {
   flex-wrap: wrap;
 }
 .action-dialog :deep([role="alert"]) {
-  color: #a02f39;
+  color: #b4402e;
   line-height: 1.6;
 }
 .action-dialog :deep(small) {
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 @media (max-width: 550px) {
   header {

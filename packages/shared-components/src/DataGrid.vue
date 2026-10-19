@@ -326,10 +326,10 @@ function text(row: DataGridRow, column: DataGridColumn) {
 <style scoped>
 .data-grid {
   min-width: 0;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 12px;
   background: var(--paper, #fff);
-  color: var(--ink, #243438);
+  color: var(--ink, #2b2b29);
   font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
@@ -349,7 +349,7 @@ function text(row: DataGridRow, column: DataGridColumn) {
 .grid-toolbar {
   padding: 14px 16px;
   justify-content: space-between;
-  border-bottom: 1px solid var(--line, #dce3e5);
+  border-bottom: 1px solid var(--line, #e8e6dc);
 }
 button,
 input,
@@ -358,7 +358,7 @@ select {
   color: inherit;
   min-height: 40px;
   border-radius: 7px;
-  border: 1px solid var(--line, #ccd7d7);
+  border: 1px solid var(--line, #d6d3c7);
   background: var(--paper, #fff);
   padding: 8px 12px;
 }
@@ -375,17 +375,17 @@ input:focus-visible,
 select:focus-visible,
 .grid-row:focus-visible,
 .grid-card:focus-visible {
-  outline: 3px solid #195e62;
+  outline: 3px solid #141413;
   outline-offset: -3px;
 }
 .grid-views button {
   border-color: transparent;
   background: transparent;
-  color: #536269;
+  color: #5e5d59;
 }
 .grid-views button.active {
-  background: #e8f2f0;
-  color: #164d51;
+  background: #f3f1ea;
+  color: #141413;
   font-weight: 600;
 }
 .view-count {
@@ -395,7 +395,7 @@ select:focus-visible,
   border-radius: 5px;
   font-size: 12px;
   background: #ffffffa8;
-  color: #4e6265;
+  color: #5e5d59;
   margin-left: 4px;
   font-variant-numeric: tabular-nums;
 }
@@ -417,7 +417,7 @@ select:focus-visible,
   text-align: left;
   padding: 14px 12px;
   vertical-align: top;
-  border-bottom: 1px solid var(--line, #e6ebeb);
+  border-bottom: 1px solid var(--line, #f0eee6);
   overflow-wrap: anywhere;
 }
 .desktop-table th.numeric,
@@ -425,10 +425,10 @@ select:focus-visible,
   text-align: right;
 }
 .desktop-table thead th {
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
   font-weight: 500;
-  background: #f6f8f7;
+  background: #faf9f5;
 }
 .title-col {
   width: 21%;
@@ -440,7 +440,7 @@ select:focus-visible,
   cursor: pointer;
 }
 .grid-row:hover {
-  background: #f6faf9;
+  background: #faf9f5;
 }
 .grid-row th {
   font-weight: 600;
@@ -453,7 +453,7 @@ select:focus-visible,
   text-align: left;
   line-height: 1.6;
   font-weight: 600;
-  color: #195e62;
+  color: #141413;
   max-width: 100%;
   overflow-wrap: anywhere;
 }
@@ -464,7 +464,7 @@ select:focus-visible,
   font-variant-numeric: tabular-nums;
 }
 .group-heading th {
-  background: #f5f7f6;
+  background: #faf9f5;
   padding: 9px 12px;
   font-weight: 500;
 }
@@ -472,7 +472,7 @@ select:focus-visible,
   margin-right: 10px;
 }
 .group-heading small {
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
   font-weight: 400;
 }
@@ -486,24 +486,24 @@ select:focus-visible,
   overflow-wrap: anywhere;
 }
 .success {
-  background: #e5f2eb;
-  color: #205c44;
+  background: #e3efe5;
+  color: #2f7d4f;
 }
 .warning {
-  background: #fff0d4;
-  color: #815400;
+  background: #f5ead3;
+  color: #a86a12;
 }
 .danger {
-  background: #fcebe8;
-  color: #a23327;
+  background: #f6e1dc;
+  color: #b4402e;
 }
 .neutral {
-  background: #edf0f0;
-  color: #55636a;
+  background: #f0eee6;
+  color: #5e5d59;
 }
 .leader {
-  background: #eee8f7;
-  color: #69439b;
+  background: #efe9f8;
+  color: #6e4fa8;
 }
 .next-cell p,
 .grid-card footer p {
@@ -513,13 +513,13 @@ select:focus-visible,
 .next-cell button,
 .grid-card footer button {
   font-size: 13px;
-  border-color: #b6cecb;
-  color: #195e62;
-  background: #f5faf8;
+  border-color: #d6d3c7;
+  color: #141413;
+  background: #faf9f5;
 }
 .next-cell > span {
   font-size: 12px;
-  color: #637078;
+  color: #6f6e68;
 }
 .grid-totals {
   display: flex;
@@ -528,8 +528,8 @@ select:focus-visible,
   gap: 12px 26px;
   flex-wrap: wrap;
   padding: 16px;
-  background: #f6f8f7;
-  border-top: 1px solid var(--line, #dce3e5);
+  background: #faf9f5;
+  border-top: 1px solid var(--line, #e8e6dc);
 }
 .grid-totals > div {
   display: flex;
@@ -538,7 +538,7 @@ select:focus-visible,
   flex-wrap: wrap;
 }
 .grid-totals span {
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
 }
 .grid-totals strong {
@@ -549,13 +549,13 @@ select:focus-visible,
 .grid-notice {
   padding: 8px 16px;
   margin: 0;
-  color: #637078;
-  background: #f6faf9;
+  color: #6f6e68;
+  background: #faf9f5;
 }
 .grid-empty {
   text-align: center;
   padding: 36px 20px;
-  color: #637078;
+  color: #6f6e68;
 }
 .grid-empty p {
   margin: 0 0 14px;
@@ -573,7 +573,7 @@ select:focus-visible,
   gap: 4px;
 }
 .detail-fields dt {
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
 }
 .detail-fields dd {
@@ -598,7 +598,7 @@ select:focus-visible,
   .mobile-groups {
     display: block;
     padding: 0 14px 14px;
-    background: #f6f8f7;
+    background: #faf9f5;
   }
   .mobile-group-heading {
     display: flex;
@@ -607,7 +607,7 @@ select:focus-visible,
     flex-wrap: wrap;
     padding: 18px 2px 10px;
     font-size: 12px;
-    color: #637078;
+    color: #6f6e68;
   }
   .mobile-group-heading p {
     flex-basis: 100%;
@@ -617,7 +617,7 @@ select:focus-visible,
   .grid-card {
     padding: 16px;
     background: var(--paper, #fff);
-    border: 1px solid var(--line, #dce3e5);
+    border: 1px solid var(--line, #e8e6dc);
     border-radius: 10px;
     margin: 0 0 10px;
     min-width: 0;
@@ -651,7 +651,7 @@ select:focus-visible,
   }
   .grid-card dt {
     font-size: 12px;
-    color: #637078;
+    color: #6f6e68;
     margin-bottom: 3px;
   }
   .grid-card dd {
@@ -661,7 +661,7 @@ select:focus-visible,
   }
   .grid-card footer {
     padding-top: 12px;
-    border-top: 1px solid var(--line, #e6ebeb);
+    border-top: 1px solid var(--line, #f0eee6);
     font-size: 13px;
   }
   .grid-card footer button {

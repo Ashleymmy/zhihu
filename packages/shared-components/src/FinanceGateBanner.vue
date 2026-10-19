@@ -23,8 +23,8 @@ defineProps<{
   padding: 15px 20px;
   border: 1px solid var(--sun);
   border-radius: var(--radius);
-  background: #f4e8c7;
-  color: #8b5d1e;
+  background: #f5ead3;
+  color: #a86a12;
   box-shadow: var(--shadow);
 }
 .finance-gate-banner__title {

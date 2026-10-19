@@ -141,12 +141,12 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
-    <div v-if="created" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 13px; font-family: var(--font-mono); color: #59645d;">
+    <div v-if="created" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f5ead3; font-size: 13px; font-family: var(--font-mono); color: #5e5d59;">
       创建成功！临时密码：<strong>{{ created.temporaryPassword }}</strong>（{{ created.username }}）
     </div>
-    <div v-if="resetResult" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f4e8c7; font-size: 13px; font-family: var(--font-mono); color: #59645d;">
+    <div v-if="resetResult" style="padding: 12px 16px; border: 1px solid var(--sun); border-radius: var(--radius); background: #f5ead3; font-size: 13px; font-family: var(--font-mono); color: #5e5d59;">
       <template v-if="resetResult.temporaryPassword">已生成临时密码：<strong>{{ resetResult.temporaryPassword }}</strong>（成员下次登录需修改）</template>
       <template v-else>密码已更新为自定义密码。</template>
     </div>
@@ -216,7 +216,7 @@ onMounted(load)
     </article>
 
     <Teleport to="body">
-      <div v-if="showCreate" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showCreate = false">
+      <div v-if="showCreate" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(20, 20, 19, 0.4); backdrop-filter: blur(2px);" @click.self="showCreate = false">
         <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">添加成员</h2>
           <form class="form-grid" @submit.prevent="createMember" style="gap: 16px;">
@@ -237,7 +237,7 @@ onMounted(load)
 
     <!-- 重置密码对话框 -->
     <Teleport to="body">
-      <div v-if="resetTarget" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="resetTarget = null">
+      <div v-if="resetTarget" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(20, 20, 19, 0.4); backdrop-filter: blur(2px);" @click.self="resetTarget = null">
         <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 6px; font-family: var(--font-display); font-size: 22px;">重置密码</h2>
           <p style="margin: 0 0 20px; color: var(--ink-soft); font-size: 12px;">为 <strong style="color: var(--ink);">{{ resetTarget.displayName }}</strong> 设置新密码。</p>

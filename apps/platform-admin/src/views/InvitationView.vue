@@ -55,9 +55,9 @@ async function join() {
   </main>
 </template>
 <style scoped>
-.invite-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--paper,#f5f4f0)}
+.invite-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--paper,#f5f3ec)}
 .invite-card{max-width:600px;width:100%;padding:32px;box-sizing:border-box}
 .invite-card h1{font-size:28px}.invite-card h2{font-size:20px}.invite-card p{line-height:1.8;overflow-wrap:anywhere}
 .invite-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:24px;align-items:center}.invite-actions a{text-decoration:none}
-[role=alert]{color:#964639}
+[role=alert]{color:#b4402e}
 </style>

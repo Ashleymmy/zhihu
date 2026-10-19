@@ -73,8 +73,8 @@ onMounted(async () => {
 .page-error {
   margin: 0 0 16px;
   padding: 12px;
-  background: #f1ded9;
-  color: #964639;
+  background: #f6e1dc;
+  color: #b4402e;
   font-size: 12px;
   border-radius: var(--radius);
   border: 1px solid var(--clay);

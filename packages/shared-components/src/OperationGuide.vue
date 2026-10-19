@@ -133,10 +133,10 @@ function toggle() {
 <style scoped>
 .operation-guide {
   min-width: 0;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 12px;
   background: var(--paper, #fff);
-  color: var(--ink, #1b3035);
+  color: var(--ink, #2b2b29);
 }
 .guide-header {
   display: flex;
@@ -150,7 +150,7 @@ function toggle() {
 }
 .guide-audience {
   margin: 0 0 6px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
   font-size: 12px;
 }
 .operation-guide h2 {
@@ -171,7 +171,7 @@ function toggle() {
 }
 .guide-intro {
   margin: 8px 0 0;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
   font-size: 14px;
 }
 .operation-guide .guide-toggle {
@@ -182,7 +182,7 @@ function toggle() {
   flex-shrink: 0;
   padding: 8px 12px;
   min-height: 44px;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 7px;
   background: transparent;
   font: inherit;
@@ -214,7 +214,7 @@ function toggle() {
   align-items: flex-start;
   min-width: 0;
   padding: 20px;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 8px;
 }
 .guide-card-title {
@@ -223,7 +223,7 @@ function toggle() {
   gap: 12px;
 }
 .guide-number {
-  color: #195e62;
+  color: #141413;
   font:
     600 14px/1.5 ui-monospace,
     monospace;
@@ -231,7 +231,7 @@ function toggle() {
 .guide-card > p {
   margin: 12px 0;
   font-size: 14px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 .guide-instructions {
   margin: 0 0 16px;
@@ -263,40 +263,40 @@ function toggle() {
   align-items: center;
   gap: 12px;
   min-height: 44px;
-  color: #195e62;
+  color: #141413;
   font-size: 14px;
   text-underline-offset: 4px;
 }
 .guide-actions .guide-primary {
   padding: 8px 14px;
-  border: 1px solid #195e62;
+  border: 1px solid #141413;
   border-radius: 7px;
-  background: #195e62;
+  background: #141413;
   color: #fff;
   text-decoration: none;
 }
 .guide-primary:hover {
-  background: #124b4e;
+  background: #141413;
 }
 .guide-actions a:hover {
   text-decoration: underline;
 }
 .guide-toggle:hover {
-  border-color: #195e62;
+  border-color: #141413;
 }
 .operation-guide :is(a, button, summary):focus-visible {
-  outline: 2px solid #247c82;
+  outline: 2px solid #141413;
   outline-offset: 3px;
 }
 .guide-management {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid var(--line, #dce3e5);
+  border-top: 1px solid var(--line, #e8e6dc);
 }
 .guide-management-intro {
   margin: 8px 0 16px;
   font-size: 13px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 .guide-management-card {
   padding: 16px 20px;

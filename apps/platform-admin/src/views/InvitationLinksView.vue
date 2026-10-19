@@ -365,7 +365,7 @@ th,
 td {
   text-align: left;
   padding: 14px 12px;
-  border-bottom: 1px solid var(--line, #ddd);
+  border-bottom: 1px solid var(--line, #e8e6dc);
   vertical-align: top;
 }
 th {
@@ -395,10 +395,10 @@ input {
   width: auto;
 }
 small {
-  color: var(--muted, #666);
+  color: var(--muted, #6f6e68);
 }
 .error {
-  color: #a52e2e;
+  color: #b4402e;
 }
 .empty-state {
   padding: 28px 0;

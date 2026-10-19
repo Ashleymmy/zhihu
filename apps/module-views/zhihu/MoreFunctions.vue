@@ -77,10 +77,10 @@ const pages = computed(() =>
   text-decoration: none;
 }
 .function-card:hover {
-  border-color: #195e62;
+  border-color: #141413;
 }
 .function-card:focus-visible {
-  outline: 2px solid #195e62;
+  outline: 2px solid #141413;
   outline-offset: 3px;
 }
 @media (max-width: 550px) {

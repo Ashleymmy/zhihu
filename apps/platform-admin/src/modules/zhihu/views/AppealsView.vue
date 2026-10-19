@@ -121,7 +121,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 团长：初审队列 -->
     <article v-if="isLeader" class="panel data-panel">
@@ -136,7 +136,7 @@ onMounted(load)
             <strong><span class="event-tag">{{ a.kind }}</span> {{ a.title }}</strong>
             <small style="white-space: normal;">{{ a.content }}</small>
             <small v-if="a.evidence" style="color: var(--ink-soft);">证据：{{ a.evidence }}</small>
-            <small style="color: #9a9d9e;">{{ a.applicantName }} · {{ new Date(a.createdAt).toLocaleString('zh-CN') }}</small>
+            <small style="color: #b0aea5;">{{ a.applicantName }} · {{ new Date(a.createdAt).toLocaleString('zh-CN') }}</small>
           </div>
           <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
             <input v-model="remark" placeholder="驳回原因（驳回时必填）" style="width: 150px; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px;" />
@@ -160,7 +160,7 @@ onMounted(load)
             <strong><span class="event-tag">{{ a.kind }}</span> {{ a.title }}</strong>
             <small style="white-space: normal;">{{ a.content }}</small>
             <small v-if="a.evidence" style="color: var(--ink-soft);">证据：{{ a.evidence }}</small>
-            <small style="color: #9a9d9e;">{{ a.applicantName }} · 初审：{{ a.leaderName ?? '—' }}</small>
+            <small style="color: #b0aea5;">{{ a.applicantName }} · 初审：{{ a.leaderName ?? '—' }}</small>
           </div>
           <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap;">
             <input v-model="adjustAmount" type="number" step="0.01" placeholder="调账（元，正补负扣，可空）" style="width: 160px; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 2px;" />
@@ -185,7 +185,7 @@ onMounted(load)
           <div>
             <strong><span class="event-tag">{{ a.kind }}</span> {{ a.title }}</strong>
             <small style="white-space: normal;">{{ a.content }}</small>
-            <small style="color: #9a9d9e;">
+            <small style="color: #b0aea5;">
               {{ new Date(a.createdAt).toLocaleString('zh-CN') }}
               <template v-if="a.adjustAmount"> · 调账 {{ (a.adjustAmount / 100).toFixed(2) }} 元</template>
               <template v-if="a.remark"> · 终审备注：{{ a.remark }}</template>

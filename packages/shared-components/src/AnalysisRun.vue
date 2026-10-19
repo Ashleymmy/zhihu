@@ -140,10 +140,10 @@ const progress = computed(() =>
 <style scoped>
 .analysis-run {
   min-width: 0;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 12px;
   background: var(--paper, #fff);
-  color: var(--ink, #243438);
+  color: var(--ink, #2b2b29);
   overflow: hidden;
   font-size: 14px;
   line-height: 1.6;
@@ -153,7 +153,7 @@ header {
   gap: 12px;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid var(--line, #dce3e5);
+  border-bottom: 1px solid var(--line, #e8e6dc);
 }
 header > div,
 .step-content {
@@ -166,8 +166,8 @@ header > div,
   width: 40px;
   height: 44px;
   border-radius: 8px;
-  background: #e5f2eb;
-  color: #205c44;
+  background: #e3efe5;
+  color: #2f7d4f;
   font-weight: 700;
 }
 h2 {
@@ -185,7 +185,7 @@ p {
   overflow-wrap: anywhere;
 }
 header p {
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
   font-size: 12px;
 }
 .run-state {
@@ -193,7 +193,7 @@ header p {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 20px 4px;
-  color: #526269;
+  color: #5e5d59;
   font-size: 12px;
 }
 .run-state strong {
@@ -205,18 +205,18 @@ progress {
   height: 5px;
   margin: 8px 20px 4px;
   border: 0;
-  accent-color: #195e62;
+  accent-color: #141413;
 }
 progress::-webkit-progress-bar {
-  background: #e8eeec;
+  background: #f0eee6;
   border-radius: 6px;
 }
 progress::-webkit-progress-value {
-  background: #195e62;
+  background: #141413;
   border-radius: 6px;
 }
 progress::-moz-progress-bar {
-  background: #195e62;
+  background: #141413;
   border-radius: 6px;
 }
 .steps {
@@ -229,7 +229,7 @@ progress::-moz-progress-bar {
   grid-template-columns: 24px minmax(0, 1fr);
   gap: 10px;
   padding: 16px 0;
-  border-bottom: 1px dashed var(--line, #dce3e5);
+  border-bottom: 1px dashed var(--line, #e8e6dc);
 }
 .step:last-child {
   border-bottom: 0;
@@ -240,25 +240,25 @@ progress::-moz-progress-bar {
   width: 23px;
   height: 23px;
   border-radius: 50%;
-  background: #edf0f0;
-  color: #55636a;
+  background: #f0eee6;
+  color: #5e5d59;
   font-weight: 700;
 }
 .step.done .step-icon {
-  background: #e5f2eb;
-  color: #205c44;
+  background: #e3efe5;
+  color: #2f7d4f;
 }
 .step.ask .step-icon {
-  background: #fff0d4;
-  color: #815400;
+  background: #f5ead3;
+  color: #a86a12;
 }
 .step.failed .step-icon {
-  background: #fcebe8;
-  color: #a23327;
+  background: #f6e1dc;
+  color: #b4402e;
 }
 .step.running .step-icon {
-  background: #e5f0ef;
-  color: #195e62;
+  background: #f0eee6;
+  color: #141413;
 }
 .step-heading {
   display: flex;
@@ -269,18 +269,18 @@ progress::-moz-progress-bar {
 }
 .step-heading > span {
   font-size: 11px;
-  color: #637078;
+  color: #6f6e68;
 }
 .step-content > p {
-  color: #536269;
+  color: #5e5d59;
 }
 .ask-box {
   margin-top: 12px;
-  border: 1px solid #ecd6a7;
+  border: 1px solid #ead9b4;
   border-radius: 8px;
-  background: #fff8e9;
+  background: #f5ead3;
   padding: 12px;
-  color: #694a0a;
+  color: #a86a12;
 }
 .ask-box > p:first-child {
   margin: 0;
@@ -297,15 +297,15 @@ button {
   min-height: 42px;
   padding: 8px 12px;
   border-radius: 7px;
-  border: 1px solid #ccd7d7;
+  border: 1px solid #d6d3c7;
   background: var(--paper, #fff);
-  color: #243438;
+  color: #2b2b29;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 button.primary {
-  background: #195e62;
-  border-color: #195e62;
+  background: #141413;
+  border-color: #141413;
   color: white;
 }
 button:disabled {
@@ -313,19 +313,19 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible {
-  outline: 3px solid #195e62;
+  outline: 3px solid #141413;
   outline-offset: 3px;
 }
 .error {
-  color: #9a2f27;
+  color: #b4402e;
   font-weight: 500;
 }
 .conclusion {
   margin: 0 20px 20px;
   padding: 16px;
-  border: 1px solid #c7ddda;
+  border: 1px solid #d6d3c7;
   border-radius: 10px;
-  background: #eef6f4;
+  background: #f5f3ec;
 }
 .conclusion-value {
   display: block;
@@ -336,7 +336,7 @@ button:focus-visible {
   overflow-wrap: anywhere;
 }
 .pending-text {
-  color: #79520a;
+  color: #a86a12;
 }
 @media (max-width: 600px) {
   header {

@@ -20,9 +20,9 @@ const financeGate = ref<ApiError | null>(null)
 const statusSlices = computed(() => {
   if (!summary.value) return []
   return [
-    { label: '待确认', value: summary.value.pending, color: '#b98a2f' },
-    { label: '已确认', value: summary.value.confirmed, color: '#e66b3a' },
-    { label: '已支付', value: summary.value.paid, color: '#5d7668' },
+    { label: '待确认', value: summary.value.pending, color: '#d46b45' },
+    { label: '已确认', value: summary.value.confirmed, color: '#3b7dd8' },
+    { label: '已支付', value: summary.value.paid, color: '#4e9a4a' },
   ]
 })
 
@@ -142,8 +142,8 @@ onMounted(load)
 .page-error {
   margin: 0 0 16px;
   padding: 12px;
-  background: #f1ded9;
-  color: #964639;
+  background: #f6e1dc;
+  color: #b4402e;
   font-size: 12px;
   border-radius: var(--radius);
   border: 1px solid var(--clay);
@@ -244,15 +244,15 @@ onMounted(load)
   font-weight: 700;
   cursor: pointer;
   transition: all 0.16s ease;
-  box-shadow: 2px 2px 0 #b8c2b7;
+  box-shadow: var(--shadow);
 }
 .withdraw-form button:hover {
   transform: translateY(-1px);
-  box-shadow: 3px 3px 0 #b8c2b7;
+  box-shadow: var(--shadow);
 }
 .withdraw-form button:active {
   transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0 #b8c2b7;
+  box-shadow: var(--shadow);
 }
 .withdraw-remark {
   display: block;
@@ -292,7 +292,7 @@ onMounted(load)
   color: var(--clay) !important;
 }
 .withdraw-actions__danger:hover {
-  background: #f1ded9;
+  background: #f6e1dc;
 }
 .withdraw-link { display: inline-block; margin-top: 8px; color: var(--clay-deep); font-size: 12px; font-weight: 600; }
 </style>

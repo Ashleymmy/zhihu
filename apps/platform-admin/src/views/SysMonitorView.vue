@@ -47,12 +47,12 @@ onMounted(()=>{if(fullAccess.value)void load();else loading.value=false})
     </header>
     <MiniMonitorPanel />
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article v-if="fullAccess" class="panel" style="padding: 22px; margin-bottom: 18px;">
       <p class="section-index quiet">活跃度分布</p>
       <h2 class="workspace-title" style="font-size: 20px; margin: 4px 0 14px;">近 7 日操作量</h2>
-      <BarChart :items="chartItems" color="#e66b3a" :max-items="8" />
+      <BarChart :items="chartItems" color="#d46b45" :max-items="8" />
     </article>
 
     <article v-if="fullAccess" class="panel data-panel" style="min-height: 300px;">

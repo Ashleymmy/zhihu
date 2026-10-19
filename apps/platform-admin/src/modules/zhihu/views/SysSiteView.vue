@@ -60,8 +60,8 @@ onMounted(load)
       <button class="row-action" @click="load">刷新</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="message" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ message }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="message" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e8e6dc; font-size: 13px; color: var(--moss);">{{ message }}</div>
 
     <section class="workspace-grid">
       <div class="min-w-0">
@@ -97,7 +97,7 @@ onMounted(load)
 .info-grid { display: grid; gap: 0; margin-top: 12px; }
 .info-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .info-item:last-child { border-bottom: 0; }
-.info-item span { color: #737a80; font-size: 13px; }
+.info-item span { color: #6f6e68; font-size: 13px; }
 .info-item strong { font-size: 12px; font-weight: 500; }
 .rail-form { display: grid; gap: 10px; }
 .rail-form label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }

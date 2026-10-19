@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
   size?: number
 }>(), { size: 160, centerLabel: '总计' })
 
-const palette = ['#e66b3a', '#5d7668', '#b98a2f', '#39454c', '#c3c1bb']
+const palette = ['#d46b45', '#3b7dd8', '#4e9a4a', '#8e6cc9', '#b0aea5']
 
 const total = computed(() => props.slices.reduce((sum, s) => sum + s.value, 0))
 
@@ -37,7 +37,7 @@ const arcs = computed(() => {
   <div class="donut-chart">
     <div class="donut-wrap" :style="{ width: `${size}px`, height: `${size}px` }">
       <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; display: block; transform: rotate(-90deg);">
-        <circle cx="50" cy="50" :r="R" fill="none" stroke="#efede8" stroke-width="10" />
+        <circle cx="50" cy="50" :r="R" fill="none" stroke="#f0eee6" stroke-width="10" />
         <circle
           v-for="arc in arcs"
           :key="arc.label"

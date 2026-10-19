@@ -6,23 +6,11 @@
  */
 
 .finance-flow {
-  --ink: #1b3035;
-  --ink-soft: #637078;
-  --paper: #fff;
-  --bg: #f4f6f6;
-  --line: #dce3e5;
-  --primary: #195e62;
-  --primary-soft: #eef6f5;
-  --warn: #8a6d1d;
-  --warn-bg: #fff8e8;
-  --danger: #a02f39;
-  --danger-bg: #fff1f1;
-  --ok: #26734d;
-  --ok-bg: #eaf6ef;
-  --info: #1d5fa8;
-  --info-bg: #eaf2fb;
+  /* 颜色、状态色继承全局主题；这里只把 --paper 改成卡片白，--bg 作页面底 */
+  --paper: var(--white);
+  --bg: #faf9f5;
 
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-sans);
   color: var(--ink);
   font-size: 14px;
   line-height: 1.6;
@@ -54,7 +42,7 @@
   border-color: var(--primary);
 }
 .finance-flow button.primary:hover {
-  background: #12484b;
+  background: #141413;
 }
 .finance-flow button.ghost {
   border-color: transparent;
@@ -62,7 +50,7 @@
 }
 .finance-flow button.danger {
   color: var(--danger);
-  border-color: #e5c3c6;
+  border-color: #ecc9c0;
 }
 .finance-flow button:disabled {
   opacity: 0.45;
@@ -144,7 +132,7 @@
 .finance-flow th,
 .finance-flow td {
   padding: 10px 12px;
-  border-bottom: 1px solid #e8edee;
+  border-bottom: 1px solid #f0eee6;
   vertical-align: top;
 }
 .finance-flow th {
@@ -153,7 +141,7 @@
   font-weight: 500;
 }
 .finance-flow .row-problem {
-  background: #fffaf0;
+  background: #f5ead3;
 }
 
 /* ---------- 徽章 ---------- */
@@ -169,22 +157,22 @@
 .finance-flow .badge.ok {
   background: var(--ok-bg);
   color: var(--ok);
-  border-color: #bfe0cd;
+  border-color: #d6d3c7;
 }
 .finance-flow .badge.warn {
   background: var(--warn-bg);
   color: var(--warn);
-  border-color: #ecd9a8;
+  border-color: #ead9b4;
 }
 .finance-flow .badge.danger {
   background: var(--danger-bg);
   color: var(--danger);
-  border-color: #e5c3c6;
+  border-color: #ecc9c0;
 }
 .finance-flow .badge.info {
   background: var(--info-bg);
   color: var(--info);
-  border-color: #c0d6ef;
+  border-color: #c5d7f1;
 }
 .finance-flow .badge.solid {
   background: var(--primary);
@@ -205,11 +193,11 @@
 }
 .finance-flow .banner.warn {
   background: var(--warn-bg);
-  border-color: #ecd9a8;
+  border-color: #ead9b4;
 }
 .finance-flow .banner.danger {
   background: var(--danger-bg);
-  border-color: #e5c3c6;
+  border-color: #ecc9c0;
 }
 .finance-flow .banner .grow {
   flex: 1;
@@ -330,11 +318,11 @@
 
 /* ---------- 上传 ---------- */
 .finance-flow .drop {
-  border: 2px dashed #b8ccd0;
+  border: 2px dashed #d6d3c7;
   border-radius: 14px;
   padding: 36px 24px;
   text-align: center;
-  background: #fafcfd;
+  background: #faf9f5;
 }
 .finance-flow .drop.dragging {
   border-color: var(--primary);
@@ -391,7 +379,7 @@
 }
 .finance-flow .todo-group > header {
   padding: 12px 16px;
-  background: #f8fafa;
+  background: #faf9f5;
   border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
@@ -403,7 +391,7 @@
   display: flex;
   gap: 14px;
   padding: 14px 16px;
-  border-bottom: 1px solid #eef1f2;
+  border-bottom: 1px solid #f3f1ea;
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -439,7 +427,7 @@
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px dashed #e8edee;
+  border-bottom: 1px dashed #f0eee6;
   font-size: 13px;
   gap: 8px;
 }
@@ -459,12 +447,12 @@
   background: #fff;
 }
 .finance-flow .fact > header:hover {
-  background: #f8fafa;
+  background: #faf9f5;
 }
 .finance-flow .fact .detail {
   padding: 12px 16px;
-  border-top: 1px solid #eef1f2;
-  background: #fcfdfd;
+  border-top: 1px solid #f3f1ea;
+  background: #ffffff;
 }
 .finance-flow .drill {
   display: grid;
@@ -494,7 +482,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px dashed #e8edee;
+  border-bottom: 1px dashed #f0eee6;
   flex-wrap: wrap;
 }
 
@@ -524,7 +512,7 @@
   display: flex;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px dashed #eef1f2;
+  border-bottom: 1px dashed #f3f1ea;
   font-size: 13px;
 }
 .finance-flow .tl li .t {
@@ -544,7 +532,7 @@
   z-index: 1200;
 }
 .finance-flow-toasts .toast {
-  background: var(--ink, #1b3035);
+  background: var(--ink, #2b2b29);
   color: #fff;
   padding: 12px 18px;
   border-radius: 10px;
@@ -568,7 +556,7 @@
 .finance-flow-modal {
   position: fixed;
   inset: 0;
-  background: rgba(20, 35, 38, 0.45);
+  background: rgba(20, 20, 19, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -584,7 +572,7 @@
   width: 100%;
   max-height: 85vh;
   overflow: auto;
-  color: var(--ink, #1b3035);
+  color: var(--ink, #2b2b29);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -602,7 +590,7 @@
   display: block;
   margin: 10px 0 4px;
   font-size: 13px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 .finance-flow-modal .dialog input,
 .finance-flow-modal .dialog textarea,
@@ -610,65 +598,65 @@
   font: inherit;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 8px;
   background: #fff;
-  color: var(--ink, #1b3035);
+  color: var(--ink, #2b2b29);
 }
 .finance-flow-modal .dialog button {
   font: inherit;
   cursor: pointer;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 8px;
   background: #fff;
   padding: 8px 14px;
-  color: var(--ink, #1b3035);
+  color: var(--ink, #2b2b29);
 }
 .finance-flow-modal .dialog button:hover {
-  border-color: var(--primary, #195e62);
+  border-color: var(--primary, #141413);
 }
 .finance-flow-modal .dialog button.primary {
-  background: var(--primary, #195e62);
+  background: var(--primary, #141413);
   color: #fff;
-  border-color: var(--primary, #195e62);
+  border-color: var(--primary, #141413);
 }
 .finance-flow-modal .dialog button.primary:hover {
-  background: #12484b;
+  background: #141413;
 }
 .finance-flow-modal .dialog button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .finance-flow-modal .dialog .choice {
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 10px;
   padding: 12px 14px;
   margin: 8px 0;
   cursor: pointer;
 }
 .finance-flow-modal .dialog .choice:hover {
-  border-color: var(--primary, #195e62);
+  border-color: var(--primary, #141413);
 }
 .finance-flow-modal .dialog .choice.sel {
-  border-color: var(--primary, #195e62);
-  background: var(--primary-soft, #eef6f5);
+  border-color: var(--primary, #141413);
+  background: var(--primary-soft, #f5f3ec);
 }
 .finance-flow-modal .dialog .muted {
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 .finance-flow-modal .dialog .small {
   font-size: 12px;
 }
 .finance-flow-modal .dialog .hr {
   border: none;
-  border-top: 1px solid var(--line, #dce3e5);
+  border-top: 1px solid var(--line, #e8e6dc);
   margin: 16px 0;
 }
 .finance-flow-modal .dialog .recon-item {
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px dashed #e8edee;
+  border-bottom: 1px dashed #f0eee6;
   font-size: 13px;
   gap: 8px;
 }
@@ -685,40 +673,40 @@
 .finance-flow-modal .dialog th,
 .finance-flow-modal .dialog td {
   padding: 8px 10px;
-  border-bottom: 1px solid #e8edee;
+  border-bottom: 1px solid #f0eee6;
   vertical-align: top;
 }
 .finance-flow-modal .dialog th {
   font-size: 12px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
   font-weight: 500;
 }
 .finance-flow-modal .dialog .row-problem {
-  background: #fffaf0;
+  background: #f5ead3;
 }
 .finance-flow-modal .dialog .badge {
   display: inline-block;
   padding: 2px 9px;
   border-radius: 20px;
   font-size: 12px;
-  border: 1px solid var(--line, #dce3e5);
-  color: var(--ink-soft, #637078);
+  border: 1px solid var(--line, #e8e6dc);
+  color: var(--ink-soft, #6f6e68);
   white-space: nowrap;
 }
 .finance-flow-modal .dialog .badge.ok {
-  background: var(--ok-bg, #eaf6ef);
-  color: var(--ok, #26734d);
-  border-color: #bfe0cd;
+  background: var(--ok-bg, #e3efe5);
+  color: var(--ok, #2f7d4f);
+  border-color: #d6d3c7;
 }
 .finance-flow-modal .dialog .badge.warn {
-  background: var(--warn-bg, #fff8e8);
-  color: var(--warn, #8a6d1d);
-  border-color: #ecd9a8;
+  background: var(--warn-bg, #f5ead3);
+  color: var(--warn, #a86a12);
+  border-color: #ead9b4;
 }
 .finance-flow-modal .dialog .badge.danger {
-  background: var(--danger-bg, #fff1f1);
-  color: var(--danger, #a02f39);
-  border-color: #e5c3c6;
+  background: var(--danger-bg, #f6e1dc);
+  color: var(--danger, #b4402e);
+  border-color: #ecc9c0;
 }
 .finance-flow-modal .dialog .flex {
   display: flex;
@@ -728,14 +716,14 @@
 }
 .finance-flow-modal .dialog .empty {
   text-align: center;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
   padding: 20px 10px;
 }
 .finance-flow-modal .dialog .spin {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--line, #dce3e5);
-  border-top-color: var(--primary, #195e62);
+  border: 2px solid var(--line, #e8e6dc);
+  border-top-color: var(--primary, #141413);
   border-radius: 50%;
   animation: finance-flow-sp 0.8s linear infinite;
   display: inline-block;
@@ -745,7 +733,7 @@
   align-items: center;
   gap: 10px;
   margin-top: 14px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
   font-size: 13px;
 }
 .finance-flow-modal .dialog h4 {
@@ -780,7 +768,7 @@
   margin: 16px 0;
 }
 .finance-flow code.k {
-  background: #f0f4f4;
+  background: #f5f3ec;
   padding: 1px 6px;
   border-radius: 5px;
   font-size: 12px;
@@ -808,7 +796,7 @@
   transition: background 0.22s ease, opacity 0.22s ease;
 }
 .finance-flow .step:not(.locked):hover {
-  background: #f4f8f8;
+  background: #faf9f5;
 }
 .finance-flow .step .no {
   transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease, transform 0.22s ease;
@@ -817,7 +805,7 @@
   animation: finance-flow-pop 0.32s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
 .finance-flow .step.current .no {
-  box-shadow: 0 0 0 4px rgba(25, 94, 98, 0.12);
+  box-shadow: 0 0 0 4px rgba(20, 20, 19, 0.12);
 }
 .finance-flow .step .dot {
   animation: finance-flow-pulse 1.6s ease-in-out infinite;
@@ -875,10 +863,10 @@
   transform: scale(0.97);
 }
 .finance-flow button.primary:not(:disabled) {
-  box-shadow: 0 1px 2px rgba(25, 94, 98, 0.18);
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.18);
 }
 .finance-flow button.primary:hover:not(:disabled) {
-  box-shadow: 0 3px 10px rgba(25, 94, 98, 0.24);
+  box-shadow: 0 3px 10px rgba(20, 20, 19, 0.24);
 }
 
 /* --- 6. 待办完成过渡 --- */
@@ -914,7 +902,7 @@
 .finance-flow .progress-track > i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--primary), #2a7d82);
+  background: linear-gradient(90deg, var(--primary), #141413);
   border-radius: 999px;
   transition: width 0.4s ease;
   position: relative;

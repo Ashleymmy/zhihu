@@ -8,7 +8,7 @@ describe('roleTone', () => {
   })
 
   it('空角色降级为中性色', () => {
-    expect(roleTone(null)).toBe('#8c8c8c')
-    expect(roleTone(undefined)).toBe('#8c8c8c')
+    expect(roleTone(null)).toBe('#87867f')
+    expect(roleTone(undefined)).toBe('#87867f')
   })
 })

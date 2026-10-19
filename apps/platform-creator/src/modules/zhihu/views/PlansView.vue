@@ -180,7 +180,7 @@ onMounted(load);
   overflow-wrap: anywhere;
 }
 .my-plans [role="alert"] {
-  color: #9b3434;
+  color: #b4402e;
 }
 .my-plans button,
 .my-plans .primary-action {
@@ -263,7 +263,7 @@ onMounted(load);
   flex-wrap: wrap;
 }
 .plan-actions a {
-  color: #195e62;
+  color: #141413;
   white-space: nowrap;
 }
 .plan-note {

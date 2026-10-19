@@ -43,7 +43,7 @@ onMounted(load)
       </button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar"><span class="toolbar-title">MCN 账号</span><span class="toolbar-count">{{ accounts.length }}</span></div>
@@ -65,7 +65,7 @@ onMounted(load)
     </article>
 
     <Teleport to="body">
-      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(33, 33, 33, 0.4); backdrop-filter: blur(2px);" @click.self="showModal = false">
+      <div v-if="showModal" style="position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; background: rgba(20, 20, 19, 0.4); backdrop-filter: blur(2px);" @click.self="showModal = false">
         <div style="width: min(420px, 90vw); padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow-float);">
           <h2 style="margin: 0 0 20px; font-family: var(--font-display); font-size: 22px;">添加 MCN 账号</h2>
           <form class="form-grid" @submit.prevent="createAccount" style="gap: 16px;">

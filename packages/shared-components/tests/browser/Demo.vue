@@ -215,8 +215,8 @@ async function decide(value: { askId: string; option: string }) {
 }
 body {
   margin: 0;
-  background: #f5f5f2;
-  color: #243438;
+  background: #f5f3ec;
+  color: #2b2b29;
   font:
     14px/1.6 -apple-system,
     BlinkMacSystemFont,
@@ -239,7 +239,7 @@ main {
 }
 .page-header p {
   margin: 0;
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
 }
 .page-header h1 {
@@ -247,7 +247,7 @@ main {
   margin: 4px 0 0;
 }
 .page-header > span {
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
 }
 .layout {
@@ -261,7 +261,7 @@ dl {
   gap: 20px;
 }
 dt {
-  color: #637078;
+  color: #6f6e68;
   font-size: 12px;
 }
 dd {

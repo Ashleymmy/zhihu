@@ -49,7 +49,7 @@ onMounted(load)
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <div v-if="loading" class="skeleton-row" aria-label="加载中"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
 
@@ -67,8 +67,8 @@ onMounted(load)
           :labels="trend.map(p => p.date.slice(5))"
           :series="[
             { label: '曝光', points: trend.map(p => p.impressions) },
-            { label: '点击', color: '#5d7668', points: trend.map(p => p.clicks) },
-            { label: '转化', color: '#b98a2f', points: trend.map(p => p.conversions) },
+            { label: '点击', color: '#6f6e68', points: trend.map(p => p.clicks) },
+            { label: '转化', color: '#a86a12', points: trend.map(p => p.conversions) },
           ]"
         />
       </article>

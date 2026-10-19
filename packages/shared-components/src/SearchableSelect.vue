@@ -89,7 +89,7 @@ async function keydown(event: KeyboardEvent) {
 .select-control input { box-sizing: border-box; width: 100%; padding-right: 62px !important; }
 .select-arrow { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .select-clear { position: absolute; right: 30px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
-.select-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5; max-height: min(260px, 40vh); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: 0 6px 18px #0002; }
+.select-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5; max-height: min(260px, 40vh); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: 0 6px 18px #14141322; }
 .select-menu ul { margin: 0; padding: 4px; list-style: none; }
 .select-menu li { padding: 9px 10px; cursor: pointer; overflow-wrap: anywhere; font-size: 13px; }
 .select-menu li[data-active="true"], .select-menu li[aria-selected="true"] { background: var(--paper-deep); }

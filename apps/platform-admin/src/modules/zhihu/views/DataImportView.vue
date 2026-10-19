@@ -839,7 +839,7 @@ onMounted(() => loadBatches());
 <style scoped>
 .result-panel {
   padding: 24px;
-  border-top: 3px solid var(--moss, #557766);
+  border-top: 3px solid var(--moss, #6f6e68);
   scroll-margin-top: 24px;
 }
 .result-heading {
@@ -890,7 +890,7 @@ onMounted(() => loadBatches());
 }
 .result-issues {
   line-height: 1.9;
-  color: #964639;
+  color: #b4402e;
 }
 .result-actions {
   display: flex;
@@ -921,12 +921,12 @@ onMounted(() => loadBatches());
   font-size: 13px;
 }
 .error-notice {
-  background: #f1ded9;
-  color: #964639;
+  background: #f6e1dc;
+  color: #b4402e;
   border: 1px solid var(--clay);
 }
 .success-notice {
-  background: #e6ebe7;
+  background: #e8e6dc;
   color: var(--moss);
   border: 1px solid var(--moss);
 }
@@ -1111,8 +1111,8 @@ onMounted(() => loadBatches());
   padding: 12px 14px;
   border: 1px solid var(--clay);
   border-radius: var(--radius);
-  background: #fbf1ed;
-  color: #964639;
+  background: #f6e1dc;
+  color: #b4402e;
   font-size: 12px;
   line-height: 1.5;
 }

@@ -175,7 +175,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <template v-if="!registrationPage"><form class="page-actions" @submit.prevent="page=1;load()"><label>查找关键词<input v-model.trim="keywordFilter" maxlength="128" placeholder="与关键词管理使用相同关键词" /></label><button type="submit" :disabled="loading">搜索</button><button type="button" :disabled="loading" @click="load">刷新</button><router-link v-if="selectedPlan" to="/modules/zhihu/works">查看全部作品</router-link></form>
     <article class="panel data-panel" style="min-height: 300px;">
@@ -269,8 +269,8 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
 </template>
 
 <style scoped>
-.work-batch-button { margin-left: auto; margin-right: 14px; padding: 7px 13px; border: 1px solid var(--line, #d6d2cc); border-radius: 2px; background: transparent; color: var(--ink, #20282d); font-size: 12px; font-weight: 600; cursor: pointer; }
-.work-batch-button:hover { background: var(--paper, #f2f0ec); border-color: var(--ink-soft, #807b73); }
+.work-batch-button { margin-left: auto; margin-right: 14px; padding: 7px 13px; border: 1px solid var(--line, #d6d3c7); border-radius: 2px; background: transparent; color: var(--ink, #2b2b29); font-size: 12px; font-weight: 600; cursor: pointer; }
+.work-batch-button:hover { background: var(--paper, #f3f1ea); border-color: var(--ink-soft, #87867f); }
 .work-batch-button:disabled { opacity: .5; cursor: wait; }
 </style>
 

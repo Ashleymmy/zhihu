@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
   format?: (value: number) => string
   color?: string
   maxItems?: number
-}>(), { color: '#20292f', maxItems: 10 })
+}>(), { color: '#d46b45', maxItems: 10 })
 
 const shown = computed(() => props.items.slice(0, props.maxItems))
 const maxValue = computed(() => Math.max(1e-9, ...shown.value.map((i) => i.value)))

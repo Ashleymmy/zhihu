@@ -31,12 +31,12 @@ onMounted(load)
 
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <!-- 路径说明 -->
     <section class="workflow-grid" style="grid-template-columns: repeat(3, 1fr);">
       <article class="panel" style="padding: 20px; text-align: center;">
-        <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--forest); background: #dbe9db; margin: 0 auto 12px;">
+        <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--forest); background: #e3efe5; margin: 0 auto 12px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
         </div>
         <p class="eyebrow" style="margin-bottom: 4px;">01</p>
@@ -44,7 +44,7 @@ onMounted(load)
         <p style="margin: 0; font-size: 13px; color: var(--ink-soft);">绑定推广关键词</p>
       </article>
       <article class="panel" style="padding: 20px; text-align: center;">
-        <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--forest); background: #dbe9db; margin: 0 auto 12px;">
+        <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--forest); background: #e3efe5; margin: 0 auto 12px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
         </div>
         <p class="eyebrow" style="margin-bottom: 4px;">02</p>
@@ -52,7 +52,7 @@ onMounted(load)
         <p style="margin: 0; font-size: 13px; color: var(--ink-soft);">关联知乎推广内容</p>
       </article>
       <article class="panel" style="padding: 20px; text-align: center;">
-        <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--clay); background: #f1ded9; margin: 0 auto 12px;">
+        <div style="display: grid; width: 37px; height: 37px; place-items: center; border-radius: 50%; color: var(--clay); background: #f6e1dc; margin: 0 auto 12px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
         </div>
         <p class="eyebrow" style="margin-bottom: 4px;">03</p>

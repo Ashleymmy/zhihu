@@ -276,7 +276,7 @@ button {
   min-width: 0;
   min-height: 44px;
   font: inherit;
-  border: 1px solid var(--line, #dce3e5);
+  border: 1px solid var(--line, #e8e6dc);
   border-radius: 8px;
   padding: 10px 12px;
   color: inherit;
@@ -297,12 +297,12 @@ input:focus-visible,
 select:focus-visible,
 button:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #195e62;
+  outline: 3px solid #141413;
   outline-offset: 2px;
 }
 .rate-overview {
   padding: 16px;
-  background: var(--surface-soft, #f3f6f5);
+  background: var(--surface-soft, #f5f3ec);
   border-radius: 12px;
 }
 .rate-row {
@@ -311,7 +311,7 @@ summary:focus-visible {
   justify-content: space-between;
   align-items: baseline;
   padding: 12px 0;
-  border-bottom: 1px solid var(--line, #dce3e5);
+  border-bottom: 1px solid var(--line, #e8e6dc);
 }
 .rate-row:last-child {
   border-bottom: 0;
@@ -331,7 +331,7 @@ small {
 .period,
 .note {
   display: block;
-  color: #59676a;
+  color: #5e5d59;
   font-weight: 400;
   font-size: 13px;
 }
@@ -347,21 +347,21 @@ form h3 {
   gap: 14px;
 }
 .publish {
-  background: #195e62;
+  background: #141413;
   color: white;
-  border-color: #195e62;
+  border-color: #141413;
   width: 100%;
   font-weight: 600;
 }
 .notice {
-  background: #e9f3ef;
-  color: #205545;
+  background: #f3f1ea;
+  color: #2f7d4f;
   padding: 14px;
   border-radius: 8px;
 }
 .problem {
-  background: #fff1ed;
-  color: #8e3c25;
+  background: #f6e1dc;
+  color: #b4402e;
   padding: 14px;
   border-radius: 8px;
   display: grid;
@@ -382,7 +382,7 @@ ul {
 }
 li {
   padding: 12px 0;
-  border-top: 1px solid var(--line, #dce3e5);
+  border-top: 1px solid var(--line, #e8e6dc);
 }
 li > div {
   display: flex;
@@ -390,7 +390,7 @@ li > div {
   gap: 12px;
 }
 li p {
-  color: #59676a;
+  color: #5e5d59;
   font-size: 12px;
 }
 @media (max-width: 600px) {

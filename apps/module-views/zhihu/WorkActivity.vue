@@ -225,17 +225,17 @@ async function showWorks(result = "", member?: Member) {
 }
 .activity-metrics span {
   font-size: 14px;
-  color: var(--ink-soft, #637078);
+  color: var(--ink-soft, #6f6e68);
 }
 .activity-metrics strong {
   display: block;
   font-size: 34px;
   font-weight: 600;
   margin: 12px 0;
-  color: #195e62;
+  color: #141413;
 }
 .activity-metrics button:hover {
-  border-color: #195e62;
+  border-color: #141413;
 }
 .work-drill {
   margin-top: 28px;
@@ -244,7 +244,7 @@ async function showWorks(result = "", member?: Member) {
 .engine button.member-link {
   border: 0;
   padding-left: 0;
-  color: #195e62;
+  color: #141413;
   text-align: left;
 }
 @media (max-width: 700px) {

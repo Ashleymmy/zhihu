@@ -9,5 +9,5 @@ defineProps<{ rows: AnalysisComparison[] }>();
  </table>
 </template>
 <style scoped>
-.value-comparison{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;line-height:1.5;background:var(--paper,#fff)}.value-comparison th,.value-comparison td{padding:8px;border:1px solid var(--line,#dce3e5);white-space:normal;overflow-wrap:anywhere;text-align:left;vertical-align:top;font-variant-numeric:tabular-nums}.value-comparison thead{color:var(--muted,#53656c)}.value-comparison tbody th{font-weight:500}.value-comparison .changed td:last-child{background:var(--warning-soft,#fff4df)}.value-comparison small{display:block;color:#77540e;font-size:11px}
+.value-comparison{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;line-height:1.5;background:var(--paper,#fff)}.value-comparison th,.value-comparison td{padding:8px;border:1px solid var(--line,#e8e6dc);white-space:normal;overflow-wrap:anywhere;text-align:left;vertical-align:top;font-variant-numeric:tabular-nums}.value-comparison thead{color:var(--muted,#5e5d59)}.value-comparison tbody th{font-weight:500}.value-comparison .changed td:last-child{background:var(--warning-soft,#f5ead3)}.value-comparison small{display:block;color:#a86a12;font-size:11px}
 </style>

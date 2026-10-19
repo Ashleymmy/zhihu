@@ -93,6 +93,6 @@ onMounted(load)
  </section>
 </template>
 <style scoped>
-.issue-detail{display:grid;gap:16px;overflow-wrap:anywhere}.issue-detail p{margin:0}.issue-actions{display:flex;gap:10px;flex-wrap:wrap}.issue-detail button{min-height:44px;padding:10px 14px;border:1px solid var(--line,#dce3e5);border-radius:8px;font:inherit;cursor:pointer}.issue-detail .primary{background:#195e62;color:#fff}.issue-detail button:disabled{opacity:.5;cursor:wait}
+.issue-detail{display:grid;gap:16px;overflow-wrap:anywhere}.issue-detail p{margin:0}.issue-actions{display:flex;gap:10px;flex-wrap:wrap}.issue-detail button{min-height:44px;padding:10px 14px;border:1px solid var(--line,#e8e6dc);border-radius:8px;font:inherit;cursor:pointer}.issue-detail .primary{background:#141413;color:#fff}.issue-detail button:disabled{opacity:.5;cursor:wait}
 .issue-search{display:flex;flex-wrap:wrap;gap:8px;max-width:100%;min-width:0}.issue-search label{min-width:0;flex:1}.issue-search input{box-sizing:border-box;min-width:0;width:100%;min-height:40px}
 </style>

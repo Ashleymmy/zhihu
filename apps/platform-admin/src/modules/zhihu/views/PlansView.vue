@@ -253,8 +253,8 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
-    <div v-if="catalogMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e6ebe7; font-size: 13px; color: var(--moss);">{{ catalogMessage }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="catalogMessage" style="padding: 12px 16px; border: 1px solid var(--moss); border-radius: var(--radius); background: #e8e6dc; font-size: 13px; color: var(--moss);">{{ catalogMessage }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -448,7 +448,7 @@ onUnmounted(() => {
 .picker-option:last-child { border-bottom: 0; }
 .picker-option:hover { background: var(--paper-deep); }
 .picker-option strong { font-size: 12px; font-weight: 500; }
-.picker-meta { color: #7b8286; font-family: var(--font-mono); font-size: 12px; }
+.picker-meta { color: #87867f; font-family: var(--font-mono); font-size: 12px; }
 .picker-empty { margin: 0; padding: 12px; color: var(--ink-soft); font-size: 13px; }
 
 .plan-dialog-overlay {
@@ -459,7 +459,7 @@ onUnmounted(() => {
   place-items: center;
   overflow-y: auto;
   padding: 16px;
-  background: rgba(33, 33, 33, 0.4);
+  background: rgba(20, 20, 19, 0.4);
   backdrop-filter: blur(2px);
 }
 .plan-dialog {

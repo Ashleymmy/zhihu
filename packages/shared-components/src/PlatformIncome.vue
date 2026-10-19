@@ -545,8 +545,8 @@ function close() {
 .income-error,
 .income-notice {
   padding: 16px;
-  background: #fff5e5;
-  border: 1px solid #e3c78b;
+  background: #f5ead3;
+  border: 1px solid #ead9b4;
   border-radius: 8px;
 }
 .income-error,
@@ -571,8 +571,8 @@ function close() {
 }
 .income-calculation {
   padding: 18px;
-  background: #edf5f3;
-  border: 1px solid #c6dad4;
+  background: #f5f3ec;
+  border: 1px solid #d6d3c7;
   border-radius: 8px;
   overflow-wrap: anywhere;
 }

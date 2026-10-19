@@ -16,7 +16,7 @@ const props = withDefaults(defineProps<{
 const W = 720
 const PAD = { top: 16, right: 12, bottom: 24, left: 44 }
 
-const palette = ['#e66b3a', '#5d7668', '#b98a2f', '#39454c']
+const palette = ['#d46b45', '#3b7dd8', '#4e9a4a', '#8e6cc9']
 
 const maxValue = computed(() => {
   const max = Math.max(1, ...props.series.flatMap((s) => s.points))
@@ -57,10 +57,10 @@ function fmtTick(v: number) {
   <div class="line-chart">
     <svg :viewBox="`0 0 ${W} ${height}`" preserveAspectRatio="none" style="width: 100%; height: 100%; display: block;">
       <g v-for="t in gridTicks" :key="t.y">
-        <line :x1="PAD.left" :y1="t.y" :x2="W - PAD.right" :y2="t.y" stroke="#dedbd4" stroke-width="1" :stroke-dasharray="t.value === 0 ? '' : '3 4'" />
-        <text :x="PAD.left - 8" :y="t.y + 3" text-anchor="end" fill="#8a9196" style="font-family: var(--font-mono); font-size: 12px;">{{ fmtTick(t.value) }}</text>
+        <line :x1="PAD.left" :y1="t.y" :x2="W - PAD.right" :y2="t.y" stroke="#f0eee6" stroke-width="1" :stroke-dasharray="t.value === 0 ? '' : '3 4'" />
+        <text :x="PAD.left - 8" :y="t.y + 3" text-anchor="end" fill="#87867f" style="font-family: var(--font-mono); font-size: 12px;">{{ fmtTick(t.value) }}</text>
       </g>
-      <text v-for="(label, i) in labels" :key="i" :x="x(i)" :y="height - 8" text-anchor="middle" fill="#8a9196" style="font-family: var(--font-mono); font-size: 12px;">{{ label }}</text>
+      <text v-for="(label, i) in labels" :key="i" :x="x(i)" :y="height - 8" text-anchor="middle" fill="#87867f" style="font-family: var(--font-mono); font-size: 12px;">{{ label }}</text>
       <template v-for="(s, si) in series" :key="s.label">
         <path class="line-area" :d="areaFor(s.points)" :fill="s.color ?? palette[si % palette.length]" fill-opacity="0.06" />
         <path class="line-path" :d="pathFor(s.points)" :stroke="s.color ?? palette[si % palette.length]" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round" pathLength="1" />

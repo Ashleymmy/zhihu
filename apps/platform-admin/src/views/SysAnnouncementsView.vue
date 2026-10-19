@@ -53,7 +53,7 @@ onMounted(load)
       <button class="primary-action" @click="showCreate = true">发布公告</button>
     </header>
 
-    <div v-if="error" style="padding: 12px 16px; background: #f1ded9; color: #964639; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
+    <div v-if="error" style="padding: 12px 16px; background: #f6e1dc; color: #b4402e; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--clay);">{{ error }}</div>
 
     <article class="panel data-panel" style="min-height: 300px;">
       <div class="list-toolbar">
@@ -67,7 +67,7 @@ onMounted(load)
           <div>
             <strong>{{ a.title }}</strong>
             <small style="white-space: normal;">{{ a.content }}</small>
-            <small style="margin-top: 4px; color: #9a9d9e;">{{ a.createdByName ?? '' }} · {{ new Date(a.createdAt).toLocaleString('zh-CN') }}</small>
+            <small style="margin-top: 4px; color: #b0aea5;">{{ a.createdByName ?? '' }} · {{ new Date(a.createdAt).toLocaleString('zh-CN') }}</small>
           </div>
           <span :class="['status-badge', a.status === 'published' ? 'active' : 'ended']">{{ a.status === 'published' ? '已发布' : '已下线' }}</span>
           <button class="row-action" @click="toggle(a)">{{ a.status === 'published' ? '下线' : '重新发布' }}</button>

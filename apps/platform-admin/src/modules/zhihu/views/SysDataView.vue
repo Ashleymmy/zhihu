@@ -84,8 +84,8 @@ onMounted(load)
       v-if="error"
       style="
         padding: 12px 16px;
-        background: #f1ded9;
-        color: #964639;
+        background: #f6e1dc;
+        color: #b4402e;
         font-size: 13px;
         border-radius: var(--radius);
         border: 1px solid var(--clay);
@@ -99,7 +99,7 @@ onMounted(load)
         padding: 12px 16px;
         border: 1px solid var(--moss);
         border-radius: var(--radius);
-        background: #e6ebe7;
+        background: #e8e6dc;
         font-size: 13px;
         color: var(--moss);
       "
@@ -216,7 +216,7 @@ onMounted(load)
   margin: 0;
 }
 .auth-card span {
-  color: #737a80;
+  color: #6f6e68;
   font-size: 13px;
 }
 .auth-card strong {
