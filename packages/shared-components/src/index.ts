@@ -10,7 +10,7 @@ export { default as DonutChart } from "./DonutChart.vue";
 export type { LineSeries } from "./LineChart.vue";
 export type { BarItem } from "./BarChart.vue";
 export type { DonutSlice } from "./DonutChart.vue";
-export type { NavItem, NavGroup, ShellAnnouncement } from "./AppShell.vue";
+export type { NavItem, NavGroup, ShellAnnouncement, ShellTodo } from "./AppShell.vue";
 export * from "./role-tone";
 export { vReveal } from "./vReveal";
 

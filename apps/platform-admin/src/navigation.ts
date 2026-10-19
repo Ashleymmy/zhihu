@@ -26,3 +26,15 @@ export function workspaceNavigation(user: AuthUser | null, hasBusiness: boolean)
   ] })
   return groups.map(group => ({ ...group, items: group.items.filter(item => canAccessPath(user, item.path)) })).filter(group => group.items.length)
 }
+
+/** 手机底部标签栏：只给达人和团长，最多 5 个，标签用短名 */
+export function mobileTabs(user: AuthUser | null, groups: NavGroup[]): NavItem[] {
+  if (!user || isStaffRole(user.role)) return []
+  const items = groups.flatMap(group => group.items)
+  const order = user.role === 'leader' ? ['home', 'hall', 'team', 'finance', 'me'] : ['home', 'hall', 'tasks', 'finance', 'me']
+  const short: Record<string, string> = { home: '首页', hall: '大厅', tasks: '任务', team: '团队', finance: '收益', me: '我的' }
+  return order.flatMap(key => {
+    const item = items.find(entry => entry.key === key)
+    return item ? [{ ...item, label: short[key] ?? item.label }] : []
+  })
+}
