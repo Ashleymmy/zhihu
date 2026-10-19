@@ -125,35 +125,32 @@ async function submit() {
     <aside class="login-manifesto">
       <div>
         <div class="login-wordmark">
-          <span class="studio-mark">O</span>
-          <strong>OPC</strong>
-          <i>OPERATIONS</i>
+          <span class="studio-mark">T</span>
+          <strong>TIMO</strong>
+          <i>推广任务聚合平台</i>
         </div>
       </div>
 
       <div class="manifesto-copy">
-        <p class="eyebrow">WELCOME BACK</p>
-        <h1>让每一项<br /><em>业务协作更清晰。</em></h1>
+        <p class="eyebrow">欢迎回来</p>
+        <h1>让每一段关系、<br /><em>每一分收益，<br />都看得见。</em></h1>
         <p>
-          统一管理项目与团队，按需接入业务平台，在同一个工作台查看各项业务。
+          领取推广项目、跟进作品、查看收益和提现进度，都在这里完成。
         </p>
       </div>
 
       <div class="manifesto-note">
         <div>
-          <strong>账号与权限</strong>
-          <span>按角色分配权限，管理登录设备</span>
+          <strong>每一笔收益都能查</strong>
+          <span>点开任意金额，就能看到它是怎么算出来的</span>
         </div>
-        <b>OPC</b>
       </div>
     </aside>
 
     <main class="login-access">
       <div class="access-card">
         <div class="access-heading">
-          <p class="eyebrow">
-            {{ registering ? 'CREATE ACCOUNT' : 'SIGN IN' }}
-          </p>
+          <p class="eyebrow">{{ registering ? '新成员注册' : '账号登录' }}</p>
           <h2>{{ registering ? '创建账号' : '登录' }}</h2>
           <p>
             {{
@@ -268,7 +265,7 @@ async function submit() {
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            推广计划管理与数据分析
+            领取项目任务，按业绩计算收益
           </span>
           <span>
             <svg
@@ -281,7 +278,7 @@ async function submit() {
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            订单处理与结算审批
+            邀请好友，关系与收益清楚可查
           </span>
           <span>
             <svg
@@ -294,12 +291,12 @@ async function submit() {
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            团队协作与权限控制
+            收益确认后可申请提现
           </span>
         </div>
 
         <div class="access-footer">
-          OPC © 2024 · Powered by Zhihu KOC Platform
+          TIMO 推广任务聚合平台
         </div>
       </div>
     </main>
@@ -308,9 +305,11 @@ async function submit() {
 
 <style scoped>
 .access-card input:not([type=checkbox]) { min-height:44px; box-sizing:border-box; padding:10px 12px; font:inherit }
-.auth-modes { display:flex; gap:8px; flex-wrap:wrap }
-.auth-modes button { flex:1; min-height:40px }
-.auth-modes button[aria-pressed=true] { background:#3d3d3a; color:white }
+.auth-modes { display:flex; gap:2px; padding:3px; border-radius:12px; background:var(--paper-deep) }
+.auth-modes button { flex:1; min-height:38px; border:0; border-radius:9px; background:transparent; color:var(--ink-soft); font-size:13.5px; transition:background .2s, color .2s }
+.auth-modes button[aria-pressed=true] { background:var(--white); color:var(--ink); font-weight:600; box-shadow:0 1px 3px rgba(20,20,19,.1) }
+.legacy-login-switch { justify-self:start; padding:2px 0; border:0; background:none; color:var(--ink-soft); font-size:13px; text-decoration:underline; text-underline-offset:3px }
+.legacy-login-switch:hover { color:var(--ink) }
 .sms-code-row { display:flex; gap:8px }
 .sms-code-row input { width:0; flex:1; min-width:0 }
 .sms-code-row button { flex-shrink:0; padding:8px }
