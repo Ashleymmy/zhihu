@@ -1,31 +1,31 @@
 // Design Tokens - TypeScript exports
 
 export const colors = {
-  paper: '#f4f1e9',
-  paperDeep: '#e8e3d8',
-  ink: '#202923',
-  inkSoft: '#59645d',
-  line: '#d6d1c6',
-  forest: '#214239',
-  forestDeep: '#17352e',
-  moss: '#6c8c72',
-  clay: '#c96249',
-  sun: '#d4a847',
-  white: '#fffdf8',
+  paper: '#faf9f5',
+  paperDeep: '#f3f1ea',
+  ink: '#141413',
+  inkSoft: '#5e5d59',
+  line: '#e8e6dc',
+  forest: '#2b2b29',
+  forestDeep: '#3d3d3a',
+  moss: '#6f6e68',
+  clay: '#d46b45',
+  sun: '#a86a12',
+  white: '#ffffff',
 } as const;
 
 export const fonts = {
-  sans: '"Manrope", "PingFang SC", "Microsoft YaHei", sans-serif',
-  display: '"Noto Serif SC", "DM Serif Display", serif',
-  mono: '"DM Mono", monospace',
+  sans: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif",
+  display: "'TIMO Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif",
+  mono: "'SF Mono', 'JetBrains Mono', Consolas, monospace",
 } as const;
 
 export const radius = {
-  default: '8px',
+  default: '10px',
 } as const;
 
 export const shadows = {
-  default: '4px 4px 0 rgba(32, 41, 35, 0.13)',
+  default: '0 1px 2px rgba(20, 20, 19, 0.04), 0 8px 24px rgba(20, 20, 19, 0.05)',
 } as const;
 
 export const breakpoints = {
