@@ -123,10 +123,11 @@ beforeAll(async () => {
   const {ModuleRuntime}=await import('../../src/core/module-runtime');
   const {zhihuManifest}=await import('../../src/modules/zhihu/manifest');
   const runtime=new ModuleRuntime([zhihuManifest]);
-  runtime.register({manifest:zhihuManifest,router:express.Router(),dataProvider:(await import('../../src/modules/zhihu/attribution/provider')).attributionDataProvider});
+  runtime.register({manifest:zhihuManifest,router:express.Router(),dataProvider:{...(await import('../../src/modules/zhihu/attribution/provider')).attributionDataProvider,workRegistrations:(await import('../../src/modules/zhihu/attribution/works')).workRegistrations}});
   app = express()
     .use(express.json())
     .use('/core/activity',(req,_res,next)=>{req.user=actor;next();},(await import('../../src/core/activity-routes')).createActivityRouter(runtime))
+    .use('/core/work-registrations',(req,_res,next)=>{req.user=actor;next();},(await import('../../src/core/work-registration-routes')).createWorkRegistrationRouter(runtime))
     .use('/compositions', compositionsRouter)
     .use('/activity', (await import('../../src/modules/zhihu/routes/attribution')).attributionRouter)
     .use('/plans', plansRouter)
@@ -300,6 +301,62 @@ it('report activity isolates roles, keeps both metrics and totals before paginat
   expect((await get({metricType:'price'})).status).toBe(422);
   expect((await get({metricType:'activation',from:'2026-10-02',to:'2026-10-02'})).body.data.total).toBe(1);
   expect((await get({from:'2026-10-03',to:'2026-10-03'})).body.data.total).toBe(0);
+});
+
+describe('successful daily registrations and Excel export',()=>{
+ const dates={from:'2026-10-10',to:'2026-10-12'},goodIds:string[]=[];
+ const longUrl='https://example.com/complete?source='+ 'x'.repeat(300)+'&mst=keep-the-entire-tail';
+ let retryId='',group:any;
+ beforeAll(async()=>{
+  group=await keyword(team);
+  const save=async(owner:AuthUser,k:any,at:string,patch:Record<string,unknown>={})=>{
+   const item=await works.createComposition(owner,{...input(k.planId),promoUrl:goodIds.length===0?longUrl:input(k.planId).promoUrl});
+   const fields={created_at:at,sync_status:'synced',zhihu_composition_id:'receipt-'+item.id,...patch};
+   await c.query(`UPDATE compositions SET ${Object.keys(fields).map(key=>key+'=?').join(',')} WHERE id=?`,[...Object.values(fields),item.id]);return item.id;
+  };
+  for(let n=0;n<28;n++)goodIds.push(await save(team,group,n===0?'2026-10-10 00:00:00':'2026-10-12 23:59:59',n===0?{title:'=SUM(1,2)',media_account:'00123456789012345678'}:{}));
+  // Duplicate evidence must not inflate successful registrations.
+  for(let n=0;n<2;n++)await c.query("INSERT INTO zh_evidence(binding_id,work_url,description,status,submitted_by) VALUES(?,?,?,'pending',?)",[group.bindingId,longUrl,'重复凭据',team.sub]);
+  for(const patch of [
+   {sync_status:'failed'},{sync_status:'local'},{sync_status:'syncing'},{status:'ended'},
+   {status:'rejected'},{reject_reason:'退回'},{zhihu_composition_id:null},
+   {zhihu_status_json:JSON.stringify({auditStatus:'rejected'})},
+   {zhihu_status_json:JSON.stringify({status:'failed'})},
+   {zhihu_status_json:JSON.stringify({rejectReason:'未通过'})},
+  ]){const id=await save(team,group,'2026-10-10 12:00:00',patch);if(patch.sync_status==='failed')retryId=id;}
+  const rejected=await save(team,group,'2026-10-10 12:00:00');
+  const [[row]]=await c.query<RowDataPacket[]>('SELECT promo_url FROM compositions WHERE id=?',[rejected]);
+  await c.query("INSERT INTO zh_evidence(binding_id,work_url,description,status,submitted_by) VALUES(?,?,?,'rejected',?)",[group.bindingId,row.promo_url,'核验不通过',team.sub]);
+  await save(team,group,'2026-10-09 23:59:59');await save(team,group,'2026-10-13 00:00:00');
+  await save(leader,await keyword(leader),'2026-10-10 12:00:00');await save(direct,await keyword(direct),'2026-10-10 12:00:00');
+ },90000);
+ const get=(extra:Record<string,unknown>={},suffix='')=>request(app).get('/core/work-registrations'+suffix).query({...scope,...dates,moduleId:'zhihu',...extra});
+ const excel=(extra:Record<string,unknown>={})=>get(extra,'/export').buffer(true).parse((res,done)=>{const chunks:Buffer[]=[];res.on('data',chunk=>chunks.push(Buffer.from(chunk)));res.on('end',()=>done(null,Buffer.concat(chunks)));res.on('error',done);});
+ it('uses receipt validity and China registration dates consistently; exports every page and intact text links',async()=>{
+  actor=team;const summary=await get();expect(summary.status,JSON.stringify(summary.body)).toBe(200);expect(summary.body.data.total).toBe(28);
+  expect(summary.body.data.daily).toEqual([{date:'2026-10-12',count:27},{date:'2026-10-11',count:0},{date:'2026-10-10',count:1}]);
+  const list=await request(app).get('/activity/workbench/works').query({...scope,...dates,successfulOnly:'1',pageSize:25});expect(list.body.data.total).toBe(28);expect(list.body.data.list).toHaveLength(25);
+  const exported=await excel();expect(exported.status).toBe(200);expect(exported.headers['content-type']).toContain('spreadsheetml.sheet');
+  const workbook=XLSX.read(exported.body,{type:'buffer'});expect(workbook.SheetNames).toEqual(['每日汇总','作品明细']);
+  const sheet=workbook.Sheets['作品明细'],rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(sheet);expect(rows).toHaveLength(28);expect(rows.every(row=>row['登记状态']==='成功登记')).toBe(true);
+  const line=rows.findIndex(row=>row['回传链接']===longUrl)+2;expect(line).toBeGreaterThan(1);
+  // xlsx 0.18 reads relationship targets without decoding XML entities; Excel decodes &amp; correctly.
+  expect(sheet['G'+line].l?.Target).toBe(longUrl.replace(/&/g,'&amp;'));expect(sheet['C'+line].t).toBe('s');expect(sheet['C'+line].f).toBeUndefined();expect(sheet['F'+line].v).toBe('00123456789012345678');
+  expect((await get({search:'keep-the-entire-tail'})).body.data.total).toBe(1);
+  expect((await get({from:'2026-10-11',to:'2026-10-11'})).body.data.daily).toEqual([{date:'2026-10-11',count:0}]);
+ });
+ it('enforces creator/team/project scope for summaries and downloadable files',async()=>{
+  actor=team;expect((await get({view:'all',ownerId:direct.sub})).body.data.total).toBe(0);
+  const empty=XLSX.read((await excel({ownerId:direct.sub})).body,{type:'buffer'});expect(XLSX.utils.sheet_to_json(empty.Sheets['作品明细'])).toEqual([]);
+  actor=leader;expect((await get({view:'team'})).body.data.total).toBe(28);expect((await get({view:'self'})).body.data.total).toBe(1);
+  for(const adminDuty of ['all','finance','operations'] as const){actor={...admin,adminDuty};expect((await get()).body.data.total).toBe(30);}
+  for(const suffix of ['','/export']){actor=team;expect((await get({projectId:'999'},suffix)).status).toBe(403);expect((await get({accountId:'999'},suffix)).status).toBe(403);expect((await get({from:'2026-02-30'},suffix)).status).toBe(422);expect((await get({from:'2026-10-13'},suffix)).status).toBe(422);}
+ });
+ it('successful retries retain original registration date and do not duplicate a record',async()=>{
+  actor=team;await c.query("UPDATE compositions SET sync_status='synced',updated_at=NOW() WHERE id=?",[retryId]);
+  expect((await get()).body.data.total).toBe(29);expect((await get({from:'2026-10-10',to:'2026-10-10'})).body.data.total).toBe(2);
+  await c.query("UPDATE compositions SET title='再次编辑',updated_at=NOW() WHERE id=?",[retryId]);expect((await get()).body.data.total).toBe(29);
+ });
 });
 
  describe('keyword work drilldown',()=>{it('filters a specific plan before paging and cannot expose another creator works',async()=>{

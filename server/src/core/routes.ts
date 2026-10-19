@@ -13,6 +13,7 @@ import { createTaskRouter } from './task-routes';
 import { createEarningRouter } from './earning-routes';
 import { createFinanceWorkspaceRouter } from './finance-workspace';
 import { createActivityRouter } from './activity-routes';
+import { createWorkRegistrationRouter } from './work-registration-routes';
 import { createMemberSummaryRouter } from './member-summary';
 import {
   listAccounts,
@@ -43,6 +44,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   r.use('/earnings',createEarningRouter(runtime));
   r.use('/member-summary',createMemberSummaryRouter(runtime));
   r.use('/activity',createActivityRouter(runtime));
+  r.use('/work-registrations',createWorkRegistrationRouter(runtime));
   r.get('/dashboard', asyncHandler(async (req, res) => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
     const query = z.object({ projectId: id.optional(), from: date.default(today.slice(0, 8) + '01'), to: date.default(today) }).parse(req.query);
