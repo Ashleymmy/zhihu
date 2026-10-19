@@ -128,6 +128,53 @@ export function createEarningRouter(runtime: ModuleRuntime) {
       );
     }),
   );
+  // 按天汇总本人收益（首页趋势图用）：沿用 /mine 的岗位与项目范围，本人任务与团队分成分开，不含内部业绩
+  const dailyFilter = z.object({ projectId: id.optional(), accountId: id.optional(), from: day, to: day }).strict();
+  router.get(
+    '/mine/daily',
+    asyncHandler(async (req, res) => {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+      const monthAgo = new Date(Date.parse(today) - 29 * 86400000).toISOString().slice(0, 10);
+      const f = dailyFilter.parse({ from: monthAgo, to: today, ...req.query });
+      if (f.from > f.to) throw new AppError(422, 42200, '开始日期不能晚于结束日期');
+      if ((Date.parse(f.to) - Date.parse(f.from)) / 86400000 > 92) throw new AppError(422, 42200, '一次最多查看 93 天');
+      if (f.accountId && !f.projectId) throw new AppError(422, 42200, '请先选择项目');
+      if (f.projectId) await assertProjectMembership(req.user, f.projectId);
+      const scope = scopeWhere(req.user, runtime);
+      ok(
+        res,
+        await withTransaction(async (c) => {
+          if (f.projectId) {
+            const [scopes] = await c.query<RowDataPacket[]>(
+              `SELECT CAST(p.id AS CHAR) project_id,CAST(a.id AS CHAR) account_id FROM projects p JOIN project_integrations pi ON pi.project_id=p.id JOIN integration_accounts a ON a.id=pi.account_id WHERE ${scope.sql}`,
+              scope.args,
+            );
+            if (!scopes.some((s) => s.project_id === f.projectId && (!f.accountId || s.account_id === f.accountId)))
+              throw new AppError(403, 40300, '这个项目暂不可查看');
+          }
+          const [rows] = await c.query<RowDataPacket[]>(
+            `SELECT DATE_FORMAT(s.business_date,'%Y-%m-%d') date,IF(l.performer_id<>l.payee_id,'team','self') earning_group,
+        CAST(COALESCE(SUM(l.amount),0) AS CHAR) amount,COUNT(*) records,SUM(l.amount IS NULL) pending_calculations
+        ${joins} WHERE l.payee_id=? AND l.source_version=s.current_version AND l.is_internal=0 AND ${scope.sql}
+        AND s.business_date BETWEEN ? AND ? ${f.projectId ? 'AND s.project_id=?' : ''} ${f.accountId ? 'AND s.account_id=?' : ''}
+        GROUP BY date,earning_group ORDER BY date,earning_group`,
+            [req.user.sub, ...scope.args, f.from, f.to, ...(f.projectId ? [f.projectId] : []), ...(f.accountId ? [f.accountId] : [])],
+          );
+          return {
+            from: f.from,
+            to: f.to,
+            days: rows.map((row) => ({
+              date: String(row.date),
+              group: String(row.earning_group),
+              amount: String(row.amount),
+              records: Number(row.records),
+              pendingCalculations: Number(row.pending_calculations),
+            })),
+          };
+        }),
+      );
+    }),
+  );
   router.get(
     '/:id/history',
     asyncHandler(async (req, res) => {

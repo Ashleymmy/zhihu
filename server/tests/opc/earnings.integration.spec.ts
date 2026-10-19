@@ -395,6 +395,29 @@ it('风险排除说明不当作未处理，后续业务阻断仍覆盖当前就�
   expect(await q('SELECT * FROM opc_earning_lines WHERE confirmed_at IS NOT NULL ORDER BY id')).toEqual(original);
 });
 
+it('按天收益只汇总本人金额，本人任务与团队分成分开；拒绝未登录、运营、跨项目与超长区间', async () => {
+  const endpoint = '/api/v1/core/earnings/mine/daily';
+  const own = input('daily-own', '12.5000');
+  own.date = '2026-10-09';
+  await write(own);
+  const team = input('daily-team', '500.0000');
+  team.date = '2026-10-09';
+  team.lines.push({ ...team.lines[0], payeeId: '3', amount: '3.2500', ruleCode: 'leader_override' });
+  await write(team);
+  const range = { from: '2026-10-09', to: '2026-10-09' };
+  const leader = await request(app).get(endpoint).set(headers['3']).query(range);
+  expect(leader.status, leader.text).toBe(200);
+  expect(leader.body.data.days).toEqual([{ date: '2026-10-09', group: 'team', amount: '3.2500', records: 1, pendingCalculations: 0 }]);
+  expect(leader.text).not.toContain('500.0000');
+  const creator = await request(app).get(endpoint).set(headers['2']).query(range);
+  expect(creator.body.data.days).toEqual([{ date: '2026-10-09', group: 'self', amount: '512.5000', records: 2, pendingCalculations: 0 }]);
+  expect((await request(app).get(endpoint).query(range)).status).toBe(401);
+  expect((await request(app).get(endpoint).set(headers['4']).query(range)).status).toBe(403);
+  expect((await request(app).get(endpoint).set(headers['2']).query({ ...range, projectId: '3' })).status).toBe(403);
+  expect((await request(app).get(endpoint).set(headers['2']).query({ ...range, userId: '3' })).status).toBe(422);
+  expect((await request(app).get(endpoint).set(headers['2']).query({ from: '2026-01-01', to: '2026-10-09' })).status).toBe(422);
+});
+
 it('成员概览按业绩日期汇总已确认净额，直推和团队分成分开且不含成员个人金额', async () => {
   const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Shanghai'}).format(new Date());
   const yesterday = new Date(Date.parse(today)-86400000).toISOString().slice(0,10);
