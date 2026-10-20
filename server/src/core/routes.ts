@@ -15,6 +15,7 @@ import { createFinanceWorkspaceRouter } from './finance-workspace';
 import { createActivityRouter } from './activity-routes';
 import { createWorkRegistrationRouter, createKeywordBindingRouter } from './work-registration-routes';
 import { createMemberSummaryRouter } from './member-summary';
+import { createRelationRouter } from './relation-routes';
 import {
   listAccounts,
   createAccount,
@@ -43,6 +44,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   r.use('/tasks',createTaskRouter(runtime));
   r.use('/earnings',createEarningRouter(runtime));
   r.use('/member-summary',createMemberSummaryRouter(runtime));
+  r.use('/relations',createRelationRouter());
   r.use('/activity',createActivityRouter(runtime));
   r.use('/work-registrations',createWorkRegistrationRouter(runtime));
   r.use('/keyword-bindings',createKeywordBindingRouter(runtime));
