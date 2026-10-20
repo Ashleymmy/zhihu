@@ -88,7 +88,18 @@ export interface MemberAccessPatch {
   parentId?: string | null;
   projectIds?: string[];
 }
-export async function updateMemberAccess(auth: AuthUser, id: string, patch: MemberAccessPatch, runtime: ModuleRuntime) {
+/** 成员关系图里的调整会带上原因和类型，写进团队归属与角色历史；账号编辑不带，按「管理员调整」记录 */
+export interface MemberChangeContext {
+  reason: string;
+  source: 'transfer' | 'removal' | 'demotion';
+}
+export async function updateMemberAccess(
+  auth: AuthUser,
+  id: string,
+  patch: MemberAccessPatch,
+  runtime: ModuleRuntime,
+  context?: MemberChangeContext,
+) {
   await withTransaction(async (c) => {
     const [locked] = await c.query<MemberRecord[]>(
       "SELECT * FROM users WHERE id IN (?,?,?) OR role='developer' ORDER BY id FOR UPDATE",
@@ -159,8 +170,22 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
     );
     // 团队归属与角色历史：没变化时这两个调用不写任何记录
     if (changesTeam || role !== member.role)
-      await setTeamLeader(c, { userId: id, parentId, source: 'transfer', refType: 'account_edit', operatorId: auth.sub });
-    await recordRoleChange(c, { userId: id, fromRole: member.role, toRole: role, reason: 'manual', operatorId: auth.sub });
+      await setTeamLeader(c, {
+        userId: id,
+        parentId,
+        source: context?.source ?? 'transfer',
+        refType: context ? 'relation_panel' : 'account_edit',
+        reason: context?.reason ?? null,
+        operatorId: auth.sub,
+      });
+    await recordRoleChange(c, {
+      userId: id,
+      fromRole: member.role,
+      toRole: role,
+      reason: context?.source === 'demotion' ? 'demotion' : 'manual',
+      operatorId: auth.sub,
+      note: context?.reason ?? null,
+    });
     if (active && (role !== member.role || changesTeam)) await openMemberProjects(c, id, role, parentId, auth.sub);
     const projectsChanged =
       patch.projectIds !== undefined

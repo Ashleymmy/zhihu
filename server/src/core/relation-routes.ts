@@ -2,16 +2,29 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { RowDataPacket } from 'mysql2/promise';
 import { rows } from '../db';
+import type { ModuleRuntime } from './module-runtime';
+import { updateMemberAccess } from '../services/member-access.service';
+import { writeAudit } from '../services/audit.service';
 import { AppError, asyncHandler } from '../middleware/errors';
 import { ok } from '../utils/response';
 import { isStaffRole } from '../auth/roles';
-import { requireDuty } from './duties';
+import { dutyAllows, requireDuty } from './duties';
 
 /**
  * 成员关系只读接口（P1a）。
  * - /mine：达人、团长看自己的邀请人、所在团队、直接 / 间接邀请人数和直接邀请名单（昵称脱敏，不给手机号和任何金额）
  * - /members/:id、/tree：运营岗位看任一成员的三种关系、时间线和成员树
+ * 调整（P1c）：调整团队、移出团队、移交团长名下全部成员由运营岗位操作；降级只允许完整管理员。
+ * 都复用账号编辑的同一套校验（项目内进行中的工作、项目权限、重新登录、审计），并写明原因。
+ * 设置：团长能否看到第二层及以下成员的昵称（默认只看人数），只有完整管理员可以修改。
  */
+const SETTING_INDIRECT_NAMES = 'leader_sees_indirect_names';
+export async function leaderSeesIndirectNames() {
+  const [row] = await rows<RowDataPacket>('SELECT setting_value FROM platform_settings WHERE setting_key=?', [SETTING_INDIRECT_NAMES]);
+  const value = typeof row?.setting_value === 'string' ? JSON.parse(row.setting_value) : row?.setting_value;
+  return value === true;
+}
+const reason = z.string().trim().min(2, '请写明原因').max(500);
 const id = z.string().regex(/^[1-9]\d*$/);
 const SOURCE_TEXT: Record<string, string> = {
   registration: '注册',
@@ -53,7 +66,7 @@ async function layerCounts(userId: string) {
   return { direct: Number(row?.direct ?? 0), indirect: Number(row?.indirect ?? 0) };
 }
 
-export function createRelationRouter() {
+export function createRelationRouter(runtime: ModuleRuntime) {
   const router = Router();
 
   router.get(
@@ -88,6 +101,23 @@ export function createRelationRouter() {
           ? { leaderName: team.leader_id ? String(team.leader_name) : null, since: team.effective_from }
           : null,
         counts: await layerCounts(me),
+        ...(req.user.role === 'leader' && (await leaderSeesIndirectNames())
+          ? {
+              indirectList: (
+                await rows<RowDataPacket>(
+                  `SELECT u.display_name,u.closed_at,c.depth,r.registered_at
+                   FROM member_referral_closure c JOIN users u ON u.id=c.descendant_id LEFT JOIN member_referrals r ON r.user_id=u.id
+                   WHERE c.ancestor_id=? AND c.depth>=2 ORDER BY c.depth,r.registered_at DESC,u.id DESC LIMIT 200`,
+                  [me],
+                )
+              ).map((row) => ({
+                name: row.closed_at ? '已注销用户' : maskName(row.display_name),
+                depth: Number(row.depth),
+                registeredAt: row.registered_at,
+                active: !row.closed_at,
+              })),
+            }
+          : {}),
         directList: direct.map((row) => ({
           name: row.closed_at ? '已注销用户' : maskName(row.display_name),
           registeredAt: row.registered_at,
@@ -154,6 +184,9 @@ export function createRelationRouter() {
           : null,
         team: open ? { leader: open.leader_id ? { id: String(open.leader_id), name: String(open.leader_name) } : null, since: open.effective_from } : null,
         counts: await layerCounts(userId),
+        teamSize: Number(
+          (await rows<RowDataPacket>('SELECT COUNT(*) n FROM team_memberships WHERE leader_id=? AND effective_to IS NULL', [userId]))[0]?.n ?? 0,
+        ),
         timeline,
       });
     }),
@@ -211,6 +244,95 @@ export function createRelationRouter() {
         );
       }
       ok(res, list.map(node));
+    }),
+  );
+
+  /* ---------------- 调整团队、移交成员、降级 ---------------- */
+  const target = async (userId: string) => {
+    const [user] = await rows<RowDataPacket>('SELECT id,role,parent_id,display_name,closed_at FROM users WHERE id=?', [userId]);
+    if (!user || user.closed_at) throw new AppError(404, 40400, '成员不存在或已注销');
+    return user;
+  };
+  router.post(
+    '/members/:id/transfer',
+    requireDuty('operations'),
+    asyncHandler(async (req, res) => {
+      const userId = id.parse(req.params.id);
+      const body = z.object({ leaderId: id.nullable(), reason }).strict().parse(req.body);
+      const user = await target(userId);
+      if (user.role !== 'creator') throw new AppError(409, 40900, '只有达人可以调整团队；团长请先降级');
+      if (str(user.parent_id) === body.leaderId) throw new AppError(409, 40900, '已经在这个团队里了');
+      await updateMemberAccess(req.user, userId, { parentId: body.leaderId }, runtime, {
+        reason: body.reason,
+        source: body.leaderId ? 'transfer' : 'removal',
+      });
+      ok(res, { userId, leaderId: body.leaderId });
+    }),
+  );
+  router.post(
+    '/members/:id/handover',
+    requireDuty('operations'),
+    asyncHandler(async (req, res) => {
+      const leaderId = id.parse(req.params.id);
+      const body = z.object({ leaderId: id.nullable(), reason }).strict().parse(req.body);
+      if (body.leaderId === leaderId) throw new AppError(422, 42200, '请选择另一位团长');
+      const leader = await target(leaderId);
+      if (leader.role !== 'leader') throw new AppError(409, 40900, '只能移交团长名下的成员');
+      const members = await rows<RowDataPacket>(
+        "SELECT id,display_name FROM users WHERE parent_id=? AND role='creator' AND closed_at IS NULL ORDER BY id LIMIT 500",
+        [leaderId],
+      );
+      // 每位成员单独一个事务：个别成员被项目内的工作卡住时，其余成员照常移交，结果逐人返回
+      const failed: { id: string; name: string; message: string }[] = [];
+      for (const m of members) {
+        try {
+          await updateMemberAccess(req.user, String(m.id), { parentId: body.leaderId }, runtime, {
+            reason: body.reason,
+            source: body.leaderId ? 'transfer' : 'removal',
+          });
+        } catch (e) {
+          failed.push({ id: String(m.id), name: String(m.display_name), message: e instanceof AppError ? e.message : '移交没有完成' });
+        }
+      }
+      ok(res, { moved: members.length - failed.length, failed });
+    }),
+  );
+  router.post(
+    '/members/:id/demote',
+    requireDuty('operations'),
+    asyncHandler(async (req, res) => {
+      if (!dutyAllows(req.user, 'staff')) throw new AppError(403, 40301, '只有完整管理员可以把团长降级');
+      const userId = id.parse(req.params.id);
+      const body = z.object({ reason }).strict().parse(req.body);
+      const user = await target(userId);
+      if (user.role !== 'leader') throw new AppError(409, 40900, '只有团长可以降级');
+      await updateMemberAccess(req.user, userId, { role: 'creator' }, runtime, { reason: body.reason, source: 'demotion' });
+      ok(res, { userId, role: 'creator' });
+    }),
+  );
+
+  /* ---------------- 设置 ---------------- */
+  router.get(
+    '/settings',
+    requireDuty('operations'),
+    asyncHandler(async (req, res) => {
+      z.object({}).strict().parse(req.query);
+      ok(res, { leaderSeesIndirectNames: await leaderSeesIndirectNames(), canEdit: dutyAllows(req.user, 'staff') });
+    }),
+  );
+  router.put(
+    '/settings',
+    requireDuty('operations'),
+    asyncHandler(async (req, res) => {
+      if (!dutyAllows(req.user, 'staff')) throw new AppError(403, 40301, '只有完整管理员可以修改这项设置');
+      const body = z.object({ leaderSeesIndirectNames: z.boolean() }).strict().parse(req.body);
+      await rows(
+        `INSERT INTO platform_settings(setting_key,setting_value,updated_by) VALUES(?,?,?)
+         ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)`,
+        [SETTING_INDIRECT_NAMES, JSON.stringify(body.leaderSeesIndirectNames), req.user.sub],
+      );
+      await writeAudit({ userId: req.user.sub, action: 'platform.setting_update', resourceType: 'platform_setting', resourceId: SETTING_INDIRECT_NAMES, detail: body });
+      ok(res, { leaderSeesIndirectNames: body.leaderSeesIndirectNames, canEdit: true });
     }),
   );
 

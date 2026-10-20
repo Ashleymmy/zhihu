@@ -146,3 +146,47 @@ it('成员树按团队或邀请逐层加载；平台直管单列；拒绝非运�
   for (const who of ['2', '3', '6']) expect((await get(who, '/tree')).status).toBe(403);
   expect((await get('5', '/tree', { depth: '3' })).status).toBe(422);
 });
+
+it('设置：默认团长只看人数；只有完整管理员可以打开，打开后团长能看到第二层成员的脱敏昵称', async () => {
+  expect((await get('5', '/settings')).body.data).toEqual({ leaderSeesIndirectNames: false, canEdit: false });
+  expect((await get('2', '/mine')).body.data.indirectList).toBeUndefined();
+  const put = (who: string, body: object) => request(app).put('/api/v1/core/relations/settings').set(headers[who]).send(body);
+  expect((await put('5', { leaderSeesIndirectNames: true })).status).toBe(403);
+  expect((await put('2', { leaderSeesIndirectNames: true })).status).toBe(403);
+  expect((await put('1', { leaderSeesIndirectNames: 'yes' })).status).toBe(422);
+  expect((await put('1', { leaderSeesIndirectNames: true })).status).toBe(200);
+  expect((await get('2', '/mine')).body.data.indirectList).toMatchObject([{ name: '人*4', depth: 2, active: true }]);
+  expect((await get('3', '/mine')).body.data.indirectList).toBeUndefined();
+  expect((await put('1', { leaderSeesIndirectNames: false })).status).toBe(200);
+  expect((await get('2', '/mine')).body.data.indirectList).toBeUndefined();
+});
+
+const post = (who: string, path: string, body: object) => request(app).post('/api/v1/core/relations' + path).set(headers[who]).send(body);
+it('运营调整团队、移出团队都要写原因，并留下团队归属记录；团长、达人、财务岗位被拒绝', async () => {
+  for (const who of ['2', '3', '6']) expect((await post(who, '/members/7/transfer', { leaderId: '2', reason: '加入团队' })).status).toBe(403);
+  expect((await post('5', '/members/7/transfer', { leaderId: '2', reason: '' })).status).toBe(422);
+  expect((await post('5', '/members/2/transfer', { leaderId: null, reason: '团长不能直接调' })).status).toBe(409);
+  const moved = await post('5', '/members/7/transfer', { leaderId: '2', reason: '本人申请加入' });
+  expect(moved.status, moved.text).toBe(200);
+  expect((await post('5', '/members/7/transfer', { leaderId: '2', reason: '重复调整' })).status).toBe(409);
+  const [open] = (await c.query<mysql.RowDataPacket[]>('SELECT CAST(leader_id AS CHAR) l,source,reason FROM team_memberships WHERE open_user=7'))[0];
+  expect(open).toMatchObject({ l: '2', source: 'transfer', reason: '本人申请加入' });
+  expect((await post('5', '/members/7/transfer', { leaderId: null, reason: '暂停合作' })).status).toBe(200);
+  const [removed] = (await c.query<mysql.RowDataPacket[]>('SELECT leader_id,source FROM team_memberships WHERE open_user=7'))[0];
+  expect(removed).toMatchObject({ leader_id: null, source: 'removal' });
+});
+
+it('团长名下有成员时不能降级；移交全部成员后，完整管理员才能降级，运营岗位不能降级', async () => {
+  expect((await get('5', '/members/2')).body.data.teamSize).toBe(2);
+  expect((await post('1', '/members/2/demote', { reason: '团队解散' })).status).toBe(409);
+  const handover = await post('5', '/members/2/handover', { leaderId: null, reason: '团队解散' });
+  expect(handover.status, handover.text).toBe(200);
+  expect(handover.body.data).toEqual({ moved: 2, failed: [] });
+  expect((await post('5', '/members/2/demote', { reason: '团队解散' })).status).toBe(403);
+  const demoted = await post('1', '/members/2/demote', { reason: '团队解散' });
+  expect(demoted.status, demoted.text).toBe(200);
+  const [history] = (await c.query<mysql.RowDataPacket[]>("SELECT from_role,to_role,note FROM member_role_history WHERE user_id=2 AND reason='demotion'"))[0];
+  expect(history).toMatchObject({ from_role: 'leader', to_role: 'creator', note: '团队解散' });
+  const rel = await import('../../src/core/member-relations'), { withTransaction } = await import('../../src/db');
+  expect((await withTransaction((conn) => rel.checkMemberRelations(conn))).ok).toBe(true);
+});
