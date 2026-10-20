@@ -199,6 +199,13 @@ function inspect(row: DataGridRow) {
   historyPage.value = 1;
   void loadHistory();
 }
+/* 详情面板里的「上一条 / 下一条」：顺序与表格当前分组一致 */
+const grid = ref<InstanceType<typeof DataGrid> | null>(null);
+const drawerPosition = computed(() => grid.value?.positionOf(selected.value?.id));
+function stepDetail(delta: number) {
+  const row = selected.value ? grid.value?.neighbor(selected.value.id, delta) : undefined;
+  if (row) grid.value?.inspect(row);
+}
 function close() {
   selected.value = null;
   ++historyGeneration;
@@ -292,6 +299,7 @@ function close() {
           {{ w.role.value === "leader" ? "团队业绩与分成" : "我的收入明细" }}
         </h2>
         <DataGrid
+          ref="grid"
           :rows="rows"
           title="我的收入明细"
           title-label="任务"
@@ -377,6 +385,9 @@ function close() {
     <DetailDrawer
       :open="!!selected"
       :title="selected?.taskName ?? '收益明细'"
+      :position="drawerPosition"
+      @prev="stepDetail(-1)"
+      @next="stepDetail(1)"
       @close="close"
     >
       <template v-if="selected"
