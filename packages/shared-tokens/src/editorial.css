@@ -1432,6 +1432,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
 .bento-head { display: flex; align-items: center; gap: 10px; min-height: 32px; margin-bottom: 14px; }
 .bento-head h2, .bento-head h3 { margin: 0; font-family: var(--font-sans); font-size: 15px; font-weight: 650; letter-spacing: 0; }
 .bento-head .sub { color: var(--muted); font-size: 12.5px; }
+.bento-link { margin-left: auto; color: var(--clay-deep); font-size: 13px; font-weight: 600; text-decoration: none; }
+.bento-link:hover { text-decoration: underline; }
 .bento-head .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .bento-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border-radius: 10px; }
 .bento-figure { font-family: var(--font-display); font-size: 34px; font-weight: 600; line-height: 1.15; }

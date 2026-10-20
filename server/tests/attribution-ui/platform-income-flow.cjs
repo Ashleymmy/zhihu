@@ -99,7 +99,7 @@ module.exports = async ({ browser, port, out, date }) => {
           let response = page.waitForResponse(
             (r) => r.url().includes('/core/earnings/mine') && r.url().includes('group=team'),
           );
-          await page.getByRole('button', { name: /^团队分成/ }).click();
+          await page.getByRole('button', { name: /^团队管理收益/ }).click();
           await response;
           await loaded();
           const text = await page.locator('.income-details').innerText();
@@ -109,7 +109,7 @@ module.exports = async ({ browser, port, out, date }) => {
           response = page.waitForResponse(
             (r) => r.url().includes('/core/earnings/mine') && r.url().includes('group=self'),
           );
-          await page.getByRole('button', { name: /^我的作品/ }).click();
+          await page.getByRole('button', { name: /^任务收益/ }).click();
           await response;
           await loaded();
           assert((await page.locator('.income-totals').innerText()).includes('¥85.00'));

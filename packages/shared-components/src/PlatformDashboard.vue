@@ -121,7 +121,7 @@ const trend = computed(() => {
   }
   const sum = (list: bigint[]) => list.reduce((a, b) => a + b, 0n)
   const series: (TrendSeries & { total: bigint })[] = [{ label: '本人任务', color: '#d46b45', points: self.map(toNumber), area: true, total: sum(self) }]
-  if (w.role.value === 'leader' || sum(team) > 0n) series.push({ label: '团队分成', color: '#3b7dd8', points: team.map(toNumber), total: sum(team) })
+  if (w.role.value === 'leader' || sum(team) > 0n) series.push({ label: '团队管理收益', color: '#3b7dd8', points: team.map(toNumber), total: sum(team) })
   return { labels, series, hasData: series.some(s => s.total !== 0n) }
 })
 
@@ -146,7 +146,7 @@ const teamShare = computed<ShareItem[]>(() => {
   if (own + team === 0n) return []
   return [
     { label: '本人任务', value: toNumber(own), text: '¥' + yuan(own), color: 'var(--chart-1)' },
-    { label: '团队分成', value: toNumber(team), text: '¥' + yuan(team), color: 'var(--chart-2)' },
+    { label: '团队管理收益', value: toNumber(team), text: '¥' + yuan(team), color: 'var(--chart-2)' },
   ]
 })
 const showShareCard = computed(() => isMember.value && (composition.value.length > 0 || teamShare.value.length > 0 || !!summary.value?.team))
@@ -211,7 +211,7 @@ function untilt(event: PointerEvent) {
         <ShareBar v-if="composition.length" :items="composition" />
         <p v-else class="bento-note">本月还没有收益记录。</p>
         <template v-if="teamShare.length">
-          <div class="bento-head" style="margin-top:18px"><h3>本人与团队分成</h3><span class="sub">累计已确认</span></div>
+          <div class="bento-head" style="margin-top:18px"><h3>任务与团队管理收益</h3><span class="sub">累计已确认</span></div>
           <ShareBar :items="teamShare" />
         </template>
       </article>
@@ -224,7 +224,7 @@ function untilt(event: PointerEvent) {
 
       <!-- 我的关系：邀请人、所在团队、我邀请的人（第二层及以下只给人数） -->
       <article v-if="isMember && relation" class="bento-card lift span-12 home-relation" style="--i:4">
-        <div class="bento-head"><h2>我的关系</h2><span class="sub">注册即建立，永久记录</span></div>
+        <div class="bento-head"><h2>我的关系</h2><span class="sub">注册即建立，永久记录</span><router-link to="/invite-center" class="bento-link">邀请中心 →</router-link></div>
         <div class="relation-cols">
           <div><small>谁邀请了我</small><b>{{ relation.inviter?.name ?? '自行注册' }}</b><span>{{ relation.channel }}</span></div>
           <div><small>我所在的团队</small><b>{{ relation.team?.leaderName ? relation.team.leaderName + ' 的团队' : '平台直管' }}</b><span>团队收益按业绩当天的归属计算</span></div>

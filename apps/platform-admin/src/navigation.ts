@@ -14,6 +14,7 @@ export function workspaceNavigation(user: AuthUser | null, hasBusiness: boolean)
   if (hasBusiness && (!staff || duty !== 'operations')) items.push({ key: 'finance', label: staff ? '财务' : '我的收益', path: staff ? '/finance' : '/income' })
   if (staff && duty !== 'operations') items.push({ key: 'rates', label: '计费规则', path: '/rates' })
   if (staff && duty !== 'finance') items.push({ key: 'projects', label: '项目设置', path: '/projects' })
+  if (!staff) items.push({ key: 'invite', label: '邀请中心', path: '/invite-center' })
   if (!staff) items.push({ key: 'academy', label: '学院', path: '/academy' })
   items.push({ key: 'me', label: '我的', path: '/me' })
   const groups: NavGroup[] = [{ label: '日常工作', items }]

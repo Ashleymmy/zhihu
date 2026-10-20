@@ -151,7 +151,7 @@ const rows = computed<DataGridRow[]>(
           date: l.businessDate,
           metric:
             l.metricLabel + " " + (l.quantity ?? "待核对") + l.quantityUnit,
-          person: l.earningGroup === "team" ? l.performerName : "我的作品",
+          person: l.earningGroup === "team" ? l.performerName : "本人",
           project: l.projectName,
           amount: money(l.amount),
           pending: money(l.pendingAmount),
@@ -280,6 +280,14 @@ function close() {
         {{ view.summary.pendingCalculations }}
         条业绩在核对，计算完成后会自动显示金额。
       </p>
+      <details class="income-rules">
+        <summary>收益是怎么算的</summary>
+        <dl>
+          <div><dt>任务收益</dt><dd>你本人完成的业绩数量 × 项目公布的单价。项目报表核对后计入「已确认收入」。</dd></div>
+          <div v-if="w.role.value === 'leader'"><dt>团队管理收益</dt><dd>团队成员的业绩数量 × 团队管理单价，对应你在任务分配、作品审核和培训上的工作。成员调到其他团队或晋升为团长后，之后的业绩不再计入。</dd></div>
+          <div><dt>不会产生收益的情况</dt><dd>邀请他人注册本身没有奖励；第二层及以下成员的业绩不会给你带来收益。</dd></div>
+        </dl>
+      </details>
       <div v-if="view.groups.length" class="income-projects">
         <button
           v-for="g in view.groups"
@@ -317,8 +325,8 @@ function close() {
             w.role.value === 'leader'
               ? [
                   { key: 'all', label: '全部' },
-                  { key: 'self', label: '我的作品' },
-                  { key: 'team', label: '团队分成' },
+                  { key: 'self', label: '任务收益' },
+                  { key: 'team', label: '团队管理收益' },
                 ]
               : [{ key: 'all', label: '全部' }]
           "
@@ -398,8 +406,8 @@ function close() {
         <p>
           {{
             selected.earningGroup === "team"
-              ? "团队分成 · " + selected.performerName
-              : "我的作品"
+              ? "团队管理收益 · " + selected.performerName
+              : "任务收益"
           }}
         </p>
         <div class="income-calculation">
@@ -554,6 +562,11 @@ function close() {
   font-size: 20px;
 }
 .income-error,
+.income-rules { padding: 14px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
+.income-rules summary { cursor: pointer; font-weight: 600; }
+.income-rules dl { display: grid; gap: 12px; margin: 14px 0 2px; }
+.income-rules dt { font-weight: 600; }
+.income-rules dd { margin: 4px 0 0; color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; }
 .income-notice {
   padding: 16px;
   background: #f5ead3;
