@@ -7,6 +7,7 @@ import type { AuthUser } from '../types';
 import { writeAudit } from './audit.service';
 import { openInvitationToken, sealInvitationToken } from '../utils/invitationToken';
 import { openMemberProjects } from './member-onboarding.service';
+import { setTeamLeader } from '../core/member-relations';
 
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 const unavailable = () => new AppError(422, 42220, '邀请链接已失效、已用完或已停用，请联系邀请人');
@@ -91,6 +92,7 @@ export async function acceptInvitation(auth: AuthUser, token: string) {
     if (invite.used_count >= invite.max_uses) throw unavailable();
     if (user.parent_id) throw new AppError(409, 40900, '你已加入其他团队，如需更换请联系管理员');
     await c.query('UPDATE users SET parent_id=? WHERE id=?', [leaderId, auth.sub]);
+    await setTeamLeader(c, { userId: auth.sub, parentId: leaderId, source: 'invitation_accept', refType: 'invitation', refId: String(invite.id), operatorId: auth.sub });
     await c.query('UPDATE member_invitations SET used_count=used_count+1 WHERE id=?', [invite.id]);
     await c.query("UPDATE team_applications SET status='cancelled',handled_at=NOW() WHERE creator_id=? AND status='pending'", [auth.sub]);
     await openMemberProjects(c, auth.sub, 'creator', leaderId);
