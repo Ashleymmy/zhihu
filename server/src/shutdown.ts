@@ -5,12 +5,14 @@ import { closeQueue } from './queue';
 import { revocationStore } from './auth/revocation';
 import { closeRateLimiter } from './utils/rateLimit';
 import { flushMiniObservations } from './wechat/observability';
+import { stopRelationCheck } from './core/relation-check-job';
 
 export function createShutdown(server: Server, runtime?: ModuleRuntime) {
   let pending: Promise<void> | undefined;
   return () =>
     (pending ??= (async () => {
       runtime?.stop();
+      stopRelationCheck();
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
       // Bull.close waits for in-flight jobs. They still need SQL and module clients.
       await closeQueue();
