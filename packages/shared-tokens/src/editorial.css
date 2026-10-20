@@ -1403,3 +1403,94 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ===== 卡片网格（Bento）：模块化卡片，宽度按 12 栏自适应重排 ===== */
+.bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; grid-auto-flow: dense; }
+.bento > * { grid-column: span 4; min-width: 0; }
+.bento > .span-3 { grid-column: span 3; }
+.bento > .span-4 { grid-column: span 4; }
+.bento > .span-5 { grid-column: span 5; }
+.bento > .span-6 { grid-column: span 6; }
+.bento > .span-7 { grid-column: span 7; }
+.bento > .span-8 { grid-column: span 8; }
+.bento > .span-12 { grid-column: 1 / -1; }
+
+/* 入场：卡片依次浮现，--i 由页面按顺序给出 */
+.bento-enter > * { animation: bento-rise 0.7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes bento-rise { from { opacity: 0; transform: translateY(16px) scale(0.985); } }
+
+.bento-card {
+  position: relative;
+  padding: 22px;
+  border: 1px solid rgba(232, 230, 220, 0.6);
+  border-radius: 22px;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.03), 0 10px 30px -8px rgba(20, 20, 19, 0.08);
+  transition: transform 0.45s var(--spring), box-shadow 0.35s var(--ease-out);
+}
+.bento-card.lift:hover { transform: translateY(-4px); box-shadow: 0 2px 4px rgba(20, 20, 19, 0.04), 0 22px 48px -12px rgba(20, 20, 19, 0.16); }
+.bento-head { display: flex; align-items: center; gap: 10px; min-height: 32px; margin-bottom: 14px; }
+.bento-head h2, .bento-head h3 { margin: 0; font-family: var(--font-sans); font-size: 15px; font-weight: 650; letter-spacing: 0; }
+.bento-head .sub { color: var(--muted); font-size: 12.5px; }
+.bento-head .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.bento-icon { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border-radius: 10px; }
+.bento-figure { font-family: var(--font-display); font-size: 34px; font-weight: 600; line-height: 1.15; }
+.bento-figure small { margin-right: 2px; color: var(--ink-soft); font-size: 0.55em; }
+.bento-note { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; }
+.bento-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; color: var(--ink-soft); font-size: 12.5px; }
+.bento-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.bento-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.bento-legend b { color: var(--ink); font-weight: 650; }
+.bento-empty { display: grid; gap: 6px; justify-items: start; padding: 8px 0; }
+.bento-empty b { font-size: 15px; }
+.bento-empty p { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
+
+/* 悬浮主卡：深墨底 + 陶土光晕，跟随指针轻微倾斜（倾斜由页面脚本设置 --rx / --ry） */
+.bento-hero {
+  overflow: hidden;
+  border: 0;
+  color: #fff;
+  background:
+    radial-gradient(420px 220px at 100% 0%, rgba(212, 107, 69, 0.55), transparent 60%),
+    radial-gradient(300px 200px at 0% 120%, rgba(142, 108, 201, 0.32), transparent 60%),
+    linear-gradient(140deg, #1b1b19, #2b2a27 70%);
+  box-shadow: 0 30px 60px -22px rgba(20, 20, 19, 0.5), 0 8px 18px -8px rgba(20, 20, 19, 0.3);
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  z-index: 1;
+}
+.bento-hero::after { content: ""; position: absolute; inset: 0; background: radial-gradient(260px circle at var(--gx, 70%) var(--gy, 20%), rgba(255, 255, 255, 0.12), transparent 60%); pointer-events: none; }
+.bento-hero .bento-figure { color: #fff; font-size: 44px; margin: 6px 0 2px; }
+.bento-hero .bento-figure small { color: rgba(255, 255, 255, 0.7); }
+.bento-hero .hero-label { color: rgba(255, 255, 255, 0.72); font-size: 13px; }
+.bento-hero .hero-meta { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; color: rgba(255, 255, 255, 0.66); font-size: 12.5px; }
+.bento-hero .hero-meta b { display: block; color: #fff; font-size: 16px; font-weight: 650; }
+.bento-hero .hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; position: relative; z-index: 1; }
+.hero-btn { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 600; transition: transform 0.36s var(--spring), background 0.2s; }
+.hero-btn:active { transform: scale(0.96); }
+.hero-btn.solid { color: var(--ink); background: #fff; }
+.hero-btn.glass { color: #fff; background: rgba(255, 255, 255, 0.14); }
+.hero-btn.glass:hover { background: rgba(255, 255, 255, 0.22); }
+
+/* 小标签 */
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.chip.up { color: var(--ok); background: var(--ok-bg); }
+.chip.down { color: var(--danger); background: var(--danger-bg); }
+.chip.soft { color: var(--ink-soft); background: var(--paper-deep); }
+.chip.clay { color: var(--clay-deep); background: var(--clay-soft); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 1180px) {
+  .bento > .span-3, .bento > .span-4 { grid-column: span 6; }
+  .bento > .span-5, .bento > .span-7, .bento > .span-8 { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .bento { gap: 12px; }
+  .bento > *, .bento > [class*="span-"] { grid-column: 1 / -1; }
+  .bento-card { padding: 18px; border-radius: 20px; }
+  .bento-hero .bento-figure { font-size: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bento-enter > * { animation: none; }
+  .bento-hero { transform: none; }
+}
