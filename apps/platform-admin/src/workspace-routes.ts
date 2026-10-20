@@ -31,6 +31,7 @@ export const workspaceRoutes: RouteRecordRaw[] = [
     component: () => import('./views/ProjectsView.vue'),
     meta: { title: '项目管理' },
   },
+  { path: 'team/relations', name: 'team-relations', component: () => import('./views/RelationsView.vue'), meta: { title: '成员关系图' } },
   {
     path: 'team',
     name: 'team',

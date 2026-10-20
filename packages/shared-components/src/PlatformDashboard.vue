@@ -16,9 +16,10 @@ interface Mine { summary: { amount: string; confirmedAmount: string; pendingAmou
 interface Daily { from: string; to: string; days: { date: string; group: 'self' | 'team'; amount: string }[] }
 interface Periods { total: string; today: string; yesterday: string }
 interface MemberSummary { direct: Periods; team: null | { memberCount: number; reward: Periods } }
+interface RelationMine { inviter: { name: string } | null; channel: string | null; team: { leaderName: string | null } | null; counts: { direct: number; indirect: number }; directList: { name: string; active: boolean }[] }
 
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
-const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null)
+const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null)
 const isMember = computed(() => ['creator', 'leader'].includes(w.role.value))
 let revision = 0
 
@@ -53,15 +54,17 @@ async function load() {
 async function loadMoney(version: number) {
   if (!isMember.value) return
   const today = shanghaiToday(), scope = projectId.value ? { projectId: projectId.value } : {}
-  const [m, d, s] = await Promise.allSettled([
+  const [m, d, s, r] = await Promise.allSettled([
     w.http.get<Mine>('/earnings/mine', { ...scope, from: today.slice(0, 8) + '01', to: today, pageSize: 1 }),
     w.http.get<Daily>('/earnings/mine/daily', scope),
     w.http.get<MemberSummary>('/member-summary'),
+    w.http.get<RelationMine>('/relations/mine'),
   ])
   if (version !== revision) return
   mine.value = m.status === 'fulfilled' ? m.value : null
   daily.value = d.status === 'fulfilled' ? d.value : null
   summary.value = s.status === 'fulfilled' ? s.value : null
+  relation.value = r.status === 'fulfilled' ? r.value : null
 }
 onMounted(load)
 
@@ -218,6 +221,20 @@ function untilt(event: PointerEvent) {
         <p v-else class="bento-note">新的待办会实时出现在这里和顶栏铃铛里。</p>
       </article>
 
+      <!-- 我的关系：邀请人、所在团队、我邀请的人（第二层及以下只给人数） -->
+      <article v-if="isMember && relation" class="bento-card lift span-12 home-relation" style="--i:4">
+        <div class="bento-head"><h2>我的关系</h2><span class="sub">注册即建立，永久记录</span></div>
+        <div class="relation-cols">
+          <div><small>谁邀请了我</small><b>{{ relation.inviter?.name ?? '自行注册' }}</b><span>{{ relation.channel }}</span></div>
+          <div><small>我所在的团队</small><b>{{ relation.team?.leaderName ? relation.team.leaderName + ' 的团队' : '平台直管' }}</b><span>团队收益按业绩当天的归属计算</span></div>
+          <div>
+            <small>我邀请的人</small><b><AnimatedNumber :value="relation.counts.direct" /><em> 人</em></b>
+            <span>第二层及以下 {{ relation.counts.indirect }} 人，只显示人数</span>
+            <div v-if="relation.directList.length" class="relation-avatars"><i v-for="(p, i) in relation.directList.slice(0, 6)" :key="i" :title="p.name">{{ p.name.slice(0, 1) }}</i><em v-if="relation.directList.length > 6">+{{ relation.directList.length - 6 }}</em></div>
+          </div>
+        </div>
+      </article>
+
       <!-- 项目卡片 -->
       <article v-for="(project, pi) in data?.groups ?? []" :key="project.id" class="bento-card span-12 home-project" :style="{ '--i': 4 + pi }">
         <div class="bento-head"><h3>{{ project.name }}</h3><span class="sub">{{ data?.period.from }} 至 {{ data?.period.to }}</span></div>
@@ -241,6 +258,17 @@ function untilt(event: PointerEvent) {
 </template>
 <style scoped>
 .home-page { min-width: 0; }
+.relation-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.relation-cols > div { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 16px; border-radius: 16px; background: var(--paper); }
+.relation-cols small { color: var(--muted); font-size: 12.5px; }
+.relation-cols b { font-family: var(--font-display); font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.relation-cols b em { color: var(--muted); font-family: var(--font-sans); font-size: 13px; font-style: normal; font-weight: 400; }
+.relation-cols > div > span { color: var(--muted); font-size: 12.5px; }
+.relation-avatars { display: flex; align-items: center; margin-top: 8px; }
+.relation-avatars i { display: grid; width: 30px; height: 30px; margin-left: -8px; place-items: center; border: 2px solid var(--paper); border-radius: 50%; color: #fff; background: var(--chart-2); font-size: 12px; font-style: normal; font-weight: 700; }
+.relation-avatars i:first-child { margin-left: 0; }
+.relation-avatars em { margin-left: 8px; color: var(--muted); font-size: 12px; font-style: normal; }
+@media (max-width: 700px) { .relation-cols { grid-template-columns: minmax(0, 1fr); } }
 .bento-hero { display: flex; flex-direction: column; }
 .hero-spark { width: 100%; height: 48px; margin-top: auto; padding-top: 18px; overflow: visible; }
 .hero-spark path { fill: none; stroke: #f0b49b; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: spark-draw 1.4s var(--ease-out) 0.3s forwards; }

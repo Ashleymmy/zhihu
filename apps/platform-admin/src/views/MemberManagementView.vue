@@ -319,6 +319,7 @@ onMounted(() => run(load));
       </div>
       <div class="member-actions">
         <router-link to="/invitations">管理邀请链接</router-link>
+        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/relations">成员关系图</router-link>
         <button
           @click="
             open('invite');
