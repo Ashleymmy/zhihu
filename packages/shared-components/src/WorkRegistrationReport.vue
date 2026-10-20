@@ -1,109 +1,129 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from "vue";
-interface Http {
-  get<T>(path: string, params?: object): Promise<T>;
-  getBlob(path: string): Promise<Blob>;
-}
+import { computed, ref, watch, onBeforeUnmount } from "vue";
 const props = defineProps<{
-  http: Http;
+  http: { getBlob(path: string): Promise<Blob> };
   query: Record<string, string>;
-  revision?: number;
+  kind?: "works" | "keywords";
 }>();
-const emit = defineEmits<{ day: [date: string] }>();
-const daily = ref<{ date: string; count: number }[]>([]),
-  total = ref(0),
-  busy = ref(false),
+const from = ref(""),
+  to = ref(""),
   exporting = ref(false),
   error = ref("");
-let generation = 0, disposed = false;
-const message = (e: unknown) =>
-  e && typeof e === "object" && "message" in e
-    ? String(e.message)
-    : "读取失败，请重试";
-async function load() {
-  const n = ++generation;
-  busy.value = true;
-  error.value = "";
-  daily.value = [];
-  try {
-    const report = await props.http.get<{
-      total: number;
-      daily: { date: string; count: number }[];
-    }>("/work-registrations", props.query);
-    if (n === generation) {
-      daily.value = report.daily;
-      total.value = report.total;
-    }
-  } catch (e) {
-    if (n === generation) error.value = message(e);
-  } finally {
-    if (n === generation) busy.value = false;
-  }
-}
-watch(() => JSON.stringify([props.query, props.revision]), load, {
-  immediate: true,
+const keywords = computed(() => props.kind === "keywords");
+const params = computed(() =>
+  keywords.value
+    ? {
+        ...props.query,
+        ...(from.value ? { from: from.value } : {}),
+        ...(to.value ? { to: to.value } : {}),
+      }
+    : props.query,
+);
+let disposed = false;
+watch(
+  () => JSON.stringify(params.value),
+  () => {
+    error.value = "";
+  },
+);
+watch(
+  () => JSON.stringify([props.query.projectId, props.query.accountId]),
+  () => {
+    from.value = "";
+    to.value = "";
+  },
+);
+onBeforeUnmount(() => {
+  disposed = true;
 });
-onBeforeUnmount(() => { generation++; disposed = true; });
+function period(kind: "day" | "week" | "month") {
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Shanghai",
+  });
+  const start = new Date(today + "T00:00:00Z");
+  if (kind === "week")
+    start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+  if (kind === "month") start.setUTCDate(1);
+  from.value = start.toISOString().slice(0, 10);
+  to.value = today;
+}
 async function download() {
-  if (exporting.value || busy.value) return;
-  const key = JSON.stringify(props.query);
+  if (exporting.value) return;
+  const query = { ...params.value },
+    key = JSON.stringify(params.value);
+  if (query.from && query.to && query.from > query.to) {
+    error.value = "开始日期不能晚于结束日期";
+    return;
+  }
   exporting.value = true;
   error.value = "";
   try {
     const blob = await props.http.getBlob(
-      "/work-registrations/export?" + new URLSearchParams(props.query),
+      (keywords.value ? "/keyword-bindings" : "/work-registrations") +
+        "/export?" +
+        new URLSearchParams(query),
     );
-    if (disposed || key !== JSON.stringify(props.query)) return;
+    if (disposed || key !== JSON.stringify(params.value)) return;
     const url = URL.createObjectURL(blob),
       link = document.createElement("a");
     link.href = url;
-    link.download = `作品登记_${props.query.from || "全部"}_${props.query.to || "至今"}.xlsx`;
+    link.download = `${keywords.value ? "关键词绑定" : "作品回传"}_${query.from || "全部"}_${query.to || "至今"}.xlsx`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (e) {
-    if (key === JSON.stringify(props.query)) error.value = message(e);
+    if (!disposed && key === JSON.stringify(params.value))
+      error.value = e instanceof Error ? e.message : "导出失败，请重试";
   } finally {
     exporting.value = false;
   }
 }
 </script>
 <template>
-  <section class="registration-report" aria-label="每日作品登记统计">
-    <div class="report-heading">
-      <span>{{
-        busy
-          ? "正在统计…"
-          : `所选范围共 ${total} 条${query.successfulOnly === "1" ? "成功登记的作品" : "作品记录"}`
-      }}</span
-      ><button
-        type="button"
-        :disabled="busy || exporting || !!error"
-        @click="download"
-      >
-        {{ exporting ? "正在导出…" : "导出 Excel（含回传链接）" }}
-      </button>
-    </div>
-    <p v-if="error" class="report-error" role="alert">
-      {{ error }} <button type="button" @click="load">重试</button>
-    </p>
-    <details v-if="!busy && !error" open>
-      <summary>每日数量 · 点击日期查看作品（未列日期为 0 条）</summary>
-      <div class="daily-list">
-        <button
-          v-for="day in daily"
-          :key="day.date"
+  <section
+    class="registration-report"
+    :aria-label="keywords ? '关键词日期导出' : '作品回传导出'"
+  >
+    <form v-if="keywords" class="export-dates" @submit.prevent="download">
+      <label>绑定开始日期<input v-model="from" type="date" /></label>
+      <label>绑定结束日期<input v-model="to" type="date" /></label>
+      <div class="export-actions">
+        <button type="button" @click="period('day')">今天</button
+        ><button type="button" @click="period('week')">本周至今</button
+        ><button type="button" @click="period('month')">本月至今</button
+        ><button
           type="button"
-          :aria-label="`${day.date}，${day.count} 条作品，查看明细`"
-          @click="emit('day', day.date)"
+          @click="
+            from = '';
+            to = '';
+          "
         >
-          <span>{{ day.date }}</span
-          ><strong>{{ day.count }} 条</strong>
+          全部日期
         </button>
-        <p v-if="!daily.length">所选范围没有作品，请调整登记日期或筛选条件。</p>
       </div>
-    </details>
+    </form>
+    <p v-if="keywords">
+      按领取／分配日期导出，保留失败和已释放记录。未分配的失败关键词按创建日期收录并标明。
+    </p>
+    <p v-else>
+      按上方填写的回传日期和筛选条件导出，包含完整链接、分类、原著、账号及团长信息。
+    </p>
+    <button type="button" :disabled="exporting" @click="download">
+      {{
+        exporting
+          ? "正在导出…"
+          : keywords
+            ? "导出关键词 Excel"
+            : "导出回传 Excel"
+      }}
+    </button>
+    <p v-if="error" class="report-error" role="alert">
+      {{ error }}
+      <button type="button" :disabled="exporting" @click="download">
+        重试导出
+      </button>
+    </p>
   </section>
 </template>
 <style scoped>
@@ -113,52 +133,63 @@ async function download() {
   margin: 16px 0;
   padding: 16px;
 }
-.report-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.registration-report summary {
-  cursor: pointer;
-  margin-top: 12px;
+.registration-report p {
   font-size: 13px;
   color: var(--ink-soft, #637078);
+  margin: 8px 0 12px;
+  line-height: 1.7;
 }
-.daily-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 8px;
-  margin-top: 12px;
-  max-height: 240px;
-  overflow: auto;
-}
-.daily-list button {
+.export-dates,
+.export-actions {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 8px;
+  align-items: end;
 }
-.daily-list p {
-  grid-column: 1/-1;
+.export-dates label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
 }
-.report-error {
+.registration-report button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line, #dce3e5);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.registration-report button:disabled { opacity: .6; cursor: wait; }
+.registration-report button:hover:not(:disabled) { background: var(--surface, #f2f5f3); }
+.export-dates input {
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 8px 10px;
+  font: inherit;
+  border: 1px solid var(--line, #dce3e5);
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+}
+.registration-report .report-error {
   color: #9c2626;
 }
 @media (max-width: 700px) {
-  .report-heading {
-    align-items: stretch;
-  }
-  .report-heading > button {
-    width: 100%;
-    white-space: normal;
-  }
-  .daily-list {
-    grid-template-columns: 1fr;
-  }
   .registration-report {
     padding: 12px;
+  }
+  .export-dates > label {
+    flex: 1 1 140px;
+  }
+  .registration-report > button {
+    width: 100%;
+    white-space: normal;
   }
 }
 </style>

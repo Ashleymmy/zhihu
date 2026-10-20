@@ -31,6 +31,7 @@ import { resetAllianceQuotaManager } from './zhihu/allianceQuota';
 import { zhihuTodoProvider } from './attribution/todo-provider';
 import { zhihuTaskProvider } from './attribution/task-provider';
 import { workRegistrations } from './attribution/works';
+import { keywordBindings } from './attribution/keyword-exports';
 export function createZhihuModule(): BusinessModule {
   const router = Router();
   router.use(miniBusinessRouter);
@@ -75,7 +76,7 @@ export function createZhihuModule(): BusinessModule {
           child,
         );
     },
-    dataProvider: { ...attributionDataProvider, workRegistrations },
+    dataProvider: { ...attributionDataProvider, workRegistrations, keywordBindings },
     accountLifecycle: zhihuAccountLifecycle,
     rateProvider: zhihuRateProvider,
     todoProvider: zhihuTodoProvider,

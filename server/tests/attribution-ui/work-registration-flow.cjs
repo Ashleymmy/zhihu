@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process'),
 const { chromium } = require(process.env.OPC_PLAYWRIGHT_MODULE || 'playwright'),
   XLSX = require('xlsx');
 const root = path.resolve(__dirname, '../..'),
-  out = path.resolve(root, '../.opc-work/work-registration-ui');
+  out = path.resolve(root, '../.opc-work/keyword-callback-ui');
 fs.mkdirSync(out, { recursive: true });
 async function main() {
   const log = fs.createWriteStream(path.join(out, 'host.log'));
@@ -73,17 +73,17 @@ async function main() {
         await context.close();
         continue;
       }
-      const form = page.getByRole('search', { name: '搜索作品' }),
-        report = page.getByRole('region', { name: '每日作品登记统计' });
+      const form = page.getByRole('search', { name: '搜索作品' });
+      const report = page.getByRole('region', { name: '作品回传导出' });
+      const canExport = ['admin', 'operations', 'developer'].includes(role);
       await form.waitFor();
-      const canSeeStats=['admin','operations','developer'].includes(role);
-      assert.equal(await form.getByRole('checkbox').isChecked(), true);
+      assert.equal(await form.getByRole('checkbox').isChecked(), false);
       const apply = async (from, to) => {
-        await form.getByLabel('登记开始日期').fill(from);
-        await form.getByLabel('登记结束日期').fill(to);
+        await form.getByLabel('回传开始日期').fill(from);
+        await form.getByLabel('回传结束日期').fill(to);
         const response = page.waitForResponse(
           (r) =>
-            r.url().includes(canSeeStats?'/core/work-registrations?':'/workbench/works?') &&
+            r.url().includes('/workbench/works?') &&
             new URL(r.url()).searchParams.get('from') === from &&
             new URL(r.url()).searchParams.get('to') === to,
         );
@@ -92,67 +92,97 @@ async function main() {
         assert.equal(r.status(), 200);
         return (await r.json()).data;
       };
-      assert.equal((await apply('2026-10-10', '2026-10-12')).total, count);
-      if(!canSeeStats){
-        assert.equal(await report.count(),0);
-        assert.equal(await page.getByRole('button',{name:'导出 Excel（含回传链接）'}).count(),0);
-        for(const width of [1440,375]){await page.setViewportSize({width,height:1050});if((await page.locator('.studio-app').getAttribute('data-menu-open'))==='true')await page.locator('.menu-toggle').click();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(out,role+'-'+width+'.png'),fullPage:true,animations:'disabled'});}
-        assert.deepEqual(errors,[]);results.push({role,dateFilter:true,statisticsAndExportHidden:true,widths:[1440,375]});await context.close();continue;
-      }
-      await report.getByText(`所选范围共 ${count} 条成功登记的作品`, { exact: true }).waitFor();
-      await report.getByRole('button', { name: '2026-10-11，0 条作品，查看明细', exact: true }).waitFor();
-      const downloaded = page.waitForEvent('download');
-      await report.getByRole('button', { name: '导出 Excel（含回传链接）', exact: true }).click();
-      const download = await downloaded;
-      assert.match(download.suggestedFilename(), /^作品登记_2026-10-10_2026-10-12\.xlsx$/);
-      const file = path.join(out, role + '.xlsx');
-      await download.saveAs(file);
-      const workbook = XLSX.readFile(file),
-        rows = XLSX.utils.sheet_to_json(workbook.Sheets['作品明细']);
-      assert.equal(rows.length, count);
-      assert(rows.every((row) => row['回传链接'].endsWith('&mst=complete-tail')));
-      assert(rows.every((row) => row['登记状态'] === '成功登记'));
-      for (const width of [1440, 375]) {
-        await page.setViewportSize({ width, height: 1050 });
-        if ((await page.locator('.studio-app').getAttribute('data-menu-open')) === 'true')
-          await page.locator('.menu-toggle').click();
-        assert(
-          await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
-          role + ' horizontal overflow',
-        );
-        assert(await form.evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
-        await page.screenshot({
-          path: path.join(out, role + '-' + width + '.png'),
-          fullPage: true,
-          animations: 'disabled',
-        });
-        await page.screenshot({path:path.join(out,role+'-viewport-'+width+'.png'),animations:'disabled'});
-      }
-      await report.getByRole('button', { name: '2026-10-11，0 条作品，查看明细', exact: true }).click();
-      await report.getByText('所选范围共 0 条成功登记的作品', { exact: true }).waitFor();
-      assert.equal(await form.getByLabel('登记开始日期').inputValue(), '2026-10-11');
-      assert.equal(await form.getByLabel('登记结束日期').inputValue(), '2026-10-11');
-      await form.getByRole('checkbox').uncheck();
       assert.equal((await apply('2026-10-10', '2026-10-12')).total, count * 2);
-      await report.getByText(`所选范围共 ${count * 2} 条作品记录`, { exact: true }).waitFor();
+      assert.equal(await report.count(), canExport ? 1 : 0);
+      const capture = async (prefix) => {
+        for (const width of [1440, 375]) {
+          await page.setViewportSize({ width, height: 1050 });
+          if ((await page.locator('.studio-app').getAttribute('data-menu-open')) === 'true')
+            await page.locator('.menu-toggle').click();
+          assert(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+            prefix + ' overflow',
+          );
+          await page.screenshot({
+            path: path.join(out, role + '-' + prefix + '-' + width + '.png'),
+            fullPage: true,
+            animations: 'disabled',
+          });
+        }
+      };
+      if (canExport) {
+        const downloaded = page.waitForEvent('download');
+        await report.getByRole('button', { name: '导出回传 Excel', exact: true }).click();
+        const download = await downloaded;
+        assert.match(download.suggestedFilename(), /^作品回传_2026-10-10_2026-10-12\.xlsx$/);
+        const file = path.join(out, role + '-works.xlsx');
+        await download.saveAs(file);
+        const rows = XLSX.utils.sheet_to_json(XLSX.readFile(file).Sheets['作品明细']);
+        assert.equal(rows.length, count * 2);
+        assert(rows.some((r) => r['登记状态'] === '提交失败'));
+        assert(rows.every((r) => r['回传链接'].endsWith('&mst=complete-tail')));
+        assert(
+          rows.every((r) => r['原著小说名'] && r['作品分类'] === '图文' && r['作品子分类'] === '实拍' && r['提交账号']),
+        );
+        assert(rows.some((r) => r['团长名'] === '王团长'));
+      }
+      await capture('works');
+      if (canExport) {
+        await form.getByLabel('回传开始日期').fill('2026-10-11');
+        await form.getByLabel('回传结束日期').fill('2026-10-11');
+        const downloaded = page.waitForEvent('download');
+        await report.getByRole('button', { name: '导出回传 Excel', exact: true }).click();
+        const file = path.join(out, role + '-empty-day.xlsx');
+        await (await downloaded).saveAs(file);
+        assert.equal(XLSX.utils.sheet_to_json(XLSX.readFile(file).Sheets['作品明细']).length, 0);
+      }
+      await form.getByRole('checkbox').check();
+      assert.equal((await apply('2026-10-10', '2026-10-12')).total, count);
       await form.getByRole('button', { name: '清空筛选', exact: true }).click();
-      assert.equal(await form.getByLabel('登记开始日期').inputValue(), '');
-      assert.equal(await form.getByRole('checkbox').isChecked(), true);
+      assert.equal(await form.getByRole('checkbox').isChecked(), false);
+      const taskResponse = page.waitForResponse((r) => r.url().includes('/core/tasks?'));
+      await page.goto(base + '/app/tasks');
+      const keywordReport = page.getByRole('region', { name: '关键词日期导出' });
+      await page.getByPlaceholder('输入任务名称或说明').waitFor();
+      const taskResult = await taskResponse;
+      assert.equal(taskResult.status(), 200);
+      if (canExport) await keywordReport.waitFor();
+      assert.equal(await keywordReport.count(), canExport ? 1 : 0);
+      if (canExport) {
+        await keywordReport.getByLabel('绑定开始日期').fill('2026-10-10');
+        await keywordReport.getByLabel('绑定结束日期').fill('2026-10-12');
+        const downloaded = page.waitForEvent('download');
+        await keywordReport.getByRole('button', { name: '导出关键词 Excel', exact: true }).click();
+        const download = await downloaded;
+        assert.match(download.suggestedFilename(), /^关键词绑定_2026-10-10_2026-10-12\.xlsx$/);
+        const file = path.join(out, role + '-keywords.xlsx');
+        await download.saveAs(file);
+        const rows = XLSX.utils.sheet_to_json(XLSX.readFile(file).Sheets['关键词绑定明细']);
+        assert(rows.some((r) => r['关键词'] === '日期导出失败验收' && r['创建状态'] === '创建失败'));
+        assert.equal(rows.filter((r) => r['关键词'].startsWith('每日登记验收')).length, 3);
+        await keywordReport.getByRole('button', { name: '本周至今', exact: true }).click();
+        assert(await keywordReport.getByLabel('绑定开始日期').inputValue());
+        await keywordReport.getByLabel('绑定开始日期').fill('2026-10-13');
+        await keywordReport.getByLabel('绑定结束日期').fill('2026-10-10');
+        await keywordReport.getByRole('button', { name: '导出关键词 Excel', exact: true }).click();
+        await keywordReport.getByRole('alert').getByText('开始日期不能晚于结束日期', { exact: false }).waitFor();
+        await keywordReport.getByLabel('绑定开始日期').fill('2026-10-10');
+        await keywordReport.getByLabel('绑定结束日期').fill('2026-10-12');
+      }
+      await capture('keywords');
       assert.deepEqual(errors, []);
       results.push({
         role,
-        successful: count,
-        all: count * 2,
         widths: [1440, 375],
         dateFilter: true,
-        zeroDayDrilldown: true,
-        excel: true,
-        fullLinks: true,
+        keywordExport: canExport,
+        callbackExport: canExport,
+        failuresIncluded: canExport,
       });
       await context.close();
     }
     fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ status: 'passed', results }, null, 2));
-    console.log('作品日期、成功筛选、逐日明细与 Excel 八角色验收通过');
+    console.log('关键词绑定日期、首次回传日期和两种 Excel 八角色验收通过');
   } finally {
     await browser?.close();
     if (host.connected) {

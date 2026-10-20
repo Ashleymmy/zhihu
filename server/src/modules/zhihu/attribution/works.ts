@@ -10,6 +10,8 @@ import { AppError } from '../../../middleware/errors';
 import { authorize, select } from './store';
 import { submittedWorkSql } from './work-receipts';
 import type { WorkRegistrationFilter, WorkRegistrationReport } from '../../../core/contracts';
+import { formatUserId } from '../../../auth/user-id';
+import { COMPOSITION_TYPES, COMPOSITION_SUB_TYPES } from '../zhihu/composition';
 
 export interface WorkFilters {
   from?: string;
@@ -185,7 +187,22 @@ export async function workRegistrations(scope: Scope, user: AuthUser, filters: W
     const daily = await select(c, `SELECT DATE_FORMAT(created_at,'%Y-%m-%d') date,COUNT(*) count FROM (${query}) records GROUP BY DATE_FORMAT(created_at,'%Y-%m-%d') ORDER BY date DESC`, args);
     const total = daily.reduce((sum, row) => sum + Number(row.count), 0);
     if (includeRows && total > 30000) throw new AppError(422, 42200, '符合条件的作品超过 30000 条，请缩小登记日期范围后导出');
-    const records = includeRows ? await select(c, `SELECT *,DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s') registered_at,DATE_FORMAT(release_time,'%Y-%m-%d %H:%i:%s') published_at FROM (${query}) records ORDER BY created_at DESC,source,id DESC`, args) : [];
+    const records = includeRows ? await select(c, `SELECT records.*,
+      DATE_FORMAT(records.created_at,'%Y-%m-%d %H:%i:%s') registered_at,DATE_FORMAT(records.release_time,'%Y-%m-%d %H:%i:%s') published_at,
+      p.name plan_name,p.novel_title,COALESCE(NULLIF(p.novel_url,''),p.landing_url) novel_url,
+      u.username performer_account,CAST(u.id AS CHAR) performer_id,
+      CAST(historical.id AS CHAR) historical_binding_id,CAST(historical.leader_id AS CHAR) leader_id,
+      leader.display_name leader_name,leader.username leader_account
+      FROM (${query}) records JOIN plans p ON p.id=records.plan_id
+      LEFT JOIN users u ON u.id=records.executor_id
+      LEFT JOIN zh_keyword_bindings historical ON historical.id=COALESCE(records.binding_id,
+        (SELECT hb.id FROM zh_keyword_bindings hb JOIN zh_keywords hk ON hk.id=hb.keyword_id
+         WHERE hk.plan_id=p.id AND hb.executor_id=records.executor_id
+           AND COALESCE(hb.assigned_at,hb.claimed_at)<=records.created_at
+           AND (hb.released_at IS NULL OR hb.released_at>=records.created_at)
+         ORDER BY COALESCE(hb.assigned_at,hb.claimed_at) DESC,hb.id DESC LIMIT 1))
+      LEFT JOIN users leader ON leader.id=historical.leader_id
+      ORDER BY records.created_at DESC,records.source,records.id DESC`, args) : [];
     return { total, daily: daily.map(row => ({ date: String(row.date), count: Number(row.count) })), rows: records.map(row => {
       const raw = row.zhihu_status_json;
       const remote = (typeof raw === 'string' ? JSON.parse(raw) : raw) || {};
@@ -198,6 +215,14 @@ export async function workRegistrations(scope: Scope, user: AuthUser, filters: W
         workUrl: String(row.work_url ?? ''), publishedAt: String(row.published_at ?? ''),
         registrationStatus: Number(row.registration_success) === 1 ? '成功登记' : row.submission_result === 'failed' ? '提交失败' : row.submission_result === 'pending' ? '待提交' : '无效或需核实',
         reviewStatus: reviewLabels[status] ?? (status || (row.composition_id ? '等待审核结果' : '平台核验记录')),
+        planName: String(row.plan_name ?? ''),
+        category: row.composition_type == null ? '' : COMPOSITION_TYPES.find(v => v.value === Number(row.composition_type))?.label ?? String(row.composition_type),
+        subcategory: row.composition_sub_type == null ? '' : COMPOSITION_SUB_TYPES.find(v => v.value === Number(row.composition_sub_type))?.label ?? String(row.composition_sub_type),
+        novelTitle: String(row.novel_title ?? ''), novelUrl: String(row.novel_url ?? ''),
+        performerAccount: String(row.performer_account ?? ''), performerId: row.performer_id ? formatUserId(String(row.performer_id)) : '',
+        leaderName: String(row.leader_name ?? ''), leaderAccount: String(row.leader_account ?? ''), leaderId: row.leader_id ? formatUserId(String(row.leader_id)) : '',
+        relationNote: !row.historical_binding_id ? '未记录回传时的团队归属' : row.leader_id ? '取自回传对应的领取／分配记录' : '回传时独立使用，无团长',
+        failureReason: row.plan_sync_status === 'failed' ? submissionFailure(row.plan_sync_error, 'keyword') : row.sync_status === 'failed' ? submissionFailure(row.sync_error, 'composition') : String(row.reason || remote.rejectReason || remote.reject_reason || ''),
       };
     }) };
   });

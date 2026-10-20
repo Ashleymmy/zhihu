@@ -123,11 +123,12 @@ beforeAll(async () => {
   const {ModuleRuntime}=await import('../../src/core/module-runtime');
   const {zhihuManifest}=await import('../../src/modules/zhihu/manifest');
   const runtime=new ModuleRuntime([zhihuManifest]);
-  runtime.register({manifest:zhihuManifest,router:express.Router(),dataProvider:{...(await import('../../src/modules/zhihu/attribution/provider')).attributionDataProvider,workRegistrations:(await import('../../src/modules/zhihu/attribution/works')).workRegistrations}});
+  runtime.register({manifest:zhihuManifest,router:express.Router(),dataProvider:{keywordBindings:(await import('../../src/modules/zhihu/attribution/keyword-exports')).keywordBindings,...(await import('../../src/modules/zhihu/attribution/provider')).attributionDataProvider,workRegistrations:(await import('../../src/modules/zhihu/attribution/works')).workRegistrations}});
   app = express()
     .use(express.json())
     .use('/core/activity',(req,_res,next)=>{req.user=actor;next();},(await import('../../src/core/activity-routes')).createActivityRouter(runtime))
     .use('/core/work-registrations',(req,_res,next)=>{req.user=actor;next();},(await import('../../src/core/work-registration-routes')).createWorkRegistrationRouter(runtime))
+    .use('/core/keyword-bindings',(req,_res,next)=>{req.user=actor;next();},(await import('../../src/core/work-registration-routes')).createKeywordBindingRouter(runtime))
     .use('/compositions', compositionsRouter)
     .use('/activity', (await import('../../src/modules/zhihu/routes/attribution')).attributionRouter)
     .use('/plans', plansRouter)
@@ -337,7 +338,7 @@ describe('successful daily registrations and Excel export',()=>{
   await save(team,group,'2026-10-09 23:59:59');await save(team,group,'2026-10-13 00:00:00');
   await save(leader,await keyword(leader),'2026-10-10 12:00:00');await save(direct,await keyword(direct),'2026-10-10 12:00:00');
  },90000);
- const get=(extra:Record<string,unknown>={},suffix='')=>request(app).get('/core/work-registrations'+suffix).query({...scope,...dates,moduleId:'zhihu',ownerId:team.sub,...extra});
+ const get=(extra:Record<string,unknown>={},suffix='')=>request(app).get('/core/work-registrations'+suffix).query({...scope,...dates,moduleId:'zhihu',ownerId:team.sub,successfulOnly:'1',...extra});
  const excel=(extra:Record<string,unknown>={})=>get(extra,'/export').buffer(true).parse((res,done)=>{const chunks:Buffer[]=[];res.on('data',chunk=>chunks.push(Buffer.from(chunk)));res.on('end',()=>done(null,Buffer.concat(chunks)));res.on('error',done);});
  it('uses receipt validity and China registration dates consistently; exports every page and intact text links',async()=>{
   actor=admin;const summary=await get();expect(summary.status,JSON.stringify(summary.body)).toBe(200);expect(summary.body.data.total).toBe(28);
@@ -376,3 +377,67 @@ describe('successful daily registrations and Excel export',()=>{
   expect(other.status).toBe(200);expect(other.body.data.total).toBe(0);
   const cross=await request(app).get('/activity/workbench/works').query({...scope,projectId:'999',planId:mine.planId});expect(cross.status).toBe(403);
  });});
+
+
+describe('keyword assignments and complete callback exports',()=>{
+ const dates={from:'2026-11-20',to:'2026-11-22'};
+ let first:any,failed:any,unassigned:any,workId='',failedWorkId='';
+ const novelUrl='https://example.com/novel?text='+'x'.repeat(300)+'&mst=novel-tail';
+ const excel=async(path:string,extra:Record<string,unknown>={})=>request(app).get('/core/'+path+'/export').query({...scope,moduleId:'zhihu',...dates,...extra}).buffer(true).parse((res,done)=>{const chunks:Buffer[]=[];res.on('data',chunk=>chunks.push(Buffer.from(chunk)));res.on('end',()=>done(null,Buffer.concat(chunks)));res.on('error',done);});
+ const rows=(response:any,sheet:string)=>XLSX.utils.sheet_to_json<Record<string,string>>(XLSX.read(response.body,{type:'buffer'}).Sheets[sheet]);
+ beforeAll(async()=>{
+  first=await keyword(team);
+  await c.query("UPDATE plans SET created_by=3,created_at='2026-11-01',name='推广计划甲',novel_title='原著甲',novel_url=? WHERE id=?",[novelUrl,first.planId]);
+  await c.query('UPDATE zh_keywords SET created_by=3 WHERE id=?',[first.id]);
+  await c.query("UPDATE zh_keyword_bindings SET claimed_at='2026-11-19',assigned_at='2026-11-20 00:00:00' WHERE id=?",[first.bindingId]);
+  workId=(await works.createComposition(team,{...input(first.planId),compositionType:2,compositionSubType:8})).id;
+  failedWorkId=(await works.createComposition(team,input(first.planId))).id;
+  await c.query("UPDATE compositions SET created_at='2026-11-22 23:59:59',sync_status='synced',zhihu_composition_id=CONCAT('receipt-',id) WHERE id=?",[workId]);
+  await c.query("UPDATE compositions SET created_at='2026-11-20 00:00:00',sync_status='failed',sync_error='invalid url' WHERE id=?",[failedWorkId]);
+  failed=await keyword(direct);
+  await c.query("UPDATE plans SET created_at='2026-11-02',sync_status='failed',sync_error='invalid URL' WHERE id=?",[failed.planId]);
+  await c.query("UPDATE zh_keyword_bindings SET claimed_at='2026-11-22 23:59:59',assigned_at='2026-11-22 23:59:59' WHERE id=?",[failed.bindingId]);
+  unassigned=await keyword();
+  await c.query("UPDATE plans SET created_at='2026-11-21',sync_status='failed',sync_error='invalid URL' WHERE id=?",[unassigned.planId]);
+  await c.query("UPDATE zh_keywords SET lifecycle_status='archived' WHERE id=?",[unassigned.id]);
+  const outside=await keyword(team);
+  await c.query("UPDATE plans SET created_at='2026-11-21' WHERE id=?",[outside.planId]);
+  await c.query("UPDATE zh_keyword_bindings SET claimed_at='2026-11-23',assigned_at='2026-11-23' WHERE id=?",[outside.bindingId]);
+ });
+ it('filters assignment date rather than creation and retains archived failures without an assignment',async()=>{
+  actor=admin;const response=await excel('keyword-bindings');expect(response.status).toBe(200);
+  const data=rows(response,'关键词绑定明细');expect(data).toHaveLength(3);
+  const assigned=data.find(r=>r['关键词计划编号']===first.planId)!;
+  expect(assigned).toMatchObject({'绑定时间（北京时间）':'2026-11-20 00:00:00','创建时间（北京时间）':'2026-11-01 00:00:00','创建账号':'team','创建人ID':'timo000003','创建人使用该词时的团长':'团长','本次归属团长':'团长','原著书名':'原著甲','原著链接':novelUrl,'推广活动':'任务','渠道':'渠道'});
+  expect(data.filter(r=>r['创建状态']==='创建失败')).toHaveLength(2);
+  expect(data.find(r=>r['关键词计划编号']===unassigned.planId)).toMatchObject({'日期收录依据':'未分配，按创建日期收录失败记录','绑定时间（北京时间）':''});
+  expect(rows(await excel('keyword-bindings',{from:'2026-11-20',to:'2026-11-20'}),'关键词绑定明细')).toHaveLength(1);
+  expect(rows(await excel('keyword-bindings',{from:'2026-12-01',to:'2026-12-01'}),'关键词绑定明细')).toHaveLength(0);
+ });
+ it('includes failures by default and exports classifications, original novel, account and recorded team',async()=>{
+  actor=admin;const response=await excel('work-registrations');expect(response.status,JSON.stringify(response.body)).toBe(200);
+  const data=rows(response,'作品明细');expect(data).toHaveLength(2);
+  expect(data.find(r=>r['作品编号']===workId)).toMatchObject({'推广计划名称':'推广计划甲','作品分类':'视频','作品子分类':'漫剧','原著小说名':'原著甲','原著链接':novelUrl,'提交账号':'team','提交人ID':'timo000003','团长名':'团长','团长ID':'timo000002'});
+  expect(data.find(r=>r['作品编号']===failedWorkId)?.['登记状态']).toBe('提交失败');
+  expect(rows(await excel('work-registrations',{successfulOnly:'1'}),'作品明细')).toHaveLength(1);
+  // A later user/team change cannot rewrite the team attached to these historical callbacks.
+  await c.query('UPDATE users SET parent_id=NULL WHERE id=3');
+  try {expect(rows(await excel('work-registrations'),'作品明细').every(r=>r['团长名']==='团长')).toBe(true);}
+  finally {await c.query('UPDATE users SET parent_id=2 WHERE id=3');}
+ });
+ it('retains released assignments and never loses them when a keyword is reclaimed',async()=>{
+  actor=admin;
+  await c.query("UPDATE zh_keyword_bindings SET released_at='2026-11-23' WHERE id=?",[failed.bindingId]);
+  await c.query("INSERT INTO zh_keyword_bindings(keyword_id,path_type,executor_id,relation_snapshot,claimed_at,assigned_at) VALUES(?,'direct_creator',5,'{}','2026-11-24','2026-11-24')",[failed.id]);
+  const data=rows(await excel('keyword-bindings'),'关键词绑定明细');expect(data).toHaveLength(3);
+  expect(data.find(r=>r['关键词计划编号']===failed.planId)?.['分配状态']).toBe('已释放');
+  expect(rows(await excel('keyword-bindings',{from:'2026-11-24',to:'2026-11-24'}),'关键词绑定明细')).toHaveLength(1);
+ });
+ it('enforces role, scope and date validation for the new keyword download',async()=>{
+  for(const member of [leader,team,direct,user('1','operator')]){actor=member;expect((await excel('keyword-bindings')).status).toBe(403);}
+  for(const member of [admin,{...admin,role:'developer' as const},{...admin,adminDuty:'operations' as const}]){actor=member;expect((await excel('keyword-bindings')).status).toBe(200);}
+  actor=admin;
+  for(const extra of [{accountId:'999'},{projectId:'999'}])expect((await excel('keyword-bindings',extra)).status).toBe(403);
+  for(const extra of [{from:'2026-11-25'},{from:'2026-02-30'},{successfulOnly:'1'}])expect((await excel('keyword-bindings',extra)).status).toBe(422);
+ });
+});
