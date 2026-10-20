@@ -14,6 +14,7 @@ import { createEarningRouter } from './earning-routes';
 import { createFinanceWorkspaceRouter } from './finance-workspace';
 import { createActivityRouter } from './activity-routes';
 import { createMemberSummaryRouter } from './member-summary';
+import { createRelationRouter } from './relation-routes';
 import {
   listAccounts,
   createAccount,
@@ -42,6 +43,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   r.use('/tasks',createTaskRouter(runtime));
   r.use('/earnings',createEarningRouter(runtime));
   r.use('/member-summary',createMemberSummaryRouter(runtime));
+  r.use('/relations',createRelationRouter());
   r.use('/activity',createActivityRouter(runtime));
   r.get('/dashboard', asyncHandler(async (req, res) => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
