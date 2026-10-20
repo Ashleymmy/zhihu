@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import ToastHost from './ToastHost.vue'
 
 export interface NavItem {
   key: string
@@ -328,6 +329,9 @@ onBeforeUnmount(() => {
         <span>{{ tab.label }}</span>
       </button>
     </nav>
+
+    <!-- 全局提示与撤销 -->
+    <ToastHost />
 
     <!-- Ctrl K 快速导航 -->
     <div v-if="searchOpen" class="quicknav-overlay" @click.self="searchOpen = false">

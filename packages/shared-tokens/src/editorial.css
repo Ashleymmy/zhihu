@@ -1494,3 +1494,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
   .bento-enter > * { animation: none; }
   .bento-hero { transform: none; }
 }
+
+/* 对话面板打开时，背后的页面轻微后退（只作用于内容区，侧栏与顶栏不动） */
+.studio-page { transition: transform 0.45s var(--ease-out), filter 0.45s var(--ease-out); transform-origin: 50% 0; }
+body:has(dialog.action-dialog[open]) .studio-page { transform: scale(0.985); filter: saturate(0.92) brightness(0.98); }
+@media (prefers-reduced-motion: reduce) { body:has(dialog.action-dialog[open]) .studio-page { transform: none; } }

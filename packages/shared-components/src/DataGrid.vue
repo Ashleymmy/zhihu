@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import DetailDrawer from "./DetailDrawer.vue";
 import { gridViewRows, groupGridRows } from "./data-grid";
 import type {
@@ -43,7 +43,8 @@ const emit = defineEmits<{
 const currentView = ref(props.modelValue ?? props.views[0]?.key ?? "all"),
   search = ref(""),
   groupBy = ref(props.groupOptions[0]?.key ?? "status"),
-  selectedId = ref<string | null>(null);
+  selectedId = ref<string | null>(null),
+  activeId = ref<string | null>(null);
 watch(
   () => props.modelValue,
   (key) => {
@@ -81,15 +82,35 @@ const totals = computed(
 watch(selected, (row) => {
   if (!row) selectedId.value = null;
 });
+/* 详情面板里的「上一条 / 下一条」：按当前分组后的顺序移动，并把那一行滚到可见位置 */
+const ordered = computed(() => groups.value.flatMap((group) => group.rows));
+const position = computed(() => positionOf(selectedId.value));
+const root = ref<HTMLElement | null>(null);
+function step(delta: number) {
+  const row = activeId.value ? neighbor(activeId.value, delta) : undefined;
+  if (!row) return;
+  inspect(row);
+  void nextTick(() => root.value?.querySelector(`[data-row-id="${CSS.escape(row.id)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+}
 function choose(key: string) {
   currentView.value = key;
   emit("update:modelValue", key);
 }
 function inspect(row: DataGridRow) {
   if (!props.externalDetails) selectedId.value = row.id;
+  activeId.value = row.id;
   emit("inspect", row);
 }
-defineExpose({inspect});
+/** 外部详情面板用：查某一行在当前顺序里的位置、取相邻行（delta 为 -1 / 1） */
+function positionOf(id: string | null | undefined) {
+  const index = id ? ordered.value.findIndex((row) => row.id === id) : -1;
+  return index < 0 ? undefined : { index, total: ordered.value.length };
+}
+function neighbor(id: string, delta: number) {
+  const p = positionOf(id);
+  return p ? ordered.value[p.index + delta] : undefined;
+}
+defineExpose({ inspect, positionOf, neighbor, step });
 function keyboard(event: KeyboardEvent, row: DataGridRow) {
   if (
     event.target === event.currentTarget &&
@@ -104,7 +125,7 @@ function text(row: DataGridRow, column: DataGridColumn) {
 }
 </script>
 <template>
-  <section class="data-grid" :aria-label="title" :aria-busy="busy">
+  <section ref="root" class="data-grid" :aria-label="title" :aria-busy="busy">
     <header class="grid-toolbar">
       <div class="grid-views" role="group" aria-label="查看范围">
         <button
@@ -182,6 +203,9 @@ function text(row: DataGridRow, column: DataGridColumn) {
             v-for="row in group.rows"
             :key="row.id"
             class="grid-row"
+            :class="{ selected: activeId === row.id }"
+            :data-row-id="row.id"
+            :aria-current="activeId === row.id ? 'true' : undefined"
             tabindex="0"
             :aria-label="'查看' + row.title + '详情'"
             @click="inspect(row)"
@@ -245,6 +269,8 @@ function text(row: DataGridRow, column: DataGridColumn) {
             v-for="row in group.rows"
             :key="row.id"
             class="grid-card"
+            :class="{ selected: activeId === row.id }"
+            :aria-current="activeId === row.id ? 'true' : undefined"
             tabindex="0"
             :aria-label="'查看' + row.title + '详情'"
             @click="inspect(row)"
@@ -303,7 +329,10 @@ function text(row: DataGridRow, column: DataGridColumn) {
     <DetailDrawer
       :open="Boolean(selected)"
       :title="selected?.title ?? '详情'"
-      @close="selectedId = null"
+      :position="position"
+      @prev="step(-1)"
+      @next="step(1)"
+      @close="selectedId = null; activeId = null"
       ><template v-if="selected"
         ><slot name="detail" :row="selected"
           ><span :class="['status-tag', selected.status.tone]">{{
@@ -324,382 +353,95 @@ function text(row: DataGridRow, column: DataGridColumn) {
   </section>
 </template>
 <style scoped>
-.data-grid {
-  min-width: 0;
-  border: 1px solid var(--line, #e8e6dc);
-  border-radius: 12px;
-  background: var(--paper, #fff);
-  color: var(--ink, #2b2b29);
-  font-size: 14px;
-  line-height: 1.5;
-  overflow: hidden;
-}
-.data-grid * {
-  box-sizing: border-box;
-}
-.grid-toolbar,
-.grid-filters,
-.grid-views {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-.grid-toolbar {
-  padding: 14px 16px;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--line, #e8e6dc);
-}
-button,
-input,
-select {
-  font: inherit;
-  color: inherit;
-  min-height: 40px;
-  border-radius: 7px;
-  border: 1px solid var(--line, #d6d3c7);
-  background: var(--paper, #fff);
-  padding: 8px 12px;
-}
-button {
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-button:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-.grid-row:focus-visible,
-.grid-card:focus-visible {
-  outline: 3px solid #141413;
-  outline-offset: -3px;
-}
-.grid-views button {
-  border-color: transparent;
-  background: transparent;
-  color: #5e5d59;
-}
-.grid-views button.active {
-  background: #f3f1ea;
-  color: #141413;
-  font-weight: 600;
-}
-.view-count {
-  display: inline-block;
-  min-width: 22px;
-  padding: 0 5px;
-  border-radius: 5px;
-  font-size: 12px;
-  background: #ffffffa8;
-  color: #5e5d59;
-  margin-left: 4px;
-  font-variant-numeric: tabular-nums;
-}
-.grid-search {
-  min-width: 0;
-}
-.grid-search input {
-  width: 220px;
-  max-width: 100%;
-}
-.desktop-table {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.desktop-table th,
-.desktop-table td {
-  text-align: left;
-  padding: 14px 12px;
-  vertical-align: top;
-  border-bottom: 1px solid var(--line, #f0eee6);
-  overflow-wrap: anywhere;
-}
-.desktop-table th.numeric,
-.desktop-table td.numeric {
-  text-align: right;
-}
-.desktop-table thead th {
-  color: #6f6e68;
-  font-size: 12px;
-  font-weight: 500;
-  background: #faf9f5;
-}
-.title-col {
-  width: 21%;
-}
-.next-col {
-  width: 21%;
-}
-.grid-row {
-  cursor: pointer;
-}
-.grid-row:hover {
-  background: #faf9f5;
-}
-.grid-row th {
-  font-weight: 600;
-}
-.row-title {
-  padding: 0;
-  min-height: 24px;
-  border: 0;
-  background: none;
-  text-align: left;
-  line-height: 1.6;
-  font-weight: 600;
-  color: #141413;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-.row-title:hover {
-  text-decoration: underline;
-}
-.numeric {
-  font-variant-numeric: tabular-nums;
-}
-.group-heading th {
-  background: #faf9f5;
-  padding: 9px 12px;
-  font-weight: 500;
-}
-.group-heading th > span {
-  margin-right: 10px;
-}
-.group-heading small {
-  color: #6f6e68;
-  font-size: 12px;
-  font-weight: 400;
-}
-.status-tag {
-  display: inline-block;
-  border-radius: 5px;
-  padding: 3px 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-.success {
-  background: #e3efe5;
-  color: #2f7d4f;
-}
-.warning {
-  background: #f5ead3;
-  color: #a86a12;
-}
-.danger {
-  background: #f6e1dc;
-  color: #b4402e;
-}
-.neutral {
-  background: #f0eee6;
-  color: #5e5d59;
-}
-.leader {
-  background: #efe9f8;
-  color: #6e4fa8;
-}
-.next-cell p,
-.grid-card footer p {
-  margin: 0 0 8px;
-  line-height: 1.6;
-}
-.next-cell button,
-.grid-card footer button {
-  font-size: 13px;
-  border-color: #d6d3c7;
-  color: #141413;
-  background: #faf9f5;
-}
-.next-cell > span {
-  font-size: 12px;
-  color: #6f6e68;
-}
-.grid-totals {
-  display: flex;
-  justify-content: flex-end;
-  align-items: baseline;
-  gap: 12px 26px;
-  flex-wrap: wrap;
-  padding: 16px;
-  background: #faf9f5;
-  border-top: 1px solid var(--line, #e8e6dc);
-}
-.grid-totals > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.grid-totals span {
-  color: #6f6e68;
-  font-size: 12px;
-}
-.grid-totals strong {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.grid-notice {
-  padding: 8px 16px;
-  margin: 0;
-  color: #6f6e68;
-  background: #faf9f5;
-}
-.grid-empty {
-  text-align: center;
-  padding: 36px 20px;
-  color: #6f6e68;
-}
-.grid-empty p {
-  margin: 0 0 14px;
-  overflow-wrap: anywhere;
-}
-.mobile-groups {
-  display: none;
-}
-.detail-fields {
-  display: grid;
-  gap: 16px;
-}
-.detail-fields > div {
-  display: grid;
-  gap: 4px;
-}
-.detail-fields dt {
-  color: #6f6e68;
-  font-size: 12px;
-}
-.detail-fields dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* 多维表格：分段视图切换、行悬停与选中、状态胶囊、窄屏变卡片 */
+.data-grid { display: grid; gap: 0; min-width: 0; overflow: clip; border: 1px solid rgba(232, 230, 220, 0.7); border-radius: 22px; background: var(--white, #fff); box-shadow: 0 1px 2px rgba(20, 20, 19, 0.03), 0 10px 30px -8px rgba(20, 20, 19, 0.08); }
+.data-grid * { box-sizing: border-box; }
+.grid-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line-soft, #f0eee6); }
+select, button { font: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+.grid-views { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 12px; background: var(--paper-deep, #f3f1ea); }
+.grid-views button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 0; border-radius: 9px; color: var(--ink-soft, #5e5d59); background: transparent; font-size: 13.5px; transition: background 0.2s, color 0.2s, box-shadow 0.2s; }
+.grid-views button:hover { color: var(--ink, #141413); }
+.grid-views button.active { color: var(--ink, #141413); background: var(--white, #fff); box-shadow: 0 1px 3px rgba(20, 20, 19, 0.1); font-weight: 600; }
+.view-count { min-width: 20px; padding: 0 6px; border-radius: 999px; color: var(--muted, #87867f); background: rgba(20, 20, 19, 0.05); font-size: 11.5px; line-height: 18px; text-align: center; }
+.grid-views button.active .view-count { color: var(--clay-deep, #b5532f); background: var(--clay-soft, #f6e5dc); }
+.grid-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.grid-search input { width: 220px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line, #e8e6dc); border-radius: 11px; background: var(--white, #fff); font: inherit; font-size: 13.5px; }
+.grid-search input:focus-visible { outline: none; border-color: var(--clay, #d46b45); box-shadow: 0 0 0 3px var(--clay-soft, #f6e5dc); }
+.grid-filters select { min-height: 36px; border-radius: 11px; }
+.desktop-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.desktop-table thead th { position: sticky; top: 0; z-index: 1; padding: 10px 16px; border-bottom: 1px solid var(--line, #e8e6dc); color: var(--muted, #87867f); background: rgba(250, 249, 245, 0.96); font-size: 12px; font-weight: 600; text-align: left; white-space: nowrap; }
+.desktop-table td { padding: 13px 16px; border-bottom: 1px solid var(--line-soft, #f0eee6); color: var(--ink-soft, #5e5d59); vertical-align: middle; }
+.desktop-table td.numeric, .numeric { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink, #141413); }
+.title-col { min-width: 180px; }
+.next-col { min-width: 220px; }
+.grid-row { cursor: pointer; transition: background 0.15s; }
+.grid-row:hover { background: var(--hover, #f5f3ec); }
+.grid-row:focus-visible { outline: 2px solid var(--clay, #d46b45); outline-offset: -2px; }
+.grid-row.selected { background: var(--clay-soft, #f6e5dc); }
+.grid-row.selected th { box-shadow: inset 3px 0 0 var(--clay, #d46b45); }
+.grid-row th { padding: 13px 16px; border-bottom: 1px solid var(--line-soft, #f0eee6); text-align: left; font-weight: 600; }
+.row-title { padding: 0; border: 0; color: var(--ink, #141413); background: none; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.row-title:hover { color: var(--clay-deep, #b5532f); }
+.group-heading th { padding: 14px 16px 8px; background: var(--white, #fff); text-align: left; font-weight: 500; }
+.group-heading th > span { margin-right: 8px; color: var(--muted, #87867f); font-size: 12.5px; }
+.group-heading small { color: var(--muted, #87867f); font-size: 12.5px; }
+.status-tag { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.status-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.success { color: var(--ok, #2f7d4f); background: var(--ok-bg, #e3efe5); }
+.warning { color: var(--warn, #a86a12); background: var(--warn-bg, #f5ead3); }
+.danger { color: var(--danger, #b4402e); background: var(--danger-bg, #f6e1dc); }
+.neutral { color: var(--ink-soft, #5e5d59); background: var(--paper-deep, #f3f1ea); }
+.leader { color: #2d63ae; background: #e3ecf8; }
+.next-cell p { margin: 0 0 6px; color: var(--ink-soft, #5e5d59); font-size: 13px; line-height: 1.5; }
+.next-cell strong { color: var(--ink, #141413); }
+.next-cell button, .grid-card footer button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 10px; color: #fff; background: var(--ink, #141413); font-size: 13px; font-weight: 600; transition: background 0.2s, transform 0.36s var(--spring, ease); }
+.next-cell button:hover, .grid-card footer button:hover { background: #2b2b29; }
+.next-cell button:active, .grid-card footer button:active { transform: scale(0.96); }
+.next-cell > span { color: var(--muted, #87867f); font-size: 13px; }
+.grid-totals { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 26px; padding: 14px 18px; border-top: 1px solid var(--line, #e8e6dc); background: var(--paper, #faf9f5); }
+.grid-totals > div { display: flex; align-items: baseline; gap: 8px; }
+.grid-totals span { color: var(--muted, #87867f); font-size: 12.5px; }
+.grid-totals strong { font-family: var(--font-display, serif); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.grid-notice { margin: 0; padding: 10px 18px; color: var(--ink-soft, #5e5d59); background: var(--paper, #faf9f5); font-size: 13px; }
+.grid-empty { display: grid; justify-items: center; gap: 10px; padding: 40px 20px; color: var(--ink-soft, #5e5d59); text-align: center; }
+.grid-empty p { margin: 0; }
+.grid-empty button { min-height: 34px; padding: 0 14px; border: 1px solid var(--line, #e8e6dc); border-radius: 10px; background: var(--white, #fff); }
+.mobile-groups { display: none; }
+.detail-fields { display: grid; gap: 0; margin: 16px 0; }
+.detail-fields > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft, #f0eee6); }
+.detail-fields dt { color: var(--muted, #87867f); font-size: 13px; }
+.detail-fields dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 760px) {
-  .desktop-table {
-    display: none;
-  }
-  .mobile-groups {
-    display: block;
-    padding: 0 14px 14px;
-    background: #faf9f5;
-  }
-  .mobile-group-heading {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    padding: 18px 2px 10px;
-    font-size: 12px;
-    color: #6f6e68;
-  }
-  .mobile-group-heading p {
-    flex-basis: 100%;
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-  .grid-card {
-    padding: 16px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line, #e8e6dc);
-    border-radius: 10px;
-    margin: 0 0 10px;
-    min-width: 0;
-    cursor: pointer;
-  }
-  .grid-card:last-child {
-    margin: 0;
-  }
-  .grid-card > header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .grid-card > header .row-title {
-    font-size: 16px;
-    min-height: 32px;
-  }
-  .grid-card > header .status-tag {
-    flex: none;
-    max-width: 45%;
-  }
-  .grid-card dl {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px 16px;
-    margin: 16px 0;
-  }
-  .grid-card dl > div {
-    min-width: 0;
-  }
-  .grid-card dt {
-    font-size: 12px;
-    color: #6f6e68;
-    margin-bottom: 3px;
-  }
-  .grid-card dd {
-    margin: 0;
-    overflow-wrap: anywhere;
-    font-weight: 500;
-  }
-  .grid-card footer {
-    padding-top: 12px;
-    border-top: 1px solid var(--line, #f0eee6);
-    font-size: 13px;
-  }
-  .grid-card footer button {
-    width: 100%;
-    min-height: 44px;
-  }
-  .grid-toolbar {
-    padding: 12px;
-    gap: 12px;
-  }
-  .grid-filters {
-    width: 100%;
-  }
-  .grid-search {
-    flex: 1;
-    min-width: 140px;
-  }
-  .grid-search input {
-    width: 100%;
-    font-size: 16px;
-  }
-  .grid-filters select {
-    max-width: 100%;
-    font-size: 16px;
-  }
-  .grid-views {
-    width: 100%;
-    gap: 4px;
-  }
-  .grid-views button {
-    padding: 8px;
-    min-height: 44px;
-    font-size: 13px;
-  }
-  .grid-totals {
-    justify-content: flex-start;
-    padding: 16px;
-    gap: 12px 20px;
-  }
+  .data-grid { border-radius: 20px; }
+  .desktop-table { display: none; }
+  .mobile-groups { display: grid; gap: 4px; padding: 6px 12px 12px; }
+  .mobile-group-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 4px 6px; color: var(--muted, #87867f); font-size: 12.5px; }
+  .mobile-group-heading p { width: 100%; margin: 0; }
+  .grid-card { display: grid; gap: 10px; margin-bottom: 8px; padding: 14px; border-radius: 16px; background: var(--paper, #faf9f5); cursor: pointer; transition: background 0.2s, transform 0.36s var(--spring, ease); }
+  .grid-card:active { transform: scale(0.985); }
+  .grid-card.selected { background: var(--clay-soft, #f6e5dc); }
+  .grid-card:focus-visible { outline: 2px solid var(--clay, #d46b45); outline-offset: 2px; }
+  .grid-card:last-child { margin-bottom: 0; }
+  .grid-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .grid-card > header .row-title { font-size: 14.5px; }
+  .grid-card > header .status-tag { flex: none; }
+  .grid-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin: 0; }
+  .grid-card dl > div { min-width: 0; }
+  .grid-card dt { color: var(--muted, #87867f); font-size: 12px; }
+  .grid-card dd { margin: 2px 0 0; overflow-wrap: anywhere; font-size: 14px; }
+  .grid-card footer { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line, #e8e6dc); }
+  .grid-card footer p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .grid-card footer button { width: 100%; min-height: 40px; }
+  .grid-toolbar { padding: 12px; }
+  .grid-filters { width: 100%; }
+  .grid-search { flex: 1; min-width: 0; }
+  .grid-search input { width: 100%; font-size: 16px; }
+  .grid-filters select { flex: none; }
+  .grid-views { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .grid-views button { flex: none; }
+  .grid-totals { justify-content: space-between; padding: 12px 14px; }
 }
 </style>
