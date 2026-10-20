@@ -12,6 +12,7 @@ import { writeAudit } from './audit.service';
 import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser, isDevDemoEnabled } from '../core/demo';
 import { listManagedMembers } from './member-access.service';
 import { openMemberProjects } from './member-onboarding.service';
+import { recordRegistration, setTeamLeader } from '../core/member-relations';
 
 interface MemberRow extends RowDataPacket {
   id: string;
@@ -119,6 +120,14 @@ export async function createMember(
     const memberId = String(result.insertId);
     formatUserId(memberId);
     await openMemberProjects(connection, memberId, role, parentId, user.sub);
+    await recordRegistration(connection, {
+      userId: memberId,
+      role,
+      parentId,
+      inviterId: user.role === 'leader' ? user.sub : null,
+      channel: user.role === 'leader' ? 'leader_created' : 'admin_assign',
+      operatorId: user.sub,
+    });
     await writeAudit(
       {
         userId: user.sub,
@@ -440,6 +449,14 @@ export async function reviewApplication(user: AuthUser, applicationId: string, a
       );
       if (update.affectedRows === 0) throw new AppError(422, 42211, '该达人已在团队内，无法重复入团');
       await openMemberProjects(connection, String(application.creator_id), 'creator', String(application.leader_id), user.sub);
+      await setTeamLeader(connection, {
+        userId: String(application.creator_id),
+        parentId: String(application.leader_id),
+        source: 'application',
+        refType: 'team_application',
+        refId: applicationId,
+        operatorId: user.sub,
+      });
     }
     await connection.query(
       'UPDATE team_applications SET status = ?, handled_by = ?, handled_at = NOW() WHERE id = ?',

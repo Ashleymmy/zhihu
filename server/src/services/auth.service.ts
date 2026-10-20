@@ -16,6 +16,7 @@ import { RefreshSession, issueRefreshSession, revokeLoginSession, rotateRefreshS
 import { writeAudit } from './audit.service';
 import { incrRateLimit, deleteRateLimit } from '../utils/rateLimit';
 import { lockInvitation, consumeInvitation } from './invitations.service';
+import { recordRegistration } from '../core/member-relations';
 import {
   devDemoLoginUser,
   devDemoPublicUser,
@@ -118,6 +119,15 @@ export async function register(
       const id = String(result.insertId);
       formatUserId(id);
       if (invitation) await consumeInvitation(connection, invitation, id);
+      // 邀请关系、首条团队归属与角色记录与账号同事务写入
+      await recordRegistration(connection, {
+        userId: id,
+        role: 'creator',
+        parentId: invitation?.team_leader_id ?? null,
+        inviterId: invitation?.owner_user_id ?? null,
+        invitationId: invitation?.id ?? null,
+        channel: 'organic',
+      });
       await openMemberProjects(
         connection,
         id,

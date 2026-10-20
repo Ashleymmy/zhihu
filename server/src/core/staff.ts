@@ -5,6 +5,7 @@ import { generateTemporaryPassword } from '../auth/password-policy';
 import { formatUserId, isReservedUserId } from '../auth/user-id';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { requireDuty } from './duties';
+import { recordRegistration, recordRoleChange } from './member-relations';
 import { rows, withTransaction } from '../db';
 import { asyncHandler, AppError } from '../middleware/errors';
 import { ok } from '../utils/response';
@@ -74,6 +75,7 @@ staffRouter.post(
         [input.username, hash, role, role, input.displayName, assignedDuty, req.user.sub],
       );
       formatUserId(r.insertId);
+      await recordRegistration(c, { userId: r.insertId, role, channel: 'admin_assign', operatorId: req.user.sub });
       await writeAudit(
         {
           userId: req.user.sub,
@@ -130,6 +132,7 @@ staffRouter.patch(
         'UPDATE users SET role=?,role_id=(SELECT id FROM roles WHERE role_key=?),admin_duty=?,is_active=? WHERE id=?',
         [role, role, assignedDuty, active ? 1 : 0, id],
       );
+      await recordRoleChange(c, { userId: id, fromRole: target.role, toRole: role, reason: 'manual', operatorId: req.user.sub });
       await c.query(
         "UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='role_changed' WHERE user_id=? AND revoked_at IS NULL",
         [id],

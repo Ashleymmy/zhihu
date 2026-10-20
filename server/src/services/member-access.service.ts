@@ -9,6 +9,7 @@ import { lifecycleProviders } from '../core/account-lifecycle';
 import { writeAudit } from './audit.service';
 import { assignMemberProjects, canAssignMemberProjects } from './member-projects.service';
 import { openMemberProjects } from './member-onboarding.service';
+import { recordRoleChange, setTeamLeader } from '../core/member-relations';
 import { memberClientInfo } from './member-clients.service';
 
 const roles: Role[] = ['developer', 'admin', 'operator', 'leader', 'creator'];
@@ -151,6 +152,10 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
         id,
       ],
     );
+    // 团队归属与角色历史：没变化时这两个调用不写任何记录
+    if (changesTeam || role !== member.role)
+      await setTeamLeader(c, { userId: id, parentId, source: 'transfer', refType: 'account_edit', operatorId: auth.sub });
+    await recordRoleChange(c, { userId: id, fromRole: member.role, toRole: role, reason: 'manual', operatorId: auth.sub });
     if (active && (role !== member.role || changesTeam)) await openMemberProjects(c, id, role, parentId, auth.sub);
     const projectsChanged =
       patch.projectIds !== undefined
