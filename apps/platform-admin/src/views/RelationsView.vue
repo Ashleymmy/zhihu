@@ -11,6 +11,7 @@ interface Detail {
   referral: { inviter: Person | null; channel: string; registeredAt: string } | null
   team: { leader: Person | null; since: string } | null
   counts: { direct: number; indirect: number }
+  teamSize: number
   timeline: { at: string; kind: 'team' | 'role'; title: string; detail: string; operator: string | null }[]
 }
 interface Nominee {
@@ -36,6 +37,71 @@ const nominateOpen = ref(false)
 const nominateNote = ref('')
 const nominateBusy = ref(false)
 const nominateError = ref('')
+/* 调整团队 / 移交成员 / 降级：同一个对话框，按类型切换文案 */
+type MoveKind = 'transfer' | 'handover' | 'demote'
+const settings = ref<{ leaderSeesIndirectNames: boolean; canEdit: boolean } | null>(null)
+const move = ref<MoveKind | null>(null)
+const moveLeader = ref('')
+const moveReason = ref('')
+const moveBusy = ref(false)
+const moveError = ref('')
+const leaders = ref<TreeNode[]>([])
+const MOVE_TEXT: Record<MoveKind, { title: string; submit: string; hint: string }> = {
+  transfer: { title: '调整团队', submit: '确认调整', hint: '调整后这位达人的团队收益归新团长；邀请关系不变，本人需要重新登录。' },
+  handover: { title: '移交全部成员', submit: '确认移交', hint: '名下成员逐个移交；有项目内进行中工作的成员会被跳过，并在结果里列出。' },
+  demote: { title: '降级为达人', submit: '确认降级', hint: '降级后成为平台直管的达人，本人需要重新登录。名下还有成员时不能降级。' },
+}
+async function openMove(kind: MoveKind) {
+  move.value = kind
+  moveReason.value = ''
+  moveError.value = ''
+  moveLeader.value = ''
+  if (kind !== 'demote') {
+    try {
+      leaders.value = (await http.get<TreeNode[]>('/relations/tree', { mode: 'team' })).filter(n => n.role === 'leader' && n.active && n.id !== detail.value?.user.id)
+    } catch { leaders.value = [] }
+  }
+}
+async function submitMove() {
+  if (!detail.value || !move.value) return
+  const userId = detail.value.user.id
+  moveBusy.value = true
+  moveError.value = ''
+  try {
+    const body = move.value === 'demote' ? { reason: moveReason.value.trim() } : { leaderId: moveLeader.value || null, reason: moveReason.value.trim() }
+    const result = await http.post<{ moved?: number; failed?: { name: string; message: string }[] }>(`/relations/members/${userId}/${move.value}`, body)
+    if (result.failed?.length) notify(`已移交 ${result.moved} 人；${result.failed.map(f => f.name + '：' + f.message).join('；')}`, 'error')
+    else notify(move.value === 'handover' ? `已移交 ${result.moved} 位成员` : move.value === 'demote' ? '已降级为达人' : '已调整团队')
+    move.value = null
+    children.clear()
+    expanded.clear()
+    await Promise.all([loadChildren(''), reloadDetail(userId)])
+  } catch (e) {
+    moveError.value = (e instanceof Error && e.message) || '操作没有完成，请重试'
+  } finally {
+    moveBusy.value = false
+  }
+}
+async function reloadDetail(id: string) {
+  try {
+    detail.value = await http.get<Detail>(`/relations/members/${id}`)
+    nominee.value = null
+    if (detail.value.user.role === 'creator') void loadNominee(id)
+  } catch { /* 保留原来的内容 */ }
+}
+async function loadSettings() {
+  try { settings.value = await http.get('/relations/settings') } catch { settings.value = null }
+}
+async function toggleIndirectNames(event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  try {
+    settings.value = await http.put('/relations/settings', { leaderSeesIndirectNames: checked })
+    notify(checked ? '团长现在可以看到第二层及以下成员的昵称（脱敏）' : '团长现在只能看到第二层及以下的人数')
+  } catch (e) {
+    ;(event.target as HTMLInputElement).checked = !checked
+    notify((e instanceof Error && e.message) || '设置没有保存', 'error')
+  }
+}
 const followCount = computed(() => nominee.value?.members.filter(m => m.defaultAction === 'follow').length ?? 0)
 
 async function loadChildren(parent: string) {
@@ -122,7 +188,7 @@ const rows = computed(() => {
 })
 const when = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '—'
-onMounted(() => loadChildren(''))
+onMounted(() => { void loadChildren(''); void loadSettings() })
 </script>
 
 <template>
@@ -135,6 +201,10 @@ onMounted(() => loadChildren(''))
       </div>
       <router-link to="/team/promotions" class="ghost-aurora">晋升工作台</router-link>
     </header>
+    <label v-if="settings" class="setting-line">
+      <input type="checkbox" :checked="settings.leaderSeesIndirectNames" :disabled="!settings.canEdit" @change="toggleIndirectNames" />
+      <span>团长可以看到第二层及以下成员的昵称（脱敏）<small>{{ settings.canEdit ? '默认关闭，团长只看人数' : '只有完整管理员可以修改' }}</small></span>
+    </label>
 
     <div class="relations-grid">
       <section class="bento-card tree-card" aria-label="成员树">
@@ -183,6 +253,13 @@ onMounted(() => loadChildren(''))
               <router-link v-if="nominee.openPromotionId" :to="`/team/promotions?id=${nominee.openPromotionId}`" class="chip clay">晋升审核中 →</router-link>
               <button v-else-if="nominee.nominable" type="button" class="ghost-aurora" @click="openNominate">提名晋升</button>
             </div>
+            <div v-if="detail.user.active" class="person-actions" :class="{ solo: !nominee }">
+              <button v-if="detail.user.role === 'creator'" type="button" class="ghost-aurora" @click="openMove('transfer')">调整团队</button>
+              <template v-if="detail.user.role === 'leader'">
+                <button v-if="detail.teamSize" type="button" class="ghost-aurora" @click="openMove('handover')">移交成员</button>
+                <button v-if="settings?.canEdit" type="button" class="ghost-aurora danger-text" :disabled="detail.teamSize > 0" :title="detail.teamSize ? '名下还有成员，先移交' : ''" @click="openMove('demote')">降级</button>
+              </template>
+            </div>
           </div>
           <div class="layer-grid">
             <div class="layer"><small>直接邀请</small><b><AnimatedNumber :value="detail.counts.direct" /></b><span>人</span></div>
@@ -208,6 +285,21 @@ onMounted(() => loadChildren(''))
         </template>
       </section>
     </div>
+
+    <ActionDialog :open="!!move" :title="move ? MOVE_TEXT[move].title + (detail ? ' · ' + detail.user.name : '') : ''" :busy="moveBusy" @close="move = null">
+      <form v-if="move && detail" @submit.prevent="submitMove">
+        <p v-if="moveError" role="alert" class="relations-error">{{ moveError }}</p>
+        <label v-if="move !== 'demote'">{{ move === 'handover' ? `把 ${detail.teamSize} 位成员移交给` : '调整到' }}
+          <select v-model="moveLeader">
+            <option value="">平台直管{{ move === 'transfer' ? '（移出团队）' : '' }}</option>
+            <option v-for="l in leaders" :key="l.id" :value="l.id">{{ l.name }} 的团队</option>
+          </select>
+        </label>
+        <label>原因<textarea v-model="moveReason" rows="3" minlength="2" maxlength="500" required placeholder="会写进成员的变更记录" /></label>
+        <p class="nominee-note">{{ MOVE_TEXT[move].hint }}</p>
+        <div class="dialog-actions"><button type="button" @click="move = null">取消</button><button class="primary" :disabled="moveBusy">{{ MOVE_TEXT[move].submit }}</button></div>
+      </form>
+    </ActionDialog>
 
     <ActionDialog :open="nominateOpen" :title="`提名 ${nominee?.user.name ?? ''} 晋升团长`" :busy="nominateBusy" @close="nominateOpen = false">
       <form v-if="nominee" @submit.prevent="submitNominate">
@@ -247,7 +339,14 @@ button.tree-toggle:hover { background: var(--line); }
 .tree-av.platform { background: var(--muted); }
 .tree-av.big { width: 52px; height: 52px; font-size: 20px; }
 .person { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-.person-actions { margin-left: auto; }
+.person-actions { display: flex; gap: 8px; margin-left: auto; }
+.person-actions + .person-actions { margin-left: 0; }
+.danger-text { color: var(--danger); }
+.setting-line { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); font-size: 14px; cursor: pointer; }
+.setting-line input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--clay); }
+.setting-line small { display: block; color: var(--muted); font-size: 12.5px; }
+select { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; }
+@media (max-width: 700px) { .person { flex-wrap: wrap; } .person-actions { margin-left: 0; } }
 .serif-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 24px; font-weight: 600; }
 .layer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
 .layer { padding: 14px 16px; border-radius: 16px; background: var(--paper); }

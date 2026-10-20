@@ -16,7 +16,7 @@ interface Mine { summary: { amount: string; confirmedAmount: string; pendingAmou
 interface Daily { from: string; to: string; days: { date: string; group: 'self' | 'team'; amount: string }[] }
 interface Periods { total: string; today: string; yesterday: string }
 interface MemberSummary { direct: Periods; team: null | { memberCount: number; reward: Periods } }
-interface RelationMine { inviter: { name: string } | null; channel: string | null; team: { leaderName: string | null } | null; counts: { direct: number; indirect: number }; directList: { name: string; active: boolean }[] }
+interface RelationMine { inviter: { name: string } | null; channel: string | null; team: { leaderName: string | null } | null; counts: { direct: number; indirect: number }; directList: { name: string; active: boolean }[]; indirectList?: { name: string; depth: number; active: boolean }[] }
 
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
 const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null)
@@ -230,7 +230,7 @@ function untilt(event: PointerEvent) {
           <div><small>我所在的团队</small><b>{{ relation.team?.leaderName ? relation.team.leaderName + ' 的团队' : '平台直管' }}</b><span>团队收益按业绩当天的归属计算</span></div>
           <div>
             <small>我邀请的人</small><b><AnimatedNumber :value="relation.counts.direct" /><em> 人</em></b>
-            <span>第二层及以下 {{ relation.counts.indirect }} 人，只显示人数</span>
+            <span v-if="relation.indirectList">第二层及以下 {{ relation.counts.indirect }} 人<template v-if="relation.indirectList.length">：{{ relation.indirectList.slice(0, 8).map(p => p.name).join('、') }}{{ relation.indirectList.length > 8 ? ' 等' : '' }}</template></span><span v-else>第二层及以下 {{ relation.counts.indirect }} 人，只显示人数</span>
             <div v-if="relation.directList.length" class="relation-avatars"><i v-for="(p, i) in relation.directList.slice(0, 6)" :key="i" :title="p.name">{{ p.name.slice(0, 1) }}</i><em v-if="relation.directList.length > 6">+{{ relation.directList.length - 6 }}</em></div>
           </div>
         </div>
