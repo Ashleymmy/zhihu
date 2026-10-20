@@ -37,7 +37,7 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
       path === '/audit-log')
   )
     return false
-  if (path === '/team/relations') return isStaffRole(user.role) && duty !== 'finance' && has('team.view')
+  if (path === '/team/relations' || path === '/team/promotions') return isStaffRole(user.role) && duty !== 'finance' && has('team.view')
   if (path === '/team') return user.role !== 'creator' && has('team.view')
   if (path === '/invitations') return user.role !== 'creator' && has('team.create_member')
   if (path === '/mcn') return has('project.manage')

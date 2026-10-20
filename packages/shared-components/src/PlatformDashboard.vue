@@ -10,7 +10,7 @@ const w = inject<CoreWorkspace>('opc')!
 interface Todo { kind: string; count: number; label: string; actor: string; actionLabel: string; path: string }
 interface Metric { key: string; label: string; value: string | null; unit: string; path: string }
 interface Service { moduleId: string; accountId: string; status: string; todos: Todo[]; metrics: Metric[] }
-interface Overview { period: { from: string; to: string }; projects: { id: string; name: string }[]; groups: { id: string; name: string; services: Service[] }[] }
+interface Overview { period: { from: string; to: string }; projects: { id: string; name: string }[]; groups: { id: string; name: string; services: Service[] }[]; todos?: Todo[] }
 interface MineGroup { projectId: string; metricType: string; metricLabel: string; amount: string }
 interface Mine { summary: { amount: string; confirmedAmount: string; pendingAmount: string }; groups: MineGroup[] }
 interface Daily { from: string; to: string; days: { date: string; group: 'self' | 'team'; amount: string }[] }
@@ -69,7 +69,8 @@ async function loadMoney(version: number) {
 onMounted(load)
 
 const todos = computed(() => data.value?.groups.flatMap(project => project.services.flatMap(service =>
-  service.todos.map(todo => ({ ...todo, projectName: project.name, key: project.id + ':' + service.accountId + ':' + todo.kind })))) ?? [])
+  service.todos.map(todo => ({ ...todo, projectName: project.name, key: project.id + ':' + service.accountId + ':' + todo.kind }))))
+  .concat((data.value?.todos ?? []).map(todo => ({ ...todo, projectName: '平台', key: 'platform:' + todo.kind }))) ?? [])
 const todoTotal = computed(() => todos.value.reduce((sum, todo) => sum + todo.count, 0))
 const todoByActor = computed(() => {
   const map = new Map<string, number>()

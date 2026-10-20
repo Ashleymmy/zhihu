@@ -1477,6 +1477,11 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
 .chip.down { color: var(--danger); background: var(--danger-bg); }
 .chip.soft { color: var(--ink-soft); background: var(--paper-deep); }
 .chip.clay { color: var(--clay-deep); background: var(--clay-soft); }
+/* 分段切换：两三个互斥选项（按团队 / 按邀请、跟随 / 留下） */
+.seg { display: inline-flex; gap: 2px; justify-self: start; padding: 3px; border-radius: 11px; background: var(--paper-deep); }
+.seg button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 8px; color: var(--ink-soft); background: transparent; font-size: 13px; transition: background 0.2s var(--ease-out), color 0.2s; }
+.seg button[aria-pressed='true'] { color: var(--ink); background: var(--white); box-shadow: 0 1px 3px rgba(20, 20, 19, 0.1); font-weight: 600; }
+.seg button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

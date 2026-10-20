@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { http } from '../stores/auth'
-import { AnimatedNumber } from '@zhihu-koc/shared-components'
+import { ActionDialog, AnimatedNumber, notify } from '@zhihu-koc/shared-components'
 
 /** 成员关系图：左侧逐层加载的成员树（按团队 / 按邀请），右侧是选中成员的三种关系与变更时间线 */
 interface TreeNode { id: string; name: string; role: string; active: boolean; children: number }
@@ -12,6 +12,13 @@ interface Detail {
   team: { leader: Person | null; since: string } | null
   counts: { direct: number; indirect: number }
   timeline: { at: string; kind: 'team' | 'role'; title: string; detail: string; operator: string | null }[]
+}
+interface Nominee {
+  user: { id: string; name: string }
+  nominable: boolean
+  openPromotionId: string | null
+  metrics: { activeDays: number; records: number; quantities: { label: string; unit: string; quantity: string }[] }
+  members: { id: string; defaultAction: 'follow' | 'stay' }[]
 }
 
 const ROLE_TEXT: Record<string, string> = { creator: '达人', leader: '团长', platform: '平台', admin: '管理员', operator: '运营', developer: '开发者' }
@@ -24,6 +31,12 @@ const selected = ref<string | null>(null)
 const detail = ref<Detail | null>(null)
 const detailBusy = ref(false)
 const detailError = ref('')
+const nominee = ref<Nominee | null>(null)
+const nominateOpen = ref(false)
+const nominateNote = ref('')
+const nominateBusy = ref(false)
+const nominateError = ref('')
+const followCount = computed(() => nominee.value?.members.filter(m => m.defaultAction === 'follow').length ?? 0)
 
 async function loadChildren(parent: string) {
   if (loading.has(parent)) return
@@ -55,13 +68,43 @@ async function select(node: TreeNode) {
   selected.value = node.id
   detailBusy.value = true
   detailError.value = ''
+  nominee.value = null
   try {
     detail.value = await http.get<Detail>(`/relations/members/${node.id}`)
+    if (detail.value.user.role === 'creator') void loadNominee(node.id)
   } catch {
     detail.value = null
     detailError.value = '这位成员的关系暂时没加载出来，请重试。'
   } finally {
     detailBusy.value = false
+  }
+}
+
+/* 提名晋升：只对在用的达人开放；已有审核中的提名时改为跳到晋升工作台 */
+async function loadNominee(id: string) {
+  try {
+    const data = await http.get<Nominee>(`/promotions/nominee/${id}`)
+    if (selected.value === id) nominee.value = data
+  } catch { /* 没有提名入口不影响查看关系 */ }
+}
+function openNominate() {
+  nominateNote.value = ''
+  nominateError.value = ''
+  nominateOpen.value = true
+}
+async function submitNominate() {
+  if (!nominee.value) return
+  nominateBusy.value = true
+  nominateError.value = ''
+  try {
+    await http.post('/promotions', { userId: nominee.value.user.id, note: nominateNote.value.trim() })
+    nominateOpen.value = false
+    notify(`已提名 ${nominee.value.user.name}，等待另一位同事审核`)
+    await loadNominee(nominee.value.user.id)
+  } catch (e) {
+    nominateError.value = (e instanceof Error && e.message) || '提名没有提交成功，请重试'
+  } finally {
+    nominateBusy.value = false
   }
 }
 
@@ -90,6 +133,7 @@ onMounted(() => loadChildren(''))
         <h1>成员关系图</h1>
         <p>邀请关系在注册时写入、永不改变；团队归属每次变化都会留下记录，按业绩当天的归属计算收益。</p>
       </div>
+      <router-link to="/team/promotions" class="ghost-aurora">晋升工作台</router-link>
     </header>
 
     <div class="relations-grid">
@@ -135,6 +179,10 @@ onMounted(() => loadChildren(''))
               <span class="chip soft">{{ ROLE_TEXT[detail.user.role] ?? detail.user.role }}</span>
               <span v-if="!detail.user.active" class="chip down" style="margin-left:6px">已停用</span>
             </div>
+            <div v-if="nominee" class="person-actions">
+              <router-link v-if="nominee.openPromotionId" :to="`/team/promotions?id=${nominee.openPromotionId}`" class="chip clay">晋升审核中 →</router-link>
+              <button v-else-if="nominee.nominable" type="button" class="ghost-aurora" @click="openNominate">提名晋升</button>
+            </div>
           </div>
           <div class="layer-grid">
             <div class="layer"><small>直接邀请</small><b><AnimatedNumber :value="detail.counts.direct" /></b><span>人</span></div>
@@ -160,14 +208,29 @@ onMounted(() => loadChildren(''))
         </template>
       </section>
     </div>
+
+    <ActionDialog :open="nominateOpen" :title="`提名 ${nominee?.user.name ?? ''} 晋升团长`" :busy="nominateBusy" @close="nominateOpen = false">
+      <form v-if="nominee" @submit.prevent="submitNominate">
+        <p v-if="nominateError" role="alert" class="relations-error">{{ nominateError }}</p>
+        <div class="nominee-stats">
+          <div><small>近 30 天有业绩</small><b>{{ nominee.metrics.activeDays }}</b><em>天</em></div>
+          <div><small>业绩条数</small><b>{{ nominee.metrics.records }}</b></div>
+          <div v-for="q in nominee.metrics.quantities" :key="q.label"><small>{{ q.label }}</small><b>{{ Number(q.quantity).toLocaleString('zh-CN') }}</b><em>{{ q.unit }}</em></div>
+        </div>
+        <p class="nominee-note">
+          <template v-if="nominee.members.length">{{ nominee.user.name }} 直接邀请的 {{ nominee.members.length }} 位在用达人中，{{ followCount }} 位和 {{ nominee.user.name }} 同在一个团队，默认跟随；审核时可以逐人调整。</template>
+          <template v-else>{{ nominee.user.name }} 还没有直接邀请的在用达人。</template>
+        </p>
+        <label>提名理由<textarea v-model="nominateNote" rows="3" minlength="2" maxlength="500" required placeholder="例如：近一个月稳定产出，作品合格率高" /></label>
+        <p class="nominee-note">提名后需要另一位同事在晋升工作台审核，通过后才生效。</p>
+        <div class="dialog-actions"><button type="button" @click="nominateOpen = false">取消</button><button class="primary" :disabled="nominateBusy">提交提名</button></div>
+      </form>
+    </ActionDialog>
   </section>
 </template>
 
 <style scoped>
 .relations-grid { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 18px; align-items: start; }
-.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--paper-deep); }
-.seg button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 8px; color: var(--ink-soft); background: transparent; font-size: 13px; }
-.seg button[aria-pressed='true'] { color: var(--ink); background: var(--white); box-shadow: 0 1px 3px rgba(20, 20, 19, 0.1); font-weight: 600; }
 .tree { max-height: calc(100vh - 260px); min-height: 360px; margin: 0 -6px; padding: 0; overflow-y: auto; list-style: none; }
 .tree-row { position: relative; display: flex; align-items: center; gap: 4px; padding-right: 6px; border-radius: 12px; transition: background 0.15s; }
 .tree-row:hover { background: var(--hover); }
@@ -184,6 +247,7 @@ button.tree-toggle:hover { background: var(--line); }
 .tree-av.platform { background: var(--muted); }
 .tree-av.big { width: 52px; height: 52px; font-size: 20px; }
 .person { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.person-actions { margin-left: auto; }
 .serif-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 24px; font-weight: 600; }
 .layer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
 .layer { padding: 14px 16px; border-radius: 16px; background: var(--paper); }
@@ -206,6 +270,14 @@ button.tree-toggle:hover { background: var(--line); }
 .timeline b { display: block; font-size: 14px; font-weight: 600; }
 .timeline small { color: var(--muted); font-size: 12.5px; }
 .relations-error { color: var(--danger); }
+.nominee-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.nominee-stats div { padding: 12px 14px; border-radius: 14px; background: var(--paper); }
+.nominee-stats small { display: block; color: var(--muted); font-size: 12px; }
+.nominee-stats b { font-family: var(--font-display); font-size: 24px; font-weight: 600; }
+.nominee-stats em { margin-left: 3px; color: var(--muted); font-size: 12px; font-style: normal; }
+.nominee-note { margin: 0; color: var(--muted); font-size: 13px; }
+textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; resize: vertical; }
+textarea:focus-visible { outline: none; border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
 .relations-error button { margin-left: 8px; }
 @media (max-width: 960px) {
   .relations-grid { grid-template-columns: minmax(0, 1fr); }

@@ -319,7 +319,7 @@ onMounted(() => run(load));
       </div>
       <div class="member-actions">
         <router-link to="/invitations">管理邀请链接</router-link>
-        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/relations">成员关系图</router-link>
+        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/relations">成员关系图</router-link>`n        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/promotions">晋升工作台</router-link>
         <button
           @click="
             open('invite');
@@ -656,7 +656,7 @@ onMounted(() => run(load));
               >
                 {{ ROLE_LABELS[role] }}
               </option>
-            </select></label
+            </select><small v-if="selected.role === 'creator' && isStaffRole(auth.user?.role)" class="role-hint">升为团长请在<router-link to="/team/relations">成员关系图</router-link>里提名晋升</small></label
           ><label
             >状态<select v-model="edit.isActive">
               <option :value="true">启用</option>
@@ -913,6 +913,7 @@ onMounted(() => run(load));
   </section>
 </template>
 <style scoped>
+.role-hint { color: var(--muted); font-size: 12.5px; }
 .members-page {
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
@@ -1116,6 +1117,7 @@ onMounted(() => run(load));
 }
 </style>
 <style scoped>
+.role-hint { color: var(--muted); font-size: 12.5px; }
 .member-projects {
   min-width: 0;
   border: 1px solid var(--line);

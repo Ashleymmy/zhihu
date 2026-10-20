@@ -15,7 +15,7 @@ const tabs = computed(() => mobileTabs(auth.user, navigation.value))
 
 /* 顶栏待办：复用首页的待办接口；读取失败时不显示铃铛，切换页面时最多每分钟刷新一次 */
 interface DashboardTodo { kind: string; count: number; label: string; actor: string; actionLabel: string; path: string }
-interface DashboardOverview { groups: { id: string; name: string; services: { accountId: string; todos: DashboardTodo[] }[] }[] }
+interface DashboardOverview { groups: { id: string; name: string; services: { accountId: string; todos: DashboardTodo[] }[] }[]; todos?: DashboardTodo[] }
 const todos = ref<ShellTodo[] | undefined>()
 let todosLoadedAt = 0
 async function loadTodos(force = false) {
@@ -30,7 +30,14 @@ async function loadTodos(force = false) {
       path: todo.path,
       detail: `${project.name} · ${todo.actor}`,
       actionLabel: todo.actionLabel,
-    }))))
+    })))).concat((data.todos ?? []).map(todo => ({
+      key: `platform:${todo.kind}`,
+      label: todo.label,
+      count: todo.count,
+      path: todo.path,
+      detail: `平台 · ${todo.actor}`,
+      actionLabel: todo.actionLabel,
+    })))
   } catch { /* 保留上一次的结果 */ }
 }
 watch(() => route.path, () => { void loadTodos() })
