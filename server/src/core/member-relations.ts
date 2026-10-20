@@ -145,12 +145,13 @@ export async function recordRoleChange(
     reason: 'registration' | 'promotion' | 'demotion' | 'manual' | 'migration';
     operatorId?: Id | null;
     note?: string | null;
+    promotionId?: Id | null;
   },
 ) {
   if (input.fromRole === input.toRole) return;
   await c.query(
-    'INSERT INTO member_role_history(user_id,from_role,to_role,reason,operator_id,effective_at,note) VALUES(?,?,?,?,?,NOW(3),?)',
-    [String(input.userId), input.fromRole, input.toRole, input.reason, text(input.operatorId), input.note ?? null],
+    'INSERT INTO member_role_history(user_id,from_role,to_role,reason,promotion_id,operator_id,effective_at,note) VALUES(?,?,?,?,?,?,NOW(3),?)',
+    [String(input.userId), input.fromRole, input.toRole, input.reason, text(input.promotionId), text(input.operatorId), input.note ?? null],
   );
 }
 

@@ -66,7 +66,10 @@ export async function listManagedMembers(actor: AuthUser) {
       .map((p) => ({ id: String(p.id), name: p.name, isEnabled: Boolean(p.is_enabled), memberRole: p.member_role })),
     canAssignProjects: canManageMember(actor, member) && canAssignMemberProjects(actor),
     canManage: canManageMember(actor, member),
-    editableRoles: canManageMember(actor, member) ? editableMemberRoles(actor) : [],
+    // 达人升为团长走晋升提名与审核，不在账号编辑里直接改
+    editableRoles: canManageMember(actor, member)
+      ? editableMemberRoles(actor).filter((role) => member.role !== 'creator' || role !== 'leader')
+      : [],
     permissions: permissionsFor(normalizeRole(member.role)!).filter((p) =>
       member.admin_duty === 'finance'
         ? p === 'audit.view'
@@ -99,6 +102,8 @@ export async function updateMemberAccess(auth: AuthUser, id: string, patch: Memb
     if (!canManageMember(current, member)) throw new AppError(403, 40301, '不能修改自己、同级或更高权限的账号');
     const role = patch.role ?? normalizeRole(member.role)!;
     if (!editableMemberRoles(current).includes(role)) throw new AppError(403, 40301, '不能授予此角色');
+    if (member.role === 'creator' && role === 'leader')
+      throw new AppError(409, 40900, '达人升为团长需要在成员关系图里提名晋升，审核通过后生效');
     if (patch.adminDuty !== undefined && (role !== 'admin' || current.role !== 'developer'))
       throw new AppError(403, 40301, '只有开发者可调整管理员职责');
     const active = patch.isActive ?? Boolean(member.is_active);

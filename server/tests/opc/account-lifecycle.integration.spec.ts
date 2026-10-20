@@ -141,10 +141,10 @@ it('changes a core-only member role through the real platform route', async () =
   const result = await request(app)
     .patch('/api/v1/core/team/members/' + member.id + '/access')
     .set(manager.headers)
-    .send({ role: 'leader' });
+    .send({ role: 'operator' });
   expect(result.status, JSON.stringify(result.body)).toBe(200);
   const [[row]] = await conn.query<RowDataPacket[]>('SELECT role FROM users WHERE id=?', [member.id]);
-  expect(row.role).toBe('leader');
+  expect(row.role).toBe('operator');
 });
 it('preserves a project blocker and the active account', async () => {
   await conn.query("INSERT INTO module_installations(module_id,version) VALUES('lifecycle-test','1')");
@@ -202,7 +202,7 @@ it('preserves member ownership while an installed module cannot check changes', 
   const result = await request(unavailableApp)
     .patch('/api/v1/core/team/members/' + member.id + '/access')
     .set(manager.headers)
-    .send({ role: 'leader' });
+    .send({ role: 'operator' });
   expect(result.status, JSON.stringify(result.body)).toBe(503);
   const [[row]] = await conn.query<RowDataPacket[]>('SELECT role FROM users WHERE id=?', [member.id]);
   expect(row.role).toBe('creator');

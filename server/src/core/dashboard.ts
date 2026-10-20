@@ -50,5 +50,12 @@ export async function dashboard(runtime: ModuleRuntime, user: AuthUser, period: 
     }));
     return { id: project.id, name: project.name, services };
   }));
-  return { period, projects: projects.map(({ id, name }) => ({ id, name })), groups };
+  // 平台级待办：不属于任何项目，例如晋升提名待审核
+  const todos: TodoItem[] = [];
+  if (dutyAllows(user, 'operations')) {
+    const [open] = await rows<RowDataPacket>("SELECT COUNT(*) total FROM member_promotions WHERE status IN ('candidate','proposed')");
+    if (Number(open?.total)) todos.push({ kind: 'promotion.review', count: Number(open!.total), label: '晋升提名待审核', actor: '运营',
+      actionLabel: '去审核', path: '/team/promotions' });
+  }
+  return { period, projects: projects.map(({ id, name }) => ({ id, name })), groups, todos };
 }
