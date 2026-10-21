@@ -1,0 +1,6 @@
+/* Shared layout is defined in app.wxss. */
+.withdrawal-rules{font-size:26rpx;line-height:1.6;overflow-wrap:anywhere}
+.rule-line{margin:12rpx 0}
+.withdrawal-totals{margin:20rpx 0;padding:20rpx;background:var(--forest-tint);border-radius:16rpx;line-height:1.8;font-size:26rpx;overflow-wrap:anywhere}
+/* 可提现余额：等宽大数字，与钱包/收益页金额同风格（作用域限定余额卡，不影响页面标题） */
+.card .title{font-family:var(--font-mono);font-size:52rpx;font-weight:700;color:var(--forest);margin:10rpx 0 20rpx}

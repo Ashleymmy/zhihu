@@ -9,6 +9,7 @@ const ICONS = {
   prices: { iconImg: "/images/icons/prices.png", tint: "#faf3e1", fg: "#c98f1b" },
   admin: { iconImg: "/images/icons/admin.png", tint: "#fbeeea", fg: "#d05a43" },
   reports: { iconImg: "/images/icons/reports.png", tint: "#e8eff5", fg: "#3a6ea5" },
+  withdrawals: { iconImg: "/images/icons/withdrawals.png", tint: "#e9f0ed", fg: "#214239" },
   password: { iconImg: "/images/icons/password.png", tint: "#eef0ee", fg: "#7c8883" },
   invite: { iconImg: "/images/icons/invite.png", tint: "#e9f0ed", fg: "#214239" },
 };
@@ -22,6 +23,7 @@ Page(
     },
     async fetch({ user }) {
       const menus = permissions.menus(user);
+      if (permissions.allowed(user, "withdrawals")) menus.push({key:"withdrawals",label:"提现与记录",path:"/pages/withdrawals/index"});
       menus.push({
         key: "invite",
         label: "邀请好友",

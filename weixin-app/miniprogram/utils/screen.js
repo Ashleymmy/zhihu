@@ -43,6 +43,7 @@ function define(page, config) {
       if (config.hide) config.hide.call(this);
     },
     onUnload() {
+      if (config.unload) config.unload.call(this);
       this._loadVersion = (this._loadVersion || 0) + 1;
       this._hidden = true;
       this._context = null;

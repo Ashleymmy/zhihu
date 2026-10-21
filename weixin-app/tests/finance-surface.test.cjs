@@ -23,11 +23,11 @@ function setup(role) {
   return {};
  });h.session(user);return {h,user};
 }
-test('wallet and withdrawal pages are absent from the mini package and denied for every role',()=>{
+test('wallet and withdrawals are registered with financial permissions for every role',()=>{
  for(const name of ['wallet','withdrawals']) {
-  assert(!app.pages.includes('pages/'+name+'/index'));
-  assert(!fs.existsSync(path.join(__dirname,'../miniprogram/pages',name,'index.js')));
-  for(const role of roles)assert.equal(harness().load('utils/permissions').allowed(role,name),false);
+  assert(app.pages.includes('pages/'+name+'/index'));
+  assert(fs.existsSync(path.join(__dirname,'../miniprogram/pages',name,'index.js')));
+  for(const role of roles)assert.equal(harness().load('utils/permissions').allowed(role,name),!['operator'].includes(role.role)&&role.adminDuty!=='operations');
  }
 });
 test('home, mine, income and tools still load for all roles without querying payment data',async()=>{
@@ -35,7 +35,7 @@ test('home, mine, income and tools still load for all roles without querying pay
   const {h,user}=setup(role);
   for(const name of ['home','mine','income','tools']) {
    const p=h.page(name);await p.onShow();assert.equal(p.data.error,'',role.role+':'+name);assert.equal(p.data.allowed,true);
-   assert(!(p.data.menus||[]).some(m=>['wallet','withdrawals'].includes(m.key)));
+   if(name==='mine')assert.equal(p.data.menus.some(m=>m.key==='withdrawals'),h.load('utils/permissions').canFinance(user));
    if(name==='home') {assert.equal(p.data.summary.keywordCount,12);assert.equal(p.data.summary.workCount,3);assert.equal(p.data.balance,undefined);}
    if(name==='income'&&['creator','leader'].includes(user.role)) {assert.equal(p.data.summary.receivable,'20.00');assert.equal(p.data.summary.confirmedReceivable,'15.00');assert.equal(p.data.summary.pendingReceivable,'5.00');}
    if(name==='mine'&&['creator','leader'].includes(user.role))assert(p.data.memberSummary.direct.total.includes('20.00'));
@@ -50,12 +50,10 @@ test('data query tool opens the existing earnings tab',async()=>{
  p.openTool({currentTarget:{dataset:{key:'income'}}});assert.equal(h.navigation.at(-1),'/pages/income/index');
  assert(!p.data.tools.some(t=>t.path&&/wallet|withdrawals/.test(t.path)));
 });
-test('active templates and mini agreements contain no withdrawal advertising or retired page links',()=>{
- for(const p of app.pages) {
-  const wxml=fs.readFileSync(path.join(__dirname,'../miniprogram',p+'.wxml'),'utf8');
-  assert(!/提现|pages\/(wallet|withdrawals)\//.test(wxml),p);
- }
+test('mini protocols disclose restored withdrawal data use and rules',()=>{
  const documents=require('../miniprogram/pages/agreement/documents.js');
- assert(!JSON.stringify(documents).includes('提现'));
- assert(JSON.stringify(documents).includes('本版本不提供钱包'));
+ assert(!JSON.stringify(documents).includes('本版本不提供钱包'));
+ assert(JSON.stringify(documents.privacy).includes('收款人姓名'));
+ assert(JSON.stringify(documents.withdrawal).includes('不设置最低起提金额'));
+ assert(JSON.stringify(documents.withdrawal).includes('500'));
 });

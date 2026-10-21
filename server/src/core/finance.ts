@@ -1,5 +1,5 @@
 import {financeReceipt} from './finance-receipts';
-import {calculateWithdrawal,shanghaiDay,withdrawalRules,withdrawalPolicyEnabled} from './withdrawal-policy';
+import {calculateWithdrawal,dailyWithdrawalLimit,shanghaiDay,withdrawalRules,withdrawalPolicyEnabled} from './withdrawal-policy';
 import { isStaffRole } from '../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
 import type { AuthUser } from '../types';
@@ -69,6 +69,19 @@ async function fundingRows(c:PoolConnection,s:FinanceScope){
  return q(c,`SELECT CAST(e.id AS CHAR) id,CAST(e.amount AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id
  WHERE src.module_id=? AND src.project_id=? AND src.account_id=? AND src.blocked_reason IS NULL AND e.availability='held' ORDER BY e.id`,[s.moduleId,s.projectId,s.accountId]);
 }
+// Read active gross reservations across every project/channel. Cancelled and rejected
+// applications release their original day's quota; paid and approved ones still occupy it.
+async function dailyQuota(c:PoolConnection,u:AuthUser,day=shanghaiDay(),locked=false){
+ const entries=await q(c,`SELECT CAST(w.amount AS CHAR) amount FROM opc_withdrawals w
+ LEFT JOIN opc_withdrawal_terms t ON t.withdrawal_id=w.id
+ WHERE w.user_id=? AND w.status IN ('pending','approved','paid')
+ AND (t.applied_day=? OR (t.withdrawal_id IS NULL AND w.created_at>=? AND w.created_at<DATE_ADD(?,INTERVAL 1 DAY)))`+(locked?' FOR UPDATE':''),[u.sub,day,day,day]);
+ const used=entries.reduce((n,r)=>n+cash(String(r.amount)),0n),limit=cash(dailyWithdrawalLimit(u.role));
+ return {appliedDay:day,dailyAmountLimit:cashText(limit),todayAmount:cashText(used),remainingAmount:cashText(used<limit?limit-used:0n)};
+}
+function checkQuota(amount:string,quota:Awaited<ReturnType<typeof dailyQuota>>){
+ if(cash(amount)>cash(quota.remainingAmount))fail('今日剩余可申请额度为 '+quota.remainingAmount.slice(0,-2)+' 元，请调整金额或明天再申请');
+}
 export async function financeOverview(u:AuthUser,s:FinanceScope,page=1,attention:'all'|'due'|'overdue'='all'){
  await authorize(u,s);
  return withTransaction(async c=>{
@@ -82,8 +95,8 @@ export async function financeOverview(u:AuthUser,s:FinanceScope,page=1,attention
   const [count]=await q(c,'SELECT COUNT(*) total FROM opc_withdrawals w'+termsJoin+where,args);
   const withdrawals=await q(c,`SELECT CAST(w.id AS CHAR) id,CAST(w.user_id AS CHAR) user_id,u.display_name,CAST(w.amount AS CHAR) amount,w.status,w.receiver_name,w.bank_name,w.bank_account,w.pay_method,w.pay_account,w.payment_version,w.paid_by,w.paid_at,w.remark,w.created_at,w.payment_reference,DATE_FORMAT(w.paid_on,'%Y-%m-%d') paid_on,w.proof_name,${termsColumns},(${followup}) attention FROM opc_withdrawals w JOIN users u ON u.id=w.user_id ${termsJoin}`+where+' ORDER BY w.id DESC LIMIT 25 OFFSET ?',[localNow,localNow,...args,(page-1)*25]);
   const rows=isStaffRole(u.role)?await fundingRows(c,s):[];
-  const todayUsed=!isStaffRole(u.role)&&(await q(c,'SELECT withdrawal_id FROM opc_withdrawal_terms WHERE user_id=? AND applied_day=?',[u.sub,shanghaiDay()])).length>0;
-  return {balance:isStaffRole(u.role)?null:await balance(c,u,s),withdrawals:withdrawals.map(normalizeWithdrawal),total:Number(count.total),page,funding:{amount:cashText(rows.reduce((n,r)=>n+cash(String(r.amount),true),0n)),hash:checksum(rows)},canManage:isStaffRole(u.role),withdrawalPolicy:{...withdrawalRules(),todayUsed}};
+  const quota:Partial<Awaited<ReturnType<typeof dailyQuota>>>=isStaffRole(u.role)?{}:await dailyQuota(c,u);
+  return {balance:isStaffRole(u.role)?null:await balance(c,u,s),withdrawals:withdrawals.map(normalizeWithdrawal),total:Number(count.total),page,funding:{amount:cashText(rows.reduce((n,r)=>n+cash(String(r.amount),true),0n)),hash:checksum(rows)},canManage:isStaffRole(u.role),withdrawalPolicy:{...withdrawalRules(isStaffRole(u.role)?undefined:u.role),...quota}};
  });
 }
 export async function releaseFunding(u:AuthUser,s:FinanceScope,hash:string,reference:string,requestKey?:string){
@@ -105,7 +118,7 @@ export async function withdrawalQuote(u:AuthUser,s:FinanceScope,amount:string){
  await authorize(u,s);if(!withdrawalPolicyEnabled())fail('新提现规则尚未启用，请刷新后查看当前规则',409);
  return withTransaction(async c=>{
   const quote=calculateWithdrawal(amount,u.role);
-  if((await q(c,'SELECT withdrawal_id FROM opc_withdrawal_terms WHERE user_id=? AND applied_day=?',[u.sub,quote.appliedDay])).length)fail('今天已申请过提现，请查看申请记录，明天可再次申请');
+  checkQuota(amount,await dailyQuota(c,u,quote.appliedDay));
   if(cash(amount)>cash((await balance(c,u,s)).available))fail('可提现余额不足');
   return {...quote,quoteToken:checksum([s.moduleId,s.projectId,s.accountId,u.sub,quote])};
  });
@@ -119,18 +132,20 @@ export async function applyWithdrawal(u:AuthUser,s:FinanceScope,key:string,input
  const hash=checksum([{moduleId:s.moduleId,projectId:s.projectId,accountId:s.accountId},fields]);
  return withTransaction(async c=>{
   // Serialize all projects and devices of one applicant before acquiring the scope lock.
-  await q(c,'SELECT id FROM users WHERE id=? FOR UPDATE',[u.sub]);
+  const [applicant]=await q(c,'SELECT id,role FROM users WHERE id=? FOR UPDATE',[u.sub]);
   await lockFinance(c,s);
   const [old]=await q(c,'SELECT id,request_hash FROM opc_withdrawals WHERE user_id=? AND request_key=? FOR UPDATE',[u.sub,key]);
   if(old){if(old.request_hash!==hash&&old.request_hash!==legacyHash)fail('请刷新页面后重新申请',409);return{id:String(old.id)}}
-  const quote=withdrawalPolicyEnabled()?calculateWithdrawal(input.amount,u.role):null;
+  if(!applicant||!['leader','creator'].includes(applicant.role))fail('当前账号不可申请提现',403);
+  const currentUser={...u,role:applicant.role} as AuthUser;
+  const quote=withdrawalPolicyEnabled()?calculateWithdrawal(input.amount,currentUser.role):null;
   if(quote){
    if(input.policyVersion!==quote.policyVersion||input.quoteToken!==checksum([s.moduleId,s.projectId,s.accountId,u.sub,quote]))throw new AppError(409,40910,'提现规则或日期已更新，请刷新页面，核对手续费和到账金额后重新确认');
-   if((await q(c,'SELECT withdrawal_id FROM opc_withdrawal_terms WHERE user_id=? AND applied_day=? FOR UPDATE',[u.sub,quote.appliedDay])).length)fail('今天已申请过提现，请查看申请记录，明天可再次申请');
+   checkQuota(input.amount,await dailyQuota(c,currentUser,quote.appliedDay,true));
   }else if(input.policyVersion||input.quoteToken)throw new AppError(409,40910,'提现规则已调整，请刷新后重新确认');
   const funds=await balance(c,u,s);if(cash(input.amount)>cash(funds.available))fail('可提现余额不足');
   const [r]=await c.query<import('mysql2/promise').ResultSetHeader>('INSERT INTO opc_withdrawals(module_id,project_id,account_id,user_id,amount,request_key,request_hash,receiver_name,bank_name,bank_account,pay_method,pay_account) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',[s.moduleId,s.projectId,s.accountId,u.sub,input.amount,key,hash,fields.receiverName,fields.bankName,fields.bankAccount,fields.payMethod,fields.payAccount]);
-  if(quote)await c.query('INSERT INTO opc_withdrawal_terms(withdrawal_id,user_id,applied_day,policy_version,applicant_role,fee_amount,net_amount,tier,review_deadline,settlement_deadline,settlement_month,invoice_required,terms_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',[r.insertId,u.sub,quote.appliedDay,quote.policyVersion,u.role,quote.feeAmount,quote.netAmount,quote.tier,quote.reviewDeadline,quote.settlementDeadline,quote.settlementMonth,quote.invoiceRequired,JSON.stringify(quote)]);
+  if(quote)await c.query('INSERT INTO opc_withdrawal_terms(withdrawal_id,user_id,applied_day,policy_version,applicant_role,fee_amount,net_amount,tier,review_deadline,settlement_deadline,settlement_month,invoice_required,terms_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',[r.insertId,u.sub,quote.appliedDay,quote.policyVersion,currentUser.role,quote.feeAmount,quote.netAmount,quote.tier,quote.reviewDeadline,quote.settlementDeadline,quote.settlementMonth,quote.invoiceRequired,JSON.stringify(quote)]);
   await writeAudit({userId:u.sub,action:'finance.withdraw_apply',resourceType:'withdrawal',resourceId:String(r.insertId),detail:{amount:input.amount}},c);
   return {id:String(r.insertId)};
  });

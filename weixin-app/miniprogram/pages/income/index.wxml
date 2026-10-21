@@ -20,7 +20,8 @@
       guide-path="/pages/work-data/index"
     />
   </view>
-  <block wx:if="{{allowed && scopeReady && summary && !error}}">
+  <block wx:if="{{allowed && scopeReady && summary && !restricted && !error}}">
+    <view class="row actions"><button size="mini" data-path="/pages/wallet/index" bindtap="open">查看钱包与提现</button></view>
     <block wx:if="{{user.role === 'leader'}}">
       <view wx:if="{{!loading && summaryError}}" class="card summary-error">
         <text>{{summaryError}}</text><button size="mini" disabled="{{busy}}" bindtap="load">重试</button>
