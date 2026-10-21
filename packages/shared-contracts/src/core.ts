@@ -157,6 +157,21 @@ export interface MiniMonitor {
 
 export type TeamApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 export interface MemberAccessPatch { displayName?: string; phone?: string | null; role?: GlobalRole; adminDuty?: 'all' | 'operations' | 'finance'; isActive?: boolean; parentId?: string | null; projectIds?: string[] }
+export type MemberChangeOperation =
+  | {kind:'team';parentId:string|null}
+  | {kind:'role';role:'creator'|'leader';parentId?:string|null;childrenParentId?:string|null}
+  | {kind:'projects';mode:'add'|'remove';projectIds:string[]}
+  | {kind:'active';isActive:boolean}
+export interface MemberChangeState {
+  id:string;name:string;username:string;role:string;parentId:string|null;parentName:string|null;active:boolean;duty:string;
+  projects:{id:string;name:string;role:string;leftAt:string|null}[]
+}
+export interface MemberChangeRun {
+  id:string;status:'preview'|'running'|'done';operation:MemberChangeOperation;reviewHash:string;createdAt:string;
+  items:{ordinal:number;reference:string;userId:string|null;status:'ready'|'blocked'|'unchanged'|'pending'|'succeeded'|'failed';message:string;
+    preview:null|{before:MemberChangeState[];after:MemberChangeState[];tasks:{id:string;label:string;projectId:string}[]}}[]
+}
+export interface MemberChangeHistory {id:string;status:string;createdAt:string;total:number;succeeded:number;remaining:number}
 export interface MemberInvitation { id: string; label: string; ownerId: string; ownerName: string; teamName: string | null; maxUses: number; usedCount: number; expiresAt: string; revokedAt: string | null; createdAt: string; canCopy?: number; status: 'active' | 'expired' | 'revoked' | 'used' }
 
 export interface TeamApplication {

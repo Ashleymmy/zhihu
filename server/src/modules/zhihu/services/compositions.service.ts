@@ -5,7 +5,7 @@ import { enqueue } from '../queue';
 import { AppError } from '../../../middleware/errors';
 import { AuthUser } from '../../../types';
 import { pageOffset } from '../../../utils/pagination';
-import { scopeFilter } from '../../../utils/scopeFilter';
+import { compositionVisibility } from './composition-visibility';
 import { writeAudit } from '../../../services/audit.service';
 import { isCompositionCategoryValid } from '../zhihu/composition';
 import { DEV_DEMO_USER_IDS, isDevDemoAuthUser } from '../dev-demo';
@@ -108,7 +108,7 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
 
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? 20);
-  const scope = scopeFilter(user, 'c.owner_id');
+  const scope = compositionVisibility(user);
   const where = [scope.clause];
   const bindings: unknown[] = [...scope.bindings];
   if (query.planId) {
@@ -168,7 +168,7 @@ export async function getComposition(user: AuthUser, id: string) {
     };
   }
 
-  const scope = scopeFilter(user, 'c.owner_id');
+  const scope = compositionVisibility(user);
   const [item] = await rows<ItemRow>(`SELECT c.* FROM compositions c WHERE c.id = ? AND ${scope.clause} LIMIT 1`, [
     id,
     ...scope.bindings,
@@ -280,8 +280,8 @@ export async function updateComposition(user: AuthUser, id: string, patch: Recor
   if (!fields.length) throw new AppError(422, 42200, '没有可修改的字段');
 
   await withTransaction(async (connection) => {
-    const access=scopeFilter(user,'owner_id');
-    const [locked]=await connection.query<ItemRow[]>(`SELECT * FROM compositions WHERE id=? AND ${access.clause} FOR UPDATE`,[id,...access.bindings]);
+    const access=compositionVisibility(user);
+    const [locked]=await connection.query<ItemRow[]>(`SELECT c.* FROM compositions c WHERE c.id=? AND ${access.clause} FOR UPDATE`,[id,...access.bindings]);
     const current=locked[0];if(!current)throw new AppError(404,40401,'作品不存在');
     if(current.sync_status==='syncing')throw new AppError(409,40900,'作品正在提交，请稍后修改');
     if(current.status==='ended')throw new AppError(409,40900,'作品已结束');

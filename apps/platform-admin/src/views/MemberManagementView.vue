@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import MemberClientDetails from './MemberClientDetails.vue';
-import { bindingLabel, miniFilters, matchesMiniFilter } from '../mini-status';
-import { ActionDialog } from "@zhihu-koc/shared-components";
+import MemberClientDetails from "./MemberClientDetails.vue";
+import MemberChangePanel from "./MemberChangePanel.vue";
+import { bindingLabel, miniFilters, matchesMiniFilter } from "../mini-status";
+import { ActionDialog, DetailDrawer } from "@zhihu-koc/shared-components";
 import {
   ROLE_LABELS,
   isStaffRole,
@@ -16,8 +17,9 @@ import {
 } from "@zhihu-koc/shared-contracts/core";
 import { apis, http, useAuthStore } from "../stores/auth";
 const auth = useAuthStore();
-const route=useRoute();
-const miniFilter=ref(''),memberIdFilter=ref('');
+const route = useRoute();
+const miniFilter = ref(""),
+  memberIdFilter = ref("");
 const projects = ref<Project[]>([]),
   projectSearch = ref("");
 const canAssignProjects = computed(
@@ -26,10 +28,18 @@ const canAssignProjects = computed(
     auth.user?.adminDuty !== "finance",
 );
 function projectLocked(project: { id: string; isEnabled: boolean }) {
-  const existing = selected.value?.projects?.find(p => p.id === project.id);
+  const existing = selected.value?.projects?.find((p) => p.id === project.id);
   if (existing?.memberRole === "owner") return true;
-  if (existing?.memberRole === "admin" && !auth.user?.permissions?.includes("project.manage")) return true;
-  return auth.user?.role === "leader" && (!project.isEnabled || !projects.value.some(p => p.id === project.id && p.isEnabled));
+  if (
+    existing?.memberRole === "admin" &&
+    !auth.user?.permissions?.includes("project.manage")
+  )
+    return true;
+  return (
+    auth.user?.role === "leader" &&
+    (!project.isEnabled ||
+      !projects.value.some((p) => p.id === project.id && p.isEnabled))
+  );
 }
 const projectOptions = computed(() => {
   const all = new Map(
@@ -58,11 +68,81 @@ const search = ref(""),
   page = ref(1),
   tab = ref("members");
 const pageSize = 20;
-watch(()=>[route.query.mini,route.query.member],()=>{
-  miniFilter.value=miniFilters.some(f=>f.value===route.query.mini)?String(route.query.mini):'';
-  memberIdFilter.value=typeof route.query.member==='string'&&/^\d+$/.test(route.query.member)?route.query.member:'';
-  page.value=1;
-},{immediate:true});
+const teamFilter = ref(""),
+  projectFilter = ref(""),
+  checked = ref<string[]>([]),
+  batchOpen = ref(false),
+  batchReferences = ref<string[]>([]);
+const canBatch = computed(
+  () => isStaffRole(auth.user?.role) && auth.user?.adminDuty !== "finance",
+);
+let previousFilters: {
+  search: string;
+  role: string;
+  status: string;
+  mini: string;
+  member: string;
+  project: string;
+  page: number;
+} | null = null;
+function viewTeam(member: TeamMember) {
+  if (!teamFilter.value)
+    previousFilters = {
+      search: search.value,
+      role: roleFilter.value,
+      status: statusFilter.value,
+      mini: miniFilter.value,
+      member: memberIdFilter.value,
+      project: projectFilter.value,
+      page: page.value,
+    };
+  search.value = "";
+  roleFilter.value = "";
+  statusFilter.value = "";
+  miniFilter.value = "";
+  memberIdFilter.value = "";
+  projectFilter.value = "";
+  teamFilter.value = member.id;
+  page.value = 1;
+  tab.value = "members";
+  dialog.value = null;
+}
+function backToMembers() {
+  teamFilter.value = "";
+  if (previousFilters) {
+    search.value = previousFilters.search;
+    roleFilter.value = previousFilters.role;
+    statusFilter.value = previousFilters.status;
+    miniFilter.value = previousFilters.mini;
+    memberIdFilter.value = previousFilters.member;
+    projectFilter.value = previousFilters.project;
+    page.value = previousFilters.page;
+    previousFilters = null;
+  }
+}
+function openBatch(paste = false) {
+  batchReferences.value = paste ? [] : checked.value.map((id) => "id:" + id);
+  batchOpen.value = true;
+}
+function selectable(m: TeamMember) {
+  return (
+    canBatch.value && m.canManage && ["creator", "leader"].includes(m.role)
+  );
+}
+watch(
+  () => [route.query.mini, route.query.member],
+  () => {
+    miniFilter.value = miniFilters.some((f) => f.value === route.query.mini)
+      ? String(route.query.mini)
+      : "";
+    memberIdFilter.value =
+      typeof route.query.member === "string" && /^\d+$/.test(route.query.member)
+        ? route.query.member
+        : "";
+    page.value = 1;
+  },
+  { immediate: true },
+);
 const dialog = ref<
     | "create"
     | "edit"
@@ -96,8 +176,14 @@ const invite = reactive({ label: "成员邀请", validDays: 7, maxUses: 20 }),
 const filtered = computed(() =>
   members.value.filter(
     (m) =>
-      (!memberIdFilter.value || m.id===memberIdFilter.value) &&
-      matchesMiniFilter(m,miniFilter.value) &&
+      (!memberIdFilter.value || m.id === memberIdFilter.value) &&
+      (!teamFilter.value ||
+        (teamFilter.value === "independent"
+          ? m.role === "creator" && !m.parentId
+          : m.parentId === teamFilter.value)) &&
+      (!projectFilter.value ||
+        m.projects?.some((p) => p.id === projectFilter.value)) &&
+      matchesMiniFilter(m, miniFilter.value) &&
       (!roleFilter.value || m.role === roleFilter.value) &&
       (!statusFilter.value ||
         String(Number(m.isActive)) === statusFilter.value) &&
@@ -123,6 +209,38 @@ const pending = computed(() =>
 );
 const leaders = computed(() =>
   members.value.filter((m) => m.role === "leader" && m.isActive),
+);
+const teamLeaders = computed(() =>
+  members.value.filter((m) => m.role === "leader" || Number(m.memberCount) > 0),
+);
+const pageSelectable = computed(() => visible.value.filter(selectable));
+const pageChecked = computed(
+  () =>
+    pageSelectable.value.length > 0 &&
+    pageSelectable.value.every((m) => checked.value.includes(m.id)),
+);
+function togglePage() {
+  const ids = pageSelectable.value.map((m) => m.id);
+  checked.value = pageChecked.value
+    ? checked.value.filter((id) => !ids.includes(id))
+    : [...new Set([...checked.value, ...ids])];
+}
+watch(
+  [
+    search,
+    roleFilter,
+    statusFilter,
+    miniFilter,
+    memberIdFilter,
+    teamFilter,
+    projectFilter,
+  ],
+  () => {
+    if (checked.value.length) {
+      checked.value = [];
+      notice.value = "筛选条件已变化，已清空选中成员。";
+    }
+  },
 );
 const managementRoles = computed<GlobalRole[]>(() =>
   auth.user?.role === "developer"
@@ -317,7 +435,7 @@ onMounted(() => run(load));
         <h1>团队与成员</h1>
         <p>查看成员资料、角色权限、团队归属与邀请记录。</p>
       </div>
-      <div class="member-actions">
+      <div v-if="!batchOpen" class="member-actions">
         <router-link to="/invitations">管理邀请链接</router-link>
         <button
           @click="
@@ -336,7 +454,21 @@ onMounted(() => run(load));
     <div v-if="secret" class="secret-note" role="status">
       {{ secret }} <button @click="secret = ''">收起密码</button>
     </div>
-    <nav class="member-tabs" aria-label="成员管理分类">
+    <MemberChangePanel
+      v-if="batchOpen"
+      :references="batchReferences"
+      :members="members"
+      :projects="projects"
+      @changed="
+        checked = [];
+        run(load);
+      "
+      @close="
+        batchOpen = false;
+        run(load);
+      "
+    />
+    <nav v-if="!batchOpen" class="member-tabs" aria-label="成员管理分类">
       <button :aria-pressed="tab === 'members'" @click="tab = 'members'">
         全部成员 {{ members.length }}</button
       ><button
@@ -352,7 +484,22 @@ onMounted(() => run(load));
         我的邀请 {{ invitations.length }}
       </button>
     </nav>
-    <article v-if="tab === 'members'" class="panel">
+    <article v-if="!batchOpen && tab === 'members'" class="panel">
+      <div v-if="teamFilter" class="team-context">
+        <div>
+          <strong>{{
+            teamFilter === "independent"
+              ? "独立达人"
+              : `${members.find((m) => m.id === teamFilter)?.displayName || "所选团长"}的团队`
+          }}</strong>
+          <p>
+            当前显示 {{ filtered.length }} 人，启用
+            {{ filtered.filter((m) => m.isActive).length }} 人，停用
+            {{ filtered.filter((m) => !m.isActive).length }} 人
+          </p>
+        </div>
+        <button @click="backToMembers">返回全部成员</button>
+      </div>
       <form class="member-filters" @submit.prevent="page = 1">
         <label
           >搜索成员<input
@@ -361,7 +508,32 @@ onMounted(() => run(load));
             placeholder="账号、昵称、ID、手机或邀请人"
             @input="page = 1" /></label
         ><label
-          >角色<select v-model="roleFilter" @change="page = 1">
+          >所属团队<select v-model="teamFilter" @change="page = 1">
+            <option value="">全部团队</option>
+            <option value="independent">独立达人</option>
+            <option
+              v-for="leader in teamLeaders"
+              :key="leader.id"
+              :value="leader.id"
+            >
+              {{ leader.displayName }}（{{ leader.username }}）{{
+                leader.isActive ? "" : " · 停用"
+              }}
+            </option>
+          </select></label
+        ><label
+          >项目<select v-model="projectFilter" @change="page = 1">
+            <option value="">全部项目</option>
+            <option v-for="p in projects" :key="p.id" :value="p.id">
+              {{ p.name }}
+            </option>
+          </select></label
+        ><label
+          >角色<select
+            v-model="roleFilter"
+            aria-label="角色"
+            @change="page = 1"
+          >
             <option value="">全部角色</option>
             <option
               v-for="(label, role) in ROLE_LABELS"
@@ -377,16 +549,65 @@ onMounted(() => run(load));
             <option value="1">启用</option>
             <option value="0">停用</option>
           </select></label
-        ><label>小程序状态<select v-model="miniFilter" @change="page=1"><option value="">全部绑定与登录状态</option><option v-for="f in miniFilters" :key="f.value" :value="f.value">{{ f.label }}</option></select></label>
+        ><label
+          >小程序状态<select v-model="miniFilter" @change="page = 1">
+            <option value="">全部绑定与登录状态</option>
+            <option v-for="f in miniFilters" :key="f.value" :value="f.value">
+              {{ f.label }}
+            </option>
+          </select></label
+        >
         <button type="button" :disabled="busy" @click="run(load)">刷新</button>
       </form>
-      <p v-if="memberIdFilter">正在定位成员 ID {{ memberIdFilter }} <button @click="memberIdFilter='';page=1">查看全部成员</button></p>
+      <div v-if="canBatch" class="member-selection">
+        <span>已选 {{ checked.length }} 人</span
+        ><button
+          :disabled="
+            !filtered.some(selectable) ||
+            filtered.filter(selectable).length > 1000
+          "
+          @click="checked = filtered.filter(selectable).map((m) => m.id)"
+        >
+          选择全部筛选结果（{{
+            filtered.filter(selectable).length
+          }}
+          人）</button
+        ><button v-if="checked.length" @click="checked = []">清空选择</button
+        ><button
+          :disabled="!checked.length || checked.length > 1000"
+          @click="openBatch()"
+        >
+          批量变更</button
+        ><button @click="openBatch(true)">粘贴账号 / 操作记录</button>
+      </div>
+      <p v-if="memberIdFilter">
+        正在定位成员 ID {{ memberIdFilter }}
+        <button
+          @click="
+            memberIdFilter = '';
+            page = 1;
+          "
+        >
+          查看全部成员
+        </button>
+      </p>
       <p v-if="loading" class="member-empty" role="status">正在加载成员…</p>
       <div v-else class="member-table">
         <table>
           <thead>
             <tr>
-              <th>成员</th>
+              <th>
+                <label class="member-check"
+                  ><input
+                    v-if="canBatch"
+                    type="checkbox"
+                    :checked="pageChecked"
+                    :disabled="!pageSelectable.length"
+                    aria-label="选择当前页成员"
+                    @change="togglePage"
+                  />成员</label
+                >
+              </th>
               <th>角色 / 状态</th>
               <th>所属团队</th>
               <th>注册 / 邀请来源</th>
@@ -398,9 +619,25 @@ onMounted(() => run(load));
           <tbody>
             <tr v-for="m in visible" :key="m.id">
               <td>
+                <label v-if="selectable(m)" class="member-check"
+                  ><input
+                    v-model="checked"
+                    type="checkbox"
+                    :value="m.id"
+                    :aria-label="`选择 ${m.displayName}（${m.username}）`"
+                /></label>
                 <strong>{{ m.displayName }}</strong
                 ><small>{{ m.username }} · ID {{ m.id }}</small
-                ><small>{{ m.phone || "未填写手机号" }}{{ m.phone ? (m.phoneVerifiedAt ? ' · 手机号已验证' : ' · 手机号未验证') : '' }}</small>
+                ><small
+                  >{{ m.phone || "未填写手机号"
+                  }}{{
+                    m.phone
+                      ? m.phoneVerifiedAt
+                        ? " · 手机号已验证"
+                        : " · 手机号未验证"
+                      : ""
+                  }}</small
+                >
               </td>
               <td>
                 {{ ROLE_LABELS[m.role]
@@ -420,7 +657,13 @@ onMounted(() => run(load));
               <td>
                 {{ m.parentName || (m.role === "leader" ? "团长本人" : "—")
                 }}<small
-                  >成员 {{ m.memberCount ?? 0 }} · 项目
+                  ><button
+                    v-if="m.role === 'leader' || Number(m.memberCount) > 0"
+                    class="team-link"
+                    @click="viewTeam(m)"
+                  >
+                    查看团队成员（{{ m.memberCount ?? 0 }}）</button
+                  ><span v-else>成员 {{ m.memberCount ?? 0 }}</span> · 项目
                   {{ m.projectCount ?? 0 }}</small
                 >
               </td>
@@ -442,8 +685,12 @@ onMounted(() => run(load));
               <td>
                 {{ bindingLabel(m.miniProgram) }}
                 <small>登录：{{ format(m.miniProgram?.lastLoginAt) }}</small>
-                <small v-if="matchesMiniFilter(m,'no-project')">待分配项目</small>
-                <small v-if="m.miniProgram?.recentBindingConflict">近期有绑定冲突</small>
+                <small v-if="matchesMiniFilter(m, 'no-project')"
+                  >待分配项目</small
+                >
+                <small v-if="m.miniProgram?.recentBindingConflict"
+                  >近期有绑定冲突</small
+                >
               </td>
               <td class="actions-column">
                 <div class="member-actions">
@@ -487,7 +734,10 @@ onMounted(() => run(load));
         </button>
       </footer>
     </article>
-    <article v-else-if="tab === 'applications'" class="panel member-table">
+    <article
+      v-else-if="!batchOpen && tab === 'applications'"
+      class="panel member-table"
+    >
       <table>
         <thead>
           <tr>
@@ -547,7 +797,7 @@ onMounted(() => run(load));
       </table>
       <p v-if="!applications.length" class="member-empty">暂无入团申请。</p>
     </article>
-    <article v-else class="panel member-table">
+    <article v-else-if="!batchOpen" class="panel member-table">
       <table>
         <thead>
           <tr>
@@ -595,7 +845,8 @@ onMounted(() => run(load));
         还没有邀请链接，点击“邀请成员”创建。
       </p>
     </article>
-    <ActionDialog
+    <component
+      :is="dialog === 'detail' ? DetailDrawer : ActionDialog"
       :open="!!dialog"
       :title="title"
       :busy="busy"
@@ -687,7 +938,9 @@ onMounted(() => run(load));
             管理角色按角色和职责访问全部项目，无需单独加入。
           </p>
           <template v-else-if="selected.canAssignProjects && canAssignProjects">
-            <p v-if="auth.user?.role === 'leader'">可分配自己已加入且启用中的项目，仅对直属达人生效。超出范围的已有项目及管理权限会保留。</p>
+            <p v-if="auth.user?.role === 'leader'">
+              可分配自己已加入且启用中的项目，仅对直属达人生效。超出范围的已有项目及管理权限会保留。
+            </p>
             <label
               >搜索项目<input
                 v-model="projectSearch"
@@ -704,23 +957,22 @@ onMounted(() => run(load));
                   type="checkbox"
                   :value="project.id"
                   :disabled="
-                    busy || projectLocked(project) ||
+                    busy ||
+                    projectLocked(project) ||
                     (!project.isEnabled &&
                       !edit.projectIds.includes(project.id))
                   "
                 />
                 <span
-                  >{{ project.name
-                  }}{{ project.isEnabled ? "" : "（已停用）" }}{{ projectLocked(project) ? "（只读）" : "" }}</span
+                  >{{ project.name }}{{ project.isEnabled ? "" : "（已停用）"
+                  }}{{ projectLocked(project) ? "（只读）" : "" }}</span
                 ></label
               >
             </div>
             <p v-if="!projectOptions.length">没有匹配的项目。</p>
             <small
               >已选择
-              {{
-                edit.projectIds.length
-              }}
+              {{ edit.projectIds.length }}
               个项目，保存后生效。新增成员权限为普通项目成员；有使用中关键词的项目需先处理后才能移出。</small
             >
           </template>
@@ -732,7 +984,7 @@ onMounted(() => run(load));
           </p>
         </fieldset>
         <p>
-          权限按角色和职责生效。调整角色或团队前，需先处理该成员使用中的关键词及下属成员。
+          权限按角色和职责生效。有旧任务或下属的身份调整，可使用批量变更预览影响并保留原业务归属。
         </p>
         <div class="dialog-actions">
           <button type="button" :disabled="busy" @click="dialog = null">
@@ -759,7 +1011,12 @@ onMounted(() => run(load));
             }}
           </dd>
           <dt>团队</dt>
-          <dd>{{ selected.parentName || "未归属团长" }}</dd>
+          <dd>
+            {{
+              selected.parentName ||
+              (selected.role === "leader" ? "团长本人" : "独立达人")
+            }}
+          </dd>
           <dt>注册来源</dt>
           <dd>{{ source(selected) }}</dd>
           <dt>创建人 / 邀请人</dt>
@@ -788,8 +1045,16 @@ onMounted(() => run(load));
           </dd>
           <dt>成员统计</dt>
           <dd>
-            项目 {{ selected.projectCount ?? 0 }} · 下属成员
-            {{ selected.memberCount ?? 0 }} · 已邀请
+            项目 {{ selected.projectCount ?? 0 }} ·
+            <button
+              v-if="
+                selected.role === 'leader' || Number(selected.memberCount) > 0
+              "
+              class="team-link"
+              @click="viewTeam(selected)"
+            >
+              下属成员 {{ selected.memberCount ?? 0 }} · 查看名单</button
+            ><span v-else>下属成员 0</span> · 已邀请
             {{ selected.invitedCount ?? 0 }} 人
           </dd>
         </dl>
@@ -874,7 +1139,13 @@ onMounted(() => run(load));
               @focus="($event.target as HTMLInputElement).select()"
           /></label>
           <p>可在“邀请链接”页面再次复制、编辑或删除此链接。</p>
-          <button type="button" @click="copyLink">复制邀请链接</button> <a :href="invitationLink" target="_blank" rel="noopener noreferrer">打开邀请页</a><p>把完整链接发给达人。新用户注册后入团；已有达人账号可登录后直接确认加入。</p>
+          <button type="button" @click="copyLink">复制邀请链接</button>
+          <a :href="invitationLink" target="_blank" rel="noopener noreferrer"
+            >打开邀请页</a
+          >
+          <p>
+            把完整链接发给达人。新用户注册后入团；已有达人账号可登录后直接确认加入。
+          </p>
         </div>
         <div class="dialog-actions">
           <button type="button" :disabled="busy" @click="dialog = null">
@@ -908,7 +1179,7 @@ onMounted(() => run(load));
           ><button :disabled="busy" @click="run(remove)">确认删除</button>
         </div>
       </div>
-    </ActionDialog>
+    </component>
   </section>
 </template>
 <style scoped>
@@ -925,6 +1196,43 @@ onMounted(() => run(load));
 }
 .members-page p {
   line-height: 1.6;
+}
+.team-context,
+.member-selection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.team-context {
+  justify-content: space-between;
+  background: #edf4f3;
+}
+.team-context p {
+  margin: 6px 0 0;
+}
+.member-check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.member-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: #195e62;
+}
+.members-page button.team-link,
+.member-detail button.team-link {
+  padding: 0;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  color: #195e62;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .member-actions {
   display: flex;
@@ -1097,7 +1405,48 @@ onMounted(() => run(load));
     min-width: 0;
   }
   .member-table table {
-    min-width: 950px;
+    min-width: 0;
+  }
+  .member-table {
+    overflow: visible;
+  }
+  .member-table thead {
+    display: none;
+  }
+  .member-table table,
+  .member-table tbody,
+  .member-table tr,
+  .member-table td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .member-table tr {
+    padding: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .member-table td {
+    padding: 6px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .member-table .actions-column {
+    min-width: 0;
+    text-align: left;
+  }
+  .member-table .member-actions {
+    justify-content: flex-start;
+  }
+  .member-selection,
+  .team-context {
+    padding: 14px;
+  }
+  .member-filters select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .member-filters label {
+    max-width: 100%;
   }
   .edit-pair {
     grid-template-columns: 1fr;

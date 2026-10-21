@@ -1,7 +1,7 @@
 import { accountRuntime } from '../support/accountRuntime';
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
-import mysql, { type Connection, type RowDataPacket } from 'mysql2/promise';
+import mysql, { type Connection, type RowDataPacket, type ResultSetHeader } from 'mysql2/promise';
 import express from 'express';
 import request from 'supertest';
 import * as XLSX from 'xlsx';
@@ -24,6 +24,95 @@ const user = (sub: string, role: AuthUser['role'], parentId: string | null = nul
   username: 'user' + sub,
   displayName: 'user' + sub,
   jti: 'isolated-test',
+});
+
+describe('reviewed member changes preserve old business ownership',()=>{
+  async function fresh(role:'leader'|'creator'='creator',parentId:string|null=null){
+    const name='changed_'+ ++serial;
+    const [r]=await c.query<ResultSetHeader>('INSERT INTO users(username,password_hash,role,display_name,parent_id,is_active) VALUES(?,?,?,?,?,1)',[name,'unused',role,name,parentId]);
+    const id=String(r.insertId);await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,?)',[id]);return user(id,role,parentId);
+  }
+  async function move(ids:string[],operation:import('../../src/services/member-changes.service').MemberChangeOperation){
+    const service=await import('../../src/services/member-changes.service');
+    const preview=await service.previewMemberChanges(admin,ids,operation,accountRuntime());
+    expect(preview.items.every(i=>i.status==='ready'),JSON.stringify(preview)).toBe(true);
+    const done=await service.executeMemberChanges(admin,preview.id,preview.reviewHash,accountRuntime());
+    expect(done.items.every(i=>i.status==='succeeded'),JSON.stringify(done)).toBe(true);return done;
+  }
+  async function binding(id:string){return (await c.query<RowDataPacket[]>('SELECT * FROM zh_keyword_bindings WHERE id=?',[id]))[0][0];}
+  async function amounts(b:RowDataPacket){
+    const {withTransaction}=await import('../../src/db');const {quote}=await import('../../src/modules/zhihu/attribution/pricing');const {quoteActivation}=await import('../../src/modules/zhihu/attribution/activation-pricing');
+    return withTransaction(async conn=>({newUser:await quote(conn,scope,'1',b,'2026-10-01','100'),activation:await quoteActivation(conn,scope,b,'2026-10-01','100',null)}));
+  }
+  it('upgrades a creator and preserves their old direct task, both prices and composition picker',async()=>{
+    const m=await fresh(),word=await keyword(m),old=await binding(word.bindingId),prices=await amounts(old);
+    const {previewMemberChanges,executeMemberChanges}=await import('../../src/services/member-changes.service');
+    const preview=await previewMemberChanges(admin,[m.sub],{kind:'role',role:'leader'},accountRuntime());
+    expect(preview.items[0].status).toBe('ready');expect((await binding(word.bindingId)).access_preserved_at).toBeNull();
+    await executeMemberChanges(admin,preview.id,preview.reviewHash,accountRuntime());
+    const upgraded={...m,role:'leader' as const},saved=await binding(word.bindingId);
+    expect(saved.access_preserved_at).toBeTruthy();expect(saved.path_type).toBe(old.path_type);expect(saved.executor_id).toBe(old.executor_id);expect(saved.leader_id).toBe(old.leader_id);expect(saved.relation_snapshot).toEqual(old.relation_snapshot);expect(await amounts(saved)).toEqual(prices);
+    expect((await plans.listPlans(upgraded,{purpose:'composition'})).list.some(p=>String(p.id)===word.planId)).toBe(true);
+    await resources.changeBinding(upgraded,scope,word.bindingId,crypto.randomUUID(),{action:'activate'});
+    expect((await works.createComposition(upgraded,input(word.planId))).id).toBeTruthy();
+    const next=await keyword();const reserved=await resources.claim(upgraded,scope,next.id,crypto.randomUUID());await resources.changeBinding(upgraded,scope,reserved.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
+    expect((await binding(reserved.id)).path_type).toBe('leader_self');
+    await expect(works.createComposition(other,input(word.planId))).rejects.toMatchObject({httpStatus:404});
+  });
+  it('moves an executor without giving the new leader access to old team works or old revenue',async()=>{
+    const oldLeader=await fresh('leader'),newLeader=await fresh('leader'),m=await fresh('creator',oldLeader.sub),word=await keyword();
+    const assigned=await resources.claim(oldLeader,scope,word.id,crypto.randomUUID());await resources.changeBinding(oldLeader,scope,assigned.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
+    const work=await works.createComposition(m,input(word.planId)),before=await binding(assigned.id),prices=await amounts(before);
+    await move([m.sub],{kind:'team',parentId:newLeader.sub});const moved={...m,parentId:newLeader.sub};
+    expect(await amounts(await binding(assigned.id))).toEqual(prices);
+    expect((await works.listCompositions(oldLeader,{planId:word.planId})).total).toBe(1);
+    expect((await works.listCompositions(newLeader,{planId:word.planId})).total).toBe(0);
+    await expect(works.getComposition(newLeader,work.id)).rejects.toMatchObject({httpStatus:404});
+    expect((await works.createComposition(moved,input(word.planId))).id).toBeTruthy();
+    expect((await works.createComposition(oldLeader,input(word.planId))).id).toBeTruthy();
+    await expect(works.createComposition(newLeader,input(word.planId))).rejects.toMatchObject({httpStatus:404});
+    const next=await keyword(),newAssignment=await resources.claim(newLeader,scope,next.id,crypto.randomUUID());await resources.changeBinding(newLeader,scope,newAssignment.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
+    expect(String((await binding(newAssignment.id)).leader_id)).toBe(newLeader.sub);
+    await works.createComposition(moved,input(next.planId));expect((await works.listCompositions(oldLeader,{planId:next.planId})).total).toBe(0);
+    const {listWorks}=await import('../../src/modules/zhihu/attribution/works');
+    expect((await listWorks(newLeader,scope,1,20,{planId:word.planId})).total).toBe(0);
+    expect((await listWorks(oldLeader,scope,1,20,{planId:word.planId})).total).toBe(3);
+  });
+  it('demotes a leader and relocates members while preserving self tasks and child execution',async()=>{
+    const l=await fresh('leader'),m=await fresh('creator',l.sub),word=await keyword(),childWord=await keyword();
+    const own=await resources.claim(l,scope,word.id,crypto.randomUUID());await resources.changeBinding(l,scope,own.id,crypto.randomUUID(),{action:'assign',executorId:l.sub});
+    const child=await resources.claim(l,scope,childWord.id,crypto.randomUUID());await resources.changeBinding(l,scope,child.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
+    await move([l.sub],{kind:'role',role:'creator',parentId:null,childrenParentId:null});
+    expect((await works.createComposition({...l,role:'creator'},input(word.planId))).id).toBeTruthy();
+    expect((await works.createComposition({...m,parentId:null},input(childWord.planId))).id).toBeTruthy();
+    expect((await binding(own.id)).path_type).toBe('leader_self');expect(String((await binding(child.id)).leader_id)).toBe(l.sub);
+  });
+  it('blocks unassigned reservations and removed project access; rechecks new tasks after preview',async()=>{
+    const service=await import('../../src/services/member-changes.service');
+    const l=await fresh('leader'),free=await keyword();await resources.claim(l,scope,free.id,crypto.randomUUID());
+    const reserved=await service.previewMemberChanges(admin,[l.sub],{kind:'role',role:'creator'},accountRuntime());expect(reserved.items[0].status).toBe('blocked');expect(reserved.items[0].message).toContain('待分配任务');
+    const m=await fresh(),word=await keyword(m);const removal=await service.previewMemberChanges(admin,[m.sub],{kind:'projects',mode:'remove',projectIds:['1']},accountRuntime());expect(removal.items[0].status).toBe('blocked');
+    const preview=await service.previewMemberChanges(admin,[m.sub],{kind:'role',role:'leader'},accountRuntime());await keyword(m);
+    const result=await service.executeMemberChanges(admin,preview.id,preview.reviewHash,accountRuntime());expect(result.items[0].status).toBe('failed');expect((await binding(word.bindingId)).access_preserved_at).toBeNull();
+  });
+  it('rolls back descendant moves if a new reservation blocks the leader after preview',async()=>{
+    const service=await import('../../src/services/member-changes.service');
+    const l=await fresh('leader'),m=await fresh('creator',l.sub),word=await keyword();
+    const assigned=await resources.claim(l,scope,word.id,crypto.randomUUID());await resources.changeBinding(l,scope,assigned.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
+    const preview=await service.previewMemberChanges(admin,[l.sub],{kind:'role',role:'creator',childrenParentId:null},accountRuntime());expect(preview.items[0].status).toBe('ready');
+    const free=await keyword();await resources.claim(l,scope,free.id,crypto.randomUUID());
+    const done=await service.executeMemberChanges(admin,preview.id,preview.reviewHash,accountRuntime());expect(done.items[0].status).toBe('failed');
+    expect(String((await c.query<RowDataPacket[]>('SELECT parent_id FROM users WHERE id=?',[m.sub]))[0][0].parent_id)).toBe(l.sub);
+    expect((await binding(assigned.id)).access_preserved_at).toBeNull();
+  });
+  it('does not let an old leader reassign a preserved unused task after its executor moves',async()=>{
+    const l=await fresh('leader'),nextLeader=await fresh('leader'),m=await fresh('creator',l.sub),replacement=await fresh('creator',l.sub),word=await keyword();
+    const assigned=await resources.claim(l,scope,word.id,crypto.randomUUID());await resources.changeBinding(l,scope,assigned.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
+    await move([m.sub],{kind:'team',parentId:nextLeader.sub});
+    await expect(resources.changeBinding(l,scope,assigned.id,crypto.randomUUID(),{action:'assign',executorId:replacement.sub})).rejects.toMatchObject({httpStatus:409});
+    expect(String((await binding(assigned.id)).executor_id)).toBe(m.sub);
+    await resources.changeBinding({...m,parentId:nextLeader.sub},scope,assigned.id,crypto.randomUUID(),{action:'activate'});
+  });
 });
 const admin = user('1', 'admin'),
   leader = user('2', 'leader'),

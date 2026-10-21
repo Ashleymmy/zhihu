@@ -2,6 +2,7 @@ import type { AuthUser } from '../../../types';
 import { canViewWorkStatistics, isStaffRole } from '../../../auth/roles';
 import { withTransaction } from '../../../db';
 import { scopeFilter } from '../../../utils/scopeFilter';
+import { compositionVisibility } from '../services/composition-visibility';
 import { planAccountSql } from '../services/plan-account';
 import type { Scope } from './domain';
 import { compositionLinkProblem, submissionFailure } from '../services/submission-feedback';
@@ -22,7 +23,7 @@ export interface WorkFilters {
 }
 // All three views use this same set: one row per composition, plus evidence-only records.
 function workQuery(user: AuthUser, scope: Scope) {
-  const visibility = scopeFilter(user, 'c.owner_id');
+  const visibility = compositionVisibility(user);
   const query = `
       SELECT CAST(e.id AS CHAR) id,'evidence' source,CAST(e.binding_id AS CHAR) binding_id,
         CAST(p.id AS CHAR) plan_id,p.keyword,e.work_url,e.description,c.title work_title,e.status,e.reason,

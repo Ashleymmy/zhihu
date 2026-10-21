@@ -52,7 +52,7 @@ export function compositionPlanScope(user: AuthUser, currentRead = false, requir
             AND cb.stop_new_use_at IS NULL AND cb.release_status<>'requested'
             AND executor.id IS NOT NULL AND ${actor}
             AND EXISTS(SELECT 1 FROM project_members member WHERE member.project_id=ck.project_id AND member.user_id=cb.executor_id AND member.left_at IS NULL${lock})
-            AND ((cb.path_type='direct_creator' AND executor.role='creator' AND ${independentCreatorSql('executor', lock)})
+            AND (cb.access_preserved_at IS NOT NULL OR (cb.path_type='direct_creator' AND executor.role='creator' AND ${independentCreatorSql('executor', lock)})
               OR (cb.path_type='team_creator' AND executor.role='creator' AND executor.parent_id=cb.leader_id)
               OR (cb.path_type='leader_self' AND executor.role='leader' AND executor.id=cb.leader_id))) ${platformRegistration})${lock}
       )

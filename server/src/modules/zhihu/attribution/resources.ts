@@ -10,6 +10,7 @@ import { ensurePoolMapping, keywordVisibility } from './plan-pool';
 import { officialPlanReadCapability } from '../zhihu/planReadCapability';
 import { planAccountSql } from '../services/plan-account';
 import { scopeFilter } from '../../../utils/scopeFilter';
+import { compositionVisibility } from '../services/composition-visibility';
 import { synchronizeKeywords } from './keyword-readiness';
 import { assertKeywordReady, assertKeywordUnused, assertNoLiveBinding, readyPlanSql, unusedKeywordSql, keywordFailureMessage, ownershipConflictSql, ownershipHistorySql } from './keyword-usability';
 import { assertDuty, dutyAllows } from '../../../core/duties';
@@ -365,7 +366,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
   return withTransaction(async (c) => {
     await scopeLock(c, scope, user);
     const visibility = keywordVisibility(user);
-    const workScope = scopeFilter(user, 'cw.owner_id');
+    const workScope = compositionVisibility(user, 'cw');
     const planScope = scopeFilter(user, 'p.owner_id');
     const compositionCount = `(SELECT COUNT(*) FROM compositions cw WHERE cw.plan_id=p.id AND ${workScope.clause})`;
     const readiness = readyPlanSql();
@@ -421,7 +422,7 @@ export async function listKeywords(user: AuthUser, scope: Scope, page: number, p
       ${compositionCount} composition_count,
       (SELECT u.display_name FROM users u WHERE u.id=p.owner_id) owner_name,
       DATE_FORMAT(TIMESTAMPADD(SECOND,TIMESTAMPDIFF(SECOND,NOW(),UTC_TIMESTAMP()),k.priority_until),'%Y-%m-%dT%H:%i:%s.%fZ') priority_until,k.used_ever_at,k.version,
-      CAST(b.id AS CHAR) binding_id,b.path_type,CAST(b.leader_id AS CHAR) leader_id,CAST(b.executor_id AS CHAR) executor_id,b.verification_status,b.release_status,
+      CAST(b.id AS CHAR) binding_id,b.path_type,b.access_preserved_at,CAST(b.leader_id AS CHAR) leader_id,CAST(b.executor_id AS CHAR) executor_id,b.verification_status,b.release_status,
       CAST(COALESCE(k.created_by,p.created_by) AS CHAR) created_by,
       (k.priority_until<=NOW(3)) AS priority_ended
       ${from}
@@ -526,6 +527,7 @@ export async function changeBinding(
     if (String(word.current_binding_id) !== String(binding.id)) fail('绑定已失效，请刷新后重试', 409);
     if (binding.released_at) fail('绑定已经释放', 409);
     if (input.action === 'assign') {
+      if(binding.access_preserved_at) fail('此任务已保留原执行人；如确未使用，请先退回任务再重新分配',409);
       await assertKeywordReady(c, String(word.id));
       await assertKeywordUnused(c, String(word.id));
       if (binding.release_status === 'requested') fail('释放申请中不可分配', 409);
@@ -555,7 +557,7 @@ export async function changeBinding(
       )
         fail('执行人必须是本团长或有效团队达人及项目成员', 403);
       await c.query(
-        'UPDATE zh_keyword_bindings SET path_type=?,executor_id=?,assigned_at=NOW(3),relation_snapshot=?,version=version+1 WHERE id=?',
+        'UPDATE zh_keyword_bindings SET path_type=?,executor_id=?,assigned_at=NOW(3),relation_snapshot=?,access_preserved_at=NULL,version=version+1 WHERE id=?',
         [
           self ? 'leader_self' : 'team_creator',
           input.executorId,
@@ -570,12 +572,12 @@ export async function changeBinding(
       if (binding.used_at) return { id };
       if (binding.stop_new_use_at) fail('已停止新增使用', 409);
       const [executor] = await select(c, 'SELECT role,parent_id FROM users WHERE id=? FOR SHARE', [user.sub]);
-      if (
+      if (!binding.access_preserved_at && (
         (binding.path_type === 'team_creator' && String(executor.parent_id) !== String(binding.leader_id)) ||
         (binding.path_type === 'direct_creator' && (await teamLeader(c, scope, executor)) !== null) ||
         (binding.path_type === 'leader_self' && executor.role !== 'leader') ||
         (binding.path_type === 'staff_self' && !isStaffRole(String(executor.role)))
-      )
+      ))
         fail('团队关系已变化，请使用新团队分配的关键词', 409);
       if (binding.release_status === 'requested') fail('释放申请中不可使用', 409);
       await c.query('UPDATE zh_keyword_bindings SET used_at=NOW(3),activated_on=?,version=version+1 WHERE id=?', [

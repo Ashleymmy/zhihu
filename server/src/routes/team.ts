@@ -33,6 +33,7 @@ import {
 } from '../services/invitations.service';
 import { updateMemberAccess } from '../services/member-access.service';
 import { myAffiliation } from '../services/team.service';
+import { previewMemberChanges, getMemberChangeRun, listMemberChangeRuns, executeMemberChanges } from '../services/member-changes.service';
 
 const id = z.string().regex(/^\d+$/);
 const create = z.object({
@@ -59,9 +60,25 @@ const apply = z.object({
 const review = z.object({
   action: z.enum(['approve', 'reject']),
 });
+const changeOperation = z.discriminatedUnion('kind',[
+  z.object({kind:z.literal('team'),parentId:id.nullable()}).strict(),
+  z.object({kind:z.literal('role'),role:z.enum(['creator','leader']),parentId:id.nullable().optional(),childrenParentId:id.nullable().optional()}).strict(),
+  z.object({kind:z.literal('projects'),mode:z.enum(['add','remove']),projectIds:z.array(id).min(1).max(200).refine(v=>new Set(v).size===v.length)}).strict(),
+  z.object({kind:z.literal('active'),isActive:z.boolean()}).strict(),
+]);
 export function createTeamRouter(runtime: ModuleRuntime) {
   const teamRouter = Router();
   teamRouter.use(requireAuth);
+  teamRouter.post('/member-changes/preview',requirePermission('team.create_member'),
+    validateBody(z.object({references:z.array(z.string().trim().min(1).max(64)).min(1).max(1000),operation:changeOperation}).strict()),
+    asyncHandler(async(req,res)=>ok(res,await previewMemberChanges(req.user,req.body.references,req.body.operation,runtime),201)));
+  teamRouter.get('/member-changes',requirePermission('team.create_member'),
+    asyncHandler(async(req,res)=>ok(res,await listMemberChangeRuns(req.user))));
+  teamRouter.get('/member-changes/:id',requirePermission('team.create_member'),
+    asyncHandler(async(req,res)=>ok(res,await getMemberChangeRun(req.user,z.string().uuid().parse(req.params.id)))));
+  teamRouter.post('/member-changes/:id/execute',requirePermission('team.create_member'),
+    validateBody(z.object({reviewHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict()),
+    asyncHandler(async(req,res)=>ok(res,await executeMemberChanges(req.user,z.string().uuid().parse(req.params.id),req.body.reviewHash,runtime))));
   teamRouter.post(
     '/invitations/accept',
     requirePermission('team.apply'),

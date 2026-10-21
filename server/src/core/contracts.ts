@@ -185,6 +185,9 @@ export interface ModuleRateProvider {
 
 export interface ModuleAccountLifecycle {
   accessChangeBlockers?(connection: PoolConnection, userId: string, projectId?: string): Promise<string[]>;
+  /** Preserve existing task ownership during a reviewed business-role/team change.
+   * All work must be transactional SQL: previews run this inside a rolled-back savepoint. */
+  preserveMemberAccess?(connection: PoolConnection, userId: string): Promise<{ id: string; label: string; projectId: string }[]>;
   closureBlockers(connection: PoolConnection, userId: string): Promise<string[]>;
   // Runs inside the same transaction as platform identity erasure. Business and
   // financial evidence must remain intact; only personal profile fields change.

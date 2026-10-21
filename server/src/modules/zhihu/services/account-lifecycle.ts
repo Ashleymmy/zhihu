@@ -1,7 +1,29 @@
 import type { RowDataPacket } from 'mysql2/promise';
 import type { ModuleAccountLifecycle } from '../../../core/contracts';
+import { AppError } from '../../../middleware/errors';
 
 export const zhihuAccountLifecycle: ModuleAccountLifecycle = {
+  async preserveMemberAccess(c, userId) {
+    const [legacy] = await c.query<RowDataPacket[]>(
+      `SELECT p.id FROM plans p WHERE p.owner_id=? AND p.status<>'ended'
+       AND NOT EXISTS(SELECT 1 FROM zh_keywords k WHERE k.plan_id=p.id) LIMIT 1 FOR UPDATE`,
+      [userId],
+    );
+    if (legacy.length) throw new AppError(409, 40900, '仍有未整理归属的旧任务，请先在任务管理中核对归属，再重新预览');
+    const [bindings] = await c.query<RowDataPacket[]>(
+      `SELECT b.id,b.executor_id,b.path_type,k.keyword,k.project_id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id
+       WHERE (b.executor_id=? OR b.leader_id=?) AND b.released_at IS NULL AND b.stop_new_use_at IS NULL ORDER BY b.id FOR UPDATE`,
+      [userId, userId],
+    );
+    if (bindings.some((b) => !b.executor_id))
+      throw new AppError(409, 40900, '仍有待分配任务，请先在任务管理中分配或退回，再重新预览');
+    for (const b of bindings)
+      await c.query(
+        'UPDATE zh_keyword_bindings SET access_preserved_at=COALESCE(access_preserved_at,NOW(3)) WHERE id=?',
+        [b.id],
+      );
+    return bindings.map((b) => ({ id: String(b.id), label: String(b.keyword), projectId: String(b.project_id) }));
+  },
   async accessChangeBlockers(c, userId, projectId) {
     const [bindings] = await c.query<RowDataPacket[]>(
       `SELECT b.id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id
