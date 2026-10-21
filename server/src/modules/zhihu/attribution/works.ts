@@ -83,7 +83,7 @@ function workQuery(user: AuthUser, scope: Scope) {
 }
 const resultSql =
   "CASE WHEN plan_sync_status='failed' OR sync_status='failed' THEN 'failed' WHEN sync_status='synced' THEN 'submitted' ELSE 'pending' END";
-function filteredQuery(user: AuthUser, scope: Scope, filters: WorkFilters = {}) {
+export function filteredQuery(user: AuthUser, scope: Scope, filters: WorkFilters = {}) {
   const base = workQuery(user, scope),
     where = ['1=1'],
     args: unknown[] = [...base.args];
