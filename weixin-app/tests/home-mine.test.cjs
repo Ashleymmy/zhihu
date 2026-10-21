@@ -26,12 +26,12 @@ const keys = list => Array.from(list, item => item.key)
 
 // 角色 → 我的页菜单。与 README 的角色能力表一一对应；「邀请好友」对全部角色开放。
 const MINE_MENUS = [
-  ['creator', null, ['join-team', 'support', 'invite', 'password']],
-  ['leader', null, ['team', 'support', 'invite', 'password']],
+  ['creator', null, ['join-team', 'support', 'withdrawals', 'invite', 'password']],
+  ['leader', null, ['team', 'support', 'withdrawals', 'invite', 'password']],
   ['admin', 'operations', ['team', 'admin', 'support', 'invite', 'password']],
-  ['admin', 'finance', ['reports', 'prices', 'support', 'invite', 'password']],
-  ['admin', 'all', ['reports', 'team', 'prices', 'admin', 'support', 'invite', 'password']],
-  ['admin', null, ['reports', 'team', 'prices', 'admin', 'support', 'invite', 'password']]
+  ['admin', 'finance', ['reports', 'prices', 'support', 'withdrawals', 'invite', 'password']],
+  ['admin', 'all', ['reports', 'team', 'prices', 'admin', 'support', 'withdrawals', 'invite', 'password']],
+  ['admin', null, ['reports', 'team', 'prices', 'admin', 'support', 'withdrawals', 'invite', 'password']]
 ]
 
 for (const [role, duty, expected] of MINE_MENUS) {
@@ -110,7 +110,7 @@ test('home lists only the non-tab role entries', async () => {
   for (const item of page.data.menus) assert.ok(item.icon || item.iconImg, item.key + ' 缺少图标')
 })
 
-test('member home and mine keep earnings while omitting pricing and payment services', async () => {
+test('member home and mine keep earnings while restoring payment services and omitting pricing', async () => {
   for (const user of [
     { id: '2', role: 'creator', parentId: null },
     { id: '3', role: 'creator', parentId: '4' },
@@ -125,7 +125,7 @@ test('member home and mine keep earnings while omitting pricing and payment serv
     }
     const permissions = h.load('utils/permissions')
     assert.equal(permissions.allowed(user, 'income'), true)
-    for (const name of ['wallet', 'withdrawals']) assert.equal(permissions.allowed(user, name), false)
+    for (const name of ['wallet', 'withdrawals']) assert.equal(permissions.allowed(user, name), true)
   }
 })
 

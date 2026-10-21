@@ -8,6 +8,8 @@
     "pages/home/index",
     "pages/college/index",
     "pages/income/index",
+    "pages/wallet/index",
+    "pages/withdrawals/index",
     "pages/tools/index",
     "pages/zhihu/index",
     "pages/keywords/index",

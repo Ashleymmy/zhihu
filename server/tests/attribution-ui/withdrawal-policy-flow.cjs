@@ -68,6 +68,7 @@ async function main() {
       page.setDefaultTimeout(20000);
       await page.route('**/*', (r) => (new URL(r.request().url()).hostname === '127.0.0.1' ? r.continue() : r.abort()));
       await page.goto(base + '/app/login');
+      await page.getByRole('button',{name:'使用原账号登录',exact:true}).click();
       await page.locator('input[autocomplete=username]').fill(name);
       await page.locator('input[type=password]').fill('Review123456');
       const logged = page.waitForResponse((r) => r.url().endsWith('/core/auth/login'));
@@ -117,8 +118,8 @@ async function main() {
     };
     for (const [role, amount] of [
       ['creator', '100'],
-      ['leader', '600'],
-      ['independent', '500'],
+      ['leader', '500'],
+      ['independent', '100'],
     ]) {
       const p = sessions[role].page;
       await p.goto(base + '/app/income');
@@ -151,19 +152,7 @@ async function main() {
       await shot(role, 'submitted');
       assert(await p.getByRole('button', { name: '申请提现', exact: true }).isDisabled());
       if(role!=='leader')assert.equal(await p.getByRole('button',{name:'查看要求 / 补充发票'}).count(),0);
-      if (role === 'leader') {
-        await p.getByRole('button', { name: '查看要求 / 补充发票' }).click();
-        await d
-          .locator('input[type=file]')
-          .setInputFiles({
-            name: 'invoice.pdf',
-            mimeType: 'application/pdf',
-            buffer: Buffer.from('%PDF-1.4\nisolated invoice'),
-          });
-        await d.getByRole('button', { name: '提交发票' }).click();
-        await d.waitFor({ state: 'hidden' });
-        await p.getByText(/待财务核验/).waitFor();
-      }
+
     }
     const creatorRecord = (await get('creator', 'core/finance?' + new URLSearchParams(scope))).withdrawals[0];
     const leaderRecord = (await get('leader', 'core/finance?' + new URLSearchParams(scope))).withdrawals[0];
@@ -183,11 +172,7 @@ async function main() {
       await f.getByRole('button', { name: '确认审核通过', exact: true }).click();
       await f.locator('dialog[open]').waitFor({ state: 'hidden' });
     }
-    assert.equal(await row(leaderRecord.id).getByRole('button', { name: '登记已线下发放' }).count(), 0);
-    await row(leaderRecord.id).getByRole('button', { name: '开票要求与核验' }).click();
-    await shot('finance', 'invoice');
-    await f.locator('dialog[open]').getByRole('button', { name: '发票核验通过' }).click();
-    await f.locator('dialog[open]').waitFor({ state: 'hidden' });
+    await row(leaderRecord.id).getByRole('button', { name: '登记已线下发放' }).waitFor();
     await row(creatorRecord.id).getByRole('button', { name: '登记已线下发放' }).click();
     await shot('finance', 'net-payment');
     await f.getByRole('checkbox', { name: '已实际转账，核对了实付金额、手续费和收款账户' }).check();

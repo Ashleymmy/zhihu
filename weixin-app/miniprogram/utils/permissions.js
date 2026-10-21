@@ -25,8 +25,8 @@ function allowed(user, page) {
   if (page === "invite") return canOperate(user);
   if (page === "join-team") return user.role === "creator";
   if (["keywords", "keywords-create"].includes(page)) return canOperate(user);
-  // 钱包及提现已从小程序移除；服务端接口和 Web 办理流程保留。
-  if (["wallet", "withdrawals"].includes(page)) return false;
+  // 金额页面沿用服务端财务岗位权限。
+  if (["wallet", "withdrawals"].includes(page)) return canFinance(user);
   if (page === "reports") return duty(user, "finance");
   if (page === "projects") return ["admin","developer"].includes(user.role) && duty(user,"operations");
   if (page === "admin") return duty(user,"operations");
