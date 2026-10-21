@@ -1,0 +1,25 @@
+<import src="../../templates/shared.wxml" />
+<view class="page business-page">
+  <view class="business-intro"><view class="title">商务合作</view><view class="intro-copy">连接好内容，共创推广机会</view></view>
+  <template is="status" data="{{error, notice, denied, loading, scopeReady, allowed, busy, guest}}" />
+  <block wx:if="{{allowed && settings && !loading}}">
+    <view wx:if="{{contact}}" class="contact-card">
+      <view class="contact-heading">渠道 · 团队 · 项目合作</view>
+      <view class="contact-name">{{contact.name || '商务合作'}}</view>
+      <view wx:if="{{settings.serviceHours}}" class="muted hours">服务时间：{{settings.serviceHours}}</view>
+      <view wx:if="{{contacts.length > 1}}" class="contact-tabs">
+        <button wx:for="{{contacts}}" wx:key="channel" class="contact-tab {{channel === item.channel ? 'active' : ''}}" data-channel="{{item.channel}}" bindtap="changeChannel" disabled="{{saving}}">{{item.label}}</button>
+      </view>
+      <view class="qr-frame">
+        <image wx:if="{{imagePath}}" class="qr-image" src="{{imagePath}}" mode="aspectFit" show-menu-by-longpress="{{true}}" bindtap="preview" binderror="imageFailed" />
+        <view wx:else class="qr-failed"><text>{{imageError || '正在加载二维码…'}}</text><button size="mini" bindtap="load">重新加载</button></view>
+      </view>
+      <view class="scan-hint">用{{contact.label}}扫一扫，添加商务联系人</view>
+      <button class="primary save-qr" bindtap="saveQr" disabled="{{!imagePath || saving}}" loading="{{saving}}">保存二维码</button>
+      <button wx:if="{{albumDenied}}" class="secondary" bindtap="albumSettings">设置相册权限</button>
+      <view class="muted preview-hint">点击二维码查看原图，也可保存后从{{contact.label}}相册中识别。</view>
+    </view>
+    <view wx:elif="{{!settings.businessUrl}}" class="card empty-contact"><view class="section-title">商务联系方式正在更新</view><view class="muted">你可以通过在线客服咨询合作事宜。</view><button class="primary" bindtap="toSupport">前往帮助与客服</button><button bindtap="load">刷新联系方式</button></view>
+    <view wx:if="{{settings.businessUrl}}" class="card link-contact"><view class="section-title">飞书联系商务</view><view class="muted">也可以复制联系链接，在浏览器打开。</view><button bindtap="copyBusiness">复制商务飞书链接</button></view>
+  </block>
+</view>

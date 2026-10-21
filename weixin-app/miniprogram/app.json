@@ -28,7 +28,8 @@
     "pages/reports/index",
     "pages/work-data/index",
     "pages/work-detail/index",
-    "pages/support/index"
+    "pages/support/index",
+    "pages/business/index"
   ],
   "window": {
     "backgroundColor": "#f5f6f5",

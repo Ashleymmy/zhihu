@@ -255,3 +255,43 @@ it('成员导出拒绝达人团长财务，运营导出不包含金额，后台�
   for (const [key, cell] of Object.entries(book.Sheets['成员与归属']))
     if (!key.startsWith('!')) expect((cell as any).f).toBeUndefined();
 });
+
+it('商务二维码仅管理人员配置，原图受登录保护，旧客户端保存保留图片且变更原子化', async () => {
+  const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1cAAAAASUVORK5CYII=';
+  const uri = '/api/v1/core/support', imageUri = uri + '/business-qrcodes/wechat';
+  expect((await request(app).get(imageUri)).status).toBe(401);
+  const before = (await request(app).get(uri).set(headers['1'])).body.data;
+  const body = { ...before, businessQrCodes: [{ channel: 'wechat', name: '微信商务', base64 }, { channel: 'feishu', name: '飞书商务', base64 }] };
+  for (const who of ['2', '3', '5', '6']) expect((await request(app).put(uri).set(headers[who]).send(body)).status).toBe(403);
+  for (const entries of [
+    [{ channel: 'wechat', name: '错误图片', base64: Buffer.from('<svg onload="alert(1)"/>').toString('base64') }],
+    [body.businessQrCodes[0], body.businessQrCodes[0]],
+    [{ channel: 'wechat', name: '外部链接', base64: 'https://example.com/qr.png' }],
+  ]) expect((await request(app).put(uri).set(headers['1']).send({ ...body, businessQrCodes: entries })).status).toBe(422);
+  const saved = await request(app).put(uri).set(headers['1']).send(body);
+  expect(saved.status, saved.text).toBe(200);
+  expect(saved.body.data.businessQrCodes).toHaveLength(2);
+  expect(saved.text).not.toContain(base64);
+  const metadata = saved.body.data.businessQrCodes;
+  for (const who of ['1', '2', '3', '5', '6', '7']) {
+    const image = await request(app).get(imageUri).set(headers[who]);
+    expect(image.status).toBe(200);
+    expect(image.body.data).toMatchObject({ channel: 'wechat', mimeType: 'image/png', base64, version: metadata.find((q: any) => q.channel === 'wechat').version });
+  }
+  expect((await request(app).put(uri).set(headers['1']).send(body)).status).toBe(409);
+  const invalidUpdate = { ...saved.body.data, businessQrCodes: [metadata[0], { channel: 'feishu', name: '错误图片', base64: 'bad' }] };
+  expect((await request(app).put(uri).set(headers['1']).send(invalidUpdate)).status).toBe(422);
+  expect((await request(app).get(uri).set(headers['1'])).body.data).toEqual(saved.body.data);
+  const { businessQrCodes: _images, ...oldClient } = saved.body.data;
+  const preserved = await request(app).put(uri).set(headers['1']).send(oldClient);
+  expect(preserved.status).toBe(200);
+  expect(preserved.body.data.businessQrCodes).toEqual(metadata);
+  const renamed = await request(app).put(uri).set(headers['1']).send({ ...preserved.body.data, businessQrCodes: metadata.map((q: any) => ({ ...q, name: q.name + '更新' })) });
+  expect(renamed.status).toBe(200);
+  expect(renamed.body.data.businessQrCodes[0].name).toContain('更新');
+  const [logs] = await c.query<mysql.RowDataPacket[]>("SELECT detail_json FROM audit_logs WHERE action='support.update'");
+  expect(JSON.stringify(logs)).not.toContain(base64);
+  const removed = await request(app).put(uri).set(headers['1']).send({ ...renamed.body.data, businessQrCodes: [] });
+  expect(removed.status).toBe(200);
+  expect((await request(app).get(imageUri).set(headers['3'])).status).toBe(404);
+});

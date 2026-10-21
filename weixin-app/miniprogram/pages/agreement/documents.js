@@ -430,6 +430,22 @@ module.exports = {
         "segments": [
           {
             "id": 0,
+            "text": "商务联系方式与保存图片：",
+            "bold": true
+          },
+          {
+            "id": 1,
+            "text": "商务合作页展示平台配置的微信或飞书联系人二维码。仅在您主动点击“保存二维码”并同意所需授权后，将该二维码图片保存到设备相册；拒绝授权不影响查看、放大二维码或使用其他功能。此操作不读取或上传您相册中的已有照片。您主动使用微信或飞书添加联系人后，相应沟通服务由对应平台提供。",
+            "bold": false
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "kind": "paragraph",
+        "segments": [
+          {
+            "id": 0,
             "text": "项目协作：",
             "bold": true
           },
@@ -441,7 +457,7 @@ module.exports = {
         ]
       },
       {
-        "id": 9,
+        "id": 10,
         "kind": "paragraph",
         "segments": [
           {
@@ -457,7 +473,7 @@ module.exports = {
         ]
       },
       {
-        "id": 10,
+        "id": 11,
         "kind": "paragraph",
         "segments": [
           {
@@ -473,7 +489,7 @@ module.exports = {
         ]
       },
       {
-        "id": 11,
+        "id": 12,
         "kind": "heading-2",
         "segments": [
           {
@@ -484,7 +500,7 @@ module.exports = {
         ]
       },
       {
-        "id": 12,
+        "id": 13,
         "kind": "paragraph",
         "segments": [
           {
@@ -495,7 +511,7 @@ module.exports = {
         ]
       },
       {
-        "id": 13,
+        "id": 14,
         "kind": "paragraph",
         "segments": [
           {
@@ -506,7 +522,7 @@ module.exports = {
         ]
       },
       {
-        "id": 14,
+        "id": 15,
         "kind": "paragraph",
         "segments": [
           {
@@ -517,7 +533,7 @@ module.exports = {
         ]
       },
       {
-        "id": 15,
+        "id": 16,
         "kind": "heading-2",
         "segments": [
           {
@@ -528,7 +544,7 @@ module.exports = {
         ]
       },
       {
-        "id": 16,
+        "id": 17,
         "kind": "paragraph",
         "segments": [
           {
@@ -544,7 +560,7 @@ module.exports = {
         ]
       },
       {
-        "id": 17,
+        "id": 18,
         "kind": "paragraph",
         "segments": [
           {
@@ -560,7 +576,7 @@ module.exports = {
         ]
       },
       {
-        "id": 18,
+        "id": 19,
         "kind": "paragraph",
         "segments": [
           {
@@ -576,7 +592,7 @@ module.exports = {
         ]
       },
       {
-        "id": 19,
+        "id": 20,
         "kind": "paragraph",
         "segments": [
           {
@@ -587,7 +603,7 @@ module.exports = {
         ]
       },
       {
-        "id": 20,
+        "id": 21,
         "kind": "heading-2",
         "segments": [
           {
@@ -598,7 +614,7 @@ module.exports = {
         ]
       },
       {
-        "id": 21,
+        "id": 22,
         "kind": "paragraph",
         "segments": [
           {
@@ -609,7 +625,7 @@ module.exports = {
         ]
       },
       {
-        "id": 22,
+        "id": 23,
         "kind": "paragraph",
         "segments": [
           {
@@ -620,7 +636,7 @@ module.exports = {
         ]
       },
       {
-        "id": 23,
+        "id": 24,
         "kind": "heading-2",
         "segments": [
           {
@@ -631,7 +647,7 @@ module.exports = {
         ]
       },
       {
-        "id": 24,
+        "id": 25,
         "kind": "paragraph",
         "segments": [
           {
@@ -642,7 +658,7 @@ module.exports = {
         ]
       },
       {
-        "id": 25,
+        "id": 26,
         "kind": "paragraph",
         "segments": [
           {
@@ -658,7 +674,7 @@ module.exports = {
         ]
       },
       {
-        "id": 26,
+        "id": 27,
         "kind": "paragraph",
         "segments": [
           {
@@ -674,7 +690,7 @@ module.exports = {
         ]
       },
       {
-        "id": 27,
+        "id": 28,
         "kind": "heading-2",
         "segments": [
           {
@@ -685,7 +701,7 @@ module.exports = {
         ]
       },
       {
-        "id": 28,
+        "id": 29,
         "kind": "paragraph",
         "segments": [
           {
@@ -696,7 +712,7 @@ module.exports = {
         ]
       },
       {
-        "id": 29,
+        "id": 30,
         "kind": "heading-2",
         "segments": [
           {
@@ -707,7 +723,7 @@ module.exports = {
         ]
       },
       {
-        "id": 30,
+        "id": 31,
         "kind": "paragraph",
         "segments": [
           {
@@ -718,7 +734,7 @@ module.exports = {
         ]
       },
       {
-        "id": 31,
+        "id": 32,
         "kind": "paragraph",
         "segments": [
           {
@@ -729,7 +745,7 @@ module.exports = {
         ]
       },
       {
-        "id": 32,
+        "id": 33,
         "kind": "paragraph",
         "segments": [
           {

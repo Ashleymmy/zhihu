@@ -9,7 +9,7 @@
       <view wx:elif="{{settings}}" class="muted">在线客服尚未开通，可先查看下方常见问题。</view>
       <button size="mini" bindtap="load" disabled="{{loading}}">刷新联系方式</button>
     </view>
-    <view wx:if="{{settings.businessUrl}}" class="card"><view class="title">商务合作</view><view class="muted">渠道、团队和项目合作，请通过飞书联系商务。</view><button bindtap="copyBusiness">复制商务飞书链接</button><view class="muted">复制后在浏览器打开，按提示添加联系人。</view></view>
+    <view wx:if="{{settings.businessUrl || settings.businessQrCodes.length}}" class="card"><view class="title">商务合作</view><view class="muted">渠道、团队和项目合作咨询。</view><button data-path="/pages/business/index" bindtap="open">联系商务</button></view>
     <view class="card"><view class="title">常见问题</view><view class="question">登录遇到问题</view><view class="muted">使用已验证的手机号加密码登录，或选择短信验证码。旧账号可以使用原账号登录。</view><view class="question">作品提交失败怎么办</view><view class="muted">在作品记录中查看失败提示，修改后重新提交。提交成功后仍需等待审核结果。</view><view class="question">咨询时提供什么</view><view class="muted">请提供用户 ID、关键词、发生时间和截图。不要发送密码或短信验证码。</view><button wx:if="{{user.userId}}" size="mini" bindtap="copyId">复制我的用户 ID</button></view>
   </block>
 </view>

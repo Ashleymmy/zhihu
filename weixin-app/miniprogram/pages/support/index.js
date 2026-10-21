@@ -7,10 +7,6 @@ Page(
     async fetch() {
       return { settings: await request.get("/core/support") };
     },
-    copyBusiness() {
-      if (this.data.settings?.businessUrl)
-        wx.setClipboardData({ data: this.data.settings.businessUrl });
-    },
     copyId() {
       if (this.data.user?.userId)
         wx.setClipboardData({ data: this.data.user.userId });
