@@ -25,7 +25,8 @@
     "pages/phone-verify/index",
     "pages/reports/index",
     "pages/work-data/index",
-    "pages/work-detail/index"
+    "pages/work-detail/index",
+    "pages/support/index"
   ],
   "window": {
     "backgroundColor": "#f5f6f5",

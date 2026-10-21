@@ -22,6 +22,7 @@ Page(
     },
     async fetch({ user }) {
       const menus = permissions.menus(user);
+      menus.push({key:"support",label:"帮助与客服",path:"/pages/support/index"});
       menus.push({
         key: "invite",
         label: "邀请好友",

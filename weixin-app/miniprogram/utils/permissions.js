@@ -17,7 +17,7 @@ function canFinance(user) {
 function allowed(user, page) {
   if (!known(user)) return false;
   if (
-    ["home", "mine", "profile", "password", "college", "tools", "income", "zhihu", "work-data", "work-detail", "works"].includes(
+    ["support", "home", "mine", "profile", "password", "college", "tools", "income", "zhihu", "work-data", "work-detail", "works"].includes(
       page,
     )
   )
