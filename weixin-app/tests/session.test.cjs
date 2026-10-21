@@ -125,7 +125,7 @@ test("concurrent restore followed by login does not overwrite new session", asyn
 test("direct unauthorized finance/admin routes make no API calls or mutations", async () => {
   for (const [user, pageName] of [
     [{ id: "1", role: "creator" }, "admin"],
-    [{ id: "1", role: "admin", adminDuty: "operations" }, "wallet"],
+    [{ id: "1", role: "admin", adminDuty: "operations" }, "reports"],
     [{ id: "1", role: "admin", adminDuty: "finance" }, "keywords"],
   ]) {
     const h = harness();

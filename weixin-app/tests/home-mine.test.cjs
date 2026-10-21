@@ -26,12 +26,12 @@ const keys = list => Array.from(list, item => item.key)
 
 // 角色 → 我的页菜单。与 README 的角色能力表一一对应；「邀请好友」对全部角色开放。
 const MINE_MENUS = [
-  ['creator', null, ['join-team', 'invite', 'withdrawals', 'password']],
-  ['leader', null, ['team', 'invite', 'withdrawals', 'password']],
+  ['creator', null, ['join-team', 'invite', 'password']],
+  ['leader', null, ['team', 'invite', 'password']],
   ['admin', 'operations', ['team', 'admin', 'invite', 'password']],
-  ['admin', 'finance', ['reports', 'prices', 'invite', 'withdrawals', 'password']],
-  ['admin', 'all', ['reports', 'team', 'prices', 'admin', 'invite', 'withdrawals', 'password']],
-  ['admin', null, ['reports', 'team', 'prices', 'admin', 'invite', 'withdrawals', 'password']]
+  ['admin', 'finance', ['reports', 'prices', 'invite', 'password']],
+  ['admin', 'all', ['reports', 'team', 'prices', 'admin', 'invite', 'password']],
+  ['admin', null, ['reports', 'team', 'prices', 'admin', 'invite', 'password']]
 ]
 
 for (const [role, duty, expected] of MINE_MENUS) {
@@ -110,7 +110,7 @@ test('home lists only the non-tab role entries', async () => {
   for (const item of page.data.menus) assert.ok(item.icon || item.iconImg, item.key + ' 缺少图标')
 })
 
-test('member home and mine omit pricing while keeping earnings and withdrawals available', async () => {
+test('member home and mine keep earnings while omitting pricing and payment services', async () => {
   for (const user of [
     { id: '2', role: 'creator', parentId: null },
     { id: '3', role: 'creator', parentId: '4' },
@@ -124,46 +124,9 @@ test('member home and mine omit pricing while keeping earnings and withdrawals a
       assert.equal(page.data.menus.some(item => item.key === 'prices'), false)
     }
     const permissions = h.load('utils/permissions')
-    for (const name of ['income', 'wallet', 'withdrawals'])
-      assert.equal(permissions.allowed(user, name), true)
+    assert.equal(permissions.allowed(user, 'income'), true)
+    for (const name of ['wallet', 'withdrawals']) assert.equal(permissions.allowed(user, name), false)
   }
-})
-
-test('home shows the withdrawable balance for a creator', async () => {
-  const h = setup({ id: '3', role: 'creator' })
-  const page = h.page('home')
-  await page.onShow()
-
-  assert.equal(page.data.balance, '12.34')
-  const call = h.calls.find(c => c.path === '/core/finance')
-  assert.equal(call.data.projectId, '1')
-  assert.equal(call.data.accountId, '10')
-})
-
-test('home skips the balance call for an admin', async () => {
-  const h = setup({ id: '4', role: 'admin', adminDuty: 'all' })
-  const page = h.page('home')
-  await page.onShow()
-
-  assert.equal(page.data.balance, null)
-  assert.equal(h.calls.some(c => c.path === '/core/finance'), false, '管理员首页不应请求钱包')
-})
-
-test('home keeps rendering when the balance call fails', async () => {
-  const user = { id: '3', role: 'creator' }
-  const h = setup(user, call => {
-    if (call.path === '/core/auth/me') return user
-    const common = scoped(call)
-    if (common !== undefined) return common
-    if (call.path === '/core/finance') return { networkError: 'request:fail' }
-    return { id: 'ok' }
-  })
-  const page = h.page('home')
-  await page.onShow()
-
-  assert.equal(page.data.balance, null)
-  assert.equal(page.data.error, '', '余额失败不能阻塞首页')
-  assert.equal(page.data.allowed, true)
 })
 
 test('home switching the account updates the global scope', async () => {

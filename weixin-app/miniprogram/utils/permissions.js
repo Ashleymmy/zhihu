@@ -25,7 +25,8 @@ function allowed(user, page) {
   if (page === "invite") return canOperate(user);
   if (page === "join-team") return user.role === "creator";
   if (["keywords", "keywords-create"].includes(page)) return canOperate(user);
-  if (["wallet", "withdrawals"].includes(page)) return canFinance(user);
+  // 钱包及提现已从小程序移除；服务端接口和 Web 办理流程保留。
+  if (["wallet", "withdrawals"].includes(page)) return false;
   if (page === "reports") return duty(user, "finance");
   if (page === "projects") return ["admin","developer"].includes(user.role) && duty(user,"operations");
   if (page === "admin") return duty(user,"operations");
@@ -39,7 +40,6 @@ function menus(user) {
   const labels = {
     keywords: isAdmin(user) ? "关键词管理" : "我的关键词",
     works: "作品记录",
-    wallet: isAdmin(user) ? "财务账单" : "收入与余额",
     reports: "报表与异常",
     team: "团队成员",
     "join-team": "我的团队 / 申请入团",

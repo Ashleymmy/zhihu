@@ -47,4 +47,5 @@ export interface TaskGroup {
   total: number | null;
   status: string;
   create?: { label: string; path: string };
+  keywordExportAvailable?: boolean;
 }

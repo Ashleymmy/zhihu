@@ -43,6 +43,35 @@ export interface ModuleDataProvider {
   activity?(scope: DataScope, user: AuthUser, filter: ActivityFilter): Promise<ActivityResult>;
   // Aggregate upstream amounts only; never expose individual members' income.
   teamTurnover?(connection: PoolConnection, scope: DataScope, user: AuthUser): Promise<TeamTurnover>;
+  workRegistrations?(scope: TaskScope, user: AuthUser, filter: WorkRegistrationFilter, includeRows: boolean): Promise<WorkRegistrationReport>;
+  keywordBindings?(scope: TaskScope, user: AuthUser, filter: KeywordBindingFilter): Promise<KeywordBindingRow[]>;
+}
+export interface KeywordBindingFilter { from?: string; to?: string; search?: string }
+export interface KeywordBindingRow {
+  id: string; bindingId: string; boundAt: string; createdAt: string; dateBasis: string;
+  taskName: string; channelName: string; keyword: string; novelTitle: string; novelUrl: string;
+  creatorAccount: string; creatorName: string; creatorId: string; creatorLeaderName: string;
+  performerAccount: string; performerName: string; performerId: string;
+  leaderName: string; leaderAccount: string; leaderId: string; relationNote: string;
+  creationStatus: string; failureReason: string; bindingStatus: string;
+}
+export interface WorkRegistrationFilter {
+  from?: string; to?: string; search?: string; ownerId?: string; planId?: string;
+  view?: 'self' | 'team' | 'all'; result?: 'submitted' | 'failed' | 'pending';
+  successfulOnly: boolean; registeredOnly?: boolean;
+}
+export interface WorkRegistrationRow {
+  id: string; registeredAt: string; title: string; keyword: string; taskName: string;
+  performerName: string; mediaType: string; mediaAccount: string; workUrl: string;
+  publishedAt: string; registrationStatus: string; reviewStatus: string;
+  planName: string; category: string; subcategory: string; novelTitle: string; novelUrl: string;
+  performerAccount: string; performerId: string; leaderName: string; leaderAccount: string; leaderId: string;
+  relationNote: string; failureReason: string;
+}
+export interface WorkRegistrationReport {
+  total: number;
+  daily: { date: string; count: number }[];
+  rows: WorkRegistrationRow[];
 }
 export interface AmountPeriods { total: string; today: string; yesterday: string }
 export interface TeamTurnover extends AmountPeriods {
