@@ -12,13 +12,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/prom
 type Id = string | number;
 type Conn = Pick<PoolConnection, 'query'>;
 export type ReferralChannel =
-  | 'leader_invite'
-  | 'creator_invite'
-  | 'staff_invite'
-  | 'leader_created'
-  | 'organic'
-  | 'admin_assign'
-  | 'migration';
+  'leader_invite' | 'creator_invite' | 'staff_invite' | 'leader_created' | 'organic' | 'admin_assign' | 'migration';
 export type MembershipSource =
   | 'registration'
   | 'invitation_accept'
@@ -66,9 +60,14 @@ export async function recordRegistration(
   const userId = String(input.userId),
     inviterId = text(input.inviterId),
     invitationId = text(input.invitationId);
+  await c.query('SELECT id FROM users WHERE id=? FOR UPDATE', [userId]);
   const channel = await channelFor(c, inviterId, invitationId, input.channel);
   // 已有邀请关系就不再写（邀请关系不可变）；不依赖 affectedRows，驱动可能把重复键也计为受影响
-  const [[existing]] = await c.query<RowDataPacket[]>('SELECT user_id FROM member_referrals WHERE user_id=? FOR UPDATE', [userId]);
+  const [[existing]] = await c.query<RowDataPacket[]>(
+    'SELECT user_id FROM member_referrals WHERE user_id=? FOR UPDATE',
+    [userId],
+  );
+  if (existing) return;
   if (!existing) {
     const inviter = inviterId === userId ? null : inviterId;
     await c.query(
@@ -84,7 +83,13 @@ export async function recordRegistration(
       );
   }
   await setTeamLeader(c, { userId, parentId: input.parentId, source: 'registration', operatorId: input.operatorId });
-  await recordRoleChange(c, { userId, fromRole: null, toRole: input.role, reason: 'registration', operatorId: input.operatorId });
+  await recordRoleChange(c, {
+    userId,
+    fromRole: null,
+    toRole: input.role,
+    reason: 'registration',
+    operatorId: input.operatorId,
+  });
 }
 
 /**
@@ -104,6 +109,7 @@ export async function setTeamLeader(
   },
 ) {
   const userId = String(input.userId);
+  await c.query('SELECT id FROM users WHERE id=? FOR UPDATE', [userId]);
   const leaderId = await teamLeaderOf(c, input.parentId);
   const [[open]] = await c.query<RowDataPacket[]>(
     'SELECT id,leader_id FROM team_memberships WHERE open_user=? FOR UPDATE',
@@ -123,12 +129,24 @@ export async function setTeamLeader(
   await c.query(
     `INSERT INTO team_memberships(user_id,leader_id,source,effective_from,ref_type,ref_id,reason,operator_id)
      VALUES(?,?,?,COALESCE(?,NOW(3)),?,?,?,?)`,
-    [userId, leaderId, input.source, from, input.refType ?? null, text(input.refId), input.reason ?? null, text(input.operatorId)],
+    [
+      userId,
+      leaderId,
+      input.source,
+      from,
+      input.refType ?? null,
+      text(input.refId),
+      input.reason ?? null,
+      text(input.operatorId),
+    ],
   );
 }
 
 /** 注销等场景：结束当前团队归属，不再开新记录 */
-export async function closeTeamMembership(c: Conn, input: { userId: Id; reason?: string | null; operatorId?: Id | null }) {
+export async function closeTeamMembership(
+  c: Conn,
+  input: { userId: Id; reason?: string | null; operatorId?: Id | null },
+) {
   await c.query(
     `UPDATE team_memberships SET effective_to=GREATEST(NOW(3),effective_from + INTERVAL 1000 MICROSECOND),
        reason=COALESCE(?,reason),operator_id=COALESCE(?,operator_id) WHERE open_user=?`,
@@ -173,7 +191,7 @@ export async function backfillMemberRelations(c: Conn): Promise<BackfillCounts> 
   const referralsFromInvitations = await run(
     `INSERT INTO member_referrals(user_id,inviter_id,invitation_id,channel,registered_at)
      SELECT iu.user_id,i.owner_user_id,i.id,
-       CASE o.role WHEN 'leader' THEN 'leader_invite' WHEN 'creator' THEN 'creator_invite' ELSE 'staff_invite' END,
+       'migration',
        iu.registered_at
      FROM member_invitation_uses iu
      JOIN member_invitations i ON i.id=iu.invitation_id
@@ -184,15 +202,15 @@ export async function backfillMemberRelations(c: Conn): Promise<BackfillCounts> 
   // ② 团长直接创建的账号：邀请人 = 创建人
   const referralsLeaderCreated = await run(
     `INSERT INTO member_referrals(user_id,inviter_id,channel,registered_at)
-     SELECT u.id,u.created_by,'leader_created',u.created_at
+     SELECT u.id,u.created_by,'migration',u.created_at
      FROM users u JOIN users c ON c.id=u.created_by AND c.role='leader'
      LEFT JOIN member_referrals r ON r.user_id=u.id
      WHERE r.user_id IS NULL AND u.created_by<>u.id`,
   );
-  // ③ 其余：自己注册的记为自然注册，员工或历史创建的无法追溯邀请人
+  // ③ 没有证据的历史账号只标整理基线，不据空 created_by 推断自然注册。
   const referralsUntraceable = await run(
     `INSERT INTO member_referrals(user_id,inviter_id,channel,registered_at)
-     SELECT u.id,NULL,IF(u.created_by IS NULL,'organic','migration'),u.created_at
+     SELECT u.id,NULL,'migration',u.created_at
      FROM users u LEFT JOIN member_referrals r ON r.user_id=u.id
      WHERE r.user_id IS NULL`,
   );
@@ -211,15 +229,10 @@ export async function backfillMemberRelations(c: Conn): Promise<BackfillCounts> 
      WHERE e.ancestor_id IS NULL
      GROUP BY t.ancestor_id,t.descendant_id`,
   );
-  // ⑤ 团队归属：取当前 parent_id（只认团长），起始时间取最早证据：入团申请通过 > 邀请注册 > 账号创建
+  // Historical current state has no reliable start time. Record a baseline at migration time.
   const memberships = await run(
-    `INSERT INTO team_memberships(user_id,leader_id,source,effective_from)
-     SELECT u.id,IF(p.role='leader',u.parent_id,NULL),'migration',
-       COALESCE(
-         (SELECT MAX(a.handled_at) FROM team_applications a
-          WHERE a.creator_id=u.id AND a.leader_id=u.parent_id AND a.status='approved'),
-         (SELECT MIN(iu.registered_at) FROM member_invitation_uses iu WHERE iu.user_id=u.id),
-         u.created_at)
+    `INSERT INTO team_memberships(user_id,leader_id,source,effective_from,reason)
+     SELECT u.id,IF(p.role='leader',u.parent_id,NULL),'migration',NOW(3),'历史关系基线；此前归属时间未核实'
      FROM users u LEFT JOIN users p ON p.id=u.parent_id
      LEFT JOIN team_memberships m ON m.user_id=u.id
      WHERE u.closed_at IS NULL AND m.id IS NULL`,
@@ -227,7 +240,7 @@ export async function backfillMemberRelations(c: Conn): Promise<BackfillCounts> 
   // ⑥ 角色历史：每人补一条初始记录
   const roleRows = await run(
     `INSERT INTO member_role_history(user_id,from_role,to_role,reason,effective_at)
-     SELECT u.id,NULL,u.role,'migration',u.created_at
+     SELECT u.id,NULL,u.role,'migration',NOW(3)
      FROM users u LEFT JOIN member_role_history h ON h.user_id=u.id
      WHERE h.id IS NULL`,
   );
@@ -294,6 +307,12 @@ export async function checkMemberRelations(c: Conn, sampleLimit = 50): Promise<R
     missingMemberships,
     closedButOpen,
     mismatches,
-    ok: !missingReferrals && !selfClosureRows && !deepChains && !missingMemberships && !closedButOpen && !mismatches.length,
+    ok:
+      !missingReferrals &&
+      !selfClosureRows &&
+      !deepChains &&
+      !missingMemberships &&
+      !closedButOpen &&
+      !mismatches.length,
   };
 }

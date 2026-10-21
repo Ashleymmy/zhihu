@@ -149,11 +149,13 @@ it('previews mixed references without changing accounts or sessions; executes on
   });
   expect(run.items.map((i: any) => i.status)).toEqual(['ready', 'blocked', 'blocked', 'blocked']);
   expect((await saved(m.id)).parent_id).toBeNull();
+  expect((await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM team_memberships WHERE user_id=?',[m.id]))[0][0].n).toBe(0);
   expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(200);
   const result = await execute(a, run);
   expect(result.status).toBe('done');
   expect(result.items[0].status).toBe('succeeded');
   expect(String((await saved(m.id)).parent_id)).toBe(l.id);
+  expect(String((await c.query<RowDataPacket[]>('SELECT leader_id FROM team_memberships WHERE open_user=?',[m.id]))[0][0].leader_id)).toBe(l.id);
   expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(401);
   await expect(
     sessions.assertLoginSession(m.id, mini.familyId, { type: 'mini', id: 'isolated-mini-device' }),
