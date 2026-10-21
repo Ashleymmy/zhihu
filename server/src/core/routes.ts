@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createMemberExportRouter } from './member-export-routes';
 import { createSupportRouter } from './support-routes';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware';
@@ -35,6 +36,7 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   const r = Router();
   r.use(requireAuth);
   r.use('/support', createSupportRouter());
+  r.use('/member-exports', createMemberExportRouter(runtime));
   r.get(
     '/modules',
     asyncHandler(async (req, res) => ok(res, runtime.list(req.user.role))),

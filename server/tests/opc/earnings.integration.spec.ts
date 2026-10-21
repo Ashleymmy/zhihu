@@ -448,3 +448,27 @@ it('成员概览拒绝匿名、后台岗位和指定他人参数，并过滤停�
   try { expect((await request(app).get(endpoint).set(headers['3'])).body.data.direct.total).toBe('0.0000'); }
   finally {await c.query('UPDATE project_members SET left_at=NULL WHERE user_id=3 AND project_id=1');}
 });
+
+
+it('成员分类导出按净额计历史更正，保留当前已移除收款人的旧账且排除演示金额',async()=>{
+  await c.query("INSERT INTO projects(id,name,slug) VALUES(4,'导出项目','member-export')");
+  await c.query("INSERT INTO integration_accounts(id,module_id,account_key,name) VALUES(4,'sample-earnings','export','导出来源')");
+  await c.query('INSERT INTO project_integrations(project_id,account_id) VALUES(4,4)');
+  const target={moduleId:'sample-earnings',projectId:'4',accountId:'4'};
+  const sale={...input('export-sale','12345.6789'),metricType:'new_user',metricLabel:'拉新'};
+  await write(sale,target);await confirm(sale,target);
+  const corrected={...sale,version:'2',lines:[{...sale.lines[0],amount:'12000.0001'}]};await write(corrected,target);await confirm(corrected,target);
+  const activation={...input('export-activation','3333.1234'),metricType:'activation',metricLabel:'拉活',unit:'个'};
+  activation.lines.push({...activation.lines[0],payeeId:'3',amount:'555.5555',ruleCode:'leader'});
+  await write(activation,target);await confirm(activation,target);
+  const old={...input('export-old','7.0000'),metricType:'new_user',metricLabel:'拉新'};await write(old,target);await confirm(old,target);
+  await write({...old,version:'2',lines:[{...old.lines[0],payeeId:'5',performerId:'5',amount:'5.0000'}]},target);
+  const internal={...input('export-internal','99999.0000'),metricType:'new_user',metricLabel:'拉新'};internal.lines[0].internal=true;await write(internal,target);
+  const res=await request(app).post('/api/v1/core/member-exports').set(headers['1']).send({memberIds:['2','3'],from:'2026-10-01',to:'2026-10-09',projectId:'4',includeEarnings:true}).buffer(true).parse((r,cb)=>{const chunks:Buffer[]=[];r.on('data',v=>chunks.push(Buffer.from(v)));r.on('end',()=>cb(null,Buffer.concat(chunks)));});
+  expect(res.status,res.text).toBe(200);
+  const XLSX=await import('xlsx');const book=XLSX.read(res.body,{type:'buffer'});
+  const exported=XLSX.utils.sheet_to_json<Record<string,unknown>>(book.Sheets['收益分类']);
+  expect(exported).toHaveLength(3);
+  expect(exported.find(r=>r['用户ID']==='timo000002'&&r['业绩类型']==='拉新')).toMatchObject({'当前应得金额（元）':'12000.0001','已确认净额（元）':'12007.0001','待确认差额（元）':'-7.0000'});
+  expect(exported.find(r=>r['用户ID']==='timo000003')).toMatchObject({'收益归属':'团队分成','业绩类型':'拉活','已确认净额（元）':'555.5555'});
+});

@@ -19,7 +19,9 @@ const people = [
   { sub: '7', role: 'creator', adminDuty: 'all' },
 ] as const;
 const get = (who: string | null, path: string, query: object = {}) => {
-  const r = request(app).get('/api/v1/core/relations' + path).query(query);
+  const r = request(app)
+    .get('/api/v1/core/relations' + path)
+    .query(query);
   return who ? r.set(headers[who]) : r;
 };
 
@@ -53,7 +55,12 @@ beforeAll(async () => {
   c = await mysql.createConnection(target);
   for (const person of people)
     await c.query('INSERT INTO users(id,username,password_hash,role,admin_duty,display_name) VALUES(?,?,?,?,?,?)', [
-      person.sub, 'user' + person.sub, 'unused', person.role, person.adminDuty, '人员' + person.sub,
+      person.sub,
+      'user' + person.sub,
+      'unused',
+      person.role,
+      person.adminDuty,
+      '人员' + person.sub,
     ]);
   await c.query('UPDATE users SET parent_id=2 WHERE id IN (3,4)');
   const dbModule = await import('../../src/db');
@@ -83,7 +90,14 @@ beforeAll(async () => {
       'X-Client-Id': client,
       Authorization:
         'Bearer ' +
-        (await signToken({ ...person, id: person.sub, username: 'user' + person.sub, displayName: '人员' + person.sub, parentId: null, sessionId: session.familyId })),
+        (await signToken({
+          ...person,
+          id: person.sub,
+          username: 'user' + person.sub,
+          displayName: '人员' + person.sub,
+          parentId: null,
+          sessionId: session.familyId,
+        })),
     };
   }
 }, 90000);
@@ -108,7 +122,11 @@ it('达人和团长看自己的邀请关系：邀请人与名单昵称脱敏，�
   expect(leader.body.data.counts).toEqual({ direct: 1, indirect: 1 });
   expect(leader.body.data.directList.map((x: { name: string }) => x.name)).toEqual(['人*3']);
   const independent = await get('7', '/mine');
-  expect(independent.body.data).toMatchObject({ inviter: null, team: { leaderName: null }, counts: { direct: 0, indirect: 0 } });
+  expect(independent.body.data).toMatchObject({
+    inviter: null,
+    team: { leaderName: null },
+    counts: { direct: 0, indirect: 0 },
+  });
 });
 
 it('拒绝未登录、后台岗位查看 /mine，以及多余参数', async () => {
@@ -135,14 +153,105 @@ it('运营岗位查看成员三种关系与时间线；达人、团长和财务�
 it('成员树按团队或邀请逐层加载；平台直管单列；拒绝非运营岗位与未知参数', async () => {
   const roots = await get('5', '/tree', { mode: 'team' });
   expect(roots.status, roots.text).toBe(200);
-  expect(roots.body.data[0]).toMatchObject({ id: 'platform', children: 1 });
-  expect(roots.body.data.find((n: { id: string }) => n.id === '2')).toMatchObject({ role: 'leader', children: 2 });
-  expect((await get('5', '/tree', { mode: 'team', parent: '2' })).body.data.map((n: { id: string }) => n.id)).toEqual(['3', '4']);
-  expect((await get('5', '/tree', { mode: 'team', parent: 'platform' })).body.data.map((n: { id: string }) => n.id)).toEqual(['7']);
-  const inviteRoots = (await get('5', '/tree', { mode: 'invite' })).body.data.map((n: { id: string }) => n.id);
+  expect(roots.body.data.list[0]).toMatchObject({ id: 'platform', children: 1 });
+  expect(roots.body.data.list.find((n: { id: string }) => n.id === '2')).toMatchObject({ role: 'leader', children: 2 });
+  expect(
+    (await get('5', '/tree', { mode: 'team', parent: '2' })).body.data.list.map((n: { id: string }) => n.id),
+  ).toEqual(['3', '4']);
+  expect(
+    (await get('5', '/tree', { mode: 'team', parent: 'platform' })).body.data.list.map((n: { id: string }) => n.id),
+  ).toEqual(['7']);
+  const inviteRoots = (await get('5', '/tree', { mode: 'invite' })).body.data.list.map((n: { id: string }) => n.id);
   expect(inviteRoots).toEqual(['2', '7']);
-  expect((await get('5', '/tree', { mode: 'invite', parent: '2' })).body.data).toMatchObject([{ id: '3', children: 1 }]);
-  expect((await get('5', '/tree', { mode: 'invite', parent: '3' })).body.data.map((n: { id: string }) => n.id)).toEqual(['4']);
+  expect((await get('5', '/tree', { mode: 'invite', parent: '2' })).body.data.list).toMatchObject([
+    { id: '3', children: 1 },
+  ]);
+  expect(
+    (await get('5', '/tree', { mode: 'invite', parent: '3' })).body.data.list.map((n: { id: string }) => n.id),
+  ).toEqual(['4']);
   for (const who of ['2', '3', '6']) expect((await get(who, '/tree')).status).toBe(403);
   expect((await get('5', '/tree', { depth: '3' })).status).toBe(422);
+});
+
+it('关系树和历史分页可继续读取，不截断完整成员名单', async () => {
+  const first = await get('1', '/tree', { mode: 'team', parent: '2', pageSize: 1 });
+  const second = await get('1', '/tree', { mode: 'team', parent: '2', pageSize: 1, page: 2 });
+  expect(first.body.data.hasMore).toBe(true);
+  expect(second.body.data.hasMore).toBe(false);
+  expect([...first.body.data.list, ...second.body.data.list].map((v: any) => v.id)).toEqual(['3', '4']);
+  const detail = await get('1', '/members/3', { pageSize: 1 });
+  expect(detail.body.data.total).toBe(2);
+});
+it('客服设置仅完整管理员可改，链接限定飞书 HTTPS 并拒绝过期保存', async () => {
+  expect((await request(app).get('/api/v1/core/support')).status).toBe(401);
+  for (const who of ['1', '2', '3', '5', '6'])
+    expect((await request(app).get('/api/v1/core/support').set(headers[who])).status).toBe(200);
+  const body = {
+    revision: 0,
+    serviceUrl: 'https://applink.feishu.cn/client/contact/example',
+    businessUrl: '',
+    serviceHours: '工作日',
+    miniContactEnabled: true,
+  };
+  for (const who of ['2', '3', '5', '6'])
+    expect((await request(app).put('/api/v1/core/support').set(headers[who]).send(body)).status).toBe(403);
+  for (const bad of ['javascript:alert(1)', 'https://feishu.cn.evil.example/', 'https://user:pass@feishu.cn/'])
+    expect(
+      (
+        await request(app)
+          .put('/api/v1/core/support')
+          .set(headers['1'])
+          .send({ ...body, serviceUrl: bad })
+      ).status,
+    ).toBe(422);
+  const saved = await request(app).put('/api/v1/core/support').set(headers['1']).send(body);
+  expect(saved.status, saved.text).toBe(200);
+  expect(saved.body.data.revision).toBe(1);
+  expect((await request(app).put('/api/v1/core/support').set(headers['1']).send(body)).status).toBe(409);
+});
+it('成员导出拒绝达人团长财务，运营导出不包含金额，后台全部筛选成员均在表中', async () => {
+  const body = { memberIds: ['2', '3', '4'], from: '2026-01-01', to: '2026-12-31' };
+  for (const who of ['2', '3', '6'])
+    expect((await request(app).post('/api/v1/core/member-exports').set(headers[who]).send(body)).status).toBe(403);
+  expect(
+    (
+      await request(app)
+        .post('/api/v1/core/member-exports')
+        .set(headers['5'])
+        .send({ ...body, includeEarnings: true })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await request(app)
+        .post('/api/v1/core/member-exports')
+        .set(headers['1'])
+        .send({ ...body, memberIds: ['99999'] })
+    ).status,
+  ).toBe(409);
+  await c.query("UPDATE users SET display_name='=unsafe()',phone='0013800123456' WHERE id=3");
+  const result = await request(app)
+    .post('/api/v1/core/member-exports')
+    .set(headers['5'])
+    .send(body)
+    .buffer(true)
+    .parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (v) => chunks.push(Buffer.from(v)));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+  expect(result.status, result.text).toBe(200);
+  const XLSX = await import('xlsx');
+  const book = XLSX.read(result.body, { type: 'buffer' });
+  expect(book.SheetNames).not.toContain('收益分类');
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets['成员与归属']);
+  expect(rows).toHaveLength(3);
+  expect(rows.find((r) => r['用户ID'] === 'timo000003')).toMatchObject({
+    姓名: '=unsafe()',
+    手机号: '0013800123456',
+    当前团长ID: 'timo000002',
+    邀请人ID: 'timo000002',
+  });
+  for (const [key, cell] of Object.entries(book.Sheets['成员与归属']))
+    if (!key.startsWith('!')) expect((cell as any).f).toBeUndefined();
 });

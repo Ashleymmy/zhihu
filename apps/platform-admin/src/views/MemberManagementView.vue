@@ -3,6 +3,8 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import MemberClientDetails from "./MemberClientDetails.vue";
 import MemberChangePanel from "./MemberChangePanel.vue";
+import MemberExportPanel from "./MemberExportPanel.vue";
+import MemberRelationsPanel from "./MemberRelationsPanel.vue";
 import { bindingLabel, miniFilters, matchesMiniFilter } from "../mini-status";
 import { ActionDialog, DetailDrawer } from "@zhihu-koc/shared-components";
 import {
@@ -68,6 +70,13 @@ const search = ref(""),
   page = ref(1),
   tab = ref("members");
 const pageSize = 20;
+const registeredFrom = ref(""),
+  registeredTo = ref("");
+function registeredDay(value: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(
+    new Date(value),
+  );
+}
 const teamFilter = ref(""),
   projectFilter = ref(""),
   checked = ref<string[]>([]),
@@ -83,6 +92,8 @@ let previousFilters: {
   mini: string;
   member: string;
   project: string;
+  registeredFrom: string;
+  registeredTo: string;
   page: number;
 } | null = null;
 function viewTeam(member: TeamMember) {
@@ -94,6 +105,8 @@ function viewTeam(member: TeamMember) {
       mini: miniFilter.value,
       member: memberIdFilter.value,
       project: projectFilter.value,
+      registeredFrom: registeredFrom.value,
+      registeredTo: registeredTo.value,
       page: page.value,
     };
   search.value = "";
@@ -102,6 +115,8 @@ function viewTeam(member: TeamMember) {
   miniFilter.value = "";
   memberIdFilter.value = "";
   projectFilter.value = "";
+  registeredFrom.value = "";
+  registeredTo.value = "";
   teamFilter.value = member.id;
   page.value = 1;
   tab.value = "members";
@@ -116,6 +131,8 @@ function backToMembers() {
     miniFilter.value = previousFilters.mini;
     memberIdFilter.value = previousFilters.member;
     projectFilter.value = previousFilters.project;
+    registeredFrom.value = previousFilters.registeredFrom;
+    registeredTo.value = previousFilters.registeredTo;
     page.value = previousFilters.page;
     previousFilters = null;
   }
@@ -177,6 +194,10 @@ const filtered = computed(() =>
   members.value.filter(
     (m) =>
       (!memberIdFilter.value || m.id === memberIdFilter.value) &&
+      (!registeredFrom.value ||
+        registeredDay(m.createdAt) >= registeredFrom.value) &&
+      (!registeredTo.value ||
+        registeredDay(m.createdAt) <= registeredTo.value) &&
       (!teamFilter.value ||
         (teamFilter.value === "independent"
           ? m.role === "creator" && !m.parentId
@@ -436,6 +457,10 @@ onMounted(() => run(load));
         <p>查看成员资料、角色权限、团队归属与邀请记录。</p>
       </div>
       <div v-if="!batchOpen" class="member-actions">
+        <MemberExportPanel
+          :member-ids="filtered.map((m) => m.id)"
+          :project-id="projectFilter || undefined"
+        />
         <router-link to="/invitations">管理邀请链接</router-link>
         <button
           @click="
@@ -483,6 +508,13 @@ onMounted(() => run(load));
       >
         我的邀请 {{ invitations.length }}
       </button>
+      <button
+        v-if="canBatch"
+        :aria-pressed="tab === 'relations'"
+        @click="tab = 'relations'"
+      >
+        成员关系
+      </button>
     </nav>
     <article v-if="!batchOpen && tab === 'members'" class="panel">
       <div v-if="teamFilter" class="team-context">
@@ -501,6 +533,20 @@ onMounted(() => run(load));
         <button @click="backToMembers">返回全部成员</button>
       </div>
       <form class="member-filters" @submit.prevent="page = 1">
+        <label
+          >注册开始日期<input
+            v-model="registeredFrom"
+            type="date"
+            :max="registeredTo"
+            @change="page = 1"
+        /></label>
+        <label
+          >注册结束日期<input
+            v-model="registeredTo"
+            type="date"
+            :min="registeredFrom"
+            @change="page = 1"
+        /></label>
         <label
           >搜索成员<input
             v-model="search"
@@ -797,7 +843,10 @@ onMounted(() => run(load));
       </table>
       <p v-if="!applications.length" class="member-empty">暂无入团申请。</p>
     </article>
-    <article v-else-if="!batchOpen" class="panel member-table">
+    <article
+      v-else-if="!batchOpen && tab === 'invitations'"
+      class="panel member-table"
+    >
       <table>
         <thead>
           <tr>
@@ -845,6 +894,9 @@ onMounted(() => run(load));
         还没有邀请链接，点击“邀请成员”创建。
       </p>
     </article>
+    <MemberRelationsPanel
+      v-if="!batchOpen && tab === 'relations' && canBatch"
+    />
     <component
       :is="dialog === 'detail' ? DetailDrawer : ActionDialog"
       :open="!!dialog"
