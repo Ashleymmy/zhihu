@@ -15,13 +15,13 @@ Page(screen('join-team', {
     // Returning after a leader approves an application must refresh project availability too.
     if (affiliation.team && !this.data.affiliation?.team) scopes.reset();
     return {affiliation, leaders, selected,
-      filteredLeaders:leaders.filter(l => `${l.displayName} ${l.username}`.toLowerCase().includes(query)),
+      filteredLeaders:leaders.filter(l => l.displayName.toLowerCase().includes(query)),
       applications:applications.map(a=>({...a,statusText:labels[a.status]||a.status})),
       pending:applications.find(a=>a.status==='pending')||null};
   },
   searchLeader(e) {
     const query = e.detail.value;
-    this.setData({query,selected:null,filteredLeaders:this.data.leaders.filter(l => `${l.displayName} ${l.username}`.toLowerCase().includes(query.trim().toLowerCase()))});
+    this.setData({query,selected:null,filteredLeaders:this.data.leaders.filter(l => l.displayName.toLowerCase().includes(query.trim().toLowerCase()))});
   },
   pickLeader(e) {
     if(this.data.busy) return;

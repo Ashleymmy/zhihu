@@ -25,12 +25,12 @@ const pickerOpen = ref(false)
 const filteredLeaders = computed(() => {
   const q = leaderQuery.value.trim().toLowerCase()
   if (!q) return leaders.value
-  return leaders.value.filter((l) => `${l.displayName}${l.username}`.toLowerCase().includes(q))
+  return leaders.value.filter((l) => l.displayName.toLowerCase().includes(q))
 })
 
 function pickLeader(leader: LeaderOption) {
   form.value.leaderUsername = leader.username
-  leaderQuery.value = `${leader.displayName}（${leader.username}）`
+  leaderQuery.value = leader.displayName
   pickerOpen.value = false
 }
 
@@ -185,7 +185,7 @@ onMounted(load)
           <div class="leader-picker">
             <input
               v-model="leaderQuery"
-              placeholder="搜索团长名字或用户名"
+              placeholder="搜索团长名字"
               @focus="pickerOpen = true"
               @blur="onPickerBlur"
               @input="form.leaderUsername = ''"
@@ -200,7 +200,7 @@ onMounted(load)
                 @click="pickLeader(l)"
               >
                 <strong>{{ l.displayName }}</strong>
-                <span class="leader-meta">{{ l.username }} · {{ l.memberCount }} 位成员</span>
+                <span class="leader-meta">{{ form.leaderUsername === l.username ? '已选择' : '选择' }}</span>
               </button>
               <p v-if="!filteredLeaders.length" class="leader-empty">没有匹配的团长。</p>
             </div>

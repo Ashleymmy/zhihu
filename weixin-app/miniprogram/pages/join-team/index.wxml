@@ -14,10 +14,10 @@
     </view>
     <view class="card" wx:if="{{!affiliation.team && !pending}}">
       <view class="title">申请加入团队</view>
-      <input value="{{query}}" bindinput="searchLeader" placeholder="搜索团长名字或账号" maxlength="64" />
+      <input value="{{query}}" bindinput="searchLeader" placeholder="搜索团长名字" maxlength="64" />
       <scroll-view scroll-y class="leader-list">
         <view wx:for="{{filteredLeaders}}" wx:key="id" class="leader {{selected.id === item.id ? 'chosen' : ''}}" data-id="{{item.id}}" bindtap="pickLeader">
-          <view>{{item.displayName}}</view><view class="muted">{{item.username}} {{selected.id === item.id ? '✓' : ''}}</view>
+          <view>{{item.displayName}}</view><view class="muted">{{selected.id === item.id ? '已选择 ✓' : '选择'}}</view>
         </view>
         <view wx:if="{{!filteredLeaders.length}}" class="muted">没有匹配的团长，可刷新后重新搜索。</view>
       </scroll-view>
