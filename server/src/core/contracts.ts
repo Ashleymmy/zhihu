@@ -45,6 +45,22 @@ export interface ModuleDataProvider {
   teamTurnover?(connection: PoolConnection, scope: DataScope, user: AuthUser): Promise<TeamTurnover>;
   workRegistrations?(scope: TaskScope, user: AuthUser, filter: WorkRegistrationFilter, includeRows: boolean): Promise<WorkRegistrationReport>;
   keywordBindings?(scope: TaskScope, user: AuthUser, filter: KeywordBindingFilter): Promise<KeywordBindingRow[]>;
+  memberActivity?: MemberActivityProvider;
+}
+export interface MemberActivityCounts { tasks: number; currentTasks: number; verifiedTasks: number; works: number }
+export interface MemberActivityFilter {
+  kind: 'tasks' | 'works'; status: 'all' | 'current' | 'verified' | 'released';
+  page: number; pageSize: number; search?: string; from?: string; to?: string; taskRef?: string;
+}
+export interface MemberActivityRecord {
+  id: string; projectId: string; accountId: string; taskRef: string;
+  title: string; keyword: string; at: string; status: string;
+  tone: 'success' | 'warning' | 'danger' | 'neutral';
+  url?: string; fields: { label: string; value: string; url?: string }[];
+}
+export interface MemberActivityProvider {
+  summary(scopes: TaskScope[], user: AuthUser, memberIds: string[]): Promise<Record<string, MemberActivityCounts>>;
+  records(scopes: TaskScope[], user: AuthUser, memberId: string, filter: MemberActivityFilter): Promise<{ list: MemberActivityRecord[]; total: number }>;
 }
 export interface KeywordBindingFilter { from?: string; to?: string; search?: string }
 export interface KeywordBindingRow {

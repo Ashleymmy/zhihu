@@ -5,6 +5,13 @@ import MemberClientDetails from "./MemberClientDetails.vue";
 import MemberChangePanel from "./MemberChangePanel.vue";
 import MemberExportPanel from "./MemberExportPanel.vue";
 import MemberRelationsPanel from "./MemberRelationsPanel.vue";
+import MemberActivityPanel from "./MemberActivityPanel.vue";
+import type {
+  ActivityCounts,
+  ActivityKind,
+  ActivityStatus,
+  ActivitySummary,
+} from "../member-activity";
 import { bindingLabel, miniFilters, matchesMiniFilter } from "../mini-status";
 import { ActionDialog, DetailDrawer } from "@zhihu-koc/shared-components";
 import {
@@ -19,6 +26,19 @@ import {
 } from "@zhihu-koc/shared-contracts/core";
 import { apis, http, useAuthStore } from "../stores/auth";
 const auth = useAuthStore();
+const canViewActivity = computed(
+  () =>
+    auth.user?.role === "developer" ||
+    (auth.user?.role === "admin" && auth.user.adminDuty !== "finance"),
+);
+const activityCounts = ref<Record<string, ActivityCounts>>({}),
+  activityLoading = ref(false),
+  activityError = ref(""),
+  activityRefresh = ref(0);
+const detailSection = ref<"profile" | "activity">("profile"),
+  activityKind = ref<ActivityKind>("tasks"),
+  activityStatus = ref<ActivityStatus>("all");
+let activityVersion = 0;
 const route = useRoute();
 const miniFilter = ref(""),
   memberIdFilter = ref("");
@@ -225,6 +245,53 @@ const filtered = computed(() =>
 const visible = computed(() =>
   filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize),
 );
+async function loadActivityCounts() {
+  const version = ++activityVersion;
+  activityCounts.value = {};
+  activityError.value = "";
+  if (!canViewActivity.value || !visible.value.length) {
+    activityLoading.value = false;
+    return;
+  }
+  activityLoading.value = true;
+  try {
+    const r = await http.post<ActivitySummary>("/member-activity/summary", {
+      memberIds: visible.value.map((m) => m.id),
+      ...(projectFilter.value ? { projectId: projectFilter.value } : {}),
+    });
+    if (version === activityVersion) {
+      activityCounts.value = r.totals;
+      if (r.unsupported.length)
+        activityError.value =
+          "部分项目尚未提供统计：" + r.unsupported.join("、");
+    }
+  } catch (e: any) {
+    if (version === activityVersion)
+      activityError.value = e.message || "成员业务统计加载失败，请重试";
+  } finally {
+    if (version === activityVersion) activityLoading.value = false;
+  }
+}
+watch(
+  () => [
+    canViewActivity.value,
+    visible.value.map((m) => m.id).join(","),
+    projectFilter.value,
+    activityRefresh.value,
+  ],
+  loadActivityCounts,
+  { immediate: true },
+);
+function openActivity(
+  member: TeamMember,
+  kind: ActivityKind,
+  status: ActivityStatus = "all",
+) {
+  open("detail", member);
+  detailSection.value = "activity";
+  activityKind.value = kind;
+  activityStatus.value = status;
+}
 const pending = computed(() =>
   applications.value.filter((a) => a.status === "pending"),
 );
@@ -280,17 +347,18 @@ const source = (m: TeamMember) =>
     : m.registrationSource === "managed"
       ? "管理创建"
       : "自主注册 / 历史账号";
-const title = computed(
-  () =>
-    ({
-      create: "创建成员",
-      edit: "编辑成员",
-      detail: "成员信息与权限",
-      reset: "重置密码",
-      invite: "邀请成员",
-      revoke: "停用邀请",
-      delete: "删除成员",
-    })[dialog.value ?? "detail"],
+const title = computed(() =>
+  dialog.value === "detail" && detailSection.value === "activity"
+    ? `${selected.value?.displayName || "成员"}的任务与作品`
+    : {
+        create: "创建成员",
+        edit: "编辑成员",
+        detail: "成员信息与权限",
+        reset: "重置密码",
+        invite: "邀请成员",
+        revoke: "停用邀请",
+        delete: "删除成员",
+      }[dialog.value ?? "detail"],
 );
 async function load() {
   loading.value = true;
@@ -305,6 +373,7 @@ async function load() {
     invitations.value = i;
     applications.value = a;
     projects.value = p;
+    activityRefresh.value++;
     page.value = Math.min(
       page.value,
       Math.max(1, Math.ceil(filtered.value.length / pageSize)),
@@ -326,6 +395,9 @@ async function run(fn: () => Promise<unknown>) {
   }
 }
 function open(kind: typeof dialog.value, member?: TeamMember) {
+  detailSection.value = "profile";
+  activityKind.value = "tasks";
+  activityStatus.value = "all";
   error.value = "";
   dialog.value = kind;
   selected.value = member ?? null;
@@ -637,6 +709,16 @@ onMounted(() => run(load));
           查看全部成员
         </button>
       </p>
+      <p
+        v-if="canViewActivity && activityError"
+        role="alert"
+        class="member-error"
+      >
+        {{ activityError }}
+        <button :disabled="activityLoading" @click="loadActivityCounts">
+          重新加载统计
+        </button>
+      </p>
       <p v-if="loading" class="member-empty" role="status">正在加载成员…</p>
       <div v-else class="member-table">
         <table>
@@ -656,6 +738,7 @@ onMounted(() => run(load));
               </th>
               <th>角色 / 状态</th>
               <th>所属团队</th>
+              <th v-if="canViewActivity">任务与作品</th>
               <th>注册 / 邀请来源</th>
               <th>注册 / 最后登录</th>
               <th>微信小程序</th>
@@ -712,6 +795,34 @@ onMounted(() => run(load));
                   ><span v-else>成员 {{ m.memberCount ?? 0 }}</span> · 项目
                   {{ m.projectCount ?? 0 }}</small
                 >
+              </td>
+              <td v-if="canViewActivity" class="member-activity-counts">
+                <template v-if="activityCounts[m.id]">
+                  <button class="team-link" @click="openActivity(m, 'tasks')">
+                    累计任务 {{ activityCounts[m.id]!.tasks }}
+                  </button>
+                  <small
+                    ><button
+                      class="team-link"
+                      @click="openActivity(m, 'tasks', 'current')"
+                    >
+                      在手 {{ activityCounts[m.id]!.currentTasks }}
+                    </button>
+                    ·
+                    <button
+                      class="team-link"
+                      @click="openActivity(m, 'tasks', 'verified')"
+                    >
+                      已核验 {{ activityCounts[m.id]!.verifiedTasks }}
+                    </button></small
+                  >
+                  <button class="team-link" @click="openActivity(m, 'works')">
+                    作品记录 {{ activityCounts[m.id]!.works }}
+                  </button>
+                </template>
+                <span v-else>{{
+                  activityLoading ? "正在统计…" : "统计未加载"
+                }}</span>
               </td>
               <td>
                 {{ source(m)
@@ -1045,95 +1156,122 @@ onMounted(() => run(load));
         </div>
       </form>
       <div v-else-if="dialog === 'detail' && selected" class="member-detail">
-        <dl>
-          <dt>账号</dt>
-          <dd>
-            {{ selected.displayName }} · {{ selected.username }} · ID
-            {{ selected.id }}
-          </dd>
-          <dt>角色与职责</dt>
-          <dd>
-            {{ ROLE_LABELS[selected.role] }}
-            {{
-              selected.adminDuty === "finance"
-                ? "· 财务"
-                : selected.adminDuty === "operations"
-                  ? "· 运营"
-                  : ""
-            }}
-          </dd>
-          <dt>团队</dt>
-          <dd>
-            {{
-              selected.parentName ||
-              (selected.role === "leader" ? "团长本人" : "独立达人")
-            }}
-          </dd>
-          <dt>注册来源</dt>
-          <dd>{{ source(selected) }}</dd>
-          <dt>创建人 / 邀请人</dt>
-          <dd>
-            {{ selected.createdByName || "—" }} /
-            {{ selected.inviterName || "—" }}
-          </dd>
-          <dt>邀请记录</dt>
-          <dd>
-            {{ selected.invitationLabel || "无邀请链接记录"
-            }}<small>{{ format(selected.invitedAt) }}</small>
-          </dd>
-          <dt>注册 / 登录</dt>
-          <dd>
-            {{ format(selected.createdAt) }} /
-            {{ format(selected.lastLoginAt) }}
-          </dd>
-          <dt>业务范围</dt>
-          <dd>
-            {{
-              isStaffRole(selected.role)
-                ? "管理角色按职责访问项目"
-                : selected.projects?.map((p) => p.name).join("、") ||
-                  "尚未分配项目"
-            }}
-          </dd>
-          <dt>成员统计</dt>
-          <dd>
-            项目 {{ selected.projectCount ?? 0 }} ·
-            <button
-              v-if="
-                selected.role === 'leader' || Number(selected.memberCount) > 0
-              "
-              class="team-link"
-              @click="viewTeam(selected)"
-            >
-              下属成员 {{ selected.memberCount ?? 0 }} · 查看名单</button
-            ><span v-else>下属成员 0</span> · 已邀请
-            {{ selected.invitedCount ?? 0 }} 人
-          </dd>
-        </dl>
-        <MemberClientDetails :member="selected" />
-        <h3>角色权限</h3>
-        <p>
-          {{
-            selected.role === "leader"
-              ? "管理本人团队成员；业务按项目授权生效。"
-              : selected.role === "creator"
-                ? "只处理本人及分配给本人的业务。"
-                : selected.adminDuty === "finance"
-                  ? "仅财务职责范围，不能执行运营和账号管理操作。"
-                  : selected.role === "operator"
-                    ? "业务运营及下级团队管理，不含财务、接入密钥和管理账号授权。"
-                    : "按角色层级管理账号与业务，不能越级授权。"
-          }}
-        </p>
-        <div class="permission-tags">
-          <span
-            v-for="permission in selected.permissions?.filter(
-              (p) => permissionNames[p],
-            )"
-            :key="permission"
-            >{{ permissionNames[permission] }}</span
+        <nav
+          v-if="canViewActivity"
+          class="member-tabs detail-tabs"
+          aria-label="成员详情分类"
+        >
+          <button
+            :aria-pressed="detailSection === 'profile'"
+            @click="detailSection = 'profile'"
           >
-        </div>
+            资料与权限
+          </button>
+          <button
+            :aria-pressed="detailSection === 'activity'"
+            @click="detailSection = 'activity'"
+          >
+            任务与作品
+          </button>
+        </nav>
+        <MemberActivityPanel
+          v-if="canViewActivity && detailSection === 'activity'"
+          :member-id="selected.id"
+          :project-id="projectFilter || undefined"
+          :initial-kind="activityKind"
+          :initial-status="activityStatus"
+        />
+        <template v-else>
+          <dl>
+            <dt>账号</dt>
+            <dd>
+              {{ selected.displayName }} · {{ selected.username }} · ID
+              {{ selected.id }}
+            </dd>
+            <dt>角色与职责</dt>
+            <dd>
+              {{ ROLE_LABELS[selected.role] }}
+              {{
+                selected.adminDuty === "finance"
+                  ? "· 财务"
+                  : selected.adminDuty === "operations"
+                    ? "· 运营"
+                    : ""
+              }}
+            </dd>
+            <dt>团队</dt>
+            <dd>
+              {{
+                selected.parentName ||
+                (selected.role === "leader" ? "团长本人" : "独立达人")
+              }}
+            </dd>
+            <dt>注册来源</dt>
+            <dd>{{ source(selected) }}</dd>
+            <dt>创建人 / 邀请人</dt>
+            <dd>
+              {{ selected.createdByName || "—" }} /
+              {{ selected.inviterName || "—" }}
+            </dd>
+            <dt>邀请记录</dt>
+            <dd>
+              {{ selected.invitationLabel || "无邀请链接记录"
+              }}<small>{{ format(selected.invitedAt) }}</small>
+            </dd>
+            <dt>注册 / 登录</dt>
+            <dd>
+              {{ format(selected.createdAt) }} /
+              {{ format(selected.lastLoginAt) }}
+            </dd>
+            <dt>业务范围</dt>
+            <dd>
+              {{
+                isStaffRole(selected.role)
+                  ? "管理角色按职责访问项目"
+                  : selected.projects?.map((p) => p.name).join("、") ||
+                    "尚未分配项目"
+              }}
+            </dd>
+            <dt>成员统计</dt>
+            <dd>
+              项目 {{ selected.projectCount ?? 0 }} ·
+              <button
+                v-if="
+                  selected.role === 'leader' || Number(selected.memberCount) > 0
+                "
+                class="team-link"
+                @click="viewTeam(selected)"
+              >
+                下属成员 {{ selected.memberCount ?? 0 }} · 查看名单</button
+              ><span v-else>下属成员 0</span> · 已邀请
+              {{ selected.invitedCount ?? 0 }} 人
+            </dd>
+          </dl>
+          <MemberClientDetails :member="selected" />
+          <h3>角色权限</h3>
+          <p>
+            {{
+              selected.role === "leader"
+                ? "管理本人团队成员；业务按项目授权生效。"
+                : selected.role === "creator"
+                  ? "只处理本人及分配给本人的业务。"
+                  : selected.adminDuty === "finance"
+                    ? "仅财务职责范围，不能执行运营和账号管理操作。"
+                    : selected.role === "operator"
+                      ? "业务运营及下级团队管理，不含财务、接入密钥和管理账号授权。"
+                      : "按角色层级管理账号与业务，不能越级授权。"
+            }}
+          </p>
+          <div class="permission-tags">
+            <span
+              v-for="permission in selected.permissions?.filter(
+                (p) => permissionNames[p],
+              )"
+              :key="permission"
+              >{{ permissionNames[permission] }}</span
+            >
+          </div>
+        </template>
       </div>
       <form
         v-else-if="dialog === 'reset' && selected"
@@ -1292,7 +1430,8 @@ onMounted(() => run(load));
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.members-page button {
+.members-page button,
+.detail-tabs button {
   min-height: 40px;
   padding: 8px 12px;
   cursor: pointer;
@@ -1364,6 +1503,12 @@ onMounted(() => run(load));
   white-space: nowrap;
   font-weight: 500;
   color: var(--ink-soft);
+}
+.member-activity-counts {
+  min-width: 140px;
+}
+.detail-tabs {
+  margin-bottom: 24px;
 }
 .member-table small,
 .member-detail small {
