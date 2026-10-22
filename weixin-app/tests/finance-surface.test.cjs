@@ -45,10 +45,16 @@ test('home, mine, income and tools still load for all roles without querying pay
   assert.equal(h.load('utils/auth').entryPath(user),'/pages/home/index');
  }
 });
-test('data query tool opens the existing earnings tab',async()=>{
- const {h}=setup({role:'creator'}),p=h.page('tools');await p.onShow();
- p.openTool({currentTarget:{dataset:{key:'income'}}});assert.equal(h.navigation.at(-1),'/pages/income/index');
- assert(!p.data.tools.some(t=>t.path&&/wallet|withdrawals/.test(t.path)));
+test('tools only exposes the working earnings query for every role',async()=>{
+ for(const role of roles) {
+  const {h}=setup(role),p=h.page('tools');await p.onShow();
+  assert.deepEqual(Array.from(p.data.tools,t=>t.key),['income']);
+  for(const key of ['title','rewrite','voice','cover','clip'])p.openTool({currentTarget:{dataset:{key}}});
+  assert.equal(h.navigation.length,0);
+  p.openTool({currentTarget:{dataset:{key:'income'}}});assert.equal(h.navigation.at(-1),'/pages/income/index');
+  const income=h.page('income');await income.onShow();assert.equal(income.data.error,'');
+  assert.equal(income.data.allowed,true);
+ }
 });
 test('mini protocols disclose restored withdrawal data use and rules',()=>{
  const documents=require('../miniprogram/pages/agreement/documents.js');
