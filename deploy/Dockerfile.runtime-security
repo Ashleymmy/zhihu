@@ -1,0 +1,15 @@
+# Runtime-only patch: preserve the exact application and hashed Web assets.
+# SOURCE_IMAGE must be the immutable deployed application image digest.
+ARG SOURCE_IMAGE
+FROM ${SOURCE_IMAGE} AS deployed
+FROM node:24.22.1-alpine3.24@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d
+RUN apk add --no-cache --upgrade 'ca-certificates-bundle>=20261020-r0'
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 TZ=Asia/Shanghai
+COPY --from=deployed --chown=node:node /app /app
+COPY --from=deployed --chown=node:node /apps /apps
+COPY deploy/verify-tls-trust.cjs /usr/local/lib/verify-tls-trust.cjs
+RUN node /usr/local/lib/verify-tls-trust.cjs
+USER node
+EXPOSE 3000
+CMD ["node", "dist/src/index.js"]

@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24.19.0-alpine3.24@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS build
+FROM node:24.22.1-alpine3.24@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS build
+RUN apk add --no-cache --upgrade 'ca-certificates-bundle>=20261020-r0'
 
 WORKDIR /app
 
@@ -13,7 +14,8 @@ COPY scripts ./scripts
 
 RUN npm run build && npm prune --omit=dev && npm ls --omit=dev --all
 
-FROM node:24.19.0-alpine3.24@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runtime
+FROM node:24.22.1-alpine3.24@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS runtime
+RUN apk add --no-cache --upgrade 'ca-certificates-bundle>=20261020-r0'
 
 WORKDIR /app
 
