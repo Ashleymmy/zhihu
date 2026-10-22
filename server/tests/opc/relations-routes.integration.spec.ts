@@ -3,6 +3,8 @@ import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysq
 import mysql from 'mysql2/promise';
 import request from 'supertest';
 import type { Express } from 'express';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
 
 let container: StartedMySqlContainer, c: mysql.Connection, app: Express;
@@ -258,10 +260,14 @@ it('成员导出拒绝达人团长财务，运营导出不包含金额，后台�
 
 it('商务二维码仅管理人员配置，原图受登录保护，旧客户端保存保留图片且变更原子化', async () => {
   const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1cAAAAASUVORK5CYII=';
+  const sharedJpeg = Buffer.concat([
+    readFileSync(path.join(__dirname, '../fixtures/business-jpeg-test.jpg')),
+    Buffer.from('55fbf40900000000000102030405060708090a0b0c0d0e0f', 'hex'),
+  ]).toString('base64');
   const uri = '/api/v1/core/support', imageUri = uri + '/business-qrcodes/wechat';
   expect((await request(app).get(imageUri)).status).toBe(401);
   const before = (await request(app).get(uri).set(headers['1'])).body.data;
-  const body = { ...before, businessQrCodes: [{ channel: 'wechat', name: '微信商务', base64 }, { channel: 'feishu', name: '飞书商务', base64 }] };
+  const body = { ...before, businessQrCodes: [{ channel: 'wechat', name: '微信商务', base64 }, { channel: 'feishu', name: '飞书商务', base64: sharedJpeg }] };
   for (const who of ['2', '3', '5', '6']) expect((await request(app).put(uri).set(headers[who]).send(body)).status).toBe(403);
   for (const entries of [
     [{ channel: 'wechat', name: '错误图片', base64: Buffer.from('<svg onload="alert(1)"/>').toString('base64') }],
@@ -273,6 +279,9 @@ it('商务二维码仅管理人员配置，原图受登录保护，旧客户端�
   expect(saved.body.data.businessQrCodes).toHaveLength(2);
   expect(saved.text).not.toContain(base64);
   const metadata = saved.body.data.businessQrCodes;
+  const jpegRead = await request(app).get(uri + '/business-qrcodes/feishu').set(headers['3']);
+  expect(jpegRead.status).toBe(200);
+  expect(jpegRead.body.data).toMatchObject({ mimeType: 'image/jpeg', base64: sharedJpeg });
   for (const who of ['1', '2', '3', '5', '6', '7']) {
     const image = await request(app).get(imageUri).set(headers[who]);
     expect(image.status).toBe(200);
@@ -291,6 +300,7 @@ it('商务二维码仅管理人员配置，原图受登录保护，旧客户端�
   expect(renamed.body.data.businessQrCodes[0].name).toContain('更新');
   const [logs] = await c.query<mysql.RowDataPacket[]>("SELECT detail_json FROM audit_logs WHERE action='support.update'");
   expect(JSON.stringify(logs)).not.toContain(base64);
+  expect(JSON.stringify(logs)).not.toContain(sharedJpeg);
   const removed = await request(app).put(uri).set(headers['1']).send({ ...renamed.body.data, businessQrCodes: [] });
   expect(removed.status).toBe(200);
   expect((await request(app).get(imageUri).set(headers['3'])).status).toBe(404);

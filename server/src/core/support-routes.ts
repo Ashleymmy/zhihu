@@ -7,7 +7,8 @@ import { ok } from '../utils/response';
 import { requireDuty } from './duties';
 import { writeAudit } from '../services/audit.service';
 import { createHash } from 'node:crypto';
-import { avatarImage, AVATAR_MAX_BYTES } from '../services/user-avatar.service';
+import { AVATAR_MAX_BYTES } from '../services/user-avatar.service';
+import { businessQrImage } from '../services/business-qr-image';
 
 const channel = z.enum(['wechat', 'feishu']);
 const qrInput = z.object({
@@ -90,7 +91,7 @@ export function createSupportRouter() {
             const prepared = value.businessQrCodes.map(item => {
               if (item.base64 !== undefined) {
                 let image;
-                try { image = avatarImage(item.base64); }
+                try { image = businessQrImage(item.base64); }
                 catch { throw new AppError(422, 42200, '请选择完整的 JPG 或 PNG 二维码，大小不超过 256 KB，长宽不超过 2048 像素'); }
                 return { ...item, content: image.buffer, mime: image.mime, hash: createHash('sha256').update(image.buffer).digest('hex') };
               }
