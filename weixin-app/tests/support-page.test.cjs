@@ -56,9 +56,11 @@ function businessSetup() {
   h.session(user);
   return { h, page: h.page('business'), change: value => { settings = { ...settings, ...value }; } };
 }
-test('商务入口打开卡片，微信飞书切换使用对应原图，更新和移除不会继续展示旧码', async () => {
+test('我的页商务入口直达卡片，微信飞书切换使用对应原图，更新和移除不会继续展示旧码', async () => {
   const { h, page, change } = businessSetup();
-  const support = h.page('support'); await support.onShow(); support.open({ currentTarget: { dataset: { path: '/pages/business/index' } } });
+  const mine = h.page('mine'); await mine.onShow();
+  const entry = mine.data.menus.find(item => item.key === 'business'); assert(entry);
+  mine.open({ currentTarget: { dataset: { path: entry.path } } });
   assert.equal(h.navigation.at(-1), '/pages/business/index');
   await page.onShow(); assert.equal(page.data.channel, 'wechat'); assert.equal(page.data.contact.name, '微信商务');
   assert.equal(h.files.get(page.data.imagePath).toString('base64'), png);

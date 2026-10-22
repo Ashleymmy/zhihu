@@ -3,6 +3,7 @@ const auth = require("../../utils/auth");
 const permissions = require("../../utils/permissions");
 const avatar = require("../../utils/avatar");
 const memberSummary = require("../../utils/member-summary");
+const request = require("../../utils/request");
 const ICONS = {
   "join-team": { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
   team: { iconImg: "/images/icons/team.png", tint: "#e9f0ed", fg: "#214239" },
@@ -24,6 +25,9 @@ Page(
     async fetch({ user }) {
       const menus = permissions.menus(user);
       menus.push({key:"support",label:"帮助与客服",path:"/pages/support/index"});
+      const settings = await request.get("/core/support").catch(() => null);
+      if (settings?.businessUrl || settings?.businessQrCodes?.length)
+        menus.push({key:"business",label:"商务合作",path:"/pages/business/index"});
       if (permissions.allowed(user, "withdrawals")) menus.push({key:"withdrawals",label:"提现与记录",path:"/pages/withdrawals/index"});
       menus.push({
         key: "invite",
