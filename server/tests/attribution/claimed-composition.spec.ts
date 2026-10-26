@@ -44,10 +44,10 @@ describe('reviewed member changes preserve old business ownership',()=>{
     const {withTransaction}=await import('../../src/db');const {quote}=await import('../../src/modules/zhihu/attribution/pricing');const {quoteActivation}=await import('../../src/modules/zhihu/attribution/activation-pricing');
     return withTransaction(async conn=>({newUser:await quote(conn,scope,'1',b,'2026-10-01','100'),activation:await quoteActivation(conn,scope,b,'2026-10-01','100',null)}));
   }
-  it('upgrades a creator and preserves their old direct task, both prices and composition picker',async()=>{
+  it.each(['role', 'edit'] as const)('upgrades a creator via %s and preserves their old direct task, both prices and composition picker',async(kind)=>{
     const m=await fresh(),word=await keyword(m),old=await binding(word.bindingId),prices=await amounts(old);
     const {previewMemberChanges,executeMemberChanges}=await import('../../src/services/member-changes.service');
-    const preview=await previewMemberChanges(admin,[m.sub],{kind:'role',role:'leader'},accountRuntime());
+    const preview=await previewMemberChanges(admin,[m.sub],kind === 'role' ? {kind,role:'leader'} : {kind,role:'leader',displayName:'单人升级',phone:null,isActive:true},accountRuntime());
     expect(preview.items[0].status).toBe('ready');expect((await binding(word.bindingId)).access_preserved_at).toBeNull();
     await executeMemberChanges(admin,preview.id,preview.reviewHash,accountRuntime());
     const upgraded={...m,role:'leader' as const},saved=await binding(word.bindingId);
@@ -59,11 +59,11 @@ describe('reviewed member changes preserve old business ownership',()=>{
     expect((await binding(reserved.id)).path_type).toBe('leader_self');
     await expect(works.createComposition(other,input(word.planId))).rejects.toMatchObject({httpStatus:404});
   });
-  it('moves an executor without giving the new leader access to old team works or old revenue',async()=>{
+  it.each(['team', 'edit'] as const)('moves an executor via %s without giving the new leader access to old team works or old revenue',async(kind)=>{
     const oldLeader=await fresh('leader'),newLeader=await fresh('leader'),m=await fresh('creator',oldLeader.sub),word=await keyword();
     const assigned=await resources.claim(oldLeader,scope,word.id,crypto.randomUUID());await resources.changeBinding(oldLeader,scope,assigned.id,crypto.randomUUID(),{action:'assign',executorId:m.sub});
     const work=await works.createComposition(m,input(word.planId)),before=await binding(assigned.id),prices=await amounts(before);
-    await move([m.sub],{kind:'team',parentId:newLeader.sub});const moved={...m,parentId:newLeader.sub};
+    await move([m.sub],kind === 'team' ? {kind,parentId:newLeader.sub} : {kind,role:'creator',parentId:newLeader.sub,displayName:'单人转团',phone:null,isActive:true});const moved={...m,parentId:newLeader.sub};
     expect(await amounts(await binding(assigned.id))).toEqual(prices);
     expect((await works.listCompositions(oldLeader,{planId:word.planId})).total).toBe(1);
     expect((await works.listCompositions(newLeader,{planId:word.planId})).total).toBe(0);

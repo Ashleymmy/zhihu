@@ -61,6 +61,7 @@ const review = z.object({
   action: z.enum(['approve', 'reject']),
 });
 const changeOperation = z.discriminatedUnion('kind',[
+  z.object({kind:z.literal('edit'),displayName:z.string().trim().min(1).max(64),phone:z.string().max(20).nullable(),role:z.enum(['creator','leader']),isActive:z.boolean(),parentId:id.nullable().optional(),childrenParentId:id.nullable().optional(),projectIds:z.array(id).max(200).refine(v=>new Set(v).size===v.length).optional()}).strict(),
   z.object({kind:z.literal('team'),parentId:id.nullable()}).strict(),
   z.object({kind:z.literal('role'),role:z.enum(['creator','leader']),parentId:id.nullable().optional(),childrenParentId:id.nullable().optional()}).strict(),
   z.object({kind:z.literal('projects'),mode:z.enum(['add','remove']),projectIds:z.array(id).min(1).max(200).refine(v=>new Set(v).size===v.length)}).strict(),

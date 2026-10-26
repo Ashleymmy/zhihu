@@ -14,8 +14,9 @@ const props = defineProps<{
   references: string[];
   members: TeamMember[];
   projects: Project[];
+  initialEdit?: Extract<MemberChangeOperation, { kind: "edit" }> | null;
 }>();
-const emit = defineEmits<{ close: []; changed: [] }>();
+const emit = defineEmits<{ close: []; changed: []; edit: [] }>();
 const input = ref(props.references.join("\n")),
   kind = ref<MemberChangeOperation["kind"]>("team"),
   parent = ref(""),
@@ -34,7 +35,20 @@ onBeforeUnmount(() => {
   mounted = false;
 });
 const leaders = computed(() =>
-  props.members.filter((m) => m.role === "leader" && m.isActive),
+  props.members.filter(
+    (m) =>
+      m.role === "leader" &&
+      m.isActive &&
+      (!props.initialEdit || !props.references.includes("id:" + m.id)),
+  ),
+);
+const singleMember = computed(() =>
+  props.members.find((m) => props.references.includes("id:" + m.id)),
+);
+const needsChildDestination = computed(
+  () =>
+    props.initialEdit?.role === "creator" &&
+    singleMember.value?.role === "leader",
 );
 const references = computed(() =>
   input.value
@@ -80,6 +94,13 @@ const labels: Record<string, string> = {
   unchanged: "无需变更",
 };
 function operation(): MemberChangeOperation {
+  if (props.initialEdit)
+    return {
+      ...props.initialEdit,
+      ...(needsChildDestination.value && childrenParent.value !== "__choose"
+        ? { childrenParentId: childrenParent.value || null }
+        : {}),
+    };
   if (kind.value === "team")
     return { kind: "team", parentId: parent.value || null };
   if (kind.value === "role")
@@ -170,6 +191,18 @@ function retry() {
     );
 }
 function editAgain() {
+  if (props.initialEdit) {
+    if (needsChildDestination.value) {
+      run.value = null;
+      error.value = "";
+    } else emit("edit");
+    return;
+  }
+  // A saved single edit is reviewed here, but new edits start from current member data.
+  if (run.value?.operation.kind === "edit") {
+    emit("close");
+    return;
+  }
   if (run.value) {
     const op = run.value.operation;
     input.value = run.value.items.map((i) => i.reference).join("\n");
@@ -192,18 +225,29 @@ function editAgain() {
   run.value = null;
   error.value = "";
 }
-onMounted(() =>
-  refreshHistory().catch(() => {
-    error.value = "操作记录暂未加载，可点击重新读取";
-  }),
-);
+onMounted(async () => {
+  if (props.initialEdit && !needsChildDestination.value) await preview();
+  else
+    await refreshHistory().catch(() => {
+      error.value = "操作记录暂未加载，可点击重新读取";
+    });
+});
 </script>
 <template>
-  <article class="member-change panel" aria-label="批量变更成员">
+  <article
+    class="member-change panel"
+    :aria-label="initialEdit ? '变更成员' : '批量变更成员'"
+  >
     <header>
       <div>
-        <h2>批量变更成员</h2>
-        <p>先核对影响，再确认执行。每位成员都有处理结果。</p>
+        <h2>{{ initialEdit ? "变更成员" : "批量变更成员" }}</h2>
+        <p>
+          {{
+            initialEdit
+              ? "核对角色、团队及资料，确认后一起保存。"
+              : "先核对影响，再确认执行。每位成员都有处理结果。"
+          }}
+        </p>
       </div>
       <button :disabled="busy" @click="emit('close')">返回成员列表</button>
     </header>
@@ -221,55 +265,21 @@ onMounted(() =>
       >
     </nav>
     <form v-if="!run" @submit.prevent="preview()">
-      <label
-        >成员账号或固定 ID<textarea
-          v-model="input"
-          rows="5"
-          placeholder="每行一个账号或 timo ID，也可以用空格、逗号分隔"
-          :disabled="busy"
-          required
-        />
-      </label>
-      <p class="muted">
-        已输入
-        {{
-          references.length
-        }}
-        条，重复与未找到的账号会在预览中逐条列出。每次最多 1000 条。
-      </p>
-      <div class="change-fields">
-        <label
-          >要做什么<select
-            aria-label="要做什么"
-            v-model="kind"
-            :disabled="busy"
-          >
-            <option value="team">调整所属团队</option>
-            <option value="role">调整业务角色</option>
-            <option value="projects">开通或移除项目</option>
-            <option value="active">启用或停用账号</option>
-          </select></label
-        >
-        <label v-if="kind === 'role'"
-          >调整为<select aria-label="调整为" v-model="newRole" :disabled="busy">
-            <option value="leader">团长</option>
-            <option value="creator">达人</option>
-          </select></label
-        >
-        <label
-          v-if="kind === 'team' || (kind === 'role' && newRole === 'creator')"
-          >成员的新归属<select
-            aria-label="成员的新归属"
-            v-model="parent"
-            :disabled="busy"
-          >
-            <option value="">独立达人</option>
-            <option v-for="l in leaders" :key="l.id" :value="l.id">
-              {{ l.displayName }}（{{ l.username }}）
-            </option>
-          </select></label
-        >
-        <label v-if="kind === 'role' && newRole === 'creator'"
+      <template v-if="initialEdit">
+        <p>{{ singleMember?.displayName }} · {{ singleMember?.username }}</p>
+        <p>
+          调整为{{ ROLE_LABELS[initialEdit.role] }} ·
+          {{
+            initialEdit.role === "leader"
+              ? "团长本人"
+              : members.find((m) => m.id === initialEdit?.parentId)
+                  ?.displayName || "独立达人"
+          }}
+        </p>
+        <button type="button" :disabled="busy" @click="emit('edit')">
+          返回修改资料
+        </button>
+        <label v-if="needsChildDestination"
           >团长名下成员的安置<select
             aria-label="团长名下成员的安置"
             v-model="childrenParent"
@@ -282,38 +292,104 @@ onMounted(() =>
             </option>
           </select></label
         >
-        <label v-if="kind === 'projects'"
-          >项目操作<select
-            aria-label="项目操作"
-            v-model="projectMode"
+      </template>
+      <template v-else>
+        <label
+          >成员账号或固定 ID<textarea
+            v-model="input"
+            rows="5"
+            placeholder="每行一个账号或 timo ID，也可以用空格、逗号分隔"
             :disabled="busy"
+            required
+          />
+        </label>
+        <p class="muted">
+          已输入
+          {{ references.length }}
+          条，重复与未找到的账号会在预览中逐条列出。每次最多 1000 条。
+        </p>
+        <div class="change-fields">
+          <label
+            >要做什么<select
+              aria-label="要做什么"
+              v-model="kind"
+              :disabled="busy"
+            >
+              <option value="team">调整所属团队</option>
+              <option value="role">调整业务角色</option>
+              <option value="projects">开通或移除项目</option>
+              <option value="active">启用或停用账号</option>
+            </select></label
           >
-            <option value="add">开通所选项目</option>
-            <option value="remove">移除所选项目</option>
-          </select></label
-        >
-        <label v-if="kind === 'active'"
-          >账号状态<select
-            aria-label="账号状态"
-            v-model="active"
-            :disabled="busy"
+          <label v-if="kind === 'role'"
+            >调整为<select
+              aria-label="调整为"
+              v-model="newRole"
+              :disabled="busy"
+            >
+              <option value="leader">团长</option>
+              <option value="creator">达人</option>
+            </select></label
           >
-            <option value="1">启用</option>
-            <option value="0">停用（退出全部设备）</option>
-          </select></label
-        >
-      </div>
-      <fieldset v-if="kind === 'projects'">
-        <legend>选择项目</legend>
-        <label v-for="p in projects" :key="p.id" class="check"
-          ><input
-            v-model="projectIds"
-            type="checkbox"
-            :value="p.id"
-            :disabled="busy || (projectMode === 'add' && !p.isEnabled)"
-          />{{ p.name }}{{ p.isEnabled ? "" : "（已停用）" }}</label
-        >
-      </fieldset>
+          <label
+            v-if="kind === 'team' || (kind === 'role' && newRole === 'creator')"
+            >成员的新归属<select
+              aria-label="成员的新归属"
+              v-model="parent"
+              :disabled="busy"
+            >
+              <option value="">独立达人</option>
+              <option v-for="l in leaders" :key="l.id" :value="l.id">
+                {{ l.displayName }}（{{ l.username }}）
+              </option>
+            </select></label
+          >
+          <label v-if="kind === 'role' && newRole === 'creator'"
+            >团长名下成员的安置<select
+              aria-label="团长名下成员的安置"
+              v-model="childrenParent"
+              :disabled="busy"
+            >
+              <option value="__choose">如有下属，需先选择归属</option>
+              <option value="">全部调整为独立达人</option>
+              <option v-for="l in leaders" :key="l.id" :value="l.id">
+                全部转入 {{ l.displayName }}（{{ l.username }}）
+              </option>
+            </select></label
+          >
+          <label v-if="kind === 'projects'"
+            >项目操作<select
+              aria-label="项目操作"
+              v-model="projectMode"
+              :disabled="busy"
+            >
+              <option value="add">开通所选项目</option>
+              <option value="remove">移除所选项目</option>
+            </select></label
+          >
+          <label v-if="kind === 'active'"
+            >账号状态<select
+              aria-label="账号状态"
+              v-model="active"
+              :disabled="busy"
+            >
+              <option value="1">启用</option>
+              <option value="0">停用（退出全部设备）</option>
+            </select></label
+          >
+        </div>
+        <fieldset v-if="kind === 'projects'">
+          <legend>选择项目</legend>
+          <label v-for="p in projects" :key="p.id" class="check"
+            ><input
+              v-model="projectIds"
+              type="checkbox"
+              :value="p.id"
+              :disabled="busy || (projectMode === 'add' && !p.isEnabled)"
+            />{{ p.name }}{{ p.isEnabled ? "" : "（已停用）" }}</label
+          >
+        </fieldset>
+      </template>
       <p class="change-note">
         旧任务、作品及收益保留原归属；新业务按变更后的身份和团队办理。
       </p>
@@ -378,10 +454,20 @@ onMounted(() =>
             <div>
               <small>变更前</small>
               <p>{{ summary(item.preview.before[0]) }}</p>
+              <p v-if="run.operation.kind === 'edit'">
+                姓名：{{ item.preview.before[0]?.name }} · 手机号：{{
+                  item.preview.before[0]?.phone || "未填写"
+                }}
+              </p>
             </div>
             <div>
               <small>变更后</small>
               <p>{{ summary(item.preview.after[0]) }}</p>
+              <p v-if="run.operation.kind === 'edit'">
+                姓名：{{ item.preview.after[0]?.name }} · 手机号：{{
+                  item.preview.after[0]?.phone || "未填写"
+                }}
+              </p>
             </div>
           </div>
           <p>{{ item.message }}</p>
@@ -464,7 +550,7 @@ onMounted(() =>
           重新预览未完成项
         </button>
         <button
-          v-if="run.status === 'done'"
+          v-if="run.status === 'done' && !initialEdit"
           :disabled="busy"
           @click="editAgain"
         >
@@ -472,7 +558,7 @@ onMounted(() =>
         </button>
       </footer>
     </template>
-    <details class="change-history">
+    <details v-if="!initialEdit" class="change-history">
       <summary>最近操作记录（{{ history.length }}）</summary>
       <button
         :disabled="busy"

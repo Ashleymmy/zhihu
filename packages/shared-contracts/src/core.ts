@@ -158,12 +158,13 @@ export interface MiniMonitor {
 export type TeamApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 export interface MemberAccessPatch { displayName?: string; phone?: string | null; role?: GlobalRole; adminDuty?: 'all' | 'operations' | 'finance'; isActive?: boolean; parentId?: string | null; projectIds?: string[] }
 export type MemberChangeOperation =
+  | {kind:'edit';displayName:string;phone:string|null;role:'creator'|'leader';isActive:boolean;parentId?:string|null;projectIds?:string[];childrenParentId?:string|null}
   | {kind:'team';parentId:string|null}
   | {kind:'role';role:'creator'|'leader';parentId?:string|null;childrenParentId?:string|null}
   | {kind:'projects';mode:'add'|'remove';projectIds:string[]}
   | {kind:'active';isActive:boolean}
 export interface MemberChangeState {
-  id:string;name:string;username:string;role:string;parentId:string|null;parentName:string|null;active:boolean;duty:string;
+  id:string;name:string;username:string;phone?:string|null;role:string;parentId:string|null;parentName:string|null;active:boolean;duty:string;
   projects:{id:string;name:string;role:string;leftAt:string|null}[]
 }
 export interface MemberChangeRun {

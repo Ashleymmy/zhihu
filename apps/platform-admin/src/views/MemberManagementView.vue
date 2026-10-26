@@ -22,6 +22,7 @@ import {
   type MemberInvitation,
   type TeamApplication,
   type MemberAccessPatch,
+  type MemberChangeOperation,
   type Project,
 } from "@zhihu-koc/shared-contracts/core";
 import { apis, http, useAuthStore } from "../stores/auth";
@@ -434,11 +435,55 @@ async function save() {
       JSON.stringify((m.projects ?? []).map((p) => p.id).sort())
   )
     patch.projectIds = [...edit.projectIds];
+  if (
+    needsChangePreview.value &&
+    (edit.role === "creator" || edit.role === "leader")
+  ) {
+    singleEdit.value = {
+      kind: "edit",
+      displayName: edit.displayName,
+      phone: edit.phone || null,
+      role: edit.role,
+      isActive: edit.isActive,
+      ...(patch.parentId !== undefined ? { parentId: patch.parentId } : {}),
+      ...(patch.projectIds ? { projectIds: patch.projectIds } : {}),
+    };
+    batchReferences.value = ["id:" + m.id];
+    dialog.value = null;
+    batchOpen.value = true;
+    return;
+  }
   await apis.team.manageMember(m.id, patch);
   dialog.value = null;
   notice.value =
     "成员已更新；角色、团队、项目或状态发生变化时，原登录会话会退出。";
   await load();
+}
+const singleEdit = ref<Extract<MemberChangeOperation, { kind: "edit" }> | null>(
+  null,
+);
+const needsChangePreview = computed(() => {
+  const m = selected.value;
+  return (
+    !!m &&
+    canBatch.value &&
+    ["creator", "leader"].includes(m.role) &&
+    ["creator", "leader"].includes(edit.role) &&
+    (edit.role !== m.role ||
+      (edit.role === "creator" &&
+        (edit.parentId || null) !== (m.parentId || null)))
+  );
+});
+function resumeSingleEdit() {
+  batchOpen.value = false;
+  singleEdit.value = null;
+  error.value = "";
+  dialog.value = "edit";
+}
+function closeChanges() {
+  batchOpen.value = false;
+  singleEdit.value = null;
+  void run(load);
 }
 async function createMember() {
   const data = isStaffRole(create.role)
@@ -556,14 +601,13 @@ onMounted(() => run(load));
       :references="batchReferences"
       :members="members"
       :projects="projects"
+      :initial-edit="singleEdit"
+      @edit="resumeSingleEdit"
       @changed="
         checked = [];
         run(load);
       "
-      @close="
-        batchOpen = false;
-        run(load);
-      "
+      @close="closeChanges"
     />
     <nav v-if="!batchOpen" class="member-tabs" aria-label="成员管理分类">
       <button :aria-pressed="tab === 'members'" @click="tab = 'members'">
@@ -1147,12 +1191,14 @@ onMounted(() => run(load));
           </p>
         </fieldset>
         <p>
-          权限按角色和职责生效。有旧任务或下属的身份调整，可使用批量变更预览影响并保留原业务归属。
+          调整角色或所属团队时，先预览影响再确认。旧任务、作品和收益保留原归属。
         </p>
         <div class="dialog-actions">
           <button type="button" :disabled="busy" @click="dialog = null">
             取消</button
-          ><button class="primary" :disabled="busy">保存修改</button>
+          ><button class="primary" :disabled="busy">
+            {{ needsChangePreview ? "预览变更" : "保存修改" }}
+          </button>
         </div>
       </form>
       <div v-else-if="dialog === 'detail' && selected" class="member-detail">

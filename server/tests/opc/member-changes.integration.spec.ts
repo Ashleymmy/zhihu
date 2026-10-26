@@ -149,13 +149,20 @@ it('previews mixed references without changing accounts or sessions; executes on
   });
   expect(run.items.map((i: any) => i.status)).toEqual(['ready', 'blocked', 'blocked', 'blocked']);
   expect((await saved(m.id)).parent_id).toBeNull();
-  expect((await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM team_memberships WHERE user_id=?',[m.id]))[0][0].n).toBe(0);
+  expect(
+    (await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM team_memberships WHERE user_id=?', [m.id]))[0][0].n,
+  ).toBe(0);
   expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(200);
   const result = await execute(a, run);
   expect(result.status).toBe('done');
   expect(result.items[0].status).toBe('succeeded');
   expect(String((await saved(m.id)).parent_id)).toBe(l.id);
-  expect(String((await c.query<RowDataPacket[]>('SELECT leader_id FROM team_memberships WHERE open_user=?',[m.id]))[0][0].leader_id)).toBe(l.id);
+  expect(
+    String(
+      (await c.query<RowDataPacket[]>('SELECT leader_id FROM team_memberships WHERE open_user=?', [m.id]))[0][0]
+        .leader_id,
+    ),
+  ).toBe(l.id);
   expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(401);
   await expect(
     sessions.assertLoginSession(m.id, mini.familyId, { type: 'mini', id: 'isolated-mini-device' }),
@@ -355,4 +362,123 @@ it('keeps current membership when a selected member already has the requested ro
   expect(run.items[0].status).toBe('unchanged');
   await execute(a, run);
   expect(String((await saved(m.id)).parent_id)).toBe(l.id);
+});
+
+it('previews and commits the complete single edit atomically, including team, profile and projects', async () => {
+  const a = await fresh('admin'),
+    m = await fresh(),
+    leader = await fresh('leader');
+  const [p] = await c.query<ResultSetHeader>(
+    "INSERT INTO projects(name,slug) VALUES('单人编辑项目','single-edit-project')",
+  );
+  const operation = {
+    kind: 'edit',
+    role: 'creator',
+    parentId: leader.id,
+    displayName: '更新后的名字',
+    phone: '13800000001',
+    isActive: true,
+    projectIds: [String(p.insertId)],
+  };
+  const run = await preview(a, [m.id], operation);
+  expect(run.items[0].status).toBe('ready');
+  expect(run.items[0].preview.after[0]).toMatchObject({
+    name: operation.displayName,
+    phone: operation.phone,
+    parentId: leader.id,
+  });
+  expect((await saved(m.id)).parent_id).toBeNull();
+  expect(
+    (await c.query<RowDataPacket[]>('SELECT display_name,phone FROM users WHERE id=?', [m.id]))[0][0],
+  ).toMatchObject({ display_name: m.name, phone: null });
+  expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(200);
+  const done = await execute(a, run);
+  expect(done.items[0].status).toBe('succeeded');
+  expect(String((await saved(m.id)).parent_id)).toBe(leader.id);
+  expect(
+    (await c.query<RowDataPacket[]>('SELECT display_name,phone FROM users WHERE id=?', [m.id]))[0][0],
+  ).toMatchObject({ display_name: operation.displayName, phone: operation.phone });
+  expect(
+    (
+      await c.query<RowDataPacket[]>('SELECT project_id FROM project_members WHERE user_id=? AND left_at IS NULL', [
+        m.id,
+      ])
+    )[0].map((r) => String(r.project_id)),
+  ).toEqual(operation.projectIds);
+  expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(401);
+  expect((await execute(a, run)).items).toEqual(done.items);
+});
+
+it('rejects stale phone data and invalid destination without saving any of the accompanying edit', async () => {
+  const a = await fresh('operator'),
+    m = await fresh(),
+    leader = await fresh('leader');
+  const operation = {
+    kind: 'edit',
+    role: 'creator',
+    parentId: leader.id,
+    displayName: '不得部分保存',
+    phone: '13800000002',
+    isActive: true,
+  };
+  const stale = await preview(a, [m.id], operation);
+  await c.query('UPDATE users SET phone=? WHERE id=?', ['13800000003', m.id]);
+  expect((await execute(a, stale)).items[0].status).toBe('failed');
+  const next = await preview(a, [m.id], operation);
+  await c.query('UPDATE users SET is_active=0 WHERE id=?', [leader.id]);
+  expect((await execute(a, next)).items[0].status).toBe('failed');
+  expect(
+    (await c.query<RowDataPacket[]>('SELECT display_name,phone,parent_id FROM users WHERE id=?', [m.id]))[0][0],
+  ).toMatchObject({ display_name: m.name, phone: '13800000003', parent_id: null });
+});
+
+it('requires and atomically applies descendant placement for a single leader edit', async () => {
+  const a = await fresh('admin'),
+    l = await fresh('leader'),
+    target = await fresh('leader'),
+    child = await fresh('creator', l.id);
+  await c.query('UPDATE users SET is_active=0 WHERE id=?', [child.id]);
+  const op = {
+    kind: 'edit',
+    role: 'creator',
+    displayName: '降级后的名字',
+    phone: null,
+    isActive: true,
+    parentId: target.id,
+  };
+  expect((await preview(a, [l.id], op)).items[0].status).toBe('blocked');
+  const run = await preview(a, [l.id], { ...op, childrenParentId: target.id });
+  expect(run.items[0].preview.before).toHaveLength(2);
+  expect((await execute(a, run)).items[0].status).toBe('succeeded');
+  expect((await saved(l.id)).role).toBe('creator');
+  expect(String((await saved(child.id)).parent_id)).toBe(target.id);
+});
+
+it('restricts single-edit payloads to one business member and rejects privilege escalation', async () => {
+  const a = await fresh('admin'),
+    m = await fresh();
+  const op = { kind: 'edit', role: 'leader', displayName: '业务团长', phone: null, isActive: true };
+  for (const denied of [await fresh(), await fresh('leader'), await fresh('admin', null, 'finance')]) {
+    expect(
+      (
+        await request(app)
+          .post(base + '/preview')
+          .set(denied.headers)
+          .send({ references: [m.id], operation: op })
+      ).status,
+    ).toBe(403);
+  }
+  for (const payload of [
+    { references: [m.id, m.id], operation: op },
+    { references: [m.id], operation: { ...op, role: 'developer' } },
+    { references: [m.id], operation: { ...op, adminDuty: 'all' } },
+  ])
+    expect(
+      (
+        await request(app)
+          .post(base + '/preview')
+          .set(a.headers)
+          .send(payload)
+      ).status,
+    ).toBe(422);
 });

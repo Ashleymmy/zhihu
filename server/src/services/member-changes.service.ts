@@ -9,6 +9,16 @@ import { canManageMember, updateMemberAccessInTransaction, type MemberAccessPatc
 import { writeAudit } from './audit.service';
 
 export type MemberChangeOperation =
+  | {
+      kind: 'edit';
+      displayName: string;
+      phone: string | null;
+      role: 'creator' | 'leader';
+      isActive: boolean;
+      parentId?: string | null;
+      projectIds?: string[];
+      childrenParentId?: string | null;
+    }
   | { kind: 'team'; parentId: string | null }
   | { kind: 'role'; role: 'creator' | 'leader'; parentId?: string | null; childrenParentId?: string | null }
   | { kind: 'projects'; mode: 'add' | 'remove'; projectIds: string[] }
@@ -17,6 +27,7 @@ type State = {
   id: string;
   name: string;
   username: string;
+  phone?: string | null;
   role: string;
   parentId: string | null;
   parentName: string | null;
@@ -71,7 +82,7 @@ async function liveActor(c: PoolConnection, actor: AuthUser) {
   assertMemberChangeAccess(current);
   return current;
 }
-async function state(c: PoolConnection, id: string): Promise<State> {
+async function state(c: PoolConnection, id: string, includePhone = false): Promise<State> {
   const [[u]] = await c.query<RowDataPacket[]>(
     `SELECT u.*,p.display_name parent_name FROM users u LEFT JOIN users p ON p.id=u.parent_id WHERE u.id=?`,
     [id],
@@ -85,6 +96,7 @@ async function state(c: PoolConnection, id: string): Promise<State> {
     id,
     name: u.display_name,
     username: u.username,
+    ...(includePhone ? { phone: u.phone ?? null } : {}),
     role: u.role,
     parentId: u.parent_id == null ? null : String(u.parent_id),
     parentName: u.parent_name,
@@ -110,7 +122,11 @@ async function applyUnit(
   const related = [
     actor.sub,
     id,
-    ...(op.kind === 'team' ? [op.parentId] : op.kind === 'role' ? [op.parentId, op.childrenParentId] : []),
+    ...(op.kind === 'team'
+      ? [op.parentId]
+      : op.kind === 'role' || op.kind === 'edit'
+        ? [op.parentId, op.childrenParentId]
+        : []),
   ].filter(Boolean);
   // Lock affected identities and descendants before checking or changing any of them.
   const [users] = await c.query<RowDataPacket[]>(
@@ -131,24 +147,38 @@ async function applyUnit(
   )
     throw new AppError(403, 40301, '此成员不在可批量管理范围内；管理身份请使用专门的授权入口');
   const children =
-    op.kind === 'role' && op.role === 'creator' && member.role === 'leader'
+    (op.kind === 'role' || op.kind === 'edit') && op.role === 'creator' && member.role === 'leader'
       ? users.filter((u) => String(u.parent_id) === id)
       : [];
-  if (children.length && op.kind === 'role' && op.childrenParentId === undefined)
+  if (children.length && (op.kind === 'role' || op.kind === 'edit') && op.childrenParentId === undefined)
     throw new AppError(409, 40900, '请在本页选择下属成员的新归属后重新预览');
   if (children.some((u) => selectedIds.has(String(u.id))))
     throw new AppError(409, 40900, '该团长的下属已单独选中，请取消下属勾选后重新预览；下属会随团长安置一起处理');
-  if (op.kind === 'role' && children.length && op.childrenParentId && selectedIds.has(op.childrenParentId))
+  if (
+    (op.kind === 'role' || op.kind === 'edit') &&
+    children.length &&
+    op.childrenParentId &&
+    selectedIds.has(op.childrenParentId)
+  )
     throw new AppError(409, 40900, '接收成员的团长也在此次角色调整范围内，请选择其他团长');
-  if (op.kind === 'role' && op.role === 'creator' && op.parentId && selectedIds.has(op.parentId))
+  if (
+    (op.kind === 'role' || op.kind === 'edit') &&
+    op.role === 'creator' &&
+    op.parentId &&
+    selectedIds.has(op.parentId)
+  )
     throw new AppError(409, 40900, '目标团长也在此次角色调整范围内，请选择其他团长');
   const ids = [id, ...children.map((u) => String(u.id))];
   const before: State[] = [];
-  for (const target of ids) before.push(await state(c, target));
+  for (const target of ids) before.push(await state(c, target, op.kind === 'edit'));
   if (expected && digest(before) !== digest(expected.before))
     throw new AppError(409, 40900, '成员、项目或下属名单已变化，请重新预览后再确认');
   let patch: MemberAccessPatch;
-  if (op.kind === 'team') {
+  if (op.kind === 'edit') {
+    // Keep the whole single-member edit in the same previewed transaction.
+    const { kind, childrenParentId, ...access } = op;
+    patch = access;
+  } else if (op.kind === 'team') {
     if (member.role !== 'creator')
       throw new AppError(422, 42200, '团队归属只适用于达人；团长改任达人请使用调整业务角色');
     patch = { parentId: op.parentId };
@@ -176,14 +206,14 @@ async function applyUnit(
         c,
         current,
         String(child.id),
-        { parentId: op.kind === 'role' ? op.childrenParentId! : null },
+        { parentId: op.kind === 'role' || op.kind === 'edit' ? op.childrenParentId! : null },
         runtime,
         true,
       )),
     );
   tasks.push(...(await updateMemberAccessInTransaction(c, current, id, patch, runtime, true)));
   const after: State[] = [];
-  for (const target of ids) after.push(await state(c, target));
+  for (const target of ids) after.push(await state(c, target, op.kind === 'edit'));
   const uniqueTasks = [...new Map(tasks.map((t) => [t.projectId + ':' + t.id, t])).values()].sort((a, b) =>
     a.id.localeCompare(b.id),
   );
@@ -221,6 +251,8 @@ export async function previewMemberChanges(
   runtime: ModuleRuntime,
 ) {
   assertMemberChangeAccess(actor);
+  if (operation.kind === 'edit' && references.length !== 1)
+    throw new AppError(422, 42200, '单人编辑每次只能处理一位成员，请返回成员列表重新选择');
   // Separate short transactions per member keep large selections from holding all account locks.
   const id = randomUUID(),
     items: { reference: string; userId: string | null; status: string; message: string; preview: Preview | null }[] =
