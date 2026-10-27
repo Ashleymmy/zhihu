@@ -7,7 +7,7 @@ const format=(date:string|null)=>date?new Date(date).toLocaleString('zh-CN'):'�
 <template>
   <section class="client-detail">
     <h3>小程序与双端账号</h3>
-    <p>统一账号 ID {{ member.id }}。网站与小程序共用此账号及业务数据。</p>
+    <p>用户 ID {{ member.userId || member.username }}。网站与小程序共用此账号及业务数据。</p>
     <template v-if="member.miniProgram">
       <dl>
         <dt>微信绑定</dt><dd>{{ bindingLabel(member.miniProgram) }}<small v-if="member.miniProgram.maskedIdentity">微信标识 {{ member.miniProgram.maskedIdentity }}</small></dd>

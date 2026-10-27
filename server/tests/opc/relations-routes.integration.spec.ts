@@ -248,11 +248,13 @@ it('成员导出拒绝达人团长财务，运营导出不包含金额，后台�
   expect(book.SheetNames).not.toContain('收益分类');
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets['成员与归属']);
   expect(rows).toHaveLength(3);
-  expect(rows.find((r) => r['用户ID'] === 'timo000003')).toMatchObject({
+  const [ids]=await c.query<mysql.RowDataPacket[]>('SELECT public_user,identifier FROM user_identifiers WHERE public_user IN (2,3)');
+  const uid=(id:number)=>ids.find(r=>Number(r.public_user)===id)!.identifier;
+  expect(rows.find((r) => r['用户ID'] === uid(3))).toMatchObject({
     姓名: '=unsafe()',
     手机号: '0013800123456',
-    当前团长ID: 'timo000002',
-    邀请人ID: 'timo000002',
+    当前团长ID: uid(2),
+    邀请人ID: uid(2),
   });
   for (const [key, cell] of Object.entries(book.Sheets['成员与归属']))
     if (!key.startsWith('!')) expect((cell as any).f).toBeUndefined();

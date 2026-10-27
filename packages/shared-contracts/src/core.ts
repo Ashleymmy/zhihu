@@ -103,6 +103,8 @@ export interface Project {
 }
 
 export interface TeamMember {
+  userId?: string
+  userIdAliases?: string[]
   phoneVerifiedAt?: string | null
   miniProgram?: MemberMiniProgram
   projects?: {id:string;name:string;isEnabled:boolean;memberRole:string}[]

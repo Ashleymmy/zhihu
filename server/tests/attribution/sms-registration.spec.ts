@@ -465,13 +465,16 @@ it('migration blocks legacy usernames occupying another present or future fixed 
   );
   await c.query(guard[0]);
   try {
+    // Exercise the historical guard only on its legacy fixture. Current accounts
+    // already use the new registry and must not replay migration 019's old rule.
+    const legacyGuard = guard[1].replace('WHERE u.id<1','WHERE u.id=? AND (u.id<1').replace(' LIMIT 1',') LIMIT 1');
     for (const username of ['timo999999', 'TIMO999999', 'TIMO-99999999']) {
       await c.query('UPDATE users SET username=? WHERE id=?', [username, insert.insertId]);
-      await expect(c.query(guard[1])).rejects.toMatchObject({ code: 'ER_CHECK_CONSTRAINT_VIOLATED' });
+      await expect(c.query(legacyGuard, [insert.insertId])).rejects.toMatchObject({ code: 'ER_CHECK_CONSTRAINT_VIOLATED' });
     }
     for (const username of ['timo' + String(insert.insertId).padStart(6, '0'), 'TIMO-' + insert.insertId]) {
       await c.query('UPDATE users SET username=? WHERE id=?', [username, insert.insertId]);
-      await c.query(guard[1]);
+      await c.query(legacyGuard, [insert.insertId]);
     }
   } finally {
     await c.query(guard[2]);
@@ -485,13 +488,13 @@ it('rejects username/password signup bypasses on both Web aliases and mini', asy
   for (const path of ['/api/v1/auth/register', '/api/v1/core/auth/register'])
     expect((await request(app).post(path).set('X-Client-Id', crypto.randomUUID()).send(data)).status).toBe(422);
 });
-it('assigns fixed IDs, enforces initial password strength and preserves legacy password login', async () => {
+it('assigns random IDs, enforces initial password strength and preserves legacy password login', async () => {
   const p = fresh(),
     r = await signup(p, await send(p)),
     user = r.body.data.user,
     token = r.body.data.token;
   expect(r.status, JSON.stringify(r.body)).toBe(201);
-  expect(user).toMatchObject({ userId: 'timo' + user.id.padStart(6, '0'), username: 'timo' + user.id.padStart(6, '0'), hasPassword: false });
+  expect(user).toMatchObject({ username: user.userId, hasPassword: false });
   expect(user.userId).toMatch(/^timo\d{6}$/);
   for (const newPassword of ['12345678', 'abcdefgh', 'Ab12345', 'Ab1234567890123456', 'Abc12345!', '中文abc123'])
     expect((await call(p.name, '/core/auth/set-password', 'POST', { newPassword }, token)).status).toBe(422);
@@ -516,12 +519,15 @@ it('assigns fixed IDs, enforces initial password strength and preserves legacy p
     "INSERT INTO users(username,password_hash,role,display_name,must_change_pwd) VALUES(?,?,'creator','旧账号',0)",
     ['old_' + p.name, await bcrypt.hash(oldPassword, 4)],
   );
+  let oldPublicId = '';
   for (const username of ['old_' + p.name, 'timo' + String(insert.insertId).padStart(6, '0'), 'TIMO' + String(insert.insertId).padStart(6, '0'), 'TIMO-' + insert.insertId]) {
     const old = await call('old_' + p.name, '/core/auth/login', 'POST', { username, password: oldPassword });
     expect(old.status).toBe(200);
     expect(old.body.data.user.id).toBe(String(insert.insertId));
-    expect(old.body.data.user.userId).toBe('timo' + String(insert.insertId).padStart(6, '0'));
+    oldPublicId ||= old.body.data.user.userId;
+    expect(old.body.data.user.userId).toBe(oldPublicId);
   }
+  expect((await call('old_' + p.name, '/core/auth/login', 'POST', { username: oldPublicId, password: oldPassword })).body.data.user.id).toBe(String(insert.insertId));
 });
 it('Web registers by SMS, issues private refresh cookie and reuses that account for SMS login', async () => {
   const p = fresh(),

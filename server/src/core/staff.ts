@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { generateTemporaryPassword } from '../auth/password-policy';
-import { formatUserId, isReservedUserId } from '../auth/user-id';
+import { assignUserId, isReservedUserId } from '../auth/user-id';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { requireDuty } from './duties';
 import { recordRegistration, recordRoleChange } from './member-relations';
@@ -74,7 +74,7 @@ staffRouter.post(
         'INSERT INTO users(username,password_hash,role,role_id,display_name,admin_duty,must_change_pwd,created_by) VALUES(?,?,?,(SELECT id FROM roles WHERE role_key=?),?,?,1,?)',
         [input.username, hash, role, role, input.displayName, assignedDuty, req.user.sub],
       );
-      formatUserId(r.insertId);
+      await assignUserId(c, String(r.insertId));
       await recordRegistration(c, { userId: r.insertId, role, channel: 'admin_assign', operatorId: req.user.sub });
       await writeAudit(
         {

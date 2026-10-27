@@ -408,7 +408,8 @@ describe('keyword assignments and complete callback exports',()=>{
   actor=admin;const response=await excel('keyword-bindings');expect(response.status).toBe(200);
   const data=rows(response,'关键词绑定明细');expect(data).toHaveLength(3);
   const assigned=data.find(r=>r['关键词计划编号']===first.planId)!;
-  expect(assigned).toMatchObject({'绑定时间（北京时间）':'2026-11-20 00:00:00','创建时间（北京时间）':'2026-11-01 00:00:00','创建账号':'team','创建人ID':'timo000003','创建人使用该词时的团长':'团长','本次归属团长':'团长','原著书名':'原著甲','原著链接':novelUrl,'推广活动':'任务','渠道':'渠道'});
+  const [[creator]]=await c.query<RowDataPacket[]>('SELECT identifier FROM user_identifiers WHERE public_user=3');
+  expect(assigned).toMatchObject({'绑定时间（北京时间）':'2026-11-20 00:00:00','创建时间（北京时间）':'2026-11-01 00:00:00','创建账号':'team','创建人ID':creator.identifier,'创建人使用该词时的团长':'团长','本次归属团长':'团长','原著书名':'原著甲','原著链接':novelUrl,'推广活动':'任务','渠道':'渠道'});
   expect(data.filter(r=>r['创建状态']==='创建失败')).toHaveLength(2);
   expect(data.find(r=>r['关键词计划编号']===unassigned.planId)).toMatchObject({'日期收录依据':'未分配，按创建日期收录失败记录','绑定时间（北京时间）':''});
   expect(rows(await excel('keyword-bindings',{from:'2026-11-20',to:'2026-11-20'}),'关键词绑定明细')).toHaveLength(1);
@@ -417,7 +418,9 @@ describe('keyword assignments and complete callback exports',()=>{
  it('includes failures by default and exports classifications, original novel, account and recorded team',async()=>{
   actor=admin;const response=await excel('work-registrations');expect(response.status,JSON.stringify(response.body)).toBe(200);
   const data=rows(response,'作品明细');expect(data).toHaveLength(2);
-  expect(data.find(r=>r['作品编号']===workId)).toMatchObject({'推广计划名称':'推广计划甲','作品分类':'视频','作品子分类':'漫剧','原著小说名':'原著甲','原著链接':novelUrl,'提交账号':'team','提交人ID':'timo000003','团长名':'团长','团长ID':'timo000002'});
+  const [ids]=await c.query<RowDataPacket[]>('SELECT public_user,identifier FROM user_identifiers WHERE public_user IN (2,3)');
+  const uid=(id:number)=>ids.find(r=>Number(r.public_user)===id)!.identifier;
+  expect(data.find(r=>r['作品编号']===workId)).toMatchObject({'推广计划名称':'推广计划甲','作品分类':'视频','作品子分类':'漫剧','原著小说名':'原著甲','原著链接':novelUrl,'提交账号':'team','提交人ID':uid(3),'团长名':'团长','团长ID':uid(2)});
   expect(data.find(r=>r['作品编号']===failedWorkId)?.['登记状态']).toBe('提交失败');
   expect(rows(await excel('work-registrations',{successfulOnly:'1'}),'作品明细')).toHaveLength(1);
   // A later user/team change cannot rewrite the team attached to these historical callbacks.

@@ -11,6 +11,7 @@ import { assignMemberProjects, canAssignMemberProjects } from './member-projects
 import { openMemberProjects } from './member-onboarding.service';
 import { recordRoleChange, setTeamLeader } from '../core/member-relations';
 import { memberClientInfo } from './member-clients.service';
+import { userIdMap } from '../auth/user-id';
 
 const roles: Role[] = ['developer', 'admin', 'operator', 'leader', 'creator'];
 type MemberRecord = RowDataPacket & { id: string; role: string; is_active: number; parent_id?: string | null };
@@ -58,8 +59,15 @@ export async function listManagedMembers(actor: AuthUser) {
     isStaffRole(actor.role) ? [] : [actor.sub, actor.sub],
   );
   const clients = await memberClientInfo(list.map((member) => String(member.id)));
+  const publicIds = await withTransaction(c => userIdMap(c, list.map(m => m.id)));
+  const aliases = isStaffRole(actor.role) && list.length ? await rows<RowDataPacket>(
+    "SELECT CAST(user_id AS CHAR) user_id,identifier FROM user_identifiers WHERE user_id IN (?) AND kind='legacy'",
+    [list.map(m => m.id)],
+  ) : [];
   return list.map((member) => ({
     ...member,
+    user_id: publicIds.get(String(member.id)),
+    user_id_aliases: aliases.filter(a => String(a.user_id) === String(member.id)).map(a => String(a.identifier)),
     parent_id: member.parent_id == null ? null : String(member.parent_id),
     is_active: Boolean(member.is_active),
     member_count: Number(member.member_count),

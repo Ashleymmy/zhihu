@@ -1,7 +1,7 @@
 import type { AuthUser } from '../../../types';
 import type { KeywordBindingFilter, KeywordBindingRow } from '../../../core/contracts';
 import { canViewWorkStatistics } from '../../../auth/roles';
-import { formatUserId } from '../../../auth/user-id';
+import { userIdMap } from '../../../auth/user-id';
 import { withTransaction } from '../../../db';
 import { AppError } from '../../../middleware/errors';
 import { planAccountSql } from '../services/plan-account';
@@ -65,7 +65,8 @@ export async function keywordBindings(
     );
     if (rows.length > 30000) throw new AppError(422, 42200, '符合条件的记录超过 30000 条，请缩小日期范围后导出');
     const text = (v: unknown) => (v == null ? '' : String(v));
-    const uid = (v: unknown) => (v == null ? '' : formatUserId(String(v)));
+    const publicIds = await userIdMap(c, rows.flatMap(r => [r.creator_id,r.performer_id,r.leader_id]));
+    const uid = (v: unknown) => (v == null ? '' : publicIds.get(String(v)) ?? '');
     return rows.map((r) => ({
       id: text(r.id),
       bindingId: text(r.binding_id),

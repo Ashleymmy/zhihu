@@ -6,7 +6,7 @@ import { withTransaction } from '../db';
 import { AppError, asyncHandler } from '../middleware/errors';
 import { assertDuty } from './duties';
 import { canViewWorkStatistics } from '../auth/roles';
-import { formatUserId } from '../auth/user-id';
+import { userIdMap } from '../auth/user-id';
 import { writeAudit } from '../services/audit.service';
 import type { ModuleRuntime } from './module-runtime';
 import { cash, cashText } from './money';
@@ -47,7 +47,6 @@ const sources: Record<string, string> = {
   manual: '管理员调整角色',
   migration: '历史关系基线',
 };
-const uid = (id: unknown) => (id == null ? '' : formatUserId(String(id)));
 const str = (value: unknown) => (value == null ? '' : String(value));
 function sheet(book: XLSX.WorkBook, name: string, head: string[], data: unknown[][]) {
   // Account IDs, phones, and decimal amounts are strings, never formulas or floating-point numbers.
@@ -83,6 +82,8 @@ export function createMemberExportRouter(runtime: ModuleRuntime) {
           [q.memberIds],
         );
         if (members.length !== q.memberIds.length) throw new AppError(409, 40900, '成员名单已变化，请刷新后重新导出');
+        const publicIds = await userIdMap(c, members.flatMap(m => [m.id, m.leader_id, m.inviter_id]));
+        const uid = (id: unknown) => id == null ? '' : publicIds.get(String(id)) ?? '';
         const [projects] = await c.query<RowDataPacket[]>(
           `SELECT CAST(pm.user_id AS CHAR) user_id,p.name FROM project_members pm
         JOIN projects p ON p.id=pm.project_id WHERE pm.user_id IN (?) AND pm.left_at IS NULL ORDER BY p.id`,
@@ -171,6 +172,7 @@ export function createMemberExportRouter(runtime: ModuleRuntime) {
           [q.memberIds],
         );
         if (history.length > 30000) throw new AppError(422, 42200, '关系记录超过 30000 条，请缩小成员范围后导出');
+        for (const [id, value] of await userIdMap(c, history.flatMap(h => [h.user_id,h.leader_id,h.operator_id]))) publicIds.set(id,value);
         sheet(
           wb,
           '团队归属历史',
@@ -205,6 +207,7 @@ export function createMemberExportRouter(runtime: ModuleRuntime) {
           [q.memberIds],
         );
         if (rolesHistory.length > 30000) throw new AppError(422, 42200, '角色变更记录超过 30000 条，请缩小成员范围');
+        for (const [id, value] of await userIdMap(c, rolesHistory.flatMap(h => [h.user_id,h.operator_id]))) publicIds.set(id,value);
         sheet(
           wb,
           '角色变更历史',

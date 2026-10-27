@@ -6,11 +6,12 @@ import bcrypt from 'bcryptjs';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { db, withTransaction } from '../src/db';
 import { writeAudit } from '../src/services/audit.service';
+import { assignUserId, isReservedUserId } from '../src/auth/user-id';
 
 async function main() {
   const [username, role, displayName] = process.argv.slice(2);
   if (
-    !/^[a-zA-Z0-9_-]{2,64}$/.test(username ?? '') ||
+    !/^[a-zA-Z0-9_-]{2,64}$/.test(username ?? '') || isReservedUserId(username) ||
     !['developer', 'operator'].includes(role) ||
     !displayName ||
     displayName.length > 64
@@ -25,6 +26,7 @@ async function main() {
       'INSERT INTO users(username,password_hash,role,role_id,display_name,admin_duty,must_change_pwd) VALUES(?,?,?,(SELECT id FROM roles WHERE role_key=?),?,?,1)',
       [username, hash, role, role, displayName, role === 'operator' ? 'operations' : 'all'],
     );
+    await assignUserId(c, String(r.insertId));
     await writeAudit(
       {
         userId: String(r.insertId),

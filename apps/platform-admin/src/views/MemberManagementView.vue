@@ -231,6 +231,8 @@ const filtered = computed(() =>
         String(Number(m.isActive)) === statusFilter.value) &&
       [
         m.username,
+        m.userId,
+        ...(m.userIdAliases ?? []),
         m.displayName,
         m.id,
         m.phone,
@@ -800,7 +802,7 @@ onMounted(() => run(load));
                     :aria-label="`选择 ${m.displayName}（${m.username}）`"
                 /></label>
                 <strong>{{ m.displayName }}</strong
-                ><small>{{ m.username }} · ID {{ m.id }}</small
+                ><small>{{ m.userId || m.username }}</small
                 ><small
                   >{{ m.phone || "未填写手机号"
                   }}{{
@@ -1231,8 +1233,7 @@ onMounted(() => run(load));
           <dl>
             <dt>账号</dt>
             <dd>
-              {{ selected.displayName }} · {{ selected.username }} · ID
-              {{ selected.id }}
+              {{ selected.displayName }} · {{ selected.userId || selected.username }}
             </dd>
             <dt>角色与职责</dt>
             <dd>

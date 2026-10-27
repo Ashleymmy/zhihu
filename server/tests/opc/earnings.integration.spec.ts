@@ -469,6 +469,8 @@ it('成员分类导出按净额计历史更正，保留当前已移除收款人�
   const XLSX=await import('xlsx');const book=XLSX.read(res.body,{type:'buffer'});
   const exported=XLSX.utils.sheet_to_json<Record<string,unknown>>(book.Sheets['收益分类']);
   expect(exported).toHaveLength(3);
-  expect(exported.find(r=>r['用户ID']==='timo000002'&&r['业绩类型']==='拉新')).toMatchObject({'当前应得金额（元）':'12000.0001','已确认净额（元）':'12007.0001','待确认差额（元）':'-7.0000'});
-  expect(exported.find(r=>r['用户ID']==='timo000003')).toMatchObject({'收益归属':'团队分成','业绩类型':'拉活','已确认净额（元）':'555.5555'});
+  const [ids]=await c.query<mysql.RowDataPacket[]>('SELECT public_user,identifier FROM user_identifiers WHERE public_user IN (2,3)');
+  const uid=(id:number)=>ids.find(r=>Number(r.public_user)===id)!.identifier;
+  expect(exported.find(r=>r['用户ID']===uid(2)&&r['业绩类型']==='拉新')).toMatchObject({'当前应得金额（元）':'12000.0001','已确认净额（元）':'12007.0001','待确认差额（元）':'-7.0000'});
+  expect(exported.find(r=>r['用户ID']===uid(3))).toMatchObject({'收益归属':'团队分成','业绩类型':'拉活','已确认净额（元）':'555.5555'});
 });

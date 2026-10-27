@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errors';
 import type { ModuleRuntime } from '../core/module-runtime';
 import { canManageMember, updateMemberAccessInTransaction, type MemberAccessPatch } from './member-access.service';
 import { writeAudit } from './audit.service';
+import { resolveUserIdentifier } from '../auth/user-id';
 
 export type MemberChangeOperation =
   | {
@@ -235,14 +236,12 @@ function message(error: unknown) {
   return error instanceof AppError ? error.message.slice(0, 1000) : '处理暂未完成，请重新预览后重试';
 }
 async function findMember(c: PoolConnection, reference: string): Promise<string | null> {
-  const explicit = reference.match(/^(?:id:|timo-?0*)([1-9]\d*)$/i);
+  const explicit = reference.match(/^id:([1-9]\d*)$/i);
   const id = explicit?.[1] ?? (/^[1-9]\d*$/.test(reference) ? reference : null);
-  const [found] = await c.query<RowDataPacket[]>(
-    `SELECT id FROM users WHERE ${explicit ? 'id=?' : 'username=? OR id=?'}`,
-    explicit ? [id] : [reference, id],
-  );
-  if (found.length > 1) throw new AppError(422, 42200, '账号与数字 ID 匹配到不同成员，请使用固定 timo ID');
-  return found.length ? String(found[0].id) : null;
+  const resolved = explicit ? undefined : await resolveUserIdentifier(c, reference);
+  const [[internal]] = id ? await c.query<RowDataPacket[]>('SELECT id FROM users WHERE id=?', [id]) : [[]];
+  if (resolved && internal && resolved !== String(internal.id)) throw new AppError(422, 42200, '账号与数字 ID 匹配到不同成员，请使用固定 timo ID');
+  return resolved ?? (internal ? String(internal.id) : null);
 }
 export async function previewMemberChanges(
   actor: AuthUser,
