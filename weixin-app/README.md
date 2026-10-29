@@ -18,7 +18,7 @@
 
 已核对 `2026.10.9.1` 上传记录（源码 `01878d1`，461821 字节）：它包含 `f62e3a8` 作品分享文案链接提取，以及 `ac5ec67` 关键词小说链接输入长度修复。作品链接保留大小写、参数和片段，多链接提示逐条填写；小说链接输入上限为 1024，不再被原生默认 140 字符截断。两项源码在本次局部修改中保持不变。
 
-2026-09-23：`0.1.0` 内测代码已上传，测试环境三个云函数已同步。260 项自动测试、五角色共 95 项页面检查通过；后台体验版设置、下载域名与真机验收进度见 [内测记录](docs/INTERNAL-BETA-2026-09-23.md)。
+2026-09-23：`0.1.0` 内测代码已上传，测试环境三个云函数已同步。260 项自动测试、五角色共 95 项页面检查通过；后台体验版设置、下载域名与真机验收进度见 [内测记录](../_archive/docs-legacy/weixin-app/docs/INTERNAL-BETA-2026-09-23.md)（已归档）。
 
 原生 WXML / WXSS / JavaScript 小程序，目标架构是 **微信云函数 + 云数据库 + 云存储**。小程序调用 `wx.cloud.callFunction`，云端不依赖本地 HTTP 服务、MySQL 或 Redis。MySQL 只作为迁移数据源保留。
 
@@ -58,19 +58,10 @@
 
 | 文档 | 用途 |
 | --- | --- |
-| [cloudbase/REHEARSAL-2026-09-18.md](cloudbase/REHEARSAL-2026-09-18.md) | **测试环境上线预演记录**：逐步操作与每条独立回读证据 |
-| [cloudbase/HANDOFF-2026-09-18.md](cloudbase/HANDOFF-2026-09-18.md) | **迁移交接总览**：架构、已完成项、未完成项、后续顺序 |
-| [cloudbase/MORNING-CHECKLIST.md](cloudbase/MORNING-CHECKLIST.md) | 需要人在云控制台执行的操作 |
-| [cloudbase/MIGRATION.md](cloudbase/MIGRATION.md) | 数据迁移细节 |
-| [cloudbase/TRANSACTIONS.md](cloudbase/TRANSACTIONS.md) | 事务限制与集合写入协议 |
-| [cloudbase/STORAGE-RULES.md](cloudbase/STORAGE-RULES.md) | 文件上传方案与云存储规则 |
-| [cloudbase/UI-API.md](cloudbase/UI-API.md) | UI 重构用的接口约定 |
-| [docs/API-REFERENCE.md](docs/API-REFERENCE.md) | 接口参考（当前 50 个，云端共 201 个） |
-| [docs/FRONTEND-INTEGRATION.md](docs/FRONTEND-INTEGRATION.md) | 前端接入示例与业务流程代码 |
-| [docs/LOCAL-TESTING-CHECKLIST.md](docs/LOCAL-TESTING-CHECKLIST.md) | 开发者工具与云端联调清单、上云前检查 |
-| [docs/IMPLEMENTATION-COMPLETE.md](docs/IMPLEMENTATION-COMPLETE.md) | 前端上传接入改动记录与已知缺陷 |
-| [docs/PRODUCTION-ROLLOUT.md](docs/PRODUCTION-ROLLOUT.md) | **生产环境上线路径**：拆分环境、部署、触发器、验收、seal 的完整顺序与验证方式 |
-| [docs/FEATURE-GAPS.md](docs/FEATURE-GAPS.md) | **页面能力缺口**：后端已就绪但 UI 未接入、完全无页面的场景 |
+| [用户协议](docs/用户协议.md) | 小程序协议页正文，构建时导入 |
+| [隐私协议](docs/隐私协议.md) | 小程序协议页正文，构建时导入 |
+| [提现规则（待确认）](docs/提现规则_待确认.md) | 手续费、到账期限与大额发票流程 |
+| [云函数时代文档（已归档）](../_archive/docs-legacy/weixin-app/docs/) | 2026-09 的接口参考、接入示例、联调清单与上线记录；当前版本使用 `opc-bridge`，见 [共享后端说明](../docs/wechat-shared-backend.md) |
 | [docs/UI-设计方向.md](docs/UI-设计方向.md) | UI 重构方向 |
 
 **测试基线为 271 项**（`npm test`）：108 项云函数逻辑 + 16 项 `tests/upload.test.cjs` + 15 项 `tests/home-mine.test.cjs` + 14 项 `tests/interaction.test.cjs`（下拉刷新/触底加载/危险确认）+ 14 项 `tests/wallet-funding.test.cjs` + 13 项 `tests/admin-page.test.cjs` + 13 项 `tests/team-members.test.cjs` + 9 项 `tests/income-page.test.cjs` + 7 项 `tests/auth-register.test.cjs`（注册/绑定/手机号登录）+ 6 项 `tests/auth-pages.test.cjs` + 6 项 `tests/courses.test.cjs` + 6 项 `tests/pricing-groups.test.cjs`（角色全局价/返利配置）+ 6 项 `tests/keyword-auto-retry.test.cjs`（放通自动重试）+ 6 项 `tests/migration-diagnostic.test.cjs` + 5 项 `tests/keyword-edit-delete.test.cjs`（编辑重试/删除失败关键词）+ 5 项 `tests/transaction-retry.test.cjs` + 4 项 `tests/home-summary.test.cjs` + 4 项 `tests/storage-acceptance.test.cjs` + 4 项 `tests/prices-page.test.cjs` + 3 项 `tests/invite-page.test.cjs` + 2 项 `tests/college-page.test.cjs` + 1 项 release 环境守卫。
@@ -233,7 +224,7 @@ skill CLI 没有触发器工具，用 CloudBase CLI 创建（项目树右键「�
 **函数代码部署不代表触发器已经生效，必须回读 `worker-heartbeat` 确认。**
 预演时实测到触发器会**静默消失**：`tcb fn trigger` 没有 list 子命令，唯一判据是心跳停住，
 处置办法是重新 create 一次（同名创建成功即说明此前已不存在），见
-[docs/PRODUCTION-ROLLOUT.md](docs/PRODUCTION-ROLLOUT.md) 第 6 步。
+[已归档的 PRODUCTION-ROLLOUT](../_archive/docs-legacy/weixin-app/docs/PRODUCTION-ROLLOUT.md) 第 6 步。
 上游返回不明确的创建请求标为 `uncertain`，不会自动重复创建；运营核对知乎端后再确认。
 
 真实云调用证据见 [cloudbase/deployment-smoke.json](cloudbase/deployment-smoke.json)，不包含账号令牌或 OPENID。复测方法：
@@ -257,7 +248,7 @@ npm run smoke:cloud
 **分片上传链路已在两个环境的真实云存储上跑通**（`check-storage` 验收：1 MB / 3 分片 / 合并 / 回读哈希一致 /
 幂等重放 / 隔离性 / 清理完成，`objectsRemoved=true`）。云存储仍然禁止客户端直接读写，上传下载都走云函数。
 仍需在真机上验证 `downloadFile` 合法域名后的凭证查看效果。已知限制：**未实现断点续传**（中断后从第 0 片重传），
-详见 [docs/IMPLEMENTATION-COMPLETE.md](docs/IMPLEMENTATION-COMPLETE.md)。
+详见[已归档的接入记录](../_archive/docs-legacy/weixin-app/docs/IMPLEMENTATION-COMPLETE.md)。
 
 ## 账号与权限
 

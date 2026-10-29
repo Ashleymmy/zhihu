@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="zh-CN" data-v="b">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIMO Web · 设计方向稿 v0.1</title>
+<style>
+/* ============ 设计令牌 ============ */
+:root {
+  --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+  --sans: "Noto Sans SC", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  --ink: #141413; --ink-2: #3D3D3A; --ink-3: #5E5D59; --muted: #87867F; --faint: #B0AEA5;
+  --clay: #D46B45; --clay-ink: #B5532F; --clay-soft: #F6E5DC;
+  --blue: #3B7DD8; --green: #4E9A4A; --violet: #8E6CC9;
+  --ok: #2F7D4F; --ok-soft: #E3EFE5; --warn: #A86A12; --warn-soft: #F5EAD3; --bad: #B4402E; --bad-soft: #F6E1DC;
+  --r-s: 10px; --r: 14px; --r-l: 20px; --r-xl: 28px;
+  --ease: cubic-bezier(.32, .72, 0, 1);          /* iOS 抽屉/面板曲线 */
+  --spring: cubic-bezier(.34, 1.36, .64, 1);      /* 轻微回弹 */
+}
+/* B 暖白（推荐）：近白底，衬线只用于标题与关键数字 */
+[data-v="b"] { --bg: #FAF9F5; --bg-2: #F3F1EA; --card: #FFFFFF; --line: #E8E6DC; --line-2: #F0EEE6; --hover: #F5F3EC; --shadow: 0 1px 2px rgba(20, 20, 19, .04), 0 8px 24px rgba(20, 20, 19, .05); }
+/* A 暖纸：Anthropic 原味的米色纸底，更有书卷气，也更“重” */
+[data-v="a"] { --bg: #F0EEE6; --bg-2: #E8E5DA; --card: #FAF9F5; --line: #DEDACD; --line-2: #E8E5DA; --hover: #ECE9DF; --shadow: 0 1px 2px rgba(20, 20, 19, .05), 0 10px 28px rgba(20, 20, 19, .07); }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; transition: background .4s var(--ease); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.serif { font-family: var(--serif); }
+.muted { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ============ 顶栏（半透明材质） ============ */
+.bar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 18px; height: 60px; padding: 0 32px; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.mark { width: 26px; height: 26px; border-radius: 8px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 15px; }
+.bar b { font-weight: 600; letter-spacing: .02em; }
+.bar nav { display: flex; gap: 2px; margin-left: 12px; }
+.bar nav a { color: var(--ink-3); text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; transition: background .2s, color .2s; }
+.bar nav a:hover { background: var(--hover); color: var(--ink); }
+.bar .sp { flex: 1; }
+
+/* 分段控件：滑块跟手移动 */
+.segc { position: relative; display: inline-flex; padding: 3px; border-radius: 11px; background: var(--bg-2); border: 1px solid var(--line-2); }
+.segc button { position: relative; z-index: 1; padding: 5px 14px; font-size: 13px; color: var(--ink-3); border-radius: 8px; transition: color .25s; white-space: nowrap; }
+.segc button.on { color: var(--ink); font-weight: 600; }
+.segc .thumb { position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: 8px; background: var(--card); box-shadow: 0 1px 3px rgba(20, 20, 19, .1), 0 0 0 .5px rgba(20, 20, 19, .04); transition: transform .36s var(--spring), width .36s var(--spring); }
+
+/* ============ 版式 ============ */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+section { padding: 96px 0 24px; }
+.eyebrow { font-size: 12.5px; letter-spacing: .14em; color: var(--clay-ink); font-weight: 600; }
+h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(38px, 5.2vw, 64px); line-height: 1.18; letter-spacing: -.01em; margin: 18px 0 20px; }
+h2 { font-family: var(--serif); font-weight: 600; font-size: 34px; line-height: 1.3; margin: 10px 0 12px; }
+h3 { font-size: 17px; font-weight: 650; }
+.lead { font-size: 18px; color: var(--ink-3); max-width: 720px; }
+.sub { color: var(--ink-3); max-width: 760px; margin-bottom: 36px; }
+.grid { display: grid; gap: 16px; }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-l); padding: 24px; box-shadow: var(--shadow); }
+.card.flat { box-shadow: none; }
+.kw h3 { font-family: var(--serif); font-size: 22px; font-weight: 600; margin: 8px 0 6px; }
+.kw p { color: var(--ink-3); font-size: 14px; }
+.kw .ix { font-family: var(--serif); color: var(--clay); font-size: 14px; }
+.tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--bg-2); color: var(--ink-2); white-space: nowrap; }
+.tag.clay { background: var(--clay-soft); color: var(--clay-ink); }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.line { background: transparent; border: 1px solid var(--line); color: var(--ink-3); }
+.note { display: flex; gap: 12px; padding: 16px 18px; border-radius: var(--r); background: var(--clay-soft); color: var(--ink-2); font-size: 14px; }
+.note b { color: var(--clay-ink); }
+
+/* 按钮：按下回弹 */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 11px; font-size: 14px; font-weight: 600; background: var(--card); border: 1px solid var(--line); transition: transform .2s var(--spring), background .2s, box-shadow .2s; white-space: nowrap; }
+.btn:hover { background: var(--hover); }
+.btn:active { transform: scale(.97); }
+.btn.pri { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.pri:hover { background: #2b2b29; }
+.btn.clay { background: var(--clay); color: #fff; border-color: var(--clay); }
+.btn.sm { height: 30px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
+.btn.ghost { background: transparent; border-color: transparent; }
+
+/* ============ 文档映射表 ============ */
+.map { width: 100%; border-collapse: collapse; font-size: 14px; }
+.map th { text-align: left; font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 0 16px 12px; border-bottom: 1px solid var(--line); }
+.map td { padding: 16px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.map tr:last-child td { border: 0; }
+.map td:first-child { width: 22%; font-weight: 650; }
+.map td:first-child small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.map td:nth-child(2) { width: 32%; color: var(--ink-3); }
+.map .go { color: var(--clay-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.map .go:hover { text-decoration: underline; }
+
+/* ============ 视觉语言 ============ */
+.sw { border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: var(--card); }
+.sw i { display: block; height: 76px; }
+.sw div { padding: 10px 12px; font-size: 12.5px; }
+.sw b { display: block; font-size: 13px; }
+.sw code { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.type-row { display: flex; align-items: baseline; gap: 24px; padding: 14px 0; border-bottom: 1px solid var(--line-2); }
+.type-row:last-child { border: 0; }
+.type-row .lbl { width: 150px; flex: none; font-size: 12px; color: var(--muted); }
+
+/* ============ 交互原则 ============ */
+.pr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 28px; align-items: center; padding: 28px; }
+.pr + .pr { margin-top: 16px; }
+.pr .ix { font-family: var(--serif); color: var(--clay); font-size: 15px; }
+.pr h3 { font-family: var(--serif); font-size: 22px; font-weight: 600; margin: 4px 0 8px; }
+.pr p { color: var(--ink-3); font-size: 14px; }
+.pr ul { margin: 10px 0 0 18px; color: var(--ink-3); font-size: 13.5px; }
+.stage { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-l); height: 260px; overflow: hidden; }
+
+/* 大标题收起 */
+.lt { height: 100%; overflow-y: auto; }
+.lt-bar { position: sticky; top: 0; height: 46px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(16px); border-bottom: 1px solid transparent; transition: border-color .2s; z-index: 2; }
+.lt-bar span { opacity: 0; transform: translateY(4px); transition: .25s var(--ease); }
+.lt.scrolled .lt-bar { border-color: var(--line); }
+.lt.scrolled .lt-bar span { opacity: 1; transform: none; }
+.lt h4 { font-family: var(--serif); font-size: 30px; font-weight: 600; padding: 0 20px 6px; transition: opacity .2s; }
+.lt.scrolled h4 { opacity: 0; }
+.lt .row { margin: 0 16px 8px; padding: 12px 14px; background: var(--card); border-radius: 12px; border: 1px solid var(--line-2); display: flex; justify-content: space-between; font-size: 13.5px; }
+
+/* 面板（Sheet）：背景后退、面板上浮 */
+.sheet-host { position: absolute; inset: 0; transition: transform .45s var(--ease), filter .45s var(--ease), border-radius .45s var(--ease); transform-origin: 50% 0; padding: 18px; }
+.stage.sheet-on .sheet-host { transform: scale(.94) translateY(8px); filter: brightness(.86); border-radius: 18px; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 74%; background: var(--card); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(20, 20, 19, .16); transform: translateY(105%); transition: transform .5s var(--ease); padding: 10px 20px 20px; }
+.stage.sheet-on .sheet { transform: none; }
+.grabber { width: 38px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 14px; }
+
+/* 检查器 */
+.insp { display: grid; grid-template-columns: 1fr 0; height: 100%; transition: grid-template-columns .4s var(--ease); }
+.insp.open { grid-template-columns: 1fr 200px; }
+.insp .list { padding: 10px; overflow: hidden; }
+.insp .it { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; cursor: pointer; transition: background .15s; }
+.insp .it:hover { background: var(--hover); }
+.insp .it.on { background: var(--clay-soft); }
+.insp .pane { background: var(--card); border-left: 1px solid var(--line); overflow: hidden; }
+.insp .pane > div { width: 200px; padding: 16px; font-size: 13px; }
+.av { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
+
+/* 撤销条 */
+.undo-list .it { display: flex; align-items: center; gap: 10px; margin: 8px 16px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line-2); border-radius: 12px; font-size: 13.5px; transition: opacity .3s, transform .35s var(--ease), max-height .35s var(--ease), margin .35s var(--ease), padding .35s var(--ease); max-height: 60px; overflow: hidden; }
+.undo-list .it.gone { opacity: 0; transform: translateX(30px); max-height: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+.snack { position: absolute; left: 50%; bottom: 16px; transform: translate(-50%, 140%); display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 16px; background: var(--ink); color: var(--bg); border-radius: 14px; font-size: 13.5px; transition: transform .4s var(--spring); white-space: nowrap; }
+.snack.on { transform: translate(-50%, 0); }
+.snack button { color: #F0B49B; font-weight: 700; }
+.snack .ring { width: 18px; height: 18px; }
+
+/* Spotlight 搜索 */
+.spot { position: absolute; left: 50%; top: 26px; width: 86%; transform: translate(-50%, -10px) scale(.98); opacity: 0; pointer-events: none; background: color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter: blur(24px) saturate(180%); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 24px 60px rgba(20, 20, 19, .2); transition: .28s var(--ease); }
+.spot.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.spot input { width: 100%; height: 48px; border: 0; outline: 0; background: none; padding: 0 18px; font-size: 15px; border-bottom: 1px solid var(--line-2); }
+.spot .r { padding: 8px 18px; font-size: 13.5px; display: flex; justify-content: space-between; }
+.spot .r.on { background: var(--clay-soft); }
+kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink-3); }
+
+.motion { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.motion td, .motion th { padding: 10px 12px; border-bottom: 1px solid var(--line-2); text-align: left; }
+.motion th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.motion .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--clay); }
+.motion .lane { position: relative; height: 14px; width: 160px; }
+.motion .lane .dot { position: absolute; left: 0; top: 0; }
+.motion.play .lane .dot { left: 146px; }
+
+/* ============ 页面方向稿：浏览器窗框 ============ */
+.win { background: var(--bg); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(20, 20, 19, .12), 0 2px 6px rgba(20, 20, 19, .05); }
+.win-top { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+.win-top i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+.win-top .url { margin: 0 auto; height: 24px; padding: 0 40px; border-radius: 7px; background: var(--card); font-size: 12px; color: var(--muted); display: grid; place-items: center; }
+.app { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: 680px; }
+.side { padding: 16px 12px; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--bg-2) 55%, var(--bg)); display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.side .who { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; }
+.side .who b { font-size: 13.5px; display: block; line-height: 1.2; }
+.side .who small { font-size: 11.5px; color: var(--muted); }
+.side h6 { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .08em; padding: 14px 10px 6px; }
+.side a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; color: var(--ink-2); text-decoration: none; }
+.side a.on { background: var(--card); box-shadow: 0 1px 2px rgba(20, 20, 19, .06); color: var(--ink); font-weight: 600; }
+.side a .n { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+.side svg { flex: none; }
+.main { padding: 28px 32px 40px; min-width: 0; }
+.ph { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
+.ph h4 { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.2; }
+.ph p { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+.ph > :last-child { margin-left: auto; }
+.kpi small { display: block; color: var(--muted); font-size: 12.5px; }
+.kpi .v { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.25; margin-top: 2px; }
+.kpi .v.sm { font-size: 24px; }
+.kpi .d { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.mc { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-l); padding: 20px; min-width: 0; }
+.mc-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.mc-h h5 { font-size: 15px; font-weight: 650; }
+.mc-h .r { margin-left: auto; }
+.cbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--card); }
+.cbar i { display: block; height: 100%; transition: flex-grow .6s var(--ease); }
+.cbar i:first-child { border-radius: 6px 0 0 6px; } .cbar i:last-child { border-radius: 0 6px 6px 0; }
+.leg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.leg div { font-size: 12.5px; color: var(--ink-3); }
+.leg b { display: block; font-size: 15px; color: var(--ink); font-weight: 650; }
+.leg i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 1px; }
+.prow { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-2); font-size: 13.5px; }
+.prow:last-child { border: 0; padding-bottom: 0; }
+.pic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; flex: none; }
+.lockrow { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--bg); border: 1px dashed var(--line); font-size: 13.5px; color: var(--ink-3); }
+.tl { list-style: none; }
+.tl li { position: relative; padding: 0 0 14px 22px; font-size: 13.5px; }
+.tl li::before { content: ""; position: absolute; left: 4px; top: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--clay)); }
+.tl li::after { content: ""; position: absolute; left: 7.5px; top: 18px; bottom: 0; width: 1px; background: var(--line); }
+.tl li:last-child::after { display: none; }
+.tl small { display: block; color: var(--muted); font-size: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 12px; border-radius: 9px; background: var(--card); border: 1px solid var(--line); font-size: 13px; }
+.chip b { font-weight: 600; }
+.chip.add { border-style: dashed; color: var(--muted); padding: 0 12px; }
+.dt { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dt th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dt td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.dt tr:hover td { background: var(--hover); }
+.dt .r { text-align: right; }
+.dt td.edit { cursor: text; }
+.dt td.edit:hover { box-shadow: inset 0 0 0 1px var(--line); border-radius: 6px; }
+.dt input { width: 80px; text-align: right; border: 1px solid var(--clay); border-radius: 6px; padding: 2px 6px; outline: 0; background: var(--card); }
+.live { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ok); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 currentColor; animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(47, 125, 79, .45); } 70% { box-shadow: 0 0 0 7px rgba(47, 125, 79, 0); } 100% { box-shadow: 0 0 0 0 rgba(47, 125, 79, 0); } }
+.screen-pane { display: none; animation: fade .35s var(--ease); }
+.screen-pane.on { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+.forest { display: grid; grid-template-columns: minmax(0, 1fr) 260px; min-height: 560px; }
+.forest .canvas { position: relative; padding: 8px 0; }
+.forest svg text { font-family: var(--sans); }
+.node { cursor: pointer; }
+.node rect { transition: stroke .2s, fill .2s; }
+.node:hover rect, .node.on rect { stroke: var(--clay); stroke-width: 1.5; }
+.forest .ins { border-left: 1px solid var(--line); padding: 4px 0 0 20px; font-size: 13px; }
+.rel { padding: 12px 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line-2); margin-bottom: 10px; }
+.rel h6 { font-size: 12.5px; font-weight: 650; display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.rel h6 i { width: 8px; height: 8px; border-radius: 2px; }
+.rel p { color: var(--ink-3); font-size: 12.5px; }
+
+/* 信息架构 */
+.ia { font-size: 13.5px; }
+.ia h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ia p { color: var(--muted); font-size: 12.5px; margin-bottom: 12px; }
+.ia ol { list-style: none; counter-reset: n; }
+.ia li { counter-increment: n; padding: 7px 0; border-bottom: 1px solid var(--line-2); display: flex; gap: 10px; }
+.ia li::before { content: counter(n, decimal-leading-zero); font-family: var(--mono); font-size: 11px; color: var(--faint); padding-top: 3px; }
+.ia li:last-child { border: 0; }
+.ia em { font-style: normal; color: var(--muted); font-size: 12px; margin-left: auto; }
+
+.q { counter-increment: q; display: grid; grid-template-columns: 40px 1fr; gap: 6px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.q::before { content: counter(q); font-family: var(--serif); font-size: 26px; color: var(--clay); line-height: 1; }
+.q b { font-size: 16px; }
+.q p { color: var(--ink-3); font-size: 14px; margin-top: 4px; }
+footer { padding: 60px 0 80px; color: var(--muted); font-size: 13px; text-align: center; }
+
+@media (max-width: 960px) {
+  .g3, .g4, .g2, .pr { grid-template-columns: minmax(0, 1fr); }
+  .app { grid-template-columns: 1fr; } .side { display: none; }
+  .forest { grid-template-columns: 1fr; } .forest .ins { border: 0; padding: 16px 0 0; }
+  .bar nav { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="mark">T</span><b>TIMO · Web 设计方向稿</b><span class="tag line">v0.1 · 待你拍板</span>
+  <nav><a href="#doc">文档落点</a><a href="#visual">视觉语言</a><a href="#interact">交互原则</a><a href="#screens">页面方向稿</a><a href="#ia">信息架构</a><a href="#decide">待确认</a></nav>
+  <span class="sp"></span>
+  <span class="muted" style="font-size:12.5px">底色方案</span>
+  <div class="segc" data-seg="v"><span class="thumb"></span><button data-v="b" class="on">B 暖白 · 推荐</button><button data-v="a">A 暖纸</button></div>
+</header>
+
+<div class="wrap">
+
+<!-- ============ 0 定位 ============ -->
+<section style="padding-top:88px">
+  <div class="eyebrow">设计方向 · 2026-10-19</div>
+  <h1>让每一段关系、<br>每一分收益，都看得见。</h1>
+  <p class="lead">视觉上借鉴 Anthropic：温暖的中性底色、衬线大标题、克制的单一强调色、大量留白。交互上遵循 Apple 的人机界面理念：内容优先、层级清楚、能撤销、即时反馈。功能和信息结构全部从《新团队成员关系数据结构设计》出发。</p>
+  <div class="grid g3" style="margin-top:44px">
+    <div class="card kw"><span class="ix">01</span><h3>温暖而克制</h3><p>暖白底、墨色字，只用陶土橙一种强调色。不用渐变大色块和硬投影，界面安静，数字才显得可信。</p></div>
+    <div class="card kw"><span class="ix">02</span><h3>关系可见</h3><p>邀请、团队归属、计酬快照是三种关系。用户侧只看属于自己的那一层，运营侧能看完整的关系森林和每一次流转。</p></div>
+    <div class="card kw"><span class="ix">03</span><h3>操作有退路</h3><p>能撤销的就不弹确认框；必须确认的（打款、晋升）用面板说清后果。每一步都有即时反馈。</p></div>
+  </div>
+  <div class="note" style="margin-top:20px"><span>⚠︎</span><div><b>先说一个风险：</b>Anthropic 的原味风格是米色纸底加衬线标题。小程序之前弃用的 Editorial 主题（暖纸底、衬线标题、硬投影）因为“显脏显重”被否过。所以我推荐 <b>B 暖白</b>：底色接近白色，衬线只用在标题和关键数字上，也不用硬投影。右上角可以切到 A 对比两种效果。</div></div>
+</section>
+
+<!-- ============ 1 文档落点 ============ -->
+<section id="doc">
+  <div class="eyebrow">01 · 文档要求 → 设计落点</div>
+  <h2>你文档里的每一项，界面上都有对应的位置</h2>
+  <p class="sub">左列是《新团队成员关系数据结构设计》的条目，中间是文档原意，右列是界面上怎么呈现。计酬口径以 v1.1 已确认的决策为准：两方封顶，团队激励按公开标准评定。点「看方向稿」可以跳到对应页面。</p>
+  <div class="card flat" style="padding:20px 8px 8px">
+  <table class="map">
+    <thead><tr><th>文档条目</th><th>文档原意</th><th>界面落点</th></tr></thead>
+    <tbody>
+      <tr><td>1 · 基本角色<small>达人 / 团长 / 开发者 / 运营 / 财务 / 超管</small></td><td>六种角色，权限与职能不同</td><td>只有一个站点，登录后按角色加载各自的工作台。侧栏顶部显示当前身份和权限范围；员工可以「以某角色预览」，便于核对。<br><span class="go" data-jump="ia">看信息架构 →</span></td></tr>
+      <tr><td>2 · 成员关系流转（用户侧）</td><td>用户看到自己和谁建立了什么关系</td><td>「我的关系」卡片：谁邀请了我、我在哪个团队、我邀请了谁。关系变化（入团、晋升）在首页以时间线通知。<br><span class="go" data-jump="s-home">看达人首页 →</span></td></tr>
+      <tr><td>2 · 成员关系流转（运营侧）</td><td>我们能看到全部关系与流转</td><td>「关系森林」：整棵邀请树和团队归属叠在一起看，右侧检查器显示选中成员的三种关系和流转记录。<br><span class="go" data-jump="s-forest">看关系森林 →</span></td></tr>
+      <tr><td>3.1 · 直邀（显性）<small>团长邀请链接 / 小程序卡片</small></td><td>邀请注册即建立上下级，团长获得邀请收益</td><td>邀请中心同时提供网页链接、小程序卡片和二维码三种形式。直邀成员逐个列出，每人带来的收益都能看到。<br><span class="go" data-jump="s-home">看邀请卡片 →</span></td></tr>
+      <tr><td>3.2 · 荐邀（团队激励，隐性）</td><td>成员再邀请的下级是隐式上下级，可继承</td><td>团长侧：隐性下级<b>只显示人数</b>，带锁标识；团队激励只显示金额和公开的评定说明，不展示构成（文档 3.5）。运营侧在关系森林里能看到全部隐性节点。<br><span class="go" data-jump="s-team">看团长团队页 →</span></td></tr>
+      <tr><td>3.3 · 独立达人</td><td>无团队；超管是其隐式团长，团队收益归超管</td><td>标记为「平台直管」，在关系森林里挂在「超级管理员（隐式团长）」节点下；团长那份差价在资金流向中单独显示为平台留存。<br><span class="go" data-jump="s-forest">看森林中的平台直管 →</span></td></tr>
+      <tr><td>3.4 · 成长规则</td><td>达人可升级为团长</td><td>达人首页有「成长进度」环，显示晋升标准达成了几项（例如 3/4）。运营有晋升工作台：候选 → 提名 → 审批。<br><span class="go" data-jump="s-home">看成长进度 →</span></td></tr>
+      <tr><td>3.5 · 隐含上下级 / 继承属性</td><td>森林结构；晋升后不切断原始关系，后台永久记录</td><td>关系森林里，<b>实线</b>表示当前团队归属，<b>虚线</b>表示原始邀请链。晋升后原团长到晋升者之间留一条虚线，历史数据可以追溯。<br><span class="go" data-jump="s-forest">看继承关系 →</span></td></tr>
+      <tr><td>4 · 财务及佣金核算</td><td>佣金核算、对账、审批、导出</td><td>收益按任务、团队、邀请、激励四类拆开显示，每一笔都能看到计算过程；财务有账单对账、提现审批，以及「打款面板」（说清后果再确认）。</td></tr>
+      <tr><td>5 · 数据服务<small>大屏 / dashboard / 清洗 / 增删改查 / worker / 导入导出</small></td><td>数形结合、细粒度、实时、可人工核查</td><td>「数据工作台」：顶部是图表，下面是数据表，图表上框选的时间段会同步筛选表格。支持筛选条件、清洗规则（可撤销）、表格内直接编辑、导入导出，并实时显示 worker 状态。另有全屏数据大屏。<br><span class="go" data-jump="s-data">看数据工作台 →</span></td></tr>
+      <tr><td>7 · 项目流转规程<small>聚合平台 / 交互入口 / web 分布</small></td><td>我们是聚合平台，目前接入知乎，入口和 UI 需要大改</td><td>「项目广场」作为统一入口：每个项目一张卡片，显示单价、状态和接入进度，后续项目即插即用。Web 保持单站点，手机网页用底部 Tab。<br><span class="go" data-jump="s-home">看项目广场 →</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 2 视觉语言 ============ -->
+<section id="visual">
+  <div class="eyebrow">02 · 视觉语言</div>
+  <h2>温暖的中性色，一种强调色</h2>
+  <p class="sub">陶土橙只用在「当前位置、主操作、需要注意的数字」上。状态色（成功、警告、错误）一律配图标和文字，不单靠颜色表达。</p>
+  <div class="grid g4" style="grid-template-columns:repeat(6,minmax(0,1fr))">
+    <div class="sw"><i style="background:var(--bg)"></i><div><b>底色</b><code class="bgv">#FAF9F5</code></div></div>
+    <div class="sw"><i style="background:var(--card)"></i><div><b>卡片</b><code class="cardv">#FFFFFF</code></div></div>
+    <div class="sw"><i style="background:#141413"></i><div><b>墨色</b><code>#141413</code></div></div>
+    <div class="sw"><i style="background:#5E5D59"></i><div><b>次要文字</b><code>#5E5D59</code></div></div>
+    <div class="sw"><i style="background:#D46B45"></i><div><b>陶土橙 · 强调</b><code>#D46B45</code></div></div>
+    <div class="sw"><i style="background:#E8E6DC"></i><div><b>分隔线</b><code>#E8E6DC</code></div></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card flat">
+      <h3 style="margin-bottom:6px">字体</h3>
+      <p class="muted" style="font-size:13px;margin-bottom:8px">标题与关键数字用思源宋体（Noto Serif SC），界面文字用思源黑体。数字一律等宽对齐。</p>
+      <div class="type-row"><span class="lbl">页面标题 · 宋 30</span><span class="serif" style="font-size:30px;font-weight:600">我的团队</span></div>
+      <div class="type-row"><span class="lbl">关键数字 · 宋 30</span><span class="serif num" style="font-size:30px;font-weight:600">¥2,377.18</span></div>
+      <div class="type-row"><span class="lbl">卡片标题 · 黑 15 / 650</span><span style="font-size:15px;font-weight:650">收益构成</span></div>
+      <div class="type-row"><span class="lbl">正文 · 黑 14</span><span style="font-size:14px">业绩当天的团长获得团队管理收益</span></div>
+      <div class="type-row"><span class="lbl">辅助 · 黑 12.5</span><span class="muted" style="font-size:12.5px">上游账单确认后可提现</span></div>
+    </div>
+    <div class="card flat">
+      <h3 style="margin-bottom:6px">图表配色</h3>
+      <p class="muted" style="font-size:13px;margin-bottom:14px">从 Anthropic 的色系里取色，提高饱和度后用色盲校验脚本测过：亮度、色度、色盲可分辨度、对比度全部通过。颜色绑定实体（例如「邀请收益」永远是绿色），不按排名分配。</p>
+      <div class="cbar" style="height:16px"><i style="flex:62;background:#D46B45"></i><i style="flex:21;background:#3B7DD8"></i><i style="flex:9;background:#4E9A4A"></i><i style="flex:8;background:#8E6CC9"></i></div>
+      <div class="leg"><div><i style="background:#D46B45"></i>任务收益<b class="num">#D46B45</b></div><div><i style="background:#3B7DD8"></i>团队收益<b class="num">#3B7DD8</b></div><div><i style="background:#4E9A4A"></i>邀请收益<b class="num">#4E9A4A</b></div><div><i style="background:#8E6CC9"></i>团队激励<b class="num">#8E6CC9</b></div></div>
+      <h3 style="margin:22px 0 10px">形状与层次</h3>
+      <div class="row" style="display:flex;gap:12px;align-items:flex-end">
+        <div style="width:64px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card)"></div>
+        <div style="width:64px;height:52px;border-radius:14px;border:1px solid var(--line);background:var(--card)"></div>
+        <div style="width:64px;height:64px;border-radius:20px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)"></div>
+        <p class="muted" style="font-size:12.5px;margin-left:8px">圆角 10 / 14 / 20，层级越高圆角越大。卡片用 1px 细边加柔和阴影，不用硬投影；浮层用半透明磨砂材质。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 交互原则 ============ -->
+<section id="interact">
+  <div class="eyebrow">03 · 交互原则（Apple 人机界面理念落到网页）</div>
+  <h2>六条原则，每条都能直接上手试</h2>
+  <p class="sub">下面的小窗口都可以操作，动效曲线和以后的正式版一致。</p>
+
+  <div class="card pr">
+    <div><span class="ix">01</span><h3>内容优先，界面让位</h3><p>每页开头一个大标题，往下滚动时收进半透明顶栏，把空间让给内容。工具栏、筛选条用磨砂材质，内容从后面透过来，不把页面切成一块一块。</p><ul><li>大标题 30px 衬线体，滚动后收成 14px 居中</li><li>顶栏材质：72% 底色 + 20px 模糊</li></ul></div>
+    <div class="stage"><div class="lt" id="lt"><div class="lt-bar"><span>收益明细</span></div><h4>收益明细</h4>
+      <div class="row"><span>10-19 · 任务收益 · 知乎</span><b class="num">¥6.00</b></div><div class="row"><span>10-19 · 邀请收益 · 红果</span><b class="num">¥0.92</b></div><div class="row"><span>10-18 · 团队收益 · 知乎</span><b class="num">¥3.30</b></div><div class="row"><span>10-18 · 任务收益 · 网盘</span><b class="num">¥9.00</b></div><div class="row"><span>10-17 · 任务收益 · 红果</span><b class="num">¥18.40</b></div><div class="row"><span>10-17 · 团队激励 · 平台</span><b class="num">¥600.00</b></div><div class="row"><span>10-16 · 任务收益 · 知乎</span><b class="num">¥12.00</b></div>
+      <p class="muted" style="text-align:center;font-size:12px;padding:8px">↑ 在这里滚动试试</p></div></div>
+  </div>
+
+  <div class="card pr">
+    <div><span class="ix">02</span><h3>用纵深表达层级</h3><p>需要专注完成的任务（提现、打款、晋升审批）用面板（Sheet）从下方升起，背后的页面后退、变暗，用户清楚自己在哪一层，关掉就回到原处。</p><ul><li>曲线 cubic-bezier(.32,.72,0,1)，500ms</li><li>点遮罩或按 Esc 关闭；手机上可以下拉关闭</li></ul></div>
+    <div class="stage" id="sheetStage"><div class="sheet-host"><div class="mc" style="height:100%"><div class="mc-h"><h5>钱包</h5></div><div class="kpi"><small>可提现余额</small><div class="v num">¥2,001.02</div></div><button class="btn pri" style="margin-top:18px" data-sheet="open">申请提现</button></div></div>
+      <div class="sheet"><div class="grabber"></div><div style="display:flex;align-items:center;margin-bottom:12px"><h3>申请提现</h3><button class="btn sm ghost" style="margin-left:auto" data-sheet="close">取消</button></div><div class="serif num" style="font-size:34px;font-weight:600">¥500.00</div><p class="muted" style="font-size:13px">手续费 ¥3.00 · 实际到账 ¥497.00 · 微信零钱</p><button class="btn clay" style="margin-top:16px;width:100%" data-sheet="close">确认提现</button></div></div>
+  </div>
+
+  <div class="card pr">
+    <div><span class="ix">03</span><h3>渐进披露：列表 + 检查器</h3><p>列表只放判断所需的最少信息，选中一行后右侧滑出检查器（Inspector）显示详情，不跳页也不弹窗，可以连续查看多条。这是成员管理、关系森林、数据工作台共用的布局。</p><ul><li>三栏：侧栏 · 内容 · 检查器</li><li>键盘 ↑↓ 切换选中行，检查器同步更新</li></ul></div>
+    <div class="stage"><div class="insp" id="insp"><div class="list">
+      <div class="it" data-p="0"><span class="av" style="background:#D46B45">林</span>林小满<span class="muted" style="margin-left:auto;font-size:12px">达人</span></div>
+      <div class="it" data-p="1"><span class="av" style="background:#3B7DD8">江</span>江照野<span class="muted" style="margin-left:auto;font-size:12px">团长</span></div>
+      <div class="it" data-p="2"><span class="av" style="background:#4E9A4A">何</span>何半夏<span class="muted" style="margin-left:auto;font-size:12px">独立达人</span></div>
+      <p class="muted" style="font-size:12px;padding:10px">← 点一位成员</p></div>
+      <div class="pane"><div id="inspBody"></div></div></div></div>
+  </div>
+
+  <div class="card pr">
+    <div><span class="ix">04</span><h3>宽容：用撤销代替确认</h3><p>大多数操作（移除筛选、标记已读、清洗合并、移出列表）直接执行，底部给 5 秒的撤销机会，不打断操作节奏。只有不可逆的操作（打款、停用账号、晋升生效）才要求确认，而且会写清后果。</p><ul><li>撤销条从底部弹出，带倒计时环</li><li>不可逆操作：用面板说明后果，按钮写具体动作（“确认打款 ¥497”），不写“确定”</li></ul></div>
+    <div class="stage"><div class="undo-list" id="undoList" style="padding-top:8px">
+      <div class="it" data-u="1"><span class="tag warn">疑似重复</span>W52031 与 W52044 标题相同<button class="btn sm" style="margin-left:auto" data-undo-del>合并</button></div>
+      <div class="it" data-u="2"><span class="tag warn">疑似重复</span>W52017 与 W52090 链接相同<button class="btn sm" style="margin-left:auto" data-undo-del>合并</button></div>
+      <div class="it" data-u="3"><span class="tag">已读</span>9 月团队激励已入账<button class="btn sm" style="margin-left:auto" data-undo-del>移除</button></div>
+    </div><div class="snack" id="snack"><svg class="ring" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2.5"/><circle id="ringC" cx="10" cy="10" r="8" fill="none" stroke="#F0B49B" stroke-width="2.5" stroke-dasharray="50.3" stroke-dashoffset="0" transform="rotate(-90 10 10)"/></svg><span id="snackT">已合并</span><button id="undoBtn">撤销</button></div></div>
+  </div>
+
+  <div class="card pr">
+    <div><span class="ix">05</span><h3>直接操作，即时反馈</h3><p>控件跟着手走：分段控件的滑块弹性滑动，按钮按下时轻微缩小，表格单元格点一下就能编辑，回车保存，Esc 取消。所有反馈在 100ms 内出现，用户不会怀疑“刚才点到没有”。</p><ul><li>按下缩放 0.97，弹性曲线 360ms</li><li>原地编辑：保存后单元格短暂高亮</li></ul></div>
+    <div class="stage" style="display:grid;place-items:center;gap:18px;padding:30px">
+      <div class="segc" data-seg="demo"><span class="thumb"></span><button class="on">本月</button><button>上月</button><button>近 90 天</button><button>自定义</button></div>
+      <table class="dt" style="max-width:380px;background:var(--card);border-radius:12px"><tr><th>账单</th><th class="r">上游金额</th></tr><tr><td>ST-知乎-261019</td><td class="r edit num" data-edit>¥3,108.00</td></tr><tr><td>ST-红果-261019</td><td class="r edit num" data-edit>¥2,431.20</td></tr></table>
+      <p class="muted" style="font-size:12px">点金额试试原地编辑</p>
+    </div>
+  </div>
+
+  <div class="card pr">
+    <div><span class="ix">06</span><h3>一个入口找到一切</h3><p>像 Spotlight 一样，按 <kbd>Ctrl</kbd> <kbd>K</kbd> 呼出全局搜索：页面、成员、账单号、操作（“切换到红果项目”）都能搜到。运营每天在几百个成员之间跳转，这比层层点菜单快得多。</p><ul><li>结果按类型分组，回车直达</li><li>最近使用的条目排在前面</li></ul></div>
+    <div class="stage" id="spotStage"><div style="padding:24px;display:grid;place-items:center;height:100%"><button class="btn" id="spotBtn">⌕ 搜索 · <kbd>Ctrl</kbd> <kbd>K</kbd></button></div>
+      <div class="spot" id="spot"><input placeholder="搜索成员、账单、页面…" value="江"><div class="r on"><span>江照野 · 团长</span><span class="muted">成员</span></div><div class="r"><span>江照野团队 · 3 人</span><span class="muted">团队</span></div><div class="r"><span>PR-0009 · 江照野晋升</span><span class="muted">晋升记录</span></div></div></div>
+  </div>
+
+  <div class="card flat" style="margin-top:16px">
+    <h3 style="margin-bottom:10px">动效节奏</h3>
+    <table class="motion" id="motion"><thead><tr><th>场景</th><th>时长</th><th>曲线</th><th>预览 <button class="btn sm" id="motionBtn" style="margin-left:8px">播放</button></th></tr></thead><tbody>
+      <tr><td>悬停、按下</td><td>120ms</td><td>ease-out</td><td><div class="lane"><span class="dot" style="transition:left .12s ease-out"></span></div></td></tr>
+      <tr><td>分段控件、开关</td><td>360ms</td><td>弹性 (.34,1.36,.64,1)</td><td><div class="lane"><span class="dot" style="transition:left .36s var(--spring)"></span></div></td></tr>
+      <tr><td>面板、检查器、页面切换</td><td>450–500ms</td><td>(.32,.72,0,1)</td><td><div class="lane"><span class="dot" style="transition:left .5s var(--ease)"></span></div></td></tr>
+      <tr><td>系统设置「减少动态效果」</td><td>0ms</td><td>全部关闭</td><td class="muted" style="font-size:12.5px">自动遵循</td></tr>
+    </tbody></table>
+  </div>
+</section>
+
+<!-- ============ 4 页面方向稿 ============ -->
+<section id="screens">
+  <div class="eyebrow">04 · 关键页面方向稿</div>
+  <h2>四个页面，覆盖文档的核心要求</h2>
+  <p class="sub">这是视觉和布局方向，不是完整功能；具体功能等你后面细说再补。数字为示意。</p>
+  <div style="margin-bottom:18px"><div class="segc" data-seg="screen"><span class="thumb"></span><button class="on" data-s="s-home">达人 · 首页</button><button data-s="s-team">团长 · 我的团队</button><button data-s="s-forest">运营 · 关系森林</button><button data-s="s-data">运营/财务 · 数据工作台</button></div></div>
+
+  <div class="win"><div class="win-top"><i></i><i></i><i></i><span class="url" id="url">timo.clouddo.cc/app/home</span></div>
+
+  <!-- 达人首页 -->
+  <div class="screen-pane on" id="s-home"><div class="app">
+    <aside class="side"><div class="who"><span class="av" style="background:#D46B45;width:34px;height:34px">林</span><div><b>林小满</b><small>达人 · 苏禾团队</small></div></div>
+      <a class="on">首页</a><a>项目广场</a><a>我的作品<span class="n">4</span></a><a>收益</a><a>邀请中心</a><a>钱包</a><h6>我的关系</h6><a>关系与成长</a></aside>
+    <div class="main">
+      <div class="ph"><div><h4>下午好，林小满</h4><p>10 月 19 日 · 星期一 · 本月第 19 天</p></div><button class="btn">邀请好友</button></div>
+      <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+        <div class="mc"><div class="mc-h"><h5>本月收益</h5><span class="tag ok r">↑ 12.4% 较上月同期</span></div>
+          <div class="kpi"><div class="v num" style="font-size:44px">¥708.12</div><div class="d">可提现 ¥2,001.02 · 待确认 ¥489.25（上游账单确认后可提现）</div></div>
+          <div class="cbar" style="margin-top:22px"><i style="flex:659.6;background:#D46B45"></i><i style="flex:48.52;background:#4E9A4A"></i></div>
+          <div class="leg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><i style="background:#D46B45"></i>任务收益<b class="num">¥659.60</b></div><div><i style="background:#4E9A4A"></i>邀请收益 · 直邀 3 人<b class="num">¥48.52</b></div></div>
+        </div>
+        <div class="mc"><div class="mc-h"><h5>成长进度</h5><span class="muted r" style="font-size:12px">晋升团长</span></div>
+          <div style="display:flex;align-items:center;gap:18px"><svg width="92" height="92" viewBox="0 0 92 92"><circle cx="46" cy="46" r="38" fill="none" stroke="var(--line-2)" stroke-width="8"/><circle cx="46" cy="46" r="38" fill="none" stroke="#D46B45" stroke-width="8" stroke-linecap="round" stroke-dasharray="179 239" transform="rotate(-90 46 46)"/><text x="46" y="52" text-anchor="middle" font-family="Noto Serif SC, serif" font-size="22" font-weight="600" fill="var(--ink)">3/4</text></svg>
+          <div style="font-size:13px;line-height:1.9"><div>✓ 近 30 天活跃 ≥ 20 天</div><div>✓ 作品合格率 ≥ 92%</div><div>✓ 直接邀请 ≥ 2 人</div><div class="muted">○ 任务收益 ¥659 / ¥800</div></div></div></div>
+      </div>
+      <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:16px">
+        <div class="mc"><div class="mc-h"><h5>我的关系</h5><span class="muted r" style="font-size:12px">注册即建立，永久记录</span></div>
+          <div class="prow"><span class="av" style="background:#3B7DD8">苏</span><div><b>苏禾</b> 邀请了你<div class="muted" style="font-size:12px">2026-06-16 · 通过小程序卡片</div></div><span class="tag" style="margin-left:auto">邀请人</span></div>
+          <div class="prow"><span class="av" style="background:#3B7DD8">苏</span><div>你在 <b>苏禾团队</b><div class="muted" style="font-size:12px">团队收益按业绩当天的归属计算</div></div><span class="tag" style="margin-left:auto">团队</span></div>
+          <div class="prow"><span class="av" style="background:#4E9A4A">3</span><div>你直接邀请了 <b>3 位好友</b><div class="muted" style="font-size:12px">好友注册 180 天内的业绩，你都有邀请收益</div></div><span class="tag clay" style="margin-left:auto">直邀</span></div>
+        </div>
+        <div class="mc"><div class="mc-h"><h5>邀请好友</h5></div>
+          <div style="display:grid;grid-template-columns:1fr 96px;gap:16px;align-items:center">
+            <div><div style="display:flex;gap:8px;margin-bottom:10px"><span class="tag clay">网页链接</span><span class="tag">小程序卡片</span><span class="tag">二维码</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px dashed var(--line);border-radius:11px;background:var(--bg)"><code style="font-family:var(--mono);font-size:12.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">timo.app/j/TC1A8K</code><button class="btn sm pri">复制</button></div>
+              <p class="muted" style="font-size:12px;margin-top:8px">好友注册即与你建立邀请关系</p></div>
+            <div style="width:96px;height:96px;border-radius:14px;border:1px solid var(--line);background:repeating-conic-gradient(var(--ink) 0 25%, #fff 0 50%) 0 0/12px 12px;opacity:.85"></div></div></div>
+      </div>
+      <div class="mc" style="margin-top:16px"><div class="mc-h"><h5>项目广场</h5><span class="muted r" style="font-size:12px">我们承接的项目，统一在这里领取</span></div>
+        <div class="grid g4">
+          <div style="padding:14px;border:1px solid var(--line-2);border-radius:14px"><span class="pic" style="background:#F6E5DC;color:#B5532F">知</span><b style="display:block;margin-top:10px">知乎推文</b><span class="muted" style="font-size:12px">¥2.00 / 拉新 · 9 个任务</span></div>
+          <div style="padding:14px;border:1px solid var(--line-2);border-radius:14px"><span class="pic" style="background:#E3ECF8;color:#2D63AE">红</span><b style="display:block;margin-top:10px">红果短剧推荐</b><span class="muted" style="font-size:12px">¥0.80 / 有效观看</span></div>
+          <div style="padding:14px;border:1px solid var(--line-2);border-radius:14px"><span class="pic" style="background:#E5F0E3;color:#3E7B3B">网</span><b style="display:block;margin-top:10px">网盘拉新</b><span class="muted" style="font-size:12px">¥3.00 / 拉新 · <span class="tag warn" style="height:18px">灰度</span></span></div>
+          <div style="padding:14px;border:1px dashed var(--line);border-radius:14px;color:var(--muted)"><span class="pic" style="background:var(--bg-2)">＋</span><b style="display:block;margin-top:10px;color:var(--ink-3)">更多项目接入中</b><span style="font-size:12px">聚合平台 · 即插即用</span></div>
+        </div></div>
+    </div></div></div>
+
+  <!-- 团长团队 -->
+  <div class="screen-pane" id="s-team"><div class="app">
+    <aside class="side"><div class="who"><span class="av" style="background:#3B7DD8;width:34px;height:34px">苏</span><div><b>苏禾</b><small>团长 · 20 人团队</small></div></div>
+      <a>首页</a><a>项目广场</a><a class="on">我的团队<span class="n">2</span></a><a>邀请中心</a><a>收益</a><a>钱包</a></aside>
+    <div class="main">
+      <div class="ph"><div><h4>我的团队</h4><p>团队收益按成员业绩当天的归属计算，转队或晋升不影响已发生的业绩</p></div><div class="segc" data-seg="tt"><span class="thumb"></span><button class="on">成员</button><button>入团申请 2</button><button>流转记录</button></div></div>
+      <div class="grid g4">
+        <div class="mc kpi"><small>直邀成员（显性）</small><div class="v sm num">9 人</div><div class="d">逐个可见，带来的收益可查</div></div>
+        <div class="mc kpi"><small>团队下级（隐性）</small><div class="v sm num">11 人 🔒</div><div class="d">由成员邀请加入，仅显示人数</div></div>
+        <div class="mc kpi"><small>本月团队收益</small><div class="v sm num">¥1,032.40</div><div class="d">成员业绩 × 团长单价</div></div>
+        <div class="mc kpi"><small>9 月团队激励</small><div class="v sm num" style="color:#8E6CC9">¥600.00</div><div class="d">B 档 · 按公开标准评定</div></div>
+      </div>
+      <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);margin-top:16px">
+        <div class="mc"><div class="mc-h"><h5>直邀成员</h5><span class="muted r" style="font-size:12px">近 30 天带来的团队收益</span></div>
+          <div class="prow"><span class="av" style="background:#D46B45">林</span><div><b>林小满</b><div class="muted" style="font-size:12px">活跃 30 天 · 另邀请了 3 人</div></div><b class="num" style="margin-left:auto">¥118.20</b></div>
+          <div class="prow"><span class="av" style="background:#4E9A4A">顾</span><div><b>顾知夏</b><div class="muted" style="font-size:12px">活跃 26 天 · 另邀请了 3 人</div></div><b class="num" style="margin-left:auto">¥96.40</b></div>
+          <div class="prow"><span class="av" style="background:#8E6CC9">唐</span><div><b>唐南乔</b><div class="muted" style="font-size:12px">活跃 22 天 · 另邀请了 3 人</div></div><b class="num" style="margin-left:auto">¥71.10</b></div>
+          <div class="prow"><span class="av" style="background:#3B7DD8">陈</span><div><b>陈子衿</b><div class="muted" style="font-size:12px">活跃 19 天 · 另邀请了 1 人</div></div><b class="num" style="margin-left:auto">¥40.55</b></div>
+          <div class="lockrow" style="margin-top:12px"><span style="font-size:18px">🔒</span><div><b style="color:var(--ink-2)">另有 11 位团队下级</b><div style="font-size:12px">由你的成员邀请加入，属于你的团队，只显示人数。他们的业绩计入团队收益和团队激励评定。</div></div></div>
+        </div>
+        <div class="stack" style="display:grid;gap:16px;align-content:start">
+          <div class="mc"><div class="mc-h"><h5>团队激励</h5><span class="tag r" style="background:#EFE9F8;color:#6E4FA8">B 档</span></div>
+            <div class="serif num" style="font-size:30px;font-weight:600">¥600.00</div>
+            <p class="muted" style="font-size:12.5px;margin-top:4px">评定说明：作品合格率 92.0%，团队活跃度 88%。<br>A 档标准：合格率 ≥ 94% 且活跃度 ≥ 80%</p></div>
+          <div class="mc"><div class="mc-h"><h5>最近流转</h5></div><ul class="tl">
+            <li style="--c:#4E9A4A">周时雨 申请加入，你已同意<small>今天 · 独立达人转入</small></li>
+            <li style="--c:#D46B45">林小满 晋升进度 3/4<small>达标后由运营提名</small></li>
+            <li style="--c:#B0AEA5">许南乔 由 林小满 邀请加入<small>10-12 · 团队下级 +1</small></li></ul></div>
+        </div>
+      </div>
+    </div></div></div>
+
+  <!-- 关系森林 -->
+  <div class="screen-pane" id="s-forest"><div class="app">
+    <aside class="side"><div class="who"><span class="av" style="background:#141413;width:34px;height:34px">陈</span><div><b>陈墨</b><small>运营管理</small></div></div>
+      <a>总览</a><a>数据工作台</a><h6>成员</h6><a>成员管理</a><a class="on">关系森林</a><a>晋升工作台<span class="n">3</span></a><a>团队激励</a><h6>数据</h6><a>导入导出</a><a>审计日志</a></aside>
+    <div class="main">
+      <div class="ph"><div><h4>关系森林</h4><p>邀请关系与团队归属叠加显示 · 点击节点查看三种关系</p></div><div class="segc" data-seg="fm"><span class="thumb"></span><button class="on">全部</button><button>只看团队</button><button>只看邀请链</button></div></div>
+      <div style="display:flex;gap:18px;font-size:12.5px;color:var(--ink-3);margin-bottom:8px;flex-wrap:wrap">
+        <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#87867F" stroke-width="1.6"/></svg> 当前团队归属</span>
+        <span><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#D46B45" stroke-width="1.6" stroke-dasharray="4 3"/></svg> 原始邀请链（继承，永久保留）</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#141413;vertical-align:-1px"></span> 团长</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;border:1.5px solid #87867F;vertical-align:-1px"></span> 达人</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#E8E6DC;vertical-align:-1px"></span> 隐性下级</span>
+      </div>
+      <div class="forest"><div class="canvas"><svg id="forestSvg" viewBox="0 0 640 520" width="100%"></svg></div>
+        <div class="ins" id="forestIns"></div></div>
+    </div></div></div>
+
+  <!-- 数据工作台 -->
+  <div class="screen-pane" id="s-data"><div class="app">
+    <aside class="side"><div class="who"><span class="av" style="background:#B5532F;width:34px;height:34px">许</span><div><b>许晴</b><small>财务管理</small></div></div>
+      <a>总览</a><a class="on">数据工作台</a><a>数据大屏</a><h6>资金</h6><a>账单对账<span class="n">6</span></a><a>提现审批<span class="n">6</span></a><a>计费规则</a><h6>数据</h6><a>导入导出</a></aside>
+    <div class="main">
+      <div class="ph"><div><h4>数据工作台</h4><p><span class="live"><i></i>Worker 实时计算 · 3 秒前同步 · 队列 0</span></p></div><div style="display:flex;gap:8px"><button class="btn sm">导入 CSV</button><button class="btn sm pri">导出当前视图</button></div></div>
+      <div class="mc"><div class="mc-h"><h5>收益流水 · 近 30 天</h5><span class="muted" style="font-size:12px">拖动框选时间段 → 下方表格同步筛选</span><div class="segc r" data-seg="dm"><span class="thumb"></span><button class="on">金额</button><button>笔数</button></div></div>
+        <svg viewBox="0 0 900 150" width="100%" id="area"></svg></div>
+      <div class="mc" style="margin-top:16px">
+        <div class="filters"><span class="chip"><span class="muted">项目</span><b>知乎、红果</b> ✕</span><span class="chip"><span class="muted">状态</span><b>待确认</b> ✕</span><span class="chip"><span class="muted">日期</span><b>10-06 ~ 10-19</b> ✕</span><span class="chip add">＋ 添加筛选</span><span style="margin-left:auto" class="tag warn">清洗：3 条疑似重复已合并 · <u style="cursor:pointer">撤销</u></span></div>
+        <table class="dt"><thead><tr><th><input type="checkbox"></th><th>日期</th><th>收款人</th><th>类型</th><th>项目</th><th>业绩来源</th><th class="r">数量</th><th class="r">金额</th><th>快照：团长 / 邀请人</th><th>状态</th></tr></thead><tbody>
+          <tr><td><input type="checkbox"></td><td class="num">10-19</td><td>林小满</td><td><span style="color:#D46B45">●</span> 任务</td><td>知乎</td><td class="muted">本人</td><td class="r num">3</td><td class="r num edit" data-edit>¥6.00</td><td class="muted">苏禾 / 苏禾</td><td><span class="tag warn">待确认</span></td></tr>
+          <tr><td><input type="checkbox"></td><td class="num">10-19</td><td>苏禾</td><td><span style="color:#3B7DD8">●</span> 团队</td><td>知乎</td><td>林小满</td><td class="r num">3</td><td class="r num edit" data-edit>¥0.90</td><td class="muted">苏禾 / 苏禾</td><td><span class="tag warn">待确认</span></td></tr>
+          <tr><td><input type="checkbox"></td><td class="num">10-19</td><td>林小满</td><td><span style="color:#4E9A4A">●</span> 邀请</td><td>红果</td><td>许南乔</td><td class="r num">23</td><td class="r num edit" data-edit>¥0.92</td><td class="muted">宋北辰 / 林小满</td><td><span class="tag warn">待确认</span></td></tr>
+          <tr><td><input type="checkbox"></td><td class="num">10-18</td><td>江照野</td><td><span style="color:#D46B45">●</span> 任务</td><td>知乎</td><td class="muted">本人</td><td class="r num">8</td><td class="r num edit" data-edit>¥18.40</td><td class="muted">— / 唐知远</td><td><span class="tag warn">待确认</span></td></tr>
+          <tr><td><input type="checkbox"></td><td class="num">10-18</td><td>平台留存</td><td><span style="color:#87867F">●</span> 留存</td><td>红果</td><td>何半夏</td><td class="r num">14</td><td class="r num">¥1.68</td><td class="muted">平台直管 / —</td><td><span class="tag">独立达人差价</span></td></tr>
+        </tbody></table>
+        <p class="muted" style="font-size:12px;margin-top:10px">金额单元格可原地编辑；改动进入「待复核」，由另一位财务确认后生效，全部写入审计日志。</p>
+      </div>
+    </div></div></div>
+  </div>
+</section>
+
+<!-- ============ 5 信息架构 ============ -->
+<section id="ia">
+  <div class="eyebrow">05 · 信息架构</div>
+  <h2>一个站点，六种工作台</h2>
+  <p class="sub">登录后按服务端返回的角色加载对应菜单。员工可以「以达人/团长身份预览」，核对用户看到的内容。手机网页只保留达人和团长的前 5 个入口，放在底部 Tab。</p>
+  <div class="grid g3">
+    <div class="card flat ia"><h3>达人 <span class="tag">用户侧</span></h3><p>做项目、赚佣金、邀请好友、成长</p><ol><li>首页</li><li>项目广场</li><li>我的作品</li><li>收益</li><li>邀请中心</li><li>钱包</li><li>关系与成长</li></ol></div>
+    <div class="card flat ia"><h3>团长 <span class="tag">用户侧</span></h3><p>达人的全部功能，另加团队管理</p><ol><li>首页</li><li>项目广场</li><li>我的团队<em>直邀显性 · 下级仅人数</em></li><li>入团申请</li><li>邀请中心</li><li>收益<em>含团队激励</em></li><li>钱包</li></ol></div>
+    <div class="card flat ia"><h3>运营管理 <span class="tag clay">运营侧</span></h3><p>成员权限变动、数据核查、成员数据管理</p><ol><li>总览</li><li>数据工作台</li><li>成员管理</li><li>关系森林</li><li>晋升工作台</li><li>团队激励拟定</li><li>导入导出</li></ol></div>
+    <div class="card flat ia"><h3>财务管理 <span class="tag clay">运营侧</span></h3><p>佣金核算、对账、审批、导出</p><ol><li>总览</li><li>数据工作台</li><li>账单对账</li><li>提现审批</li><li>团队激励复核</li><li>计费规则</li><li>导入导出</li></ol></div>
+    <div class="card flat ia"><h3>开发者 <span class="tag clay">运营侧</span></h3><p>开发、运维测试、监控、辅助管理</p><ol><li>系统状态<em>worker / 同步 / 队列</em></li><li>数据一致性巡检</li><li>项目接入<em>新项目配置</em></li><li>数据工作台（只读）</li><li>审计日志</li></ol></div>
+    <div class="card flat ia"><h3>超级管理员 <span class="tag clay">运营侧</span></h3><p>完整权限；独立达人的隐式团长</p><ol><li>总览与数据大屏</li><li>以上全部模块</li><li>审批中心<em>晋升 / 调价 / 打款</em></li><li>角色与权限</li><li>平台直管成员</li></ol></div>
+  </div>
+</section>
+
+<!-- ============ 6 待确认 ============ -->
+<section id="decide" style="counter-reset:q">
+  <div class="eyebrow">06 · 需要你拍板</div>
+  <h2>定下这几件事，我就按这个方向重做</h2>
+  <div class="q"><div><b>底色用 B 暖白，还是 A 暖纸？</b><p>推荐 B。A 更像 Anthropic 官网，书卷气更浓，但和之前被否的 Editorial 主题接近，有“显脏显重”的风险。右上角可以切换对比。</p></div></div>
+  <div class="q"><div><b>标题和关键数字用衬线体（思源宋体），可以接受吗？</b><p>这是 Anthropic 风格最有辨识度的部分。如果觉得太“文艺”，可以全部改用黑体，只保留暖色和留白。注意：用户电脑没装思源宋体时会退回系统宋体，正式版要把字体文件放到我们自己的服务器上（约 2–4 MB，可只打包常用字）。</p></div></div>
+  <div class="q"><div><b>团长看团队下级：只显示人数，还是也显示姓名？</b><p>文档 3.5 写的是“只显示人数”，方向稿按这个画的。但团长申请晋升提名、或者需要带新人的时候可能需要知道是谁，要不要开放姓名、隐藏收益？</p></div></div>
+  <div class="q"><div><b>要不要做深色模式？</b><p>数据大屏会用深色；运营后台如果经常长时间盯屏，建议也做。会让 UI 工作量增加约 20%。</p></div></div>
+  <div class="q"><div><b>手机网页的优先级</b><p>达人和团长主要用小程序，网页手机版是只做到“能用”，还是要和小程序一样精细？</p></div></div>
+</section>
+
+<footer>TIMO Web 设计方向稿 v0.1 · 视觉借鉴 Anthropic，交互遵循 Apple 人机界面理念 · 仅用于方向确认</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, el) => (el || document).querySelector(s), $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+
+  /* 分段控件：滑块跟随 */
+  function placeThumb(seg) { const on = $('button.on', seg), th = $('.thumb', seg); if (!on || !th) return; th.style.width = on.offsetWidth + 'px'; th.style.transform = `translateX(${on.offsetLeft - 3}px)`; }
+  $$('.segc').forEach(seg => {
+    placeThumb(seg);
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      $$('button', seg).forEach(x => x.classList.toggle('on', x === b)); placeThumb(seg);
+      if (seg.dataset.seg === 'v') { document.documentElement.dataset.v = b.dataset.v; syncSwatch(); requestAnimationFrame(() => $$('.segc').forEach(placeThumb)); }
+      if (seg.dataset.seg === 'screen') showScreen(b.dataset.s);
+    });
+  });
+  window.addEventListener('resize', () => $$('.segc').forEach(placeThumb));
+  document.fonts && document.fonts.ready.then(() => $$('.segc').forEach(placeThumb));
+  function syncSwatch() { const cs = getComputedStyle(document.documentElement); $('.bgv').textContent = cs.getPropertyValue('--bg').trim(); $('.cardv').textContent = cs.getPropertyValue('--card').trim(); }
+
+  /* 页面方向稿切换 */
+  const URLS = { 's-home': 'timo.clouddo.cc/app/home', 's-team': 'timo.clouddo.cc/app/team', 's-forest': 'timo.clouddo.cc/app/relations', 's-data': 'timo.clouddo.cc/app/workbench' };
+  function showScreen(id) {
+    $$('.screen-pane').forEach(p => p.classList.toggle('on', p.id === id)); $('#url').textContent = URLS[id];
+    const seg = $('[data-seg="screen"]'); $$('button', seg).forEach(x => x.classList.toggle('on', x.dataset.s === id)); placeThumb(seg);
+    requestAnimationFrame(() => $$('#' + id + ' .segc').forEach(placeThumb));
+  }
+  $$('[data-jump]').forEach(a => a.addEventListener('click', () => {
+    const t = a.dataset.jump;
+    if (t.startsWith('s-')) { showScreen(t); $('#screens').scrollIntoView({ behavior: 'smooth' }); } else $('#' + t).scrollIntoView({ behavior: 'smooth' });
+  }));
+
+  /* 01 大标题收起 */
+  const lt = $('#lt'); lt.addEventListener('scroll', () => lt.classList.toggle('scrolled', lt.scrollTop > 30));
+
+  /* 02 面板 */
+  const ss = $('#sheetStage');
+  ss.addEventListener('click', e => { const b = e.target.closest('[data-sheet]'); if (b) ss.classList.toggle('sheet-on', b.dataset.sheet === 'open'); else if (ss.classList.contains('sheet-on') && !e.target.closest('.sheet')) ss.classList.remove('sheet-on'); });
+
+  /* 03 检查器 */
+  const P = [
+    ['林小满', '达人 · 苏禾团队', '苏禾 邀请（06-16）', '苏禾团队（当前）', '直邀 3 人 · 隐性下级 0'],
+    ['江照野', '团长 · 09-20 晋升', '唐知远 邀请（04-02）', '江照野团队（自 09-20）', '原团队：唐知远团队 · 3 人随迁'],
+    ['何半夏', '独立达人 · 平台直管', '自然注册', '平台直管（超管为隐式团长）', '团长差价记为平台留存']
+  ];
+  const insp = $('#insp');
+  insp.addEventListener('click', e => {
+    const it = e.target.closest('.it'); if (!it) return;
+    $$('.it', insp).forEach(x => x.classList.toggle('on', x === it));
+    const p = P[+it.dataset.p];
+    $('#inspBody').innerHTML = `<b style="font-size:15px">${p[0]}</b><div class="muted" style="font-size:12px;margin-bottom:12px">${p[1]}</div><div class="muted" style="font-size:11.5px">邀请关系</div><div style="margin-bottom:8px">${p[2]}</div><div class="muted" style="font-size:11.5px">团队归属</div><div style="margin-bottom:8px">${p[3]}</div><div class="muted" style="font-size:11.5px">备注</div><div>${p[4]}</div>`;
+    insp.classList.add('open');
+  });
+
+  /* 04 撤销 */
+  let undoTimer, lastGone, ringAnim;
+  const snack = $('#snack'), ring = $('#ringC');
+  $('#undoList').addEventListener('click', e => {
+    const b = e.target.closest('[data-undo-del]'); if (!b) return;
+    const it = b.closest('.it'); it.classList.add('gone'); lastGone = it;
+    $('#snackT').textContent = b.textContent === '合并' ? '已合并 2 条记录' : '已移除';
+    snack.classList.add('on'); clearTimeout(undoTimer);
+    if (ringAnim) ringAnim.cancel();
+    ringAnim = ring.animate([{ strokeDashoffset: 0 }, { strokeDashoffset: 50.3 }], { duration: 5000, fill: 'forwards' });
+    undoTimer = setTimeout(() => snack.classList.remove('on'), 5000);
+  });
+  $('#undoBtn').addEventListener('click', () => { if (lastGone) lastGone.classList.remove('gone'); snack.classList.remove('on'); clearTimeout(undoTimer); });
+
+  /* 05 原地编辑 */
+  document.addEventListener('click', e => {
+    const td = e.target.closest('[data-edit]'); if (!td || td.querySelector('input')) return;
+    const old = td.textContent, inp = document.createElement('input'); inp.value = old.replace(/[¥,]/g, ''); td.textContent = ''; td.appendChild(inp); inp.focus(); inp.select();
+    const done = save => { const v = parseFloat(inp.value); td.textContent = save && !isNaN(v) ? '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : old; if (save && td.textContent !== old) td.animate([{ background: '#F6E5DC' }, { background: 'transparent' }], { duration: 900 }); };
+    inp.addEventListener('keydown', k => { if (k.key === 'Enter') done(true); if (k.key === 'Escape') done(false); });
+    inp.addEventListener('blur', () => done(true), { once: true });
+  });
+
+  /* 06 Spotlight */
+  const spot = $('#spot');
+  $('#spotBtn').addEventListener('click', () => { spot.classList.add('on'); $('input', spot).focus(); });
+  $('#spotStage').addEventListener('click', e => { if (!e.target.closest('.spot') && !e.target.closest('#spotBtn')) spot.classList.remove('on'); });
+  document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#spotStage').scrollIntoView({ behavior: 'smooth', block: 'center' }); spot.classList.add('on'); $('input', spot).focus(); } if (e.key === 'Escape') { spot.classList.remove('on'); ss.classList.remove('sheet-on'); } });
+
+  /* 动效预览 */
+  $('#motionBtn').addEventListener('click', () => { const m = $('#motion'); m.classList.toggle('play'); });
+
+  /* 关系森林 */
+  const N = {
+    tang: { x: 20, y: 30, n: '唐知远', k: 'leader', s: '团长 · 16 人', inv: '陈墨（员工）邀请', team: '唐知远团队（自 03 月）', note: '原团队成员 江照野 于 09-20 晋升；其邀请链以虚线永久保留' },
+    a1: { x: 200, y: 6, n: '宋初九', k: 'c', s: '达人', inv: '唐知远 邀请', team: '唐知远团队', note: '直邀成员' },
+    jiang: { x: 200, y: 92, n: '江照野', k: 'leader', s: '团长 · 09-20 晋升', inv: '唐知远 邀请（04-02）', team: '江照野团队（自 09-20）', note: '继承属性：与唐知远的原始邀请关系不切断，历史收益与关系可追溯；晋升后唐知远不再从其团队取得收益' },
+    j1: { x: 400, y: 56, n: '韩岁宁', k: 'c', s: '随迁', inv: '江照野 邀请', team: '江照野团队（09-20 随迁）', note: '晋升时随邀请人转入' },
+    j2: { x: 400, y: 106, n: '谢时雨', k: 'c', s: '随迁', inv: '江照野 邀请', team: '江照野团队（09-20 随迁）', note: '晋升时随邀请人转入' },
+    j3: { x: 400, y: 156, n: '方见山', k: 'c', s: '留在原团队', inv: '江照野 邀请', team: '唐知远团队', note: '晋升时选择留下：团队归属仍是唐知远，邀请关系仍指向江照野（邀请收益 180 天内照常）' },
+    su: { x: 20, y: 236, n: '苏禾', k: 'leader', s: '团长 · 20 人', inv: '陈墨（员工）邀请', team: '苏禾团队', note: '9 位直邀成员，11 位隐性下级' },
+    lin: { x: 200, y: 214, n: '林小满', k: 'c', s: '达人 · 3/4 晋升', inv: '苏禾 邀请（06-16）', team: '苏禾团队', note: '荐邀：其邀请的 3 人同属苏禾团队，对苏禾是隐性下级' },
+    h1: { x: 400, y: 214, n: '许南乔', k: 'h', s: '隐性下级', inv: '林小满 邀请', team: '苏禾团队', note: '对团长苏禾只显示人数；运营侧可见' },
+    h2: { x: 400, y: 262, n: '+2', k: 'h', s: '隐性下级', inv: '林小满 邀请', team: '苏禾团队', note: '折叠显示，点击展开' },
+    gu: { x: 200, y: 290, n: '顾知夏', k: 'c', s: '达人', inv: '苏禾 邀请', team: '苏禾团队', note: '直邀成员' },
+    adm: { x: 20, y: 400, n: '平台直管', k: 'admin', s: '超管 · 隐式团长', inv: '—', team: '独立达人 7 人', note: '独立达人无团队；超级管理员是隐式团长，团长那份差价记为平台留存' },
+    i1: { x: 200, y: 376, n: '何半夏', k: 'c', s: '独立达人', inv: '自然注册', team: '平台直管', note: '与团长同样可以邀请，但收益标准同普通成员' },
+    i2: { x: 200, y: 446, n: '程星河', k: 'c', s: '独立达人', inv: '陈墨（员工）邀请', team: '平台直管', note: '' },
+    i3: { x: 400, y: 376, n: '白一舟', k: 'c', s: '独立达人', inv: '何半夏 邀请', team: '平台直管', note: '独立达人邀请的人同样平台直管' }
+  };
+  const E = [['tang', 'a1', 's'], ['tang', 'jiang', 'd'], ['tang', 'j3', 'sb'], ['jiang', 'j1', 's'], ['jiang', 'j2', 's'], ['jiang', 'j3', 'd'], ['su', 'lin', 's'], ['su', 'gu', 's'], ['lin', 'h1', 'd'], ['lin', 'h2', 'd'], ['adm', 'i1', 's'], ['adm', 'i2', 's'], ['i1', 'i3', 'd']];
+  const W = 132, H = 40;
+  let svg = '';
+  E.forEach(([a, b, t]) => {
+    const A = N[a], B = N[b], x1 = A.x + W, y1 = A.y + H / 2, x2 = B.x, y2 = B.y + H / 2, mx = (x1 + x2) / 2;
+    if (t === 'sb') { svg += `<path d="M${A.x + W / 2} ${A.y + H}C${A.x + W / 2} ${y2} ${x2 - 150} ${y2} ${x2} ${y2}" fill="none" stroke="#87867F" stroke-width="1.6"/>`; return; } // 从下方绕开晋升者节点
+    svg += `<path d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}" fill="none" stroke="${t === 'd' ? '#D46B45' : '#87867F'}" stroke-width="1.6" ${t === 'd' ? 'stroke-dasharray="5 4"' : ''}/>`;
+  });
+  Object.keys(N).forEach(id => {
+    const n = N[id], lead = n.k === 'leader' || n.k === 'admin', hid = n.k === 'h';
+    svg += `<g class="node" data-id="${id}" transform="translate(${n.x},${n.y})"><rect width="${W}" height="${H}" rx="11" fill="${lead ? (n.k === 'admin' ? '#3D3D3A' : '#141413') : hid ? '#EFEDE6' : '#FFFFFF'}" stroke="${hid ? '#DEDACD' : '#D8D5C9'}"/>
+      <text x="12" y="17" font-size="12.5" font-weight="650" fill="${lead ? '#FAF9F5' : hid ? '#87867F' : '#141413'}">${n.n}</text><text x="12" y="31" font-size="10.5" fill="${lead ? '#B0AEA5' : '#87867F'}">${n.s}</text></g>`;
+  });
+  const fsvg = $('#forestSvg'); fsvg.innerHTML = svg;
+  function ins(id) {
+    const n = N[id];
+    $$('.node', fsvg).forEach(g => g.classList.toggle('on', g.dataset.id === id));
+    $('#forestIns').innerHTML = `<b style="font-size:16px" class="serif">${n.n === '+2' ? '另 2 位隐性下级' : n.n}</b><div class="muted" style="font-size:12px;margin-bottom:14px">${n.s}</div>
+      <div class="rel"><h6><i style="background:#D46B45"></i>邀请关系 · 永不改变</h6><p>${n.inv}</p></div>
+      <div class="rel"><h6><i style="background:#87867F"></i>团队归属 · 当前</h6><p>${n.team}</p></div>
+      <div class="rel"><h6><i style="background:#3B7DD8"></i>计酬快照</h6><p>按业绩当天的关系计算，转队/晋升不影响已发生业绩</p></div>
+      ${n.note ? `<p style="font-size:12.5px;color:var(--ink-3);margin-top:6px">${n.note}</p>` : ''}`;
+  }
+  fsvg.addEventListener('click', e => { const g = e.target.closest('.node'); if (g) ins(g.dataset.id); });
+  ins('jiang');
+
+  /* 数据工作台面积图（可框选） */
+  const vals = [1720, 1810, 1650, 1940, 2210, 2050, 1880, 1990, 2310, 2480, 2190, 2060, 2230, 2560, 2400, 2280, 2120, 2390, 2640, 2510, 2380, 2290, 2470, 2720, 2610, 2450, 2580, 2810, 2690, 1941];
+  const aw = 900, ah = 150, pl = 40, pb = 22, pt = 8, max = 3000, n = vals.length;
+  const X = i => pl + i * (aw - pl - 10) / (n - 1), Y = v => pt + (ah - pt - pb) * (1 - v / max);
+  let a = '';
+  [0, 1000, 2000, 3000].forEach(v => { a += `<line x1="${pl}" x2="${aw - 10}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line-2)"/><text x="${pl - 8}" y="${Y(v) + 4}" font-size="11" text-anchor="end" fill="#87867F">${v ? '¥' + v / 1000 + 'k' : '0'}</text>`; });
+  const d = vals.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join('');
+  a += `<rect id="brush" x="${X(16)}" y="${pt}" width="${X(29) - X(16)}" height="${ah - pt - pb}" fill="#D46B45" opacity=".08" rx="6"/><line x1="${X(16)}" x2="${X(16)}" y1="${pt}" y2="${ah - pb}" stroke="#D46B45" stroke-width="1.5"/><line x1="${X(29)}" x2="${X(29)}" y1="${pt}" y2="${ah - pb}" stroke="#D46B45" stroke-width="1.5"/>`;
+  a += `<path d="${d}L${X(n - 1)} ${ah - pb}L${X(0)} ${ah - pb}Z" fill="#D46B45" opacity=".1"/><path d="${d}" fill="none" stroke="#D46B45" stroke-width="2" stroke-linejoin="round"/>`;
+  ['09-20', '09-27', '10-04', '10-11', '10-18'].forEach((t, k) => { a += `<text x="${X(k * 7)}" y="${ah - 4}" font-size="11" text-anchor="middle" fill="#87867F">${t}</text>`; });
+  a += `<circle cx="${X(n - 1)}" cy="${Y(vals[n - 1])}" r="4" fill="#D46B45" stroke="var(--card)" stroke-width="2"/><text x="${X(n - 1) - 8}" y="${Y(vals[n - 1]) - 10}" font-size="11.5" text-anchor="end" fill="#141413" font-weight="600">今日 ¥1,941</text>`;
+  $('#area').innerHTML = a;
+
+  syncSwatch();
+})();
+</script>
+</body>
+</html>

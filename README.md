@@ -71,7 +71,7 @@ docker compose ps
 curl http://127.0.0.1/healthz
 ```
 
-数据库迁移会在后端容器启动时自动执行。首次管理员初始化、云服务器安全组、HTTPS、备份和升级步骤见 [Docker 云端部署文档](docs/10-Docker云端部署.md)。
+数据库迁移会在后端容器启动时自动执行。首次管理员初始化、云服务器安全组、HTTPS、备份和升级步骤见下文「现有 ECS 蓝绿更新」；旧的 Docker 部署文档已归档到 `_archive/docs-legacy/docs/`，仅作历史参考。
 
 ## 现有 ECS 蓝绿更新
 
@@ -144,10 +144,11 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 
 ## 知乎模块历史功能说明
 
+> 2026-09-20 核查：知乎审核状态同步已停用（`GET /popularize_plans` 未经官方 V1.4.17 文档支持，计划同步入口和定时任务已停止）。历史说明（功能概览、部署、验证清单）已归档到 `_archive/docs-legacy/docs/`，仅作追溯，不要按其中的步骤操作。
+
 ### 推广计划管理
 - 创建和管理知乎推广计划
 - 自动同步到知乎开放平台
-- **审核状态实时同步** - 查看推广计划的审核状态和拒绝原因
 
 ### 作品管理
 - 登记推广作品
@@ -163,24 +164,8 @@ python3 deploy/switch_timo_upstream.py --from-port 3202 --to-port 3212 --candida
 - 用户权限管理（管理员/团长/达人）
 - 团队入驻审核
 - 操作日志审计
-- **审核状态手动同步** - 系统工具页面一键同步
 
 ## 最新功能
-
-### 知乎审核状态同步（v1.0.0）
-
-自动从知乎开放平台同步推广计划和作品的审核状态：
-
-- ✅ **自动同步**：每天凌晨 3 点自动同步审核状态
-- 🎯 **状态追踪**：实时查看「待审核」「已通过」「已拒绝」状态
-- 📋 **拒绝原因**：直接显示知乎的拒绝原因，便于快速修改
-- 🔄 **手动触发**：系统工具页面支持立即同步
-
-**功能文档**：
-- [功能概览](docs/FEATURE-ZHIHU-AUDIT-STATUS.md) - 快速了解功能
-- [详细说明](docs/zhihu-audit-status-sync.md) - 完整使用指南
-- [部署指南](docs/zhihu-audit-status-deployment.md) - 部署和测试
-- [快速参考](docs/QUICK-REFERENCE.md) - 常用命令和诊断
 
 ### 拉活代理名称
 

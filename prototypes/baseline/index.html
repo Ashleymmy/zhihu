@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TIMO · 推广任务聚合平台 Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try {
+      var t = localStorage.getItem('timo.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side" id="side"></aside>
+    <div class="main">
+      <header class="top" id="top"></header>
+      <main class="page" id="page"></main>
+    </div>
+  </div>
+  <nav class="tabbar" id="tabbar"></nav>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+  <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+  <div class="pop" id="pop"></div>
+  <div class="palette" id="palette"></div>
+  <div class="toasts" id="toasts"></div>
+  <div id="tip"></div>
+
+  <script src="data.js"></script>
+  <script src="charts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
