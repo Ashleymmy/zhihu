@@ -1527,6 +1527,8 @@ onMounted(() => run(load));
 .member-filters input,
 .member-filters select {
   min-height: 42px;
+  min-width: 0;
+  width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 7px;
