@@ -30,14 +30,6 @@ test('report commit requires preview acknowledgement and preserves exact scope a
   const call=h.calls.find(c=>c.path.endsWith('/commit'))
   assert.equal(call.data.previewHash,'reviewed-hash');assert.equal(call.data.projectId,'1');assert.equal(call.data.accountId,'10');assert.ok(call.data.requestKey)
 })
-test('payment UI requires proof and acknowledgement before registration',async()=>{
-  const h=setup(),page=h.page('withdrawals');await page.onShow();page.pay({currentTarget:{dataset:{index:0}}})
-  page.setData({'paymentForm.reference':'bank-001'});await page.recordPayment()
-  assert.equal(h.calls.some(c=>c.path.endsWith('/pay')),false)
-  page.setData({proofFileId:'100','paymentForm.acknowledged':true});await page.recordPayment()
-  const call=h.calls.find(c=>c.path.endsWith('/pay'))
-  assert.equal(call.data.fileId,'100');assert.equal(call.data.acknowledged,true);assert.ok(call.data.requestKey)
-})
 test('file selection interrupted by context change never prepares or uploads a file',async()=>{
   const h=setup(),choice=deferred();h.wx.chooseMessageFile=()=>choice.promise
   let active=true,uploaded=false;h.wx.cloud.uploadFile=async()=>{uploaded=true}

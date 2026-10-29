@@ -6,5 +6,6 @@
     "confirm-sheet": "/components/confirm-sheet/index"
   },
   "enablePullDownRefresh": true,
-  "backgroundTextStyle": "dark"
+  "backgroundTextStyle": "dark",
+  "navigationBarTitleText": "提现与记录"
 }

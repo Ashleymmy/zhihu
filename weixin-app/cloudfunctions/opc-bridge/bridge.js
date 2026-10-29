@@ -1,6 +1,7 @@
 "use strict";
 const https = require("node:https");
 const crypto = require("node:crypto");
+const { agent } = require("./tls-trust");
 const { checkContent } = require("./content-safety");
 const ENDPOINT = "https://timo.clouddo.cc/api/v1/mini/bridge";
 const APP_ID = "wx22b91776ccf37354";
@@ -119,6 +120,8 @@ function sendHttps(url, payload, headers) {
       url,
       {
         method: "POST",
+        agent,
+        rejectUnauthorized: true,
         timeout: 55000,
         headers: {
           ...headers,

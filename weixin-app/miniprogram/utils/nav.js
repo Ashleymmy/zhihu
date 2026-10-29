@@ -12,7 +12,6 @@ const TABS = [
 const ZHIHU_HUB = [
   "/pages/keywords/index",
   "/pages/works/index",
-  "/pages/wallet/index",
   "/pages/work-data/index",
 ];
 function isTab(path) {

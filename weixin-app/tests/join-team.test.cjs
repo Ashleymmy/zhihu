@@ -18,7 +18,7 @@ function setup(role='creator') {
 test('independent creator can find all leaders and apply without an authorized business project',async()=>{
   const {h,page}=setup();await page.onShow();
   assert.equal(page.data.filteredLeaders.length,12);
-  page.searchLeader({detail:{value:'leader11'}});assert.equal(page.data.filteredLeaders.length,1);
+  page.searchLeader({detail:{value:'团长11'}});assert.equal(page.data.filteredLeaders.length,1);
   page.pickLeader({currentTarget:{dataset:{id:'41'}}});
   await page.apply();
   assert.equal(h.calls.find(c=>c.method==='POST').data.leaderUsername,'leader11');

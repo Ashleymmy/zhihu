@@ -13,7 +13,10 @@ interface Detail {
   counts: { direct: number; indirect: number }
   teamSize: number
   timeline: { at: string; kind: 'team' | 'role'; title: string; detail: string; operator: string | null }[]
+  page: number
+  hasMore: boolean
 }
+interface TreePage { list: TreeNode[]; page: number; hasMore: boolean }
 interface Nominee {
   user: { id: string; name: string }
   nominable: boolean
@@ -25,6 +28,7 @@ interface Nominee {
 const ROLE_TEXT: Record<string, string> = { creator: '达人', leader: '团长', platform: '平台', admin: '管理员', operator: '运营', developer: '开发者' }
 const mode = ref<'team' | 'invite'>('team')
 const children = reactive(new Map<string, TreeNode[]>())
+const pages = reactive(new Map<string, { page: number; hasMore: boolean }>())
 const expanded = reactive(new Set<string>())
 const loading = reactive(new Set<string>())
 const treeError = ref('')
@@ -58,7 +62,13 @@ async function openMove(kind: MoveKind) {
   moveLeader.value = ''
   if (kind !== 'demote') {
     try {
-      leaders.value = (await http.get<TreeNode[]>('/relations/tree', { mode: 'team' })).filter(n => n.role === 'leader' && n.active && n.id !== detail.value?.user.id)
+      const all: TreeNode[] = []
+      for (let page = 1, hasMore = true; hasMore && page <= 10; page++) {
+        const r = await http.get<TreePage>('/relations/tree', { mode: 'team', page, pageSize: 100 })
+        all.push(...r.list)
+        hasMore = r.hasMore
+      }
+      leaders.value = all.filter(n => n.role === 'leader' && n.active && n.id !== detail.value?.user.id)
     } catch { leaders.value = [] }
   }
 }
@@ -74,6 +84,7 @@ async function submitMove() {
     else notify(move.value === 'handover' ? `已移交 ${result.moved} 位成员` : move.value === 'demote' ? '已降级为达人' : '已调整团队')
     move.value = null
     children.clear()
+    pages.clear()
     expanded.clear()
     await Promise.all([loadChildren(''), reloadDetail(userId)])
   } catch (e) {
@@ -104,13 +115,15 @@ async function toggleIndirectNames(event: Event) {
 }
 const followCount = computed(() => nominee.value?.members.filter(m => m.defaultAction === 'follow').length ?? 0)
 
-async function loadChildren(parent: string) {
+async function loadChildren(parent: string, more = false) {
   if (loading.has(parent)) return
   loading.add(parent)
   treeError.value = ''
   try {
-    const list = await http.get<TreeNode[]>('/relations/tree', parent ? { mode: mode.value, parent } : { mode: mode.value })
-    children.set(parent, list)
+    const page = more ? (pages.get(parent)?.page ?? 1) + 1 : 1
+    const r = await http.get<TreePage>('/relations/tree', { mode: mode.value, page, ...(parent ? { parent } : {}) })
+    children.set(parent, more ? [...(children.get(parent) ?? []), ...r.list] : r.list)
+    pages.set(parent, { page: r.page, hasMore: r.hasMore })
   } catch {
     treeError.value = '成员树暂时没加载出来，请重试。'
   } finally {
@@ -121,6 +134,7 @@ function switchMode(next: 'team' | 'invite') {
   if (mode.value === next) return
   mode.value = next
   children.clear()
+  pages.clear()
   expanded.clear()
   void loadChildren('')
 }
@@ -174,14 +188,36 @@ async function submitNominate() {
   }
 }
 
-/* 把展开的节点拍平成带缩进的行，渲染一个列表即可 */
+/* 变更记录按页追加；团队归属和角色历史各自分页，合并后按时间重排 */
+const timelineBusy = ref(false)
+async function loadMoreTimeline() {
+  if (!detail.value || timelineBusy.value) return
+  timelineBusy.value = true
+  const id = detail.value.user.id
+  try {
+    const next = await http.get<Detail>(`/relations/members/${id}`, { page: detail.value.page + 1 })
+    if (detail.value?.user.id !== id) return
+    detail.value = {
+      ...next,
+      timeline: [...detail.value.timeline, ...next.timeline].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)),
+    }
+  } catch {
+    notify('更多记录暂时没加载出来，请重试', 'error')
+  } finally {
+    timelineBusy.value = false
+  }
+}
+
+/* 把展开的节点拍平成带缩进的行，渲染一个列表即可；某一层还有更多成员时在末尾加一行「加载更多」 */
+type Row = { key: string; depth: number; node: TreeNode; more?: undefined } | { key: string; depth: number; node?: undefined; more: string }
 const rows = computed(() => {
-  const out: { node: TreeNode; depth: number }[] = []
+  const out: Row[] = []
   const walk = (parent: string, depth: number) => {
     for (const node of children.get(parent) ?? []) {
-      out.push({ node, depth })
+      out.push({ key: node.id, depth, node })
       if (expanded.has(node.id)) walk(node.id, depth + 1)
     }
+    if (pages.get(parent)?.hasMore) out.push({ key: 'more:' + parent, depth, more: parent })
   }
   walk('', 0)
   return out
@@ -219,21 +255,26 @@ onMounted(() => { void loadChildren(''); void loadSettings() })
         <p v-else-if="loading.has('') && !rows.length" role="status" class="bento-note">正在加载成员…</p>
         <div v-else-if="!rows.length" class="bento-empty"><b>还没有成员</b><p>成员注册或被邀请后会出现在这里。</p></div>
         <ul class="tree" role="tree">
-          <li v-for="{ node, depth } in rows" :key="mode + node.id" role="treeitem" :aria-expanded="node.children ? expanded.has(node.id) : undefined" :aria-selected="selected === node.id">
-            <div class="tree-row" :class="{ on: selected === node.id, muted: !node.active }" :style="{ paddingLeft: 8 + depth * 22 + 'px' }">
-              <button v-if="node.children" type="button" class="tree-toggle" :class="{ open: expanded.has(node.id) }" :aria-label="(expanded.has(node.id) ? '收起 ' : '展开 ') + node.name" @click="toggle(node)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-              </button>
-              <span v-else class="tree-toggle" aria-hidden="true" />
-              <button type="button" class="tree-name" @click="select(node)">
-                <span class="tree-av" :class="node.role">{{ node.name.slice(0, 1) }}</span>
-                <span class="tree-label">{{ node.name }}</span>
-                <span v-if="node.role === 'leader'" class="chip clay">团长</span>
-                <span v-if="!node.active" class="chip soft">已停用</span>
-                <span v-if="node.children" class="tree-count">{{ node.children }}</span>
-              </button>
-            </div>
-          </li>
+          <template v-for="row in rows" :key="mode + row.key">
+            <li v-if="row.more !== undefined" role="none" class="tree-more" :style="{ paddingLeft: 32 + row.depth * 22 + 'px' }">
+              <button type="button" :disabled="loading.has(row.more)" @click="loadChildren(row.more, true)">{{ loading.has(row.more) ? '正在加载…' : '加载更多成员' }}</button>
+            </li>
+            <li v-else role="treeitem" :aria-expanded="row.node.children ? expanded.has(row.node.id) : undefined" :aria-selected="selected === row.node.id">
+              <div class="tree-row" :class="{ on: selected === row.node.id, muted: !row.node.active }" :style="{ paddingLeft: 8 + row.depth * 22 + 'px' }">
+                <button v-if="row.node.children" type="button" class="tree-toggle" :class="{ open: expanded.has(row.node.id) }" :aria-label="(expanded.has(row.node.id) ? '收起 ' : '展开 ') + row.node.name" @click="toggle(row.node)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                </button>
+                <span v-else class="tree-toggle" aria-hidden="true" />
+                <button type="button" class="tree-name" @click="select(row.node)">
+                  <span class="tree-av" :class="row.node.role">{{ row.node.name.slice(0, 1) }}</span>
+                  <span class="tree-label">{{ row.node.name }}</span>
+                  <span v-if="row.node.role === 'leader'" class="chip clay">团长</span>
+                  <span v-if="!row.node.active" class="chip soft">已停用</span>
+                  <span v-if="row.node.children" class="tree-count">{{ row.node.children }}</span>
+                </button>
+              </div>
+            </li>
+          </template>
         </ul>
       </section>
 
@@ -282,6 +323,7 @@ onMounted(() => { void loadChildren(''); void loadSettings() })
               <small>{{ when(item.at) }}{{ item.detail ? ' · ' + item.detail : '' }}{{ item.operator ? ' · 操作人 ' + item.operator : '' }}</small>
             </li>
           </ol>
+          <button v-if="detail.hasMore" type="button" class="ghost-aurora timeline-more" :disabled="timelineBusy" @click="loadMoreTimeline">{{ timelineBusy ? '正在加载…' : '加载更早的记录' }}</button>
         </template>
       </section>
     </div>
@@ -334,6 +376,10 @@ button.tree-toggle:hover { background: var(--line); }
 .tree-name { display: flex; flex: 1; align-items: center; gap: 9px; min-width: 0; min-height: 40px; padding: 0 4px; border: 0; background: transparent; text-align: left; }
 .tree-label { overflow: hidden; font-size: 14px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .tree-count { margin-left: auto; color: var(--muted); font-size: 12px; }
+.tree-more { padding: 4px 0 8px; }
+.tree-more button { padding: 0; border: 0; background: transparent; color: var(--clay); font-size: 13px; }
+.tree-more button:disabled { color: var(--muted); }
+.timeline-more { margin-top: 4px; }
 .tree-av { display: grid; width: 26px; height: 26px; flex: none; place-items: center; border-radius: 50%; color: #fff; background: #3b7dd8; font-size: 12px; font-weight: 700; }
 .tree-av.leader { background: var(--ink); }
 .tree-av.platform { background: var(--muted); }

@@ -12,7 +12,7 @@ import { quoteActivation } from './activation-pricing';
 import * as resources from './resources';
 import { assignRetro } from './retro-assignment';
 import { submitEvidence, reviewEvidence, disputeBinding } from './statements';
-import { scopeFilter } from '../../../utils/scopeFilter';
+import { compositionVisibility } from '../services/composition-visibility';
 import { submissionFailure } from '../services/submission-feedback';
 
 const link = (path: string, scope: TaskScope, extra: Record<string, string> = {}) =>
@@ -132,6 +132,7 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
   if (
     Number(word.usage_ready) &&
     word.binding_id &&
+    !word.access_preserved_at &&
     !word.used_ever_at &&
     !Number(word.has_usage_history) &&
     word.leader_id &&
@@ -342,7 +343,7 @@ async function one(scope: TaskScope, user: AuthUser, id: string) {
 // Enrich only the already authorized task IDs, retaining the work-level role scope.
 async function enrichWorks(user: AuthUser, words: RecordRow[]) {
   if (!words.length) return;
-  const visible = scopeFilter(user, 'cw.owner_id');
+  const visible = compositionVisibility(user, 'cw');
   const rows = await withTransaction((c) =>
     select(
       c,

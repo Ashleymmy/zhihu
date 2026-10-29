@@ -16,7 +16,7 @@ export function canAccessPath(user: AuthUser | null, path: string): boolean {
   const has = (permission: string) =>
     user.permissions?.includes(permission) ?? false
   const duty = user.role === 'operator' ? 'operations' : user.role === 'admin' ? (user.adminDuty ?? 'all') : 'all'
-  if (path === '/me') return true
+  if (path === '/me' || path === '/support') return true
   if (path === '/rates') return isStaffRole(user.role) && duty !== 'operations'
   if (path === '/income' || path === '/academy' || path === '/task-hall') return !isStaffRole(user.role)
   if (path === '/tasks' || path === '/works') return duty !== 'finance'

@@ -20,9 +20,6 @@
           style="background: {{item.tint}};"
           ><image wx:if="{{item.iconImg}}" class="icon-img" src="{{item.iconImg}}" mode="aspectFit" /><text wx:else style="color: {{item.fg}};">{{item.icon}}</text></view
         >
-        <text class="tag {{item.enabled ? '' : 'tag-sun'}}"
-          >{{item.enabled ? '已开通' : '未开通'}}</text
-        >
       </view>
       <view class="channel-name">{{item.name}}</view>
       <view class="channel-desc">{{item.desc}}</view>

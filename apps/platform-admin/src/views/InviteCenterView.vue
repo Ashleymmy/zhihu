@@ -13,10 +13,13 @@ interface Mine {
   counts: { direct: number; indirect: number }
   directList: Invitee[]
   indirectList?: { name: string; depth: number; registeredAt: string; active: boolean }[]
+  page: number
+  hasMore: boolean
 }
 const auth = useAuthStore()
 const data = ref<Mine | null>(null)
 const error = ref('')
+const moreBusy = ref(false)
 const isLeader = computed(() => auth.user?.role === 'leader')
 const activeCount = computed(() => data.value?.directList.filter(p => p.active).length ?? 0)
 const day = (v: string | null | undefined) =>
@@ -25,6 +28,18 @@ const day = (v: string | null | undefined) =>
 async function load() {
   error.value = ''
   try { data.value = await http.get<Mine>('/relations/mine') } catch (e) { error.value = (e instanceof Error && e.message) || '暂时没加载出来，请重试' }
+}
+async function loadMore() {
+  if (!data.value || moreBusy.value) return
+  moreBusy.value = true
+  try {
+    const next = await http.get<Mine>('/relations/mine', { page: data.value.page + 1 })
+    data.value = { ...next, directList: [...data.value.directList, ...next.directList] }
+  } catch (e) {
+    error.value = (e instanceof Error && e.message) || '更多名单暂时没加载出来，请重试'
+  } finally {
+    moreBusy.value = false
+  }
 }
 onMounted(load)
 </script>
@@ -45,7 +60,8 @@ onMounted(load)
       <article class="bento-card bento-hero span-4" style="--i:0">
         <small>我直接邀请的人</small>
         <b class="hero-num"><AnimatedNumber :value="data.counts.direct" /><em>人</em></b>
-        <span>其中 {{ activeCount }} 人在用</span>
+        <span v-if="!data.hasMore">其中 {{ activeCount }} 人在用</span>
+        <span v-else>已加载 {{ data.directList.length }} 人</span>
       </article>
       <article class="bento-card span-4" style="--i:1">
         <small class="card-label">第二层及以下</small>
@@ -74,6 +90,7 @@ onMounted(load)
             <span v-if="!p.active" class="chip soft">已注销</span>
           </li>
         </ul>
+        <button v-if="data.hasMore" type="button" class="ghost-aurora load-more" :disabled="moreBusy" @click="loadMore">{{ moreBusy ? '正在加载…' : '加载更多' }}</button>
       </section>
 
       <section class="bento-card span-4" style="--i:4" aria-labelledby="rules-title">
@@ -109,6 +126,7 @@ onMounted(load)
 .invitee-list li > div { display: grid; flex: 1; min-width: 0; }
 .invitee-list small, .invitee-day { color: var(--muted); font-size: 12.5px; }
 .invitee-av { display: grid; width: 32px; height: 32px; flex: none; place-items: center; border-radius: 50%; background: var(--chart-2); color: #fff; font-weight: 600; }
+.load-more { margin-top: 10px; }
 .rules { display: grid; gap: 8px; margin: 0; padding-left: 18px; color: var(--ink-soft); font-size: 13.5px; line-height: 1.6; }
 .rules-sub { margin: 16px 0 6px; font-size: 13px; }
 .indirect-names { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.7; }

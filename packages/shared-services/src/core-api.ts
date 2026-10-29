@@ -14,6 +14,9 @@ import type {
   ProjectMember,
   ProjectCourse,
   TeamMember,
+  MemberChangeOperation,
+  MemberChangeRun,
+  MemberChangeHistory,
   MemberAccessPatch,
   MemberInvitation,
   TeamApplication,
@@ -90,6 +93,10 @@ export function createProjectsApi(http: HttpClient) {
 
 export function createTeamApi(http: HttpClient) {
   return {
+    previewChanges: (references:string[],operation:MemberChangeOperation) => http.post<MemberChangeRun>('/team/member-changes/preview',{references,operation}),
+    changeRuns: () => http.get<MemberChangeHistory[]>('/team/member-changes'),
+    changeRun: (id:string) => http.get<MemberChangeRun>(`/team/member-changes/${id}`),
+    executeChanges: (id:string,reviewHash:string) => http.post<MemberChangeRun>(`/team/member-changes/${id}/execute`,{reviewHash}),
     acceptInvitation: (token: string) => http.post<{joined:boolean}>('/team/invitations/accept', {token}),
     listMembers: () => http.get<TeamMember[]>('/team/members'),
     manageMember: (id: string, data: MemberAccessPatch) => http.patch<void>(`/team/members/${id}/access`, data),

@@ -4,7 +4,7 @@ import type { ModuleRuntime } from './module-runtime';
 import { assertDataScope } from './accounts';
 import { listProjects, assertProjectMembership } from '../services/projectMembers.service';
 import { serviceProjects } from './project-scopes';
-import { isStaffRole } from '../auth/roles';
+import { canViewWorkStatistics, isStaffRole } from '../auth/roles';
 import { dutyAllows } from './duties';
 import { AppError, asyncHandler } from '../middleware/errors';
 import { ok } from '../utils/response';
@@ -73,6 +73,7 @@ export function createTaskRouter(runtime: ModuleRuntime) {
             accountId: account.id,
             page: filter.page,
             pageSize: filter.pageSize,
+            keywordExportAvailable: canViewWorkStatistics(req.user.role) && !!module?.dataProvider?.keywordBindings,
           };
           if (!module?.taskProvider) {
             groups.push({ ...base, list: [], total: null, status: 'unavailable' });

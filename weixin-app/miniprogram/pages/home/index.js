@@ -66,8 +66,8 @@ const BANNERS = [
   {
     key: "income",
     image: "/images/banners/banner-2.png",
-    title: "收益与提现",
-    subtitle: "查看收益、余额和历史提现进度",
+    title: "查看推广收益",
+    subtitle: "按日期查看收益与业务明细",
     path: "/pages/income/index",
   },
   {
@@ -134,23 +134,6 @@ Page(
     },
     async fetch({ user }) {
       const view = await scopes.load(true);
-      // 达人/团长在首页展示可提现余额摘要；失败不阻塞首页其它内容
-      let balance = null;
-      if (view && view.scope.accountId && !permissions.isAdmin(user)) {
-        try {
-          const finance = await request.get(
-            "/core/finance",
-            Object.assign({}, view.scope, { moduleId: "zhihu", page: 1 }),
-          );
-          balance = finance && finance.balance ? finance.balance : null;
-          // 后端金额是 4 位小数字符串，展示统一两位
-          if (balance)
-            for (const key of ["available", "held", "processing", "paid"])
-              balance[key] = Number(balance[key] || 0).toFixed(2);
-        } catch (error) {
-          balance = null;
-        }
-      }
       // 工作台摘要（今日预估/进行中/待审核）；失败不阻塞
       let summary = null;
       if (view && view.scope.accountId) {
@@ -188,7 +171,6 @@ Page(
             ),
           ),
         scopeNotice: view ? view.notice : "",
-        balance,
         summary,
         announcements: Array.isArray(announcements)
           ? announcements.slice(0, 5)
@@ -204,7 +186,7 @@ Page(
         loading: true,
         error: "",
         accounts: [],
-        balance: null, summary: null,
+        summary: null,
         projectIndex: Number(e.detail.value),
       });
       try {
@@ -219,7 +201,7 @@ Page(
     },
     onAccountChange(e) {
       const view = scopes.selectAccount(Number(e.detail.value));
-      if (view) {this.setData({...view,balance:null,summary:null});return this.load();}
+      if (view) {this.setData({...view,summary:null});return this.load();}
     },
   }),
 );

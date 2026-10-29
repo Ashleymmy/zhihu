@@ -135,60 +135,6 @@ test("leader may review team work but cannot review own work", async () => {
   assert.match(p.data.error, /退回原因/);
   assert.equal(h.calls.filter((c) => c.method === "POST").length, 0);
 });
-test("withdrawal validates balance and precision before calling backend", async () => {
-  const h = harness(
-    (c) =>
-      scoped(c) ?? {
-        balance: { available: "12.00" },
-        withdrawals: [],
-        total: 0,
-        canManage: false,
-      },
-  );
-  h.session({ id: "3", role: "creator" });
-  const p = h.page("withdrawals");
-  await p.onShow();
-  p.setData({
-    form: { amount: "13", receiverName: "A", bankName: "B", bankAccount: "C" },
-  });
-  await p.apply();
-  assert.match(p.data.error, /余额/);
-  assert.equal(h.calls.filter((c) => c.method === "POST").length, 0);
-  p.setData({ "form.amount": "1.111" });
-  await p.apply();
-  assert.match(p.data.error, /两位小数/);
-});
-test("finance confirmation requires explicit acknowledgment and uses reviewed period/hash", async () => {
-  const h = harness(
-    (c) =>
-      scoped(c) ??
-      (c.path.endsWith("/workbench")
-        ? {
-            entries: [{ factId: "1", ready: true }],
-            groups: [],
-            reviewHash: "a".repeat(64),
-            summary: {},
-          }
-        : c.path.endsWith("/confirm")
-          ? { confirmed: 1, waiting: 0 }
-          : {
-              balance: null,
-              funding: { amount: "10", hash: "b".repeat(64) },
-              canManage: true,
-            }),
-  );
-  h.session();
-  const p = h.page("wallet");
-  await p.onShow();
-  await p.confirmBills();
-  assert.equal(h.calls.filter((c) => c.method === "POST").length, 0);
-  p.setData({ acknowledged: true });
-  await p.confirmBills();
-  const post = h.calls.find((c) => c.method === "POST");
-  assert.equal(post.data.reviewHash, "a".repeat(64));
-  assert.equal(post.data.acknowledged, true);
-  assert.equal(post.data.from, p.data.from);
-});
 test("member creation keeps temporary password visible and clears it on hide", async () => {
   const h = harness((c) =>
     c.method === "GET"

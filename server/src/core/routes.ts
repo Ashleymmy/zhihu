@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import { createMemberExportRouter } from './member-export-routes';
+import { createMemberActivityRouter } from './member-activity-routes';
+import { createSupportRouter } from './support-routes';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware';
 import { requirePermission } from '../auth/permissions';
@@ -13,6 +16,7 @@ import { createTaskRouter } from './task-routes';
 import { createEarningRouter } from './earning-routes';
 import { createFinanceWorkspaceRouter } from './finance-workspace';
 import { createActivityRouter } from './activity-routes';
+import { createWorkRegistrationRouter, createKeywordBindingRouter } from './work-registration-routes';
 import { createMemberSummaryRouter } from './member-summary';
 import { createRelationRouter } from './relation-routes';
 import { createPromotionRouter } from './promotion-routes';
@@ -33,6 +37,9 @@ const date = z
 export function createPlatformRouter(runtime: ModuleRuntime) {
   const r = Router();
   r.use(requireAuth);
+  r.use('/support', createSupportRouter());
+  r.use('/member-exports', createMemberExportRouter(runtime));
+  r.use('/member-activity', createMemberActivityRouter(runtime));
   r.get(
     '/modules',
     asyncHandler(async (req, res) => ok(res, runtime.list(req.user.role))),
@@ -45,8 +52,10 @@ export function createPlatformRouter(runtime: ModuleRuntime) {
   r.use('/earnings',createEarningRouter(runtime));
   r.use('/member-summary',createMemberSummaryRouter(runtime));
   r.use('/relations',createRelationRouter(runtime));
-r.use('/promotions',createPromotionRouter(runtime));
+  r.use('/promotions',createPromotionRouter(runtime));
   r.use('/activity',createActivityRouter(runtime));
+  r.use('/work-registrations',createWorkRegistrationRouter(runtime));
+  r.use('/keyword-bindings',createKeywordBindingRouter(runtime));
   r.get('/dashboard', asyncHandler(async (req, res) => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
     const query = z.object({ projectId: id.optional(), from: date.default(today.slice(0, 8) + '01'), to: date.default(today) }).parse(req.query);

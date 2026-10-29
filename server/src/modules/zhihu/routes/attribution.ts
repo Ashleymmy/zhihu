@@ -106,6 +106,7 @@ const workFiltersSchema=scopeSchema.merge(pagingSchema).extend({
   from:z.string().date().optional(),to:z.string().date().optional(),
   view:z.enum(['self','team','all']).optional(),ownerId:idSchema.optional(),planId:idSchema.optional(),
   registeredOnly:z.enum(['1','true']).optional().transform(v=>!!v),
+  successfulOnly:z.enum(['1','true','0','false']).optional().transform(v=>v==='1'||v==='true'),
   result:z.enum(['submitted','failed','pending']).optional(),
   search:z.string().trim().max(200).optional(),
 }).refine(q=>!q.from||!q.to||q.from<=q.to,{message:'开始日期不能晚于结束日期'});

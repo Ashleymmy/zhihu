@@ -1,5 +1,5 @@
 import { newPasswordSchema } from '../auth/password-policy';
-import { formatUserId, isReservedUserId, parseUserId } from '../auth/user-id';
+import { assignUserId, isReservedUserId, resolveUserIdentifier, userIdMap } from '../auth/user-id';
 import { passwordLoginProof, type PasswordLoginMethod } from '../auth/password-login';
 import bcrypt from 'bcryptjs';
 import { openMemberProjects } from './member-onboarding.service';
@@ -44,9 +44,9 @@ interface UserRow extends RowDataPacket {
   must_change_pwd: number;
 }
 
-const publicUser = (user: UserRow, role: Role) => ({
+const publicUser = async (user: UserRow, role: Role) => ({
   id: String(user.id),
-  userId: formatUserId(user.id),
+  userId: await withTransaction(async c => (await userIdMap(c, [user.id])).get(String(user.id))!),
   hasPassword: user.password_set !== 0,
   username: user.username,
   displayName: user.display_name,
@@ -117,7 +117,7 @@ export async function register(
         ],
       );
       const id = String(result.insertId);
-      formatUserId(id);
+      await assignUserId(connection, id);
       if (invitation) await consumeInvitation(connection, invitation, id);
       // 邀请关系、首条团队归属与角色记录与账号同事务写入
       await recordRegistration(connection, {
@@ -181,7 +181,7 @@ export async function login(username: string, password: string, ip?: string, cli
       connection,
     );
   });
-  return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh };
+  return { token, user: await publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh };
 }
 
 /** Refresh Cookie 轮换：换发新 Access Token 与新 Refresh Token。 */
@@ -198,7 +198,7 @@ export async function refresh(plainToken: string, ip?: string, client?: ClientId
   if (!user || !user.is_active) throw new AppError(401, 40101, '登录已过期，请重新登录');
   const role = await requireKnownRole(user, ip);
   const token = await issueAccessToken(user, role, session.familyId);
-  return { token, user: publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh: session };
+  return { token, user: await publicUser(user, role), mustChangePwd: Boolean(user.must_change_pwd), refresh: session };
 }
 
 export async function me(auth: AuthUser) {
@@ -210,7 +210,7 @@ export async function me(auth: AuthUser) {
   const role = normalizeRole(user.role);
   if (!role) throw new AppError(403, 40303, '账号角色异常，请联系管理员');
   return {
-    ...publicUser(user, role),
+    ...await publicUser(user, role),
     permissions: permissionsFor(role),
     mustChangePwd: Boolean(user.must_change_pwd),
   };
@@ -286,7 +286,7 @@ export async function loginVerifiedUser(
   // A cloud invocation has no refresh cookie; re-enter via the verified WeChat identity after expiry.
   return {
     token,
-    user: publicUser(user, role),
+    user: await publicUser(user, role),
     mustChangePwd: Boolean(user.must_change_pwd),
     ...(client.type === 'mini' ? {} : { refresh: session }),
   };
@@ -299,16 +299,9 @@ export async function passwordLoginUser(identifier: string, method?: PasswordLog
     const [user] = await rows<UserRow>('SELECT * FROM users WHERE phone=? AND phone_verified_at IS NOT NULL LIMIT 1', [identifier]);
     return user;
   }
-  if (method === 'username') {
-    const [user] = await rows<UserRow>('SELECT * FROM users WHERE username=? LIMIT 1', [identifier]);
-    return user;
-  }
-  // Older clients and binding flows retain their original identifier semantics.
-  const id = parseUserId(identifier);
-  const [user] = await rows<UserRow>(
-    id ? 'SELECT * FROM users WHERE id=? LIMIT 1' : 'SELECT * FROM users WHERE username=? LIMIT 1',
-    [id ?? identifier],
-  );
+  const id = await withTransaction(c => resolveUserIdentifier(c, identifier));
+  if (!id) return undefined;
+  const [user] = await rows<UserRow>('SELECT * FROM users WHERE id=? LIMIT 1', [id]);
   return user;
 }
 

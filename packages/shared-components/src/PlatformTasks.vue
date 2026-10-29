@@ -3,6 +3,7 @@ import { computed, inject, reactive, ref, watch } from "vue";
 import type { CoreWorkspace } from "./core-workspace";
 import DataGrid from "./DataGrid.vue";
 import DetailDrawer from "./DetailDrawer.vue";
+import WorkRegistrationReport from "./WorkRegistrationReport.vue";
 import type { DataGridRow } from "./data-grid";
 import type {
   PlatformTask,
@@ -178,6 +179,8 @@ const rows = computed<DataGridRow[]>(() =>
   })),
 );
 const creations = computed(() => groups.value.filter((g) => g.create));
+const exportGroups = computed(() => !props.hall && ['admin', 'developer'].includes(w.role.value)
+  ? groups.value.filter(g => g.keywordExportAvailable && g.status === 'ready') : []);
 const total = computed(() =>
   groups.value.reduce((sum, g) => sum + (g.total ?? 0), 0),
 );
@@ -325,6 +328,10 @@ async function copy(value: string) {
       ><button :disabled="loading">搜索</button
       ><button type="button" :disabled="loading" @click="load">刷新</button>
     </form>
+    <div v-for="g in exportGroups" :key="g.projectId + ':' + g.moduleId + ':' + g.accountId">
+      <p v-if="exportGroups.length > 1">{{ g.projectName }}</p>
+      <WorkRegistrationReport kind="keywords" :http="w.http" :query="{moduleId:g.moduleId,projectId:g.projectId,accountId:g.accountId}" />
+    </div>
     <p v-if="notice" role="status">{{ notice }}</p>
     <div
       v-if="error || groups.some((g) => g.status === 'unavailable')"

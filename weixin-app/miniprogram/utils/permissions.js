@@ -17,7 +17,7 @@ function canFinance(user) {
 function allowed(user, page) {
   if (!known(user)) return false;
   if (
-    ["home", "mine", "profile", "password", "college", "tools", "income", "zhihu", "work-data", "work-detail", "works"].includes(
+    ["support", "business", "home", "mine", "profile", "password", "college", "tools", "income", "zhihu", "work-data", "work-detail", "works"].includes(
       page,
     )
   )
@@ -25,6 +25,7 @@ function allowed(user, page) {
   if (page === "invite") return canOperate(user);
   if (page === "join-team") return user.role === "creator";
   if (["keywords", "keywords-create"].includes(page)) return canOperate(user);
+  // 金额页面沿用服务端财务岗位权限。
   if (["wallet", "withdrawals"].includes(page)) return canFinance(user);
   if (page === "reports") return duty(user, "finance");
   if (page === "projects") return ["admin","developer"].includes(user.role) && duty(user,"operations");
@@ -39,7 +40,6 @@ function menus(user) {
   const labels = {
     keywords: isAdmin(user) ? "关键词管理" : "我的关键词",
     works: "作品记录",
-    wallet: isAdmin(user) ? "财务账单" : "收入与余额",
     reports: "报表与异常",
     team: "团队成员",
     "join-team": "我的团队 / 申请入团",

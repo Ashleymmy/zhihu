@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import MemberClientDetails from './MemberClientDetails.vue';
-import { bindingLabel, miniFilters, matchesMiniFilter } from '../mini-status';
-import { ActionDialog } from "@zhihu-koc/shared-components";
+import MemberClientDetails from "./MemberClientDetails.vue";
+import MemberChangePanel from "./MemberChangePanel.vue";
+import MemberExportPanel from "./MemberExportPanel.vue";
+import MemberRelationsPanel from "./MemberRelationsPanel.vue";
+import MemberActivityPanel from "./MemberActivityPanel.vue";
+import type {
+  ActivityCounts,
+  ActivityKind,
+  ActivityStatus,
+  ActivitySummary,
+} from "../member-activity";
+import { bindingLabel, miniFilters, matchesMiniFilter } from "../mini-status";
+import { ActionDialog, DetailDrawer } from "@zhihu-koc/shared-components";
 import {
   ROLE_LABELS,
   isStaffRole,
@@ -12,12 +22,27 @@ import {
   type MemberInvitation,
   type TeamApplication,
   type MemberAccessPatch,
+  type MemberChangeOperation,
   type Project,
 } from "@zhihu-koc/shared-contracts/core";
 import { apis, http, useAuthStore } from "../stores/auth";
 const auth = useAuthStore();
-const route=useRoute();
-const miniFilter=ref(''),memberIdFilter=ref('');
+const canViewActivity = computed(
+  () =>
+    auth.user?.role === "developer" ||
+    (auth.user?.role === "admin" && auth.user.adminDuty !== "finance"),
+);
+const activityCounts = ref<Record<string, ActivityCounts>>({}),
+  activityLoading = ref(false),
+  activityError = ref(""),
+  activityRefresh = ref(0);
+const detailSection = ref<"profile" | "activity">("profile"),
+  activityKind = ref<ActivityKind>("tasks"),
+  activityStatus = ref<ActivityStatus>("all");
+let activityVersion = 0;
+const route = useRoute();
+const miniFilter = ref(""),
+  memberIdFilter = ref("");
 const projects = ref<Project[]>([]),
   projectSearch = ref("");
 const canAssignProjects = computed(
@@ -26,10 +51,18 @@ const canAssignProjects = computed(
     auth.user?.adminDuty !== "finance",
 );
 function projectLocked(project: { id: string; isEnabled: boolean }) {
-  const existing = selected.value?.projects?.find(p => p.id === project.id);
+  const existing = selected.value?.projects?.find((p) => p.id === project.id);
   if (existing?.memberRole === "owner") return true;
-  if (existing?.memberRole === "admin" && !auth.user?.permissions?.includes("project.manage")) return true;
-  return auth.user?.role === "leader" && (!project.isEnabled || !projects.value.some(p => p.id === project.id && p.isEnabled));
+  if (
+    existing?.memberRole === "admin" &&
+    !auth.user?.permissions?.includes("project.manage")
+  )
+    return true;
+  return (
+    auth.user?.role === "leader" &&
+    (!project.isEnabled ||
+      !projects.value.some((p) => p.id === project.id && p.isEnabled))
+  );
 }
 const projectOptions = computed(() => {
   const all = new Map(
@@ -58,11 +91,96 @@ const search = ref(""),
   page = ref(1),
   tab = ref("members");
 const pageSize = 20;
-watch(()=>[route.query.mini,route.query.member],()=>{
-  miniFilter.value=miniFilters.some(f=>f.value===route.query.mini)?String(route.query.mini):'';
-  memberIdFilter.value=typeof route.query.member==='string'&&/^\d+$/.test(route.query.member)?route.query.member:'';
-  page.value=1;
-},{immediate:true});
+const registeredFrom = ref(""),
+  registeredTo = ref("");
+function registeredDay(value: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(
+    new Date(value),
+  );
+}
+const teamFilter = ref(""),
+  projectFilter = ref(""),
+  checked = ref<string[]>([]),
+  batchOpen = ref(false),
+  batchReferences = ref<string[]>([]);
+const canBatch = computed(
+  () => isStaffRole(auth.user?.role) && auth.user?.adminDuty !== "finance",
+);
+let previousFilters: {
+  search: string;
+  role: string;
+  status: string;
+  mini: string;
+  member: string;
+  project: string;
+  registeredFrom: string;
+  registeredTo: string;
+  page: number;
+} | null = null;
+function viewTeam(member: TeamMember) {
+  if (!teamFilter.value)
+    previousFilters = {
+      search: search.value,
+      role: roleFilter.value,
+      status: statusFilter.value,
+      mini: miniFilter.value,
+      member: memberIdFilter.value,
+      project: projectFilter.value,
+      registeredFrom: registeredFrom.value,
+      registeredTo: registeredTo.value,
+      page: page.value,
+    };
+  search.value = "";
+  roleFilter.value = "";
+  statusFilter.value = "";
+  miniFilter.value = "";
+  memberIdFilter.value = "";
+  projectFilter.value = "";
+  registeredFrom.value = "";
+  registeredTo.value = "";
+  teamFilter.value = member.id;
+  page.value = 1;
+  tab.value = "members";
+  dialog.value = null;
+}
+function backToMembers() {
+  teamFilter.value = "";
+  if (previousFilters) {
+    search.value = previousFilters.search;
+    roleFilter.value = previousFilters.role;
+    statusFilter.value = previousFilters.status;
+    miniFilter.value = previousFilters.mini;
+    memberIdFilter.value = previousFilters.member;
+    projectFilter.value = previousFilters.project;
+    registeredFrom.value = previousFilters.registeredFrom;
+    registeredTo.value = previousFilters.registeredTo;
+    page.value = previousFilters.page;
+    previousFilters = null;
+  }
+}
+function openBatch(paste = false) {
+  batchReferences.value = paste ? [] : checked.value.map((id) => "id:" + id);
+  batchOpen.value = true;
+}
+function selectable(m: TeamMember) {
+  return (
+    canBatch.value && m.canManage && ["creator", "leader"].includes(m.role)
+  );
+}
+watch(
+  () => [route.query.mini, route.query.member],
+  () => {
+    miniFilter.value = miniFilters.some((f) => f.value === route.query.mini)
+      ? String(route.query.mini)
+      : "";
+    memberIdFilter.value =
+      typeof route.query.member === "string" && /^\d+$/.test(route.query.member)
+        ? route.query.member
+        : "";
+    page.value = 1;
+  },
+  { immediate: true },
+);
 const dialog = ref<
     | "create"
     | "edit"
@@ -96,13 +214,25 @@ const invite = reactive({ label: "成员邀请", validDays: 7, maxUses: 20 }),
 const filtered = computed(() =>
   members.value.filter(
     (m) =>
-      (!memberIdFilter.value || m.id===memberIdFilter.value) &&
-      matchesMiniFilter(m,miniFilter.value) &&
+      (!memberIdFilter.value || m.id === memberIdFilter.value) &&
+      (!registeredFrom.value ||
+        registeredDay(m.createdAt) >= registeredFrom.value) &&
+      (!registeredTo.value ||
+        registeredDay(m.createdAt) <= registeredTo.value) &&
+      (!teamFilter.value ||
+        (teamFilter.value === "independent"
+          ? m.role === "creator" && !m.parentId
+          : m.parentId === teamFilter.value)) &&
+      (!projectFilter.value ||
+        m.projects?.some((p) => p.id === projectFilter.value)) &&
+      matchesMiniFilter(m, miniFilter.value) &&
       (!roleFilter.value || m.role === roleFilter.value) &&
       (!statusFilter.value ||
         String(Number(m.isActive)) === statusFilter.value) &&
       [
         m.username,
+        m.userId,
+        ...(m.userIdAliases ?? []),
         m.displayName,
         m.id,
         m.phone,
@@ -118,11 +248,90 @@ const filtered = computed(() =>
 const visible = computed(() =>
   filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize),
 );
+async function loadActivityCounts() {
+  const version = ++activityVersion;
+  activityCounts.value = {};
+  activityError.value = "";
+  if (!canViewActivity.value || !visible.value.length) {
+    activityLoading.value = false;
+    return;
+  }
+  activityLoading.value = true;
+  try {
+    const r = await http.post<ActivitySummary>("/member-activity/summary", {
+      memberIds: visible.value.map((m) => m.id),
+      ...(projectFilter.value ? { projectId: projectFilter.value } : {}),
+    });
+    if (version === activityVersion) {
+      activityCounts.value = r.totals;
+      if (r.unsupported.length)
+        activityError.value =
+          "部分项目尚未提供统计：" + r.unsupported.join("、");
+    }
+  } catch (e: any) {
+    if (version === activityVersion)
+      activityError.value = e.message || "成员业务统计加载失败，请重试";
+  } finally {
+    if (version === activityVersion) activityLoading.value = false;
+  }
+}
+watch(
+  () => [
+    canViewActivity.value,
+    visible.value.map((m) => m.id).join(","),
+    projectFilter.value,
+    activityRefresh.value,
+  ],
+  loadActivityCounts,
+  { immediate: true },
+);
+function openActivity(
+  member: TeamMember,
+  kind: ActivityKind,
+  status: ActivityStatus = "all",
+) {
+  open("detail", member);
+  detailSection.value = "activity";
+  activityKind.value = kind;
+  activityStatus.value = status;
+}
 const pending = computed(() =>
   applications.value.filter((a) => a.status === "pending"),
 );
 const leaders = computed(() =>
   members.value.filter((m) => m.role === "leader" && m.isActive),
+);
+const teamLeaders = computed(() =>
+  members.value.filter((m) => m.role === "leader" || Number(m.memberCount) > 0),
+);
+const pageSelectable = computed(() => visible.value.filter(selectable));
+const pageChecked = computed(
+  () =>
+    pageSelectable.value.length > 0 &&
+    pageSelectable.value.every((m) => checked.value.includes(m.id)),
+);
+function togglePage() {
+  const ids = pageSelectable.value.map((m) => m.id);
+  checked.value = pageChecked.value
+    ? checked.value.filter((id) => !ids.includes(id))
+    : [...new Set([...checked.value, ...ids])];
+}
+watch(
+  [
+    search,
+    roleFilter,
+    statusFilter,
+    miniFilter,
+    memberIdFilter,
+    teamFilter,
+    projectFilter,
+  ],
+  () => {
+    if (checked.value.length) {
+      checked.value = [];
+      notice.value = "筛选条件已变化，已清空选中成员。";
+    }
+  },
 );
 const managementRoles = computed<GlobalRole[]>(() =>
   auth.user?.role === "developer"
@@ -141,17 +350,18 @@ const source = (m: TeamMember) =>
     : m.registrationSource === "managed"
       ? "管理创建"
       : "自主注册 / 历史账号";
-const title = computed(
-  () =>
-    ({
-      create: "创建成员",
-      edit: "编辑成员",
-      detail: "成员信息与权限",
-      reset: "重置密码",
-      invite: "邀请成员",
-      revoke: "停用邀请",
-      delete: "删除成员",
-    })[dialog.value ?? "detail"],
+const title = computed(() =>
+  dialog.value === "detail" && detailSection.value === "activity"
+    ? `${selected.value?.displayName || "成员"}的任务与作品`
+    : {
+        create: "创建成员",
+        edit: "编辑成员",
+        detail: "成员信息与权限",
+        reset: "重置密码",
+        invite: "邀请成员",
+        revoke: "停用邀请",
+        delete: "删除成员",
+      }[dialog.value ?? "detail"],
 );
 async function load() {
   loading.value = true;
@@ -166,6 +376,7 @@ async function load() {
     invitations.value = i;
     applications.value = a;
     projects.value = p;
+    activityRefresh.value++;
     page.value = Math.min(
       page.value,
       Math.max(1, Math.ceil(filtered.value.length / pageSize)),
@@ -187,6 +398,9 @@ async function run(fn: () => Promise<unknown>) {
   }
 }
 function open(kind: typeof dialog.value, member?: TeamMember) {
+  detailSection.value = "profile";
+  activityKind.value = "tasks";
+  activityStatus.value = "all";
   error.value = "";
   dialog.value = kind;
   selected.value = member ?? null;
@@ -223,11 +437,55 @@ async function save() {
       JSON.stringify((m.projects ?? []).map((p) => p.id).sort())
   )
     patch.projectIds = [...edit.projectIds];
+  if (
+    needsChangePreview.value &&
+    (edit.role === "creator" || edit.role === "leader")
+  ) {
+    singleEdit.value = {
+      kind: "edit",
+      displayName: edit.displayName,
+      phone: edit.phone || null,
+      role: edit.role,
+      isActive: edit.isActive,
+      ...(patch.parentId !== undefined ? { parentId: patch.parentId } : {}),
+      ...(patch.projectIds ? { projectIds: patch.projectIds } : {}),
+    };
+    batchReferences.value = ["id:" + m.id];
+    dialog.value = null;
+    batchOpen.value = true;
+    return;
+  }
   await apis.team.manageMember(m.id, patch);
   dialog.value = null;
   notice.value =
     "成员已更新；角色、团队、项目或状态发生变化时，原登录会话会退出。";
   await load();
+}
+const singleEdit = ref<Extract<MemberChangeOperation, { kind: "edit" }> | null>(
+  null,
+);
+const needsChangePreview = computed(() => {
+  const m = selected.value;
+  return (
+    !!m &&
+    canBatch.value &&
+    ["creator", "leader"].includes(m.role) &&
+    ["creator", "leader"].includes(edit.role) &&
+    (edit.role !== m.role ||
+      (edit.role === "creator" &&
+        (edit.parentId || null) !== (m.parentId || null)))
+  );
+});
+function resumeSingleEdit() {
+  batchOpen.value = false;
+  singleEdit.value = null;
+  error.value = "";
+  dialog.value = "edit";
+}
+function closeChanges() {
+  batchOpen.value = false;
+  singleEdit.value = null;
+  void run(load);
 }
 async function createMember() {
   const data = isStaffRole(create.role)
@@ -317,9 +575,14 @@ onMounted(() => run(load));
         <h1>团队与成员</h1>
         <p>查看成员资料、角色权限、团队归属与邀请记录。</p>
       </div>
-      <div class="member-actions">
+      <div v-if="!batchOpen" class="member-actions">
+        <MemberExportPanel
+          :member-ids="filtered.map((m) => m.id)"
+          :project-id="projectFilter || undefined"
+        />
         <router-link to="/invitations">管理邀请链接</router-link>
-        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/relations">成员关系图</router-link>`n        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/promotions">晋升工作台</router-link>
+        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/relations">成员关系图</router-link>
+        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/promotions">晋升工作台</router-link>
         <button
           @click="
             open('invite');
@@ -337,7 +600,20 @@ onMounted(() => run(load));
     <div v-if="secret" class="secret-note" role="status">
       {{ secret }} <button @click="secret = ''">收起密码</button>
     </div>
-    <nav class="member-tabs" aria-label="成员管理分类">
+    <MemberChangePanel
+      v-if="batchOpen"
+      :references="batchReferences"
+      :members="members"
+      :projects="projects"
+      :initial-edit="singleEdit"
+      @edit="resumeSingleEdit"
+      @changed="
+        checked = [];
+        run(load);
+      "
+      @close="closeChanges"
+    />
+    <nav v-if="!batchOpen" class="member-tabs" aria-label="成员管理分类">
       <button :aria-pressed="tab === 'members'" @click="tab = 'members'">
         全部成员 {{ members.length }}</button
       ><button
@@ -352,9 +628,45 @@ onMounted(() => run(load));
       >
         我的邀请 {{ invitations.length }}
       </button>
+      <button
+        v-if="canBatch"
+        :aria-pressed="tab === 'relations'"
+        @click="tab = 'relations'"
+      >
+        成员关系
+      </button>
     </nav>
-    <article v-if="tab === 'members'" class="panel">
+    <article v-if="!batchOpen && tab === 'members'" class="panel">
+      <div v-if="teamFilter" class="team-context">
+        <div>
+          <strong>{{
+            teamFilter === "independent"
+              ? "独立达人"
+              : `${members.find((m) => m.id === teamFilter)?.displayName || "所选团长"}的团队`
+          }}</strong>
+          <p>
+            当前显示 {{ filtered.length }} 人，启用
+            {{ filtered.filter((m) => m.isActive).length }} 人，停用
+            {{ filtered.filter((m) => !m.isActive).length }} 人
+          </p>
+        </div>
+        <button @click="backToMembers">返回全部成员</button>
+      </div>
       <form class="member-filters" @submit.prevent="page = 1">
+        <label
+          >注册开始日期<input
+            v-model="registeredFrom"
+            type="date"
+            :max="registeredTo"
+            @change="page = 1"
+        /></label>
+        <label
+          >注册结束日期<input
+            v-model="registeredTo"
+            type="date"
+            :min="registeredFrom"
+            @change="page = 1"
+        /></label>
         <label
           >搜索成员<input
             v-model="search"
@@ -362,7 +674,32 @@ onMounted(() => run(load));
             placeholder="账号、昵称、ID、手机或邀请人"
             @input="page = 1" /></label
         ><label
-          >角色<select v-model="roleFilter" @change="page = 1">
+          >所属团队<select v-model="teamFilter" @change="page = 1">
+            <option value="">全部团队</option>
+            <option value="independent">独立达人</option>
+            <option
+              v-for="leader in teamLeaders"
+              :key="leader.id"
+              :value="leader.id"
+            >
+              {{ leader.displayName }}（{{ leader.username }}）{{
+                leader.isActive ? "" : " · 停用"
+              }}
+            </option>
+          </select></label
+        ><label
+          >项目<select v-model="projectFilter" @change="page = 1">
+            <option value="">全部项目</option>
+            <option v-for="p in projects" :key="p.id" :value="p.id">
+              {{ p.name }}
+            </option>
+          </select></label
+        ><label
+          >角色<select
+            v-model="roleFilter"
+            aria-label="角色"
+            @change="page = 1"
+          >
             <option value="">全部角色</option>
             <option
               v-for="(label, role) in ROLE_LABELS"
@@ -378,18 +715,78 @@ onMounted(() => run(load));
             <option value="1">启用</option>
             <option value="0">停用</option>
           </select></label
-        ><label>小程序状态<select v-model="miniFilter" @change="page=1"><option value="">全部绑定与登录状态</option><option v-for="f in miniFilters" :key="f.value" :value="f.value">{{ f.label }}</option></select></label>
+        ><label
+          >小程序状态<select v-model="miniFilter" @change="page = 1">
+            <option value="">全部绑定与登录状态</option>
+            <option v-for="f in miniFilters" :key="f.value" :value="f.value">
+              {{ f.label }}
+            </option>
+          </select></label
+        >
         <button type="button" :disabled="busy" @click="run(load)">刷新</button>
       </form>
-      <p v-if="memberIdFilter">正在定位成员 ID {{ memberIdFilter }} <button @click="memberIdFilter='';page=1">查看全部成员</button></p>
+      <div v-if="canBatch" class="member-selection">
+        <span>已选 {{ checked.length }} 人</span
+        ><button
+          :disabled="
+            !filtered.some(selectable) ||
+            filtered.filter(selectable).length > 1000
+          "
+          @click="checked = filtered.filter(selectable).map((m) => m.id)"
+        >
+          选择全部筛选结果（{{
+            filtered.filter(selectable).length
+          }}
+          人）</button
+        ><button v-if="checked.length" @click="checked = []">清空选择</button
+        ><button
+          :disabled="!checked.length || checked.length > 1000"
+          @click="openBatch()"
+        >
+          批量变更</button
+        ><button @click="openBatch(true)">粘贴账号 / 操作记录</button>
+      </div>
+      <p v-if="memberIdFilter">
+        正在定位成员 ID {{ memberIdFilter }}
+        <button
+          @click="
+            memberIdFilter = '';
+            page = 1;
+          "
+        >
+          查看全部成员
+        </button>
+      </p>
+      <p
+        v-if="canViewActivity && activityError"
+        role="alert"
+        class="member-error"
+      >
+        {{ activityError }}
+        <button :disabled="activityLoading" @click="loadActivityCounts">
+          重新加载统计
+        </button>
+      </p>
       <p v-if="loading" class="member-empty" role="status">正在加载成员…</p>
       <div v-else class="member-table">
         <table>
           <thead>
             <tr>
-              <th>成员</th>
+              <th>
+                <label class="member-check"
+                  ><input
+                    v-if="canBatch"
+                    type="checkbox"
+                    :checked="pageChecked"
+                    :disabled="!pageSelectable.length"
+                    aria-label="选择当前页成员"
+                    @change="togglePage"
+                  />成员</label
+                >
+              </th>
               <th>角色 / 状态</th>
               <th>所属团队</th>
+              <th v-if="canViewActivity">任务与作品</th>
               <th>注册 / 邀请来源</th>
               <th>注册 / 最后登录</th>
               <th>微信小程序</th>
@@ -399,9 +796,25 @@ onMounted(() => run(load));
           <tbody>
             <tr v-for="m in visible" :key="m.id">
               <td>
+                <label v-if="selectable(m)" class="member-check"
+                  ><input
+                    v-model="checked"
+                    type="checkbox"
+                    :value="m.id"
+                    :aria-label="`选择 ${m.displayName}（${m.username}）`"
+                /></label>
                 <strong>{{ m.displayName }}</strong
-                ><small>{{ m.username }} · ID {{ m.id }}</small
-                ><small>{{ m.phone || "未填写手机号" }}{{ m.phone ? (m.phoneVerifiedAt ? ' · 手机号已验证' : ' · 手机号未验证') : '' }}</small>
+                ><small>{{ m.userId || m.username }}</small
+                ><small
+                  >{{ m.phone || "未填写手机号"
+                  }}{{
+                    m.phone
+                      ? m.phoneVerifiedAt
+                        ? " · 手机号已验证"
+                        : " · 手机号未验证"
+                      : ""
+                  }}</small
+                >
               </td>
               <td>
                 {{ ROLE_LABELS[m.role]
@@ -421,9 +834,43 @@ onMounted(() => run(load));
               <td>
                 {{ m.parentName || (m.role === "leader" ? "团长本人" : "—")
                 }}<small
-                  >成员 {{ m.memberCount ?? 0 }} · 项目
+                  ><button
+                    v-if="m.role === 'leader' || Number(m.memberCount) > 0"
+                    class="team-link"
+                    @click="viewTeam(m)"
+                  >
+                    查看团队成员（{{ m.memberCount ?? 0 }}）</button
+                  ><span v-else>成员 {{ m.memberCount ?? 0 }}</span> · 项目
                   {{ m.projectCount ?? 0 }}</small
                 >
+              </td>
+              <td v-if="canViewActivity" class="member-activity-counts">
+                <template v-if="activityCounts[m.id]">
+                  <button class="team-link" @click="openActivity(m, 'tasks')">
+                    累计任务 {{ activityCounts[m.id]!.tasks }}
+                  </button>
+                  <small
+                    ><button
+                      class="team-link"
+                      @click="openActivity(m, 'tasks', 'current')"
+                    >
+                      在手 {{ activityCounts[m.id]!.currentTasks }}
+                    </button>
+                    ·
+                    <button
+                      class="team-link"
+                      @click="openActivity(m, 'tasks', 'verified')"
+                    >
+                      已核验 {{ activityCounts[m.id]!.verifiedTasks }}
+                    </button></small
+                  >
+                  <button class="team-link" @click="openActivity(m, 'works')">
+                    作品记录 {{ activityCounts[m.id]!.works }}
+                  </button>
+                </template>
+                <span v-else>{{
+                  activityLoading ? "正在统计…" : "统计未加载"
+                }}</span>
               </td>
               <td>
                 {{ source(m)
@@ -443,8 +890,12 @@ onMounted(() => run(load));
               <td>
                 {{ bindingLabel(m.miniProgram) }}
                 <small>登录：{{ format(m.miniProgram?.lastLoginAt) }}</small>
-                <small v-if="matchesMiniFilter(m,'no-project')">待分配项目</small>
-                <small v-if="m.miniProgram?.recentBindingConflict">近期有绑定冲突</small>
+                <small v-if="matchesMiniFilter(m, 'no-project')"
+                  >待分配项目</small
+                >
+                <small v-if="m.miniProgram?.recentBindingConflict"
+                  >近期有绑定冲突</small
+                >
               </td>
               <td class="actions-column">
                 <div class="member-actions">
@@ -488,7 +939,10 @@ onMounted(() => run(load));
         </button>
       </footer>
     </article>
-    <article v-else-if="tab === 'applications'" class="panel member-table">
+    <article
+      v-else-if="!batchOpen && tab === 'applications'"
+      class="panel member-table"
+    >
       <table>
         <thead>
           <tr>
@@ -548,7 +1002,10 @@ onMounted(() => run(load));
       </table>
       <p v-if="!applications.length" class="member-empty">暂无入团申请。</p>
     </article>
-    <article v-else class="panel member-table">
+    <article
+      v-else-if="!batchOpen && tab === 'invitations'"
+      class="panel member-table"
+    >
       <table>
         <thead>
           <tr>
@@ -596,7 +1053,11 @@ onMounted(() => run(load));
         还没有邀请链接，点击“邀请成员”创建。
       </p>
     </article>
-    <ActionDialog
+    <MemberRelationsPanel
+      v-if="!batchOpen && tab === 'relations' && canBatch"
+    />
+    <component
+      :is="dialog === 'detail' ? DetailDrawer : ActionDialog"
       :open="!!dialog"
       :title="title"
       :busy="busy"
@@ -688,7 +1149,9 @@ onMounted(() => run(load));
             管理角色按角色和职责访问全部项目，无需单独加入。
           </p>
           <template v-else-if="selected.canAssignProjects && canAssignProjects">
-            <p v-if="auth.user?.role === 'leader'">可分配自己已加入且启用中的项目，仅对直属达人生效。超出范围的已有项目及管理权限会保留。</p>
+            <p v-if="auth.user?.role === 'leader'">
+              可分配自己已加入且启用中的项目，仅对直属达人生效。超出范围的已有项目及管理权限会保留。
+            </p>
             <label
               >搜索项目<input
                 v-model="projectSearch"
@@ -705,23 +1168,22 @@ onMounted(() => run(load));
                   type="checkbox"
                   :value="project.id"
                   :disabled="
-                    busy || projectLocked(project) ||
+                    busy ||
+                    projectLocked(project) ||
                     (!project.isEnabled &&
                       !edit.projectIds.includes(project.id))
                   "
                 />
                 <span
-                  >{{ project.name
-                  }}{{ project.isEnabled ? "" : "（已停用）" }}{{ projectLocked(project) ? "（只读）" : "" }}</span
+                  >{{ project.name }}{{ project.isEnabled ? "" : "（已停用）"
+                  }}{{ projectLocked(project) ? "（只读）" : "" }}</span
                 ></label
               >
             </div>
             <p v-if="!projectOptions.length">没有匹配的项目。</p>
             <small
               >已选择
-              {{
-                edit.projectIds.length
-              }}
+              {{ edit.projectIds.length }}
               个项目，保存后生效。新增成员权限为普通项目成员；有使用中关键词的项目需先处理后才能移出。</small
             >
           </template>
@@ -733,91 +1195,132 @@ onMounted(() => run(load));
           </p>
         </fieldset>
         <p>
-          权限按角色和职责生效。调整角色或团队前，需先处理该成员使用中的关键词及下属成员。
+          调整角色或所属团队时，先预览影响再确认。旧任务、作品和收益保留原归属。
         </p>
         <div class="dialog-actions">
           <button type="button" :disabled="busy" @click="dialog = null">
             取消</button
-          ><button class="primary" :disabled="busy">保存修改</button>
+          ><button class="primary" :disabled="busy">
+            {{ needsChangePreview ? "预览变更" : "保存修改" }}
+          </button>
         </div>
       </form>
       <div v-else-if="dialog === 'detail' && selected" class="member-detail">
-        <dl>
-          <dt>账号</dt>
-          <dd>
-            {{ selected.displayName }} · {{ selected.username }} · ID
-            {{ selected.id }}
-          </dd>
-          <dt>角色与职责</dt>
-          <dd>
-            {{ ROLE_LABELS[selected.role] }}
-            {{
-              selected.adminDuty === "finance"
-                ? "· 财务"
-                : selected.adminDuty === "operations"
-                  ? "· 运营"
-                  : ""
-            }}
-          </dd>
-          <dt>团队</dt>
-          <dd>{{ selected.parentName || "未归属团长" }}</dd>
-          <dt>注册来源</dt>
-          <dd>{{ source(selected) }}</dd>
-          <dt>创建人 / 邀请人</dt>
-          <dd>
-            {{ selected.createdByName || "—" }} /
-            {{ selected.inviterName || "—" }}
-          </dd>
-          <dt>邀请记录</dt>
-          <dd>
-            {{ selected.invitationLabel || "无邀请链接记录"
-            }}<small>{{ format(selected.invitedAt) }}</small>
-          </dd>
-          <dt>注册 / 登录</dt>
-          <dd>
-            {{ format(selected.createdAt) }} /
-            {{ format(selected.lastLoginAt) }}
-          </dd>
-          <dt>业务范围</dt>
-          <dd>
-            {{
-              isStaffRole(selected.role)
-                ? "管理角色按职责访问项目"
-                : selected.projects?.map((p) => p.name).join("、") ||
-                  "尚未分配项目"
-            }}
-          </dd>
-          <dt>成员统计</dt>
-          <dd>
-            项目 {{ selected.projectCount ?? 0 }} · 下属成员
-            {{ selected.memberCount ?? 0 }} · 已邀请
-            {{ selected.invitedCount ?? 0 }} 人
-          </dd>
-        </dl>
-        <MemberClientDetails :member="selected" />
-        <h3>角色权限</h3>
-        <p>
-          {{
-            selected.role === "leader"
-              ? "管理本人团队成员；业务按项目授权生效。"
-              : selected.role === "creator"
-                ? "只处理本人及分配给本人的业务。"
-                : selected.adminDuty === "finance"
-                  ? "仅财务职责范围，不能执行运营和账号管理操作。"
-                  : selected.role === "operator"
-                    ? "业务运营及下级团队管理，不含财务、接入密钥和管理账号授权。"
-                    : "按角色层级管理账号与业务，不能越级授权。"
-          }}
-        </p>
-        <div class="permission-tags">
-          <span
-            v-for="permission in selected.permissions?.filter(
-              (p) => permissionNames[p],
-            )"
-            :key="permission"
-            >{{ permissionNames[permission] }}</span
+        <nav
+          v-if="canViewActivity"
+          class="member-tabs detail-tabs"
+          aria-label="成员详情分类"
+        >
+          <button
+            :aria-pressed="detailSection === 'profile'"
+            @click="detailSection = 'profile'"
           >
-        </div>
+            资料与权限
+          </button>
+          <button
+            :aria-pressed="detailSection === 'activity'"
+            @click="detailSection = 'activity'"
+          >
+            任务与作品
+          </button>
+        </nav>
+        <MemberActivityPanel
+          v-if="canViewActivity && detailSection === 'activity'"
+          :member-id="selected.id"
+          :project-id="projectFilter || undefined"
+          :initial-kind="activityKind"
+          :initial-status="activityStatus"
+        />
+        <template v-else>
+          <dl>
+            <dt>账号</dt>
+            <dd>
+              {{ selected.displayName }} · {{ selected.userId || selected.username }}
+            </dd>
+            <dt>角色与职责</dt>
+            <dd>
+              {{ ROLE_LABELS[selected.role] }}
+              {{
+                selected.adminDuty === "finance"
+                  ? "· 财务"
+                  : selected.adminDuty === "operations"
+                    ? "· 运营"
+                    : ""
+              }}
+            </dd>
+            <dt>团队</dt>
+            <dd>
+              {{
+                selected.parentName ||
+                (selected.role === "leader" ? "团长本人" : "独立达人")
+              }}
+            </dd>
+            <dt>注册来源</dt>
+            <dd>{{ source(selected) }}</dd>
+            <dt>创建人 / 邀请人</dt>
+            <dd>
+              {{ selected.createdByName || "—" }} /
+              {{ selected.inviterName || "—" }}
+            </dd>
+            <dt>邀请记录</dt>
+            <dd>
+              {{ selected.invitationLabel || "无邀请链接记录"
+              }}<small>{{ format(selected.invitedAt) }}</small>
+            </dd>
+            <dt>注册 / 登录</dt>
+            <dd>
+              {{ format(selected.createdAt) }} /
+              {{ format(selected.lastLoginAt) }}
+            </dd>
+            <dt>业务范围</dt>
+            <dd>
+              {{
+                isStaffRole(selected.role)
+                  ? "管理角色按职责访问项目"
+                  : selected.projects?.map((p) => p.name).join("、") ||
+                    "尚未分配项目"
+              }}
+            </dd>
+            <dt>成员统计</dt>
+            <dd>
+              项目 {{ selected.projectCount ?? 0 }} ·
+              <button
+                v-if="
+                  selected.role === 'leader' || Number(selected.memberCount) > 0
+                "
+                class="team-link"
+                @click="viewTeam(selected)"
+              >
+                下属成员 {{ selected.memberCount ?? 0 }} · 查看名单</button
+              ><span v-else>下属成员 0</span> · 已邀请
+              {{ selected.invitedCount ?? 0 }} 人
+            </dd>
+          </dl>
+          <MemberClientDetails :member="selected" />
+          <h3>角色权限</h3>
+          <p>
+            {{
+              selected.role === "leader"
+                ? "管理本人团队成员；业务按项目授权生效。"
+                : selected.role === "creator"
+                  ? "只处理本人及分配给本人的业务。"
+                  : selected.adminDuty === "finance"
+                    ? "仅财务职责范围，不能执行运营和账号管理操作。"
+                    : selected.role === "operator"
+                      ? "业务运营及下级团队管理，不含财务、接入密钥和管理账号授权。"
+                      : "按角色层级管理账号与业务，不能越级授权。"
+            }}
+          </p>
+          <div class="permission-tags">
+            <span
+              v-for="permission in selected.permissions?.filter(
+                (p) => permissionNames[p],
+              )"
+              :key="permission"
+              >{{ permissionNames[permission] }}</span
+            >
+          </div>
+        </template>
       </div>
       <form
         v-else-if="dialog === 'reset' && selected"
@@ -875,7 +1378,13 @@ onMounted(() => run(load));
               @focus="($event.target as HTMLInputElement).select()"
           /></label>
           <p>可在“邀请链接”页面再次复制、编辑或删除此链接。</p>
-          <button type="button" @click="copyLink">复制邀请链接</button> <a :href="invitationLink" target="_blank" rel="noopener noreferrer">打开邀请页</a><p>把完整链接发给达人。新用户注册后入团；已有达人账号可登录后直接确认加入。</p>
+          <button type="button" @click="copyLink">复制邀请链接</button>
+          <a :href="invitationLink" target="_blank" rel="noopener noreferrer"
+            >打开邀请页</a
+          >
+          <p>
+            把完整链接发给达人。新用户注册后入团；已有达人账号可登录后直接确认加入。
+          </p>
         </div>
         <div class="dialog-actions">
           <button type="button" :disabled="busy" @click="dialog = null">
@@ -909,7 +1418,7 @@ onMounted(() => run(load));
           ><button :disabled="busy" @click="run(remove)">确认删除</button>
         </div>
       </div>
-    </ActionDialog>
+    </component>
   </section>
 </template>
 <style scoped>
@@ -928,13 +1437,51 @@ onMounted(() => run(load));
 .members-page p {
   line-height: 1.6;
 }
+.team-context,
+.member-selection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.team-context {
+  justify-content: space-between;
+  background: #edf4f3;
+}
+.team-context p {
+  margin: 6px 0 0;
+}
+.member-check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.member-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: #195e62;
+}
+.members-page button.team-link,
+.member-detail button.team-link {
+  padding: 0;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  color: #195e62;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .member-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.members-page button {
+.members-page button,
+.detail-tabs button {
   min-height: 40px;
   padding: 8px 12px;
   cursor: pointer;
@@ -1006,6 +1553,12 @@ onMounted(() => run(load));
   white-space: nowrap;
   font-weight: 500;
   color: var(--ink-soft);
+}
+.member-activity-counts {
+  min-width: 140px;
+}
+.detail-tabs {
+  margin-bottom: 24px;
 }
 .member-table small,
 .member-detail small {
@@ -1099,7 +1652,48 @@ onMounted(() => run(load));
     min-width: 0;
   }
   .member-table table {
-    min-width: 950px;
+    min-width: 0;
+  }
+  .member-table {
+    overflow: visible;
+  }
+  .member-table thead {
+    display: none;
+  }
+  .member-table table,
+  .member-table tbody,
+  .member-table tr,
+  .member-table td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .member-table tr {
+    padding: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .member-table td {
+    padding: 6px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .member-table .actions-column {
+    min-width: 0;
+    text-align: left;
+  }
+  .member-table .member-actions {
+    justify-content: flex-start;
+  }
+  .member-selection,
+  .team-context {
+    padding: 14px;
+  }
+  .member-filters select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .member-filters label {
+    max-width: 100%;
   }
   .edit-pair {
     grid-template-columns: 1fr;

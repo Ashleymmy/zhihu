@@ -1,4 +1,4 @@
-import type { RowDataPacket } from 'mysql2/promise';
+import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { rows, withTransaction } from '../db';
 import type { AuthUser, Role } from '../types';
 import { canManageRole, effectiveDuty, isStaffRole, normalizeRole } from '../auth/roles';
@@ -11,6 +11,7 @@ import { assignMemberProjects, canAssignMemberProjects } from './member-projects
 import { openMemberProjects } from './member-onboarding.service';
 import { recordRoleChange, setTeamLeader } from '../core/member-relations';
 import { memberClientInfo } from './member-clients.service';
+import { userIdMap } from '../auth/user-id';
 
 const roles: Role[] = ['developer', 'admin', 'operator', 'leader', 'creator'];
 type MemberRecord = RowDataPacket & { id: string; role: string; is_active: number; parent_id?: string | null };
@@ -58,8 +59,20 @@ export async function listManagedMembers(actor: AuthUser) {
     isStaffRole(actor.role) ? [] : [actor.sub, actor.sub],
   );
   const clients = await memberClientInfo(list.map((member) => String(member.id)));
+  const publicIds = await withTransaction(c => userIdMap(c, list.map(m => m.id)));
+  const aliases = isStaffRole(actor.role) && list.length ? await rows<RowDataPacket>(
+    "SELECT CAST(user_id AS CHAR) user_id,identifier FROM user_identifiers WHERE user_id IN (?) AND kind='legacy'",
+    [list.map(m => m.id)],
+  ) : [];
   return list.map((member) => ({
     ...member,
+    user_id: publicIds.get(String(member.id)),
+    user_id_aliases: aliases.filter(a => String(a.user_id) === String(member.id)).map(a => String(a.identifier)),
+    parent_id: member.parent_id == null ? null : String(member.parent_id),
+    is_active: Boolean(member.is_active),
+    member_count: Number(member.member_count),
+    project_count: Number(member.project_count),
+    invited_count: Number(member.invited_count),
     miniProgram: clients.get(String(member.id)),
     projects: memberships
       .filter((p) => String(p.user_id) === String(member.id))
@@ -100,122 +113,151 @@ export async function updateMemberAccess(
   runtime: ModuleRuntime,
   context?: MemberChangeContext,
 ) {
-  await withTransaction(async (c) => {
-    const [locked] = await c.query<MemberRecord[]>(
-      "SELECT * FROM users WHERE id IN (?,?,?) OR role='developer' ORDER BY id FOR UPDATE",
-      [auth.sub, id, patch.parentId ?? null],
-    );
-    const actor = locked.find((u) => String(u.id) === auth.sub),
-      member = locked.find((u) => String(u.id) === id);
-    const actorRole = normalizeRole(actor?.role);
-    if (!actor?.is_active || !actorRole || !member) throw new AppError(403, 40301, '账号不存在或管理权限已变化');
-    const current = { ...auth, role: actorRole, adminDuty: actor.admin_duty };
-    if (!canManageMember(current, member)) throw new AppError(403, 40301, '不能修改自己、同级或更高权限的账号');
-    const role = patch.role ?? normalizeRole(member.role)!;
-    if (!editableMemberRoles(current).includes(role)) throw new AppError(403, 40301, '不能授予此角色');
-    if (member.role === 'creator' && role === 'leader')
-      throw new AppError(409, 40900, '达人升为团长需要在成员关系图里提名晋升，审核通过后生效');
-    if (patch.adminDuty !== undefined && (role !== 'admin' || current.role !== 'developer'))
-      throw new AppError(403, 40301, '只有开发者可调整管理员职责');
-    const active = patch.isActive ?? Boolean(member.is_active);
-    if (
-      member.role === 'developer' &&
-      (!active || role !== 'developer') &&
-      locked.filter((u) => u.role === 'developer' && u.is_active).length <= 1
-    )
-      throw new AppError(409, 40900, '至少保留一位有效开发者');
-    let parentId =
-      patch.parentId === undefined ? (member.parent_id == null ? null : String(member.parent_id)) : patch.parentId;
-    if (role !== 'creator' && role !== member.role) parentId = null;
-    if (patch.parentId !== undefined && parentId !== (member.parent_id == null ? null : String(member.parent_id))) {
-      if (!isStaffRole(current.role) || role !== 'creator')
-        throw new AppError(403, 40301, '只有运营管理角色可调整达人的所属团队');
-      const leader = locked.find((u) => String(u.id) === parentId);
-      if (parentId && (!leader?.is_active || leader.role !== 'leader' || parentId === id))
-        throw new AppError(422, 42200, '请选择有效的团长');
-    }
-    const changesBusinessRole = role !== member.role && (!isStaffRole(role) || !isStaffRole(member.role));
-    const changesTeam = parentId !== (member.parent_id == null ? null : String(member.parent_id));
-    if (changesBusinessRole || changesTeam) {
-      const [[children]] = await c.query<RowDataPacket[]>('SELECT id FROM users WHERE parent_id=? LIMIT 1 FOR UPDATE', [
-        id,
-      ]);
-      if (children) throw new AppError(409, 40900, '该账号名下仍有团队成员，请先调整成员归属');
-      for (const provider of await lifecycleProviders(c, runtime)) {
-        const reasons = await provider.accessChangeBlockers?.(c, id);
-        if (reasons?.length) throw new AppError(409, 40900, reasons.join('；'));
+  await withTransaction((c) => updateMemberAccessInTransaction(c, auth, id, patch, runtime, false, context));
+}
+
+export async function updateMemberAccessInTransaction(
+  c: PoolConnection,
+  auth: AuthUser,
+  id: string,
+  patch: MemberAccessPatch,
+  runtime: ModuleRuntime,
+  preserveBusiness = false,
+  context?: MemberChangeContext,
+) {
+  const retained: { id: string; label: string; projectId: string }[] = [];
+  const [locked] = await c.query<MemberRecord[]>(
+    "SELECT * FROM users WHERE id IN (?,?,?) OR role='developer' ORDER BY id FOR UPDATE",
+    [auth.sub, id, patch.parentId ?? null],
+  );
+  const actor = locked.find((u) => String(u.id) === auth.sub),
+    member = locked.find((u) => String(u.id) === id);
+  const actorRole = normalizeRole(actor?.role);
+  if (!actor?.is_active || !actorRole || !member) throw new AppError(403, 40301, '账号不存在或管理权限已变化');
+  const current = { ...auth, role: actorRole, adminDuty: actor.admin_duty };
+  if (!canManageMember(current, member)) throw new AppError(403, 40301, '不能修改自己、同级或更高权限的账号');
+  const role = patch.role ?? normalizeRole(member.role)!;
+  if (!editableMemberRoles(current).includes(role)) throw new AppError(403, 40301, '不能授予此角色');
+  if (patch.adminDuty !== undefined && (role !== 'admin' || current.role !== 'developer'))
+    throw new AppError(403, 40301, '只有开发者可调整管理员职责');
+  const active = patch.isActive ?? Boolean(member.is_active);
+  if (
+    member.role === 'developer' &&
+    (!active || role !== 'developer') &&
+    locked.filter((u) => u.role === 'developer' && u.is_active).length <= 1
+  )
+    throw new AppError(409, 40900, '至少保留一位有效开发者');
+  let parentId =
+    patch.parentId === undefined ? (member.parent_id == null ? null : String(member.parent_id)) : patch.parentId;
+  if (role !== 'creator' && role !== member.role) parentId = null;
+  if (patch.parentId !== undefined && parentId !== (member.parent_id == null ? null : String(member.parent_id))) {
+    if (!isStaffRole(current.role) || role !== 'creator')
+      throw new AppError(403, 40301, '只有运营管理角色可调整达人的所属团队');
+    const leader = locked.find((u) => String(u.id) === parentId);
+    if (parentId && (!leader?.is_active || leader.role !== 'leader' || parentId === id))
+      throw new AppError(422, 42200, '请选择有效的团长');
+  }
+  const changesBusinessRole = role !== member.role && (!isStaffRole(role) || !isStaffRole(member.role));
+  const changesTeam = parentId !== (member.parent_id == null ? null : String(member.parent_id));
+  if (changesBusinessRole || changesTeam) {
+    const [[children]] = await c.query<RowDataPacket[]>('SELECT id FROM users WHERE parent_id=? LIMIT 1 FOR UPDATE', [
+      id,
+    ]);
+    if (children) throw new AppError(409, 40900, '该账号名下仍有团队成员，请先调整成员归属');
+    for (const provider of await lifecycleProviders(c, runtime)) {
+      if (
+        preserveBusiness &&
+        provider.preserveMemberAccess &&
+        ['leader', 'creator'].includes(role) &&
+        ['leader', 'creator'].includes(String(member.role))
+      ) {
+        retained.push(...(await provider.preserveMemberAccess(c, id)));
+        continue;
       }
+      const reasons = await provider.accessChangeBlockers?.(c, id);
+      if (reasons?.length) throw new AppError(409, 40900, reasons.join('；'));
     }
-    const duty =
-      role === 'developer'
-        ? 'all'
-        : role === 'operator'
-          ? 'operations'
-          : role === 'admin'
-            ? (patch.adminDuty ?? (member.role === 'admin' ? member.admin_duty : 'all'))
-            : 'all';
-    await c.query(
-      'UPDATE users SET display_name=?,phone_verified_at=IF(phone <=> ?,phone_verified_at,NULL),phone=?,role=?,role_id=(SELECT id FROM roles WHERE role_key=?),admin_duty=?,is_active=?,parent_id=? WHERE id=?',
-      [
-        patch.displayName ?? member.display_name,
-        patch.phone === undefined ? member.phone : patch.phone,
-        patch.phone === undefined ? member.phone : patch.phone,
-        role,
-        role,
-        duty,
-        active ? 1 : 0,
-        parentId,
-        id,
-      ],
-    );
-    // 团队归属与角色历史：没变化时这两个调用不写任何记录
-    if (changesTeam || role !== member.role)
-      await setTeamLeader(c, {
-        userId: id,
-        parentId,
-        source: context?.source ?? 'transfer',
-        refType: context ? 'relation_panel' : 'account_edit',
-        reason: context?.reason ?? null,
-        operatorId: auth.sub,
-      });
-    await recordRoleChange(c, {
+  }
+  const duty =
+    role === 'developer'
+      ? 'all'
+      : role === 'operator'
+        ? 'operations'
+        : role === 'admin'
+          ? (patch.adminDuty ?? (member.role === 'admin' ? member.admin_duty : 'all'))
+          : 'all';
+  await c.query(
+    'UPDATE users SET display_name=?,phone_verified_at=IF(phone <=> ?,phone_verified_at,NULL),phone=?,role=?,role_id=(SELECT id FROM roles WHERE role_key=?),admin_duty=?,is_active=?,parent_id=? WHERE id=?',
+    [
+      patch.displayName ?? member.display_name,
+      patch.phone === undefined ? member.phone : patch.phone,
+      patch.phone === undefined ? member.phone : patch.phone,
+      role,
+      role,
+      duty,
+      active ? 1 : 0,
+      parentId,
+      id,
+    ],
+  );
+  if (changesTeam || role !== member.role)
+    await setTeamLeader(c, {
       userId: id,
-      fromRole: member.role,
-      toRole: role,
-      reason: context?.source === 'demotion' ? 'demotion' : 'manual',
+      parentId,
+      source: context?.source ?? 'transfer',
+      refType: context ? 'relation_panel' : 'account_edit',
+      reason: context?.reason ?? null,
       operatorId: auth.sub,
-      note: context?.reason ?? null,
     });
-    if (active && (role !== member.role || changesTeam)) await openMemberProjects(c, id, role, parentId, auth.sub);
-    const projectsChanged =
-      patch.projectIds !== undefined
-        ? await assignMemberProjects(c, current, id, role, patch.projectIds, runtime)
-        : false;
-    if (
-      role !== member.role ||
-      duty !== member.admin_duty ||
-      active !== Boolean(member.is_active) ||
-      changesTeam ||
-      projectsChanged
-    ) {
-      await c.query(
-        "UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='member_access_changed' WHERE user_id=? AND revoked_at IS NULL",
-        [id],
-      );
-      await c.query(
-        "UPDATE token_sessions SET revoked_at=NOW(3),revoke_reason='member_access_changed' WHERE user_id=? AND revoked_at IS NULL",
-        [id],
-      );
-    }
-    await writeAudit(
-      {
-        userId: auth.sub,
-        action: 'user.access_update',
-        resourceType: 'user',
-        resourceId: id,
-        detail: { from: member.role, to: role, duty, isActive: active, parentId, projectsChanged },
-      },
-      c,
-    );
+  await recordRoleChange(c, {
+    userId: id,
+    fromRole: member.role,
+    toRole: role,
+    reason: context?.source === 'demotion' ? 'demotion' : 'manual',
+    operatorId: auth.sub,
+    note: context?.reason ?? null,
   });
+  if (active && (role !== member.role || changesTeam)) await openMemberProjects(c, id, role, parentId, auth.sub);
+  const projectsChanged =
+    patch.projectIds !== undefined
+      ? await assignMemberProjects(c, current, id, role, patch.projectIds, runtime)
+      : false;
+  if (
+    role !== member.role ||
+    duty !== member.admin_duty ||
+    active !== Boolean(member.is_active) ||
+    changesTeam ||
+    projectsChanged
+  ) {
+    await c.query(
+      "UPDATE login_sessions SET revoked_at=NOW(3),revoke_reason='member_access_changed' WHERE user_id=? AND revoked_at IS NULL",
+      [id],
+    );
+    await c.query(
+      "UPDATE token_sessions SET revoked_at=NOW(3),revoke_reason='member_access_changed' WHERE user_id=? AND revoked_at IS NULL",
+      [id],
+    );
+  }
+  await writeAudit(
+    {
+      userId: auth.sub,
+      action: 'user.access_update',
+      resourceType: 'user',
+      resourceId: id,
+      detail: {
+        from: member.role,
+        to: role,
+        duty,
+        isActive: active,
+        parentId,
+        previousParentId: member.parent_id,
+        previousDuty: member.admin_duty,
+        previousActive: Boolean(member.is_active),
+        projectsChanged,
+        retainedTasks: retained,
+      },
+    },
+    c,
+  );
+  return retained;
 }

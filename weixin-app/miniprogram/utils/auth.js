@@ -166,9 +166,7 @@ async function logout() {
 }
 function entryPath(user) {
   if (user.mustChangePwd || (user.hasPassword === false && !wx.getStorageSync("zk_password_later_" + user.id))) return "/pages/password/index";
-  return user.role === "admin" && user.adminDuty === "finance"
-    ? "/pages/wallet/index"
-    : "/pages/home/index";
+  return "/pages/home/index";
 }
 module.exports = {
   profile,

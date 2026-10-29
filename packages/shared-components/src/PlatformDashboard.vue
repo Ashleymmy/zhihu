@@ -58,7 +58,7 @@ async function loadMoney(version: number) {
     w.http.get<Mine>('/earnings/mine', { ...scope, from: today.slice(0, 8) + '01', to: today, pageSize: 1 }),
     w.http.get<Daily>('/earnings/mine/daily', scope),
     w.http.get<MemberSummary>('/member-summary'),
-    w.http.get<RelationMine>('/relations/mine'),
+    w.http.get<RelationMine>('/relations/mine', { pageSize: 6 }),
   ])
   if (version !== revision) return
   mine.value = m.status === 'fulfilled' ? m.value : null
@@ -231,7 +231,7 @@ function untilt(event: PointerEvent) {
           <div>
             <small>我邀请的人</small><b><AnimatedNumber :value="relation.counts.direct" /><em> 人</em></b>
             <span v-if="relation.indirectList">第二层及以下 {{ relation.counts.indirect }} 人<template v-if="relation.indirectList.length">：{{ relation.indirectList.slice(0, 8).map(p => p.name).join('、') }}{{ relation.indirectList.length > 8 ? ' 等' : '' }}</template></span><span v-else>第二层及以下 {{ relation.counts.indirect }} 人，只显示人数</span>
-            <div v-if="relation.directList.length" class="relation-avatars"><i v-for="(p, i) in relation.directList.slice(0, 6)" :key="i" :title="p.name">{{ p.name.slice(0, 1) }}</i><em v-if="relation.directList.length > 6">+{{ relation.directList.length - 6 }}</em></div>
+            <div v-if="relation.directList.length" class="relation-avatars"><i v-for="(p, i) in relation.directList.slice(0, 6)" :key="i" :title="p.name">{{ p.name.slice(0, 1) }}</i><em v-if="relation.counts.direct > 6">+{{ relation.counts.direct - 6 }}</em></div>
           </div>
         </div>
       </article>

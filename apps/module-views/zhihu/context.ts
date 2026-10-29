@@ -37,6 +37,7 @@ export interface EngineContext {
   http: HttpClient
   scope: Scope
   role: string
+  authRole?: string
   userId: string
   options: EngineOptions
 }

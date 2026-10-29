@@ -43,6 +43,51 @@ export interface ModuleDataProvider {
   activity?(scope: DataScope, user: AuthUser, filter: ActivityFilter): Promise<ActivityResult>;
   // Aggregate upstream amounts only; never expose individual members' income.
   teamTurnover?(connection: PoolConnection, scope: DataScope, user: AuthUser): Promise<TeamTurnover>;
+  workRegistrations?(scope: TaskScope, user: AuthUser, filter: WorkRegistrationFilter, includeRows: boolean): Promise<WorkRegistrationReport>;
+  keywordBindings?(scope: TaskScope, user: AuthUser, filter: KeywordBindingFilter): Promise<KeywordBindingRow[]>;
+  memberActivity?: MemberActivityProvider;
+}
+export interface MemberActivityCounts { tasks: number; currentTasks: number; verifiedTasks: number; works: number }
+export interface MemberActivityFilter {
+  kind: 'tasks' | 'works'; status: 'all' | 'current' | 'verified' | 'released';
+  page: number; pageSize: number; search?: string; from?: string; to?: string; taskRef?: string;
+}
+export interface MemberActivityRecord {
+  id: string; projectId: string; accountId: string; taskRef: string;
+  title: string; keyword: string; at: string; status: string;
+  tone: 'success' | 'warning' | 'danger' | 'neutral';
+  url?: string; fields: { label: string; value: string; url?: string }[];
+}
+export interface MemberActivityProvider {
+  summary(scopes: TaskScope[], user: AuthUser, memberIds: string[]): Promise<Record<string, MemberActivityCounts>>;
+  records(scopes: TaskScope[], user: AuthUser, memberId: string, filter: MemberActivityFilter): Promise<{ list: MemberActivityRecord[]; total: number }>;
+}
+export interface KeywordBindingFilter { from?: string; to?: string; search?: string }
+export interface KeywordBindingRow {
+  id: string; bindingId: string; boundAt: string; createdAt: string; dateBasis: string;
+  taskName: string; channelName: string; keyword: string; novelTitle: string; novelUrl: string;
+  creatorAccount: string; creatorName: string; creatorId: string; creatorLeaderName: string;
+  performerAccount: string; performerName: string; performerId: string;
+  leaderName: string; leaderAccount: string; leaderId: string; relationNote: string;
+  creationStatus: string; failureReason: string; bindingStatus: string;
+}
+export interface WorkRegistrationFilter {
+  from?: string; to?: string; search?: string; ownerId?: string; planId?: string;
+  view?: 'self' | 'team' | 'all'; result?: 'submitted' | 'failed' | 'pending';
+  successfulOnly: boolean; registeredOnly?: boolean;
+}
+export interface WorkRegistrationRow {
+  id: string; registeredAt: string; title: string; keyword: string; taskName: string;
+  performerName: string; mediaType: string; mediaAccount: string; workUrl: string;
+  publishedAt: string; registrationStatus: string; reviewStatus: string;
+  planName: string; category: string; subcategory: string; novelTitle: string; novelUrl: string;
+  performerAccount: string; performerId: string; leaderName: string; leaderAccount: string; leaderId: string;
+  relationNote: string; failureReason: string;
+}
+export interface WorkRegistrationReport {
+  total: number;
+  daily: { date: string; count: number }[];
+  rows: WorkRegistrationRow[];
 }
 export interface AmountPeriods { total: string; today: string; yesterday: string }
 export interface TeamTurnover extends AmountPeriods {
@@ -185,6 +230,9 @@ export interface ModuleRateProvider {
 
 export interface ModuleAccountLifecycle {
   accessChangeBlockers?(connection: PoolConnection, userId: string, projectId?: string): Promise<string[]>;
+  /** Preserve existing task ownership during a reviewed business-role/team change.
+   * All work must be transactional SQL: previews run this inside a rolled-back savepoint. */
+  preserveMemberAccess?(connection: PoolConnection, userId: string): Promise<{ id: string; label: string; projectId: string }[]>;
   closureBlockers(connection: PoolConnection, userId: string): Promise<string[]>;
   // Runs inside the same transaction as platform identity erasure. Business and
   // financial evidence must remain intact; only personal profile fields change.

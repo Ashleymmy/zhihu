@@ -1,11 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { harness, scoped, deferred } = require("./harness.cjs");
-test("finance login defaults to wallet, temporary passwords take priority", () => {
+test("finance login defaults to home, temporary passwords take priority", () => {
   const auth = harness().load("utils/auth");
   assert.equal(
     auth.entryPath({ role: "admin", adminDuty: "finance" }),
-    "/pages/wallet/index",
+    "/pages/home/index",
   );
   assert.equal(
     auth.entryPath({

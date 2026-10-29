@@ -8,14 +8,14 @@
     "pages/home/index",
     "pages/college/index",
     "pages/income/index",
+    "pages/wallet/index",
+    "pages/withdrawals/index",
     "pages/tools/index",
     "pages/zhihu/index",
     "pages/keywords/index",
     "pages/keywords/create/index",
     "pages/works/index",
-    "pages/wallet/index",
     "pages/mine/index",
-    "pages/withdrawals/index",
     "pages/admin/index",
     "pages/team/index",
     "pages/join-team/index",
@@ -27,7 +27,9 @@
     "pages/phone-verify/index",
     "pages/reports/index",
     "pages/work-data/index",
-    "pages/work-detail/index"
+    "pages/work-detail/index",
+    "pages/support/index",
+    "pages/business/index"
   ],
   "window": {
     "backgroundColor": "#f5f6f5",

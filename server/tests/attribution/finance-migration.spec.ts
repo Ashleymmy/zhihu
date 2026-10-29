@@ -24,7 +24,7 @@ it('从已付款的旧结构升级，保留银行资料、凭证、金额和旧�
   try {
     await cp(path.resolve('schema'), tempRoot, {
       recursive: true,
-      filter: (src) => !['017_offline_payment_records.sql', '039_finance_workflow.sql'].includes(path.basename(src)),
+      filter: (src) => !['017_offline_payment_records.sql', '039_finance_workflow.sql', '020_withdrawal_daily_amount.sql'].includes(path.basename(src)),
     });
     await runOpcMigrations(target, ['zhihu'], tempRoot);
     await c.query(
@@ -39,6 +39,8 @@ it('从已付款的旧结构升级，保留银行资料、凭证、金额和旧�
       "INSERT INTO earnings(user_id,project_id,settle_date,amount,status,source_ref) VALUES(1,1,'2026-09-01',1234.5678,'confirmed','upgrade-fixture')",
     );
     const [before] = await c.query<mysql.RowDataPacket[]>('SELECT * FROM opc_withdrawals');
+    await c.query("INSERT INTO opc_withdrawal_terms(withdrawal_id,user_id,applied_day,policy_version,applicant_role,fee_amount,net_amount,tier,review_deadline,settlement_deadline,invoice_required,terms_json) VALUES(?,1,'2026-09-01','2026-10-13-v1','creator',0.12,12.22,'small','2026-09-04','2026-09-04',0,'{}')",[before[0].id]);
+    const [terms]=await c.query('SELECT * FROM opc_withdrawal_terms');
     const [earnings] = await c.query('SELECT * FROM earnings');
     await runOpcMigrations(target, ['zhihu']);
     const [after] = await c.query<mysql.RowDataPacket[]>('SELECT * FROM opc_withdrawals');
@@ -46,6 +48,9 @@ it('从已付款的旧结构升级，保留银行资料、凭证、金额和旧�
     expect((await c.query('SELECT * FROM earnings'))[0]).toEqual(earnings);
     await runOpcMigrations(target, ['zhihu']);
     expect((await c.query('SELECT * FROM opc_withdrawals'))[0]).toEqual(after);
+    expect((await c.query('SELECT * FROM opc_withdrawal_terms'))[0]).toEqual(terms);
+    const [indexes]=await c.query<mysql.RowDataPacket[]>("SELECT NON_UNIQUE FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='opc_withdrawal_terms' AND index_name='ix_opc_withdrawal_day'");
+    expect(indexes).toHaveLength(2);expect(indexes.every(i=>i.NON_UNIQUE===1)).toBe(true);
     expect((await c.query('SELECT * FROM earnings'))[0]).toEqual(earnings);
   } finally {
     await c.end();

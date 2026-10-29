@@ -4,7 +4,8 @@
 # 运行依赖：MySQL 8 + Redis 7（见 compose.yaml）
 
 # ── 阶段 1：构建前端（pnpm workspace：packages + apps）──
-FROM node:24.19.0-alpine3.24@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS frontend-build
+FROM node:24.22.1-alpine3.24@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS frontend-build
+RUN apk add --no-cache --upgrade 'ca-certificates-bundle>=20261020-r0'
 
 WORKDIR /workspace
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
@@ -19,7 +20,8 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm build
 
 # ── 阶段 2：构建后端（server 独立 npm 管理）──
-FROM node:24.19.0-alpine3.24@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS server-build
+FROM node:24.22.1-alpine3.24@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS server-build
+RUN apk add --no-cache --upgrade 'ca-certificates-bundle>=20261020-r0'
 
 WORKDIR /app
 COPY server/package.json server/package-lock.json ./
@@ -30,7 +32,8 @@ COPY server/scripts ./scripts
 RUN npm run build && npm prune --omit=dev
 
 # ── 阶段 3：运行时 ──
-FROM node:24.19.0-alpine3.24@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runtime
+FROM node:24.22.1-alpine3.24@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS runtime
+RUN apk add --no-cache --upgrade 'ca-certificates-bundle>=20261020-r0'
 
 WORKDIR /app
 

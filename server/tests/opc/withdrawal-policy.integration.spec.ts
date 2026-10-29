@@ -153,8 +153,8 @@ afterAll(async () => {
   await container?.stop();
 }, 30000);
 
-it('enforces minimum, consent version, amount tampering and read access on real HTTP', async () => {
-  expect((await get(2, '/withdrawal-quote', { ...scope, amount: '9.99' })).status).toBe(422);
+it('accepts sub-ten-yuan amounts and enforces consent version, amount tampering and read access on real HTTP', async () => {
+  expect((await get(2, '/withdrawal-quote', { ...scope, amount: '0.01' })).status).toBe(200);
   expect((await get(2, '/withdrawal-quote', { ...scope, amount: '2000.01' })).status).toBe(422);
   expect((await get(4, '/withdrawal-quote', { ...scope, amount: '100' })).status).toBe(403);
   expect((await get(4, '/withdrawal-policy', {})).status).toBe(403);
@@ -167,7 +167,7 @@ it('enforces minimum, consent version, amount tampering and read access on real 
     (
       await post(2, '/withdrawals', {
         ...scope,
-        amount: '101',
+        amount: '99',
         policyVersion: quote.policyVersion,
         quoteToken: quote.quoteToken,
         requestKey: crypto.randomUUID(),
@@ -224,30 +224,29 @@ it('reserves gross, pays net once, preserves income, and retains original intent
   expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
   expect((await post(2, '/withdrawals', entry.body)).body.data.id).toBe(entry.id);
 });
-it('serializes concurrent requests from different projects and does not restore a cancelled daily slot', async () => {
-  const quoted = await Promise.all([scope, second].map((s) => get(5, '/withdrawal-quote', { ...s, amount: '10' })));
-  const attempts = await Promise.all(
-    [scope, second].map((s, i) =>
-      post(5, '/withdrawals', {
-        ...s,
-        amount: '10',
-        requestKey: crypto.randomUUID(),
-        policyVersion: quoted[i].body.data.policyVersion,
-        quoteToken: quoted[i].body.data.quoteToken,
-      }),
-    ),
-  );
-  expect(attempts.map((a) => a.status).sort()).toEqual([201, 422]);
-  const winner = attempts.findIndex((a) => a.status === 201),
-    s = winner === 0 ? scope : second;
-  expect(
-    (await post(5, '/withdrawals/' + attempts[winner].body.data.id + '/review', { ...s, action: 'cancel' })).status,
-  ).toBe(200);
-  expect((await get(5, '', s)).body.data.balance.available).toBe('2000.0000');
-  expect((await get(5, '/withdrawal-quote', { ...s, amount: '10' })).status).toBe(422);
+it('serializes concurrent requests across projects and releases cancelled gross quota', async () => {
+ const quoted=await Promise.all([scope,second].map(s=>get(5,'/withdrawal-quote',{...s,amount:'60'})));
+ const attempts=await Promise.all([scope,second].map((s,i)=>post(5,'/withdrawals',{...s,amount:'60',requestKey:crypto.randomUUID(),policyVersion:quoted[i].body.data.policyVersion,quoteToken:quoted[i].body.data.quoteToken})));
+ expect(attempts.map(a=>a.status).sort()).toEqual([201,422]);
+ const winner=attempts.findIndex(a=>a.status===201),s=winner===0?scope:second;
+ const remainder=await apply(5,'40',s);
+ expect((await get(5,'',s)).body.data.withdrawalPolicy).toMatchObject({dailyLimit:null,dailyAmountLimit:'100.0000',todayAmount:'100.0000',remainingAmount:'0.0000'});
+ expect((await get(5,'/withdrawal-quote',{...s,amount:'0.01'})).status).toBe(422);
+ expect((await post(5,'/withdrawals/'+attempts[winner].body.data.id+'/review',{...s,action:'cancel'})).status).toBe(200);
+ expect((await get(5,'',s)).body.data.withdrawalPolicy.remainingAmount).toBe('60.0000');
+ await apply(5,'0.01',s);await apply(5,'59.99',s);
+ expect((await get(5,'',s)).body.data.withdrawalPolicy.remainingAmount).toBe('0.0000');
+ expect(remainder.id).toBeTruthy();
 });
+// Pre-v2 requests are fixtures of already accepted obligations, never new-policy applications.
+async function historical(who:number,invoiceRequired:boolean) {
+ const [insert]=await c.query<mysql.ResultSetHeader>("INSERT INTO opc_withdrawals(module_id,project_id,account_id,user_id,amount,request_key,request_hash,receiver_name,bank_name,bank_account) VALUES(?,1,1,?,600,?,REPEAT('a',64),'历史验收','隔离银行','TEST')",[scope.moduleId,who,crypto.randomUUID()]);
+ const id=String(insert.insertId),quote={policyVersion:'2026-10-13-v1',appliedDay:'2026-10-13',feeAmount:'6.0000',netAmount:'594.0000',invoiceRequired};
+ await c.query("INSERT INTO opc_withdrawal_terms(withdrawal_id,user_id,applied_day,policy_version,applicant_role,fee_amount,net_amount,tier,review_deadline,settlement_deadline,settlement_month,invoice_required,terms_json) VALUES(?,?,'2026-10-13','2026-10-13-v1',?,6,594,'large','2026-11-03','2026-11-30','2026-11',?,?)",[id,who,actors[who-1].role,invoiceRequired,JSON.stringify(quote)]);
+ return {id,quote};
+}
 it('requires invoices only for large leader applications and protects all attachment actions', async () => {
-  const entry = await apply(3, '600'),
+  const entry = await historical(3, true),
     endpoint = '/withdrawals/' + entry.id;
   expect(entry.quote.invoiceRequired).toBe(true);
   expect((await post(1, endpoint + '/review', { ...scope, action: 'approve' })).status).toBe(200);
@@ -319,9 +318,9 @@ it('requires invoices only for large leader applications and protects all attach
   expect((await q('SELECT COUNT(*) n FROM opc_withdrawal_invoices WHERE withdrawal_id=?', [entry.id]))[0].n).toBe(2);
 });
 it('large creators need no invoice and small leaders also stay on the small schedule', async () => {
-  const large = await apply(7, '600'),
+  const large = await historical(7, false),
     small = await apply(6, '500');
-  expect(large.quote).toMatchObject({ invoiceRequired: false, tier: 'large' });
+  expect(large.quote).toMatchObject({ invoiceRequired: false, policyVersion:'2026-10-13-v1' });
   expect(small.quote).toMatchObject({ invoiceRequired: false, tier: 'small' });
   for (const id of [large.id, small.id]) {
     const sheet = (await get(1, '/payment-sheet')).body.data;
@@ -425,9 +424,10 @@ it('rolls back both balance reservation and the daily slot when writing the term
     ).status,
   ).toBe(200);
   expect((await get(10, '')).body.data.balance.available).toBe('2000.0000');
-  expect((await get(10, '/withdrawal-quote', { ...scope, amount: '10' })).status).toBe(422);
+  expect((await get(10, '/withdrawal-quote', { ...scope, amount: '10' })).status).toBe(200);
 });
 it('filters overdue requests before pagination without broadening access', async () => {
+  const beforeCount=(await get(1,'',{...scope,attention:'overdue'})).body.data.total;
   const entry = await apply(11, '10');
   // Synthetic overdue fixture, never applied to business records.
   await c.query(
@@ -435,14 +435,14 @@ it('filters overdue requests before pagination without broadening access', async
     [entry.id],
   );
   const queue = (await get(1, '', { ...scope, attention: 'overdue' })).body.data;
-  expect(queue.total).toBe(1);
+  expect(queue.total).toBe(beforeCount+1);
   expect(queue.withdrawals[0]).toMatchObject({ id: entry.id, attention: 'overdue' });
   expect((await get(12, '', { ...scope, attention: 'overdue' })).body.data.total).toBe(0);
   expect((await get(4, '', { ...scope, attention: 'overdue' })).status).toBe(403);
 });
 
 
-it('pauses applications for every mini account/version while preserving Web applications and mini history', async () => {
+it('shares accepted mini requests, Web financial decisions and payment corrections without leaking another user', async () => {
   const { issueRefreshSession } = await import('../../src/auth/tokenSessions');
   const { signToken } = await import('../../src/auth/jwt');
   const { wechatClientId } = await import('../../src/wechat/context');
@@ -458,23 +458,60 @@ it('pauses applications for every mini account/version while preserving Web appl
     }).send(raw);
   };
   const before = (await get(12,'')).body.data.balance;
-  for (const amount of ['0.01','10','100','600']) {
-    const quoted = await mini('GET','/withdrawal-quote',{...scope,amount});
-    expect(quoted.status,quoted.text).toBe(403);expect(quoted.body.code).toBe(40330);
-    const applied = await mini('POST','/withdrawals',{...scope,amount,requestKey:crypto.randomUUID()});
-    expect(applied.status,applied.text).toBe(403);expect(applied.body.message).toContain('暂不受理');
-  }
-  expect((await get(12,'')).body.data.balance).toEqual(before);
-  const entry = await apply(12,'100');
-  const history = await mini('GET','',scope);
-  expect(history.status,history.text).toBe(200);
-  expect(history.body.data.withdrawals.some((r:any)=>r.id===entry.id)).toBe(true);
+  const quoted=await mini('GET','/withdrawal-quote',{...scope,amount:'10'});
+  expect(quoted.status,quoted.text).toBe(200);
+  const quote=quoted.body.data;
+  const body={...scope,amount:'10',requestKey:crypto.randomUUID(),policyVersion:quote.policyVersion,quoteToken:quote.quoteToken,receiverName:'隔离',bankName:'测试',bankAccount:'TEST'};
+  const created=await mini('POST','/withdrawals',body);
+  expect(created.status,created.text).toBe(201);const id=created.body.data.id;
+  const check=async(status:string)=>{const r=await mini('GET','',scope);expect(r.status,r.text).toBe(200);expect(r.body.data.withdrawals.find((w:any)=>w.id===id).status).toBe(status);};
+  await check('pending');
+  expect((await post(1,'/withdrawals/'+id+'/review',{...scope,action:'approve'})).status).toBe(200);
+  await check('approved');
+  expect((await post(1,'/withdrawals/'+id+'/pay',{...scope,paidOn:quote.appliedDay,acknowledged:true,requestKey:crypto.randomUUID(),policyVersion:quote.policyVersion,netAmount:quote.netAmount})).status).toBe(200);
+  await check('paid');
+  const paid=(await mini('GET','',scope)).body.data;
+  expect(paid.balance.paid).toBe('9.9000');expect(paid.withdrawalPolicy.remainingAmount).toBe('90.0000');
+  const version=paid.withdrawals.find((w:any)=>w.id===id).paymentVersion;
+  expect((await post(1,'/withdrawals/'+id+'/correct',{...scope,expectedVersion:version,requestKey:crypto.randomUUID(),action:'void',reason:'隔离状态回归，无真实付款'})).status).toBe(200);
+  await check('approved');
   expect((await mini('GET','',{...scope,projectId:'999'})).status).toBe(403);
-  const cancelled = await mini('POST','/withdrawals/'+entry.id+'/review',{...scope,action:'cancel'});
-  expect(cancelled.status,cancelled.text).toBe(200);
-  expect((await get(12,'')).body.data.balance).toEqual(before);
-  // A mini token cannot claim to be a Web client to bypass the channel pause.
+  expect((await mini('POST','/withdrawals/'+id+'/review',{...scope,action:'approve'})).status).toBe(403);
+  expect((await get(6,'')).body.data.withdrawals.some((w:any)=>w.id===id)).toBe(false);
+  const again=await apply(12,'0.01');
+  expect((await post(1,'/withdrawals/'+again.id+'/review',{...scope,action:'reject',reason:'请核对收款资料'})).status).toBe(200);
+  const rejected=(await mini('GET','',scope)).body.data.withdrawals.find((w:any)=>w.id===again.id);
+  expect(rejected).toMatchObject({status:'rejected',remark:'请核对收款资料'});
+  // A mini token cannot claim to be a Web client to bypass transport authentication.
   const forged = await request(app).post(path+'/withdrawals').set('Authorization','Bearer '+token)
-    .set('X-Client-Id',wechatClientId(identity)).send(entry.body);
+    .set('X-Client-Id',wechatClientId(identity)).send(body);
   expect(forged.status).toBe(401);
+});
+
+it('counts gross after a role change and never resets quota on a rejected duplicate',async()=>{
+ const who=10,u=actors[9],quote=await finance.withdrawalQuote(u,scope,'10');
+ await c.query("UPDATE users SET role='leader' WHERE id=10");
+ try {
+  await expect(finance.applyWithdrawal(u,scope,crypto.randomUUID(),{amount:'10',policyVersion:quote.policyVersion,quoteToken:quote.quoteToken})).rejects.toThrow('重新确认');
+  const leader={...u,role:'leader'} as AuthUser;
+  const q2=await finance.withdrawalQuote(leader,scope,'500');
+  const entry=await finance.applyWithdrawal(leader,scope,crypto.randomUUID(),{amount:'500',policyVersion:q2.policyVersion,quoteToken:q2.quoteToken});
+  expect((await finance.financeOverview(leader,second)).withdrawalPolicy).toMatchObject({todayAmount:'500.0000',remainingAmount:'0.0000'});
+  await c.query("UPDATE users SET role='creator' WHERE id=10");
+  expect((await finance.financeOverview(u,scope)).withdrawalPolicy.remainingAmount).toBe('0.0000');
+  await finance.reviewWithdrawal(actors[0],scope,entry.id,'reject','隔离额度验收');
+  expect((await finance.financeOverview(u,scope)).withdrawalPolicy.remainingAmount).toBe('100.0000');
+ } finally {await c.query("UPDATE users SET role='creator' WHERE id=10");}
+});
+it('releasing a prior-day reservation does not add extra allowance today',async()=>{
+ vi.useFakeTimers({toFake:['Date']});
+ try {
+  vi.setSystemTime(new Date('2026-10-25T15:59:00Z'));
+  const u=actors[8],quote=await finance.withdrawalQuote(u,scope,'100');
+  const entry=await finance.applyWithdrawal(u,scope,crypto.randomUUID(),{amount:'100',policyVersion:quote.policyVersion,quoteToken:quote.quoteToken});
+  vi.setSystemTime(new Date('2026-10-25T16:01:00Z'));
+  expect((await finance.financeOverview(u,scope)).withdrawalPolicy.remainingAmount).toBe('100.0000');
+  await finance.reviewWithdrawal(u,scope,entry.id,'cancel','');
+  expect((await finance.financeOverview(u,scope)).withdrawalPolicy.remainingAmount).toBe('100.0000');
+ } finally {vi.useRealTimers();}
 });

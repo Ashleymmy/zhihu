@@ -35,6 +35,7 @@ export interface HttpClient {
   patch<T>(url: string, data?: unknown): Promise<T>
   del<T>(url: string): Promise<T>
   getBlob(url: string): Promise<Blob>
+  postBlob(url: string, data?: unknown): Promise<Blob>
   tokens: TokenStore
   /** 主动刷新 Access Token；并发调用会共享同一次请求。 */
   refresh(): Promise<boolean>
@@ -143,7 +144,19 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
     }
   }
 
+  async function postBlob(url: string, data?: unknown, retried = false): Promise<Blob> {
+    try { return (await instance.request<Blob>({method:'POST',url,data,responseType:'blob',timeout:60000})).data }
+    catch(raw:any) {
+      if(raw?.response?.status===401 && !retried && await refresh()) return postBlob(url,data,true)
+      if(raw?.response?.data instanceof Blob) {
+        try { raw.response.data=JSON.parse(await raw.response.data.text()) } catch {}
+      }
+      throw normalizeError(raw)
+    }
+  }
+
   return {
+    postBlob,
     get: (url, params) => request({ method: 'GET', url, params }),
     getBlob: async (url) => {
       const response = await instance.request<Blob>({ method: 'GET', url, responseType: 'blob' })

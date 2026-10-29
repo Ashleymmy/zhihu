@@ -1,5 +1,5 @@
 import { newPasswordSchema, generateTemporaryPassword } from '../auth/password-policy';
-import { formatUserId, isReservedUserId } from '../auth/user-id';
+import { assignUserId, isReservedUserId, resolveUserIdentifier } from '../auth/user-id';
 import { isStaffRole } from '../auth/roles';
 import bcrypt from 'bcryptjs';
 import { ResultSetHeader, RowDataPacket, PoolConnection } from 'mysql2/promise';
@@ -118,7 +118,7 @@ export async function createMember(
       [input.username, hash, role, parentId, input.displayName, input.phone ?? null, user.sub],
     );
     const memberId = String(result.insertId);
-    formatUserId(memberId);
+    await assignUserId(connection, memberId);
     await openMemberProjects(connection, memberId, role, parentId, user.sub);
     await recordRegistration(connection, {
       userId: memberId,
@@ -226,9 +226,25 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
     if(isStaffRole(current.role))throw new AppError(422,42212,'管理账号不可删除');
     const [[invitation]] = await connection.query<RowDataPacket[]>('SELECT id FROM member_invitations WHERE owner_user_id=? OR team_leader_id=? LIMIT 1 FOR UPDATE', [id,id]);
     const [[use]] = await connection.query<RowDataPacket[]>('SELECT user_id FROM member_invitation_uses WHERE user_id=? LIMIT 1 FOR UPDATE', [id]);
+    const [[history]] = await connection.query<RowDataPacket[]>(`SELECT
+      EXISTS(SELECT 1 FROM team_memberships WHERE leader_id=? OR (user_id=? AND
+        (leader_id IS NOT NULL OR effective_to IS NOT NULL OR source NOT IN ('registration','migration')))) teams,
+      EXISTS(SELECT 1 FROM member_role_history WHERE user_id=? AND
+        (from_role IS NOT NULL OR reason NOT IN ('registration','migration'))) roles,
+      EXISTS(SELECT 1 FROM member_referrals WHERE inviter_id=? OR (user_id=? AND
+        (inviter_id IS NOT NULL OR invitation_id IS NOT NULL OR corrected_at IS NOT NULL))) referrals,
+      EXISTS(SELECT 1 FROM member_referral_closure WHERE ancestor_id=? OR descendant_id=?) closure`,
+      [id,id,id,id,id,id,id]);
+    if ([history.teams, history.roles, history.referrals, history.closure].some(value => Number(value) > 0))
+      throw new AppError(422,42213,'该账号已有成员关系变更或邀请记录，请改为停用以保留历史');
     if (invitation || use) throw new AppError(422,42213,'该账号存在邀请记录，不可删除；如不再使用请改为停用');
+    // 无业务空账号仍允许删除；仅清除首次注册/整理时的平台直管基线，不删实际关系变更。
+    await connection.query('DELETE FROM member_role_history WHERE user_id=?', [id]);
+    await connection.query('DELETE FROM team_memberships WHERE user_id=?', [id]);
+    await connection.query('DELETE FROM member_referrals WHERE user_id=?', [id]);
     // 入团申请是低价值流程记录，随账号一并清除（其他业务数据已在上方拦截）
     await connection.query('DELETE FROM team_applications WHERE creator_id = ? OR leader_id = ?', [id, id]);
+    await connection.query('UPDATE user_identifiers SET user_id=NULL WHERE user_id=?', [id]);
     await connection.query('DELETE FROM users WHERE id = ?', [id]);
     await writeAudit(
       { userId: user.sub, action: 'user.delete', resourceType: 'user', resourceId: id, detail: { username: member.username }, ip },
@@ -354,9 +370,10 @@ export async function applyToTeam(user: AuthUser, leaderUsername: string, messag
   const [meRow] = await rows<MemberRow>('SELECT id, role, parent_id, is_active FROM users WHERE id = ? LIMIT 1', [user.sub]);
   if (meRow?.parent_id) throw new AppError(422, 42207, '你已在团队内，如需变更请联系管理员');
 
+  const leaderId = await withTransaction(c => resolveUserIdentifier(c, leaderUsername));
   const [leader] = await rows<MemberRow & { username: string }>(
-    'SELECT id, role, parent_id, is_active, username FROM users WHERE username = ? LIMIT 1',
-    [leaderUsername],
+    'SELECT id, role, parent_id, is_active, username FROM users WHERE id = ? LIMIT 1',
+    [leaderId ?? null],
   );
   if (!leader || !leader.is_active || normalizeRole(leader.role) !== 'leader') {
     throw new AppError(422, 42208, '目标团长不存在或暂不可加入');

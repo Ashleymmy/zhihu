@@ -13,15 +13,25 @@
     is="status"
     data="{{error, notice, denied, loading, scopeReady, scopeNotice, allowed, busy, guest, skeleton: true}}"
   /><skeleton wx:if="{{allowed && scopeReady && loading && !view}}" rows="{{3}}" /><block wx:if="{{allowed && scopeReady}}">
-    <view class="card withdrawal-notice">
-      <view class="section-title">提现申请暂未开放</view>
-      <view class="muted">小程序暂不受理新的提现申请，收益、余额及历史申请进度仍可查看，已提交申请继续按原规则处理。</view>
+    <view class="card withdrawal-rules" wx:if="{{policy.enabled}}">
+      <view class="section-title">提现说明</view>
+      <view wx:for="{{policy.lines}}" wx:key="*this" class="rule-line">{{item}}</view>
+      <button size="mini" bindtap="toggleRules">{{rulesOpen ? '收起完整规则' : '查看完整规则'}}</button>
+      <block wx:if="{{rulesOpen}}"><view wx:for="{{policy.details}}" wx:key="*this" class="rule-line muted">{{item}}</view></block>
+
     </view>
     <block wx:if="{{view}}">
       <view class="card" wx:if="{{view.balance}}"
         ><text class="muted">可提现余额</text
         ><view class="title">¥{{view.balance.availableDisplay}}</view
-        ></view>
+        ><view wx:if="{{policy.enabled}}" class="muted">今日限额 ¥{{policy.dailyAmountLimit}} · 已申请 ¥{{policy.todayAmount}} · 剩余额度 ¥{{policy.remainingAmount}}</view
+        ><button
+          class="primary"
+          disabled="{{busy || loading || !view.canWithdraw}}"
+          bindtap="openApply"
+          >申请提现</button
+        ><view wx:if="{{!view.canWithdraw}}" class="muted">{{view.quotaExhausted ? '今日额度已用完，明天恢复；可在下方查看申请进度。' : '账单确认且财务开放款项后，可申请提现。'}}</view></view
+      >
       <view class="notice" wx:if="{{view.canManage}}"
         >审批通过后，请先在银行或支付渠道实际付款，再上传凭证登记。登记不会自动转账。</view
       >
@@ -34,6 +44,7 @@
           >{{item.displayName}} · {{item.receiverName}} ·
           {{item.bankName}}</view
         ><view class="muted">{{item.createdAt}}</view
+        ><view class="muted">{{item.status === 'pending' ? '下一步：财务审核申请' : item.status === 'approved' ? '下一步：财务打款并登记，当前尚未打款' : item.status === 'rejected' ? '请根据退回原因核对资料后重新申请' : item.status === 'cancelled' ? '占用金额已释放，可重新申请' : '财务已登记实际付款，可核对收款记录'}}</view
         ><view wx:if="{{item.policyVersion}}" class="withdrawal-totals">
           <view>手续费 ¥{{item.feeAmount}} · {{item.status === 'paid' ? '实际打款' : '预计到账'}} ¥{{item.netAmount}}</view>
           <view wx:if="{{item.tier === 'small'}}">审核并结算期限：{{item.settlementDeadline}} 18:00 前</view>
@@ -48,7 +59,7 @@
         ><view class="wrap actions">
           <button wx:if="{{view.canManage && item.canPay}}" size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="pay">登记实际付款</button>
           <button wx:if="{{item.invoiceRequired}}" size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="invoice">{{view.canManage ? '开票要求与核验' : '查看要求 / 补充发票'}}</button>
-          <button wx:if="{{item.status === 'paid'}}" size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="proof">查看凭证</button>
+          <button wx:if="{{item.status === 'paid' && item.proofName}}" size="mini" data-index="{{index}}" disabled="{{busy}}" bindtap="proof">查看凭证</button>
           <button
             wx:if="{{!view.canManage && item.status === 'pending'}}"
             size="mini"
@@ -79,12 +90,73 @@
         </view></view
       ><state-view
         wx:if="{{!loading && !error && !view.withdrawals.length}}"
-        text="暂无提现记录。"
+        text="还没有提现记录，可在上方提交申请。"
       /><template
         is="loadmore"
         data="{{total, page, loadingMore, pageSize: 25}}"
       />
     </block> </block
+  ><view wx:if="{{applyOpen && allowed && scopeReady}}" class="modal-mask"
+    ><scroll-view scroll-y class="modal"
+      ><view class="row"
+        ><view class="section-title">申请提现</view
+        ><button size="mini" disabled="{{busy}}" bindtap="close"
+          >关闭</button
+        ></view
+      ><text class="muted">可提现 ¥{{view.balance.availableDisplay}}</text>
+      <view wx:if="{{policy.enabled}}" class="withdrawal-rules"><view wx:for="{{policy.lines}}" wx:key="*this" class="rule-line">{{item}}</view></view>
+      <view class="field"
+        ><view class="row"
+          ><text class="field-label">金额（最多两位小数）</text
+          ><text class="link-btn" bindtap="fillAll">填入可申请金额</text></view
+        ><input
+          type="digit"
+          data-name="form.amount"
+          value="{{form.amount}}"
+          maxlength="16"
+          disabled="{{busy}}"
+          bindinput="amountInput"
+      /></view>
+      <view class="field"
+        ><text class="field-label">收款人</text
+        ><input
+          data-name="form.receiverName"
+          value="{{form.receiverName}}"
+          maxlength="128"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">银行或支付渠道</text
+        ><input
+          data-name="form.bankName"
+          value="{{form.bankName}}"
+          maxlength="128"
+          bindinput="input"
+      /></view>
+      <view class="field"
+        ><text class="field-label">收款账号</text
+        ><input
+          data-name="form.bankAccount"
+          value="{{form.bankAccount}}"
+          maxlength="128"
+          bindinput="input"
+      /></view>
+      <view wx:if="{{quote && policy.enabled}}" class="withdrawal-totals">
+        <view>本次扣减余额：¥{{quote.amount}}</view><view>手续费（1%）：¥{{quote.feeAmount}}</view><view class="item-title">预计到账：¥{{quote.netAmount}}</view>
+        <view wx:if="{{quote.tier === 'small'}}">最迟 {{quote.settlementDeadline}} 18:00 前审核并结算</view>
+        <block wx:else><view>最迟 {{quote.reviewDeadline}} 18:00 前审核</view><view>{{quote.settlementMonth}} 月内结算，最迟 {{quote.settlementDeadline}} 完成</view></block>
+        <view wx:if="{{quote.invoiceRequired}}">团长需向平台开具发票，可在申请记录内查看要求及补交。</view>
+        <checkbox-group bindchange="acceptRules"><label><checkbox value="yes" checked="{{rulesAccepted}}" />已阅读提现规则，确认费用和到账金额</label></checkbox-group>
+      </view>
+      <view wx:if="{{error}}" class="error">{{error}}</view
+      ><button
+        class="primary"
+        disabled="{{busy}}"
+        loading="{{busy}}"
+        bindtap="apply"
+        >{{policy.enabled ? (quote ? '确认申请提现' : '核对到账金额') : '提交申请'}}</button
+      >
+    </scroll-view></view
   >
   <view wx:if="{{selected && allowed && scopeReady}}" class="modal-mask"
     ><scroll-view scroll-y class="modal"
