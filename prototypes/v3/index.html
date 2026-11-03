@@ -617,7 +617,34 @@ const leaderPages = {
   },
   projects: () => creatorPages.projects(),
   invite: () => creatorPages.invite(),
-  income: () => creatorPages.income(),
+  /* 团长收益页：任务/邀请/团队/激励四类齐全（团队收益与激励是团长核心收入） */
+  income() {
+    const line = (date, name, type, qty, price, amount, state) => `
+      <tr data-click><td class="muted">${date}</td><td><b>${name}</b></td><td>${type}</td><td class="num">${qty}</td><td class="num muted">${price}</td><td class="num"><b>${amount}</b></td><td>${state}</td></tr>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:3;--i:0"><div class="card-h"><h3>任务收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>486.00</div><p class="muted" style="font-size:12px">本月 · 本人任务</p></div>
+      <div class="card lift" style="--s:3;--i:1"><div class="card-h"><h3>邀请收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>132.80</div><p class="muted" style="font-size:12px">本月 · 直邀 9 人</p></div>
+      <div class="card lift" style="--s:3;--i:2"><div class="card-h"><h3>团队收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>1,032.40</div><p class="muted" style="font-size:12px">本月 · 成员业绩 × 团长单价</p></div>
+      <div class="card lift" style="--s:3;--i:3"><div class="card-h"><h3>激励</h3><span class="chip r" style="background:#efe9f8;color:#6e4fa8">B 档</span></div><div class="big num" style="font-size:26px;color:#6e4fa8"><small style="color:#6e4fa8">¥</small>600.00</div><p class="muted" style="font-size:12px">9 月团队激励 · 按月度评定发放</p></div>
+      <div class="card sheetcard" style="--s:12;--i:4">
+        <div class="sheet-toolbar">
+          <div class="seg"><button class="on">全部</button><button>任务收益</button><button>邀请收益</button><button>团队收益</button><button>激励</button></div>
+          <div class="sp"></div>
+          <div class="seg"><button>7 天</button><button class="on">30 天</button><button>90 天</button></div>
+        </div>
+        <table class="sheet-table"><thead><tr><th>日期</th><th>内容</th><th>类型</th><th>数量</th><th>单价</th><th>金额</th><th>状态</th></tr></thead><tbody>
+          ${line('10-19', '林小满 · 知乎 8 单', '<span class="chip blue">团队</span>', '8 单', '¥0.80', '+¥6.40', '<span class="chip warn">待确认</span>')}
+          ${line('10-19', '考研英语怎么学', '<span class="chip clay">任务</span>', '4 单', '¥2.00', '+¥8.00', '<span class="chip warn">待确认</span>')}
+          ${line('10-18', '顾知夏 · 红果 31 次', '<span class="chip blue">团队</span>', '31 次', '¥0.16', '+¥4.96', '<span class="chip warn">待确认</span>')}
+          ${line('10-18', '唐南乔的业绩', '<span class="chip up">邀请</span>', '分成', '—', '+¥2.18', '<span class="chip up">已确认</span>')}
+          ${line('10-17', '唐南乔 · 知乎 6 单', '<span class="chip blue">团队</span>', '6 单', '¥0.80', '+¥4.80', '<span class="chip up">已确认</span>')}
+          ${line('10-17', '剧荒救星', '<span class="chip clay">任务</span>', '19 次', '¥0.80', '+¥15.20', '<span class="chip up">已确认</span>')}
+          ${line('09-30', '9 月团队激励（B 档）', '<span class="chip" style="background:#efe9f8;color:#6e4fa8">激励</span>', '月度', '—', '+¥600.00', '<span class="chip up">已发放</span>')}
+        </tbody></table>
+        <div class="sheet-foot"><span>已显示 7 条 · 点任意一行看计算过程</span><span>合计 <b>+¥641.54</b></span></div>
+      </div>
+    </div>`;
+  },
   me: () => creatorPages.me(),
 };
 
