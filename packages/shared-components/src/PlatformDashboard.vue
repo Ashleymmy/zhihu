@@ -471,6 +471,10 @@ function untilt(event: PointerEvent) {
   .home-v2 { grid-template-columns: 1fr; }
   .home-aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
+/* 大屏加密：1900px 以上小卡一行 4 张（内联 --s:4 用 !important 覆盖） */
+@media (min-width: 1900px) {
+  .home-v2 .bento .card[style*="--s:4"] { grid-column: span 3 !important; }
+}
 @media (max-width: 720px) {
   .home-aside { grid-template-columns: 1fr; }
   .home-toolbar { justify-content: stretch; }

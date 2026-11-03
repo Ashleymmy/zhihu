@@ -131,7 +131,8 @@ code, kbd, pre, samp { font-family: var(--font-code); }
 /* ===== 外框：88px 图标侧栏 + 衬线问候顶部 + 手机底部标签栏 ===== */
 .studio-app {
   --nav-w: 88px;
-  --page-w: 1600px;
+  /* 页面宽度跟随视口自适应，上限 2160px 防超宽屏拉伸过度 */
+  --page-w: min(2160px, 100%);
   display: flex;
   min-height: 100vh;
   background: var(--paper);
