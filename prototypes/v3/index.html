@@ -425,7 +425,7 @@ const creatorPages = {
     return `<div class="bento enter">
       <div class="card sheetcard" style="--s:12">
         <div class="sheet-toolbar">
-          <div class="seg"><button class="on">全部 12</button><button>进行中 7</button><button>待审核 3</button><button>已完成 2</button></div>
+          <div class="seg"><button class="on">全部</button><button>进行中</button><button>待审核</button><button>需要处理</button><button>已完成</button></div>
           <div class="sp"></div>
           <div class="sheet-search">⌕ 搜索关键词</div>
           <button class="btn ink sm">自主创建任务</button>
@@ -440,6 +440,8 @@ const creatorPages = {
           ${row('高效学习计划表', '知乎推文', '¥2.00 / 拉新', '9 单 · ¥18.00', '<span class="chip warn">审核中</span>', '<span class="muted" style="font-size:12.5px">预计明天出结果</span>')}
           <tr class="sheet-group"><td colspan="5">需要处理 · 1</td></tr>
           ${row('宿舍好物清单', '知乎推文', '¥2.00 / 拉新', '0 单', '<span class="chip down">被驳回</span>', '<button class="btn sm">查看原因</button>')}
+          <tr class="sheet-group"><td colspan="5">已完成 · 1</td></tr>
+          ${row('四六级听力提分', '知乎推文', '¥2.00 / 拉新', '31 单 · ¥62.00', '<span class="chip soft">已结清</span>', '<span class="muted" style="font-size:12.5px">查看记录</span>')}
         </tbody></table>
         <div class="sheet-foot"><span>已显示 9 条</span><span>近 30 天合计 <b>¥341.20</b></span></div>
       </div>
