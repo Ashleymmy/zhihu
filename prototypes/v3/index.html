@@ -682,6 +682,165 @@ const operatorPages = {
         ${[['#4e9a4a', '孟*宁 · 网盘 2 人', '+¥9.00'], ['#3b7dd8', '许*念 · 红果 23 次', '+¥27.60'], ['#d46b45', '袁*宁 · 知乎 8 单', '+¥24.00'], ['#4e9a4a', '孟*宁 · 网盘 2 人', '+¥9.00'], ['#d46b45', '林*满 · 知乎 3 单', '+¥9.00']].map(x => `<div class="it"><span class="ic2" style="background:${x[0]}22;color:${x[0]}">↗</span><div class="t"><b style="font-size:13px">${x[1]}</b><div class="muted" style="font-size:12px">15:09</div></div><b class="amt">${x[2]}</b></div>`).join('')}</div>
     </aside></div>`;
   },
+  /* ----- 工作台：报表核对 + 作品审核队列 ----- */
+  workbench() {
+    const review = (name, by, time, state, act) => `
+      <tr data-click><td><b>${name}</b><div class="muted" style="font-size:12px">${by}</div></td><td class="muted">${time}</td><td>${state}</td><td style="text-align:right">${act}</td></tr>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:4;--i:0"><div class="card-h"><h3>报表核对</h3><span class="chip clay r">3 张待处理</span></div>
+        <div class="big num" style="font-size:30px">3<small>张</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">知乎 10-19 日报表 2 张 · 红果 1 张</p>
+        <button class="btn ink" style="margin-top:14px">去核对</button></div>
+      <div class="card lift" style="--s:4;--i:1"><div class="card-h"><h3>作品审核</h3><span class="chip warn r">12 件待审</span></div>
+        <div class="big num" style="font-size:30px">12<small>件</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">最早提交于今天 08:40</p>
+        <button class="btn ink" style="margin-top:14px">去审核</button></div>
+      <div class="card lift" style="--s:4;--i:2"><div class="card-h"><h3>今日回传</h3><span class="chip up r">正常</span></div>
+        <div class="big num" style="font-size:30px">214<small>条</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">知乎 182 · 红果 32 · 无失败</p></div>
+      <div class="card sheetcard" style="--s:12;--i:3">
+        <div class="sheet-toolbar">
+          <div class="seg"><button class="on">全部队列</button><button>报表核对</button><button>作品审核</button><button>回传异常</button></div>
+          <div class="sp"></div>
+          <div class="sheet-search">⌕ 搜索成员、关键词</div>
+        </div>
+        <table class="sheet-table"><thead><tr><th style="width:34%">内容</th><th>提交</th><th>状态</th><th style="text-align:right">操作</th></tr></thead><tbody>
+          <tr class="sheet-group"><td colspan="4">报表核对 · 3</td></tr>
+          ${review('知乎 10-19 日报表（382 行）', '许知远 上传', '今天 10:24', '<span class="chip warn">2 行待确认</span>', '<button class="btn sm">处理</button>')}
+          ${review('知乎 10-18 日报表（296 行）', '许知远 上传', '昨天 16:02', '<span class="chip clay">1 行待确认</span>', '<button class="btn sm">处理</button>')}
+          <tr class="sheet-group"><td colspan="4">作品审核 · 12</td></tr>
+          ${review('《考研英语怎么学》图文', '林小满 · 知乎', '今天 09:41', '<span class="chip warn">待审核</span>', '<button class="btn sm">审核</button>')}
+          ${review('《剧荒救星》短视频', '顾知夏 · 红果', '今天 09:18', '<span class="chip warn">待审核</span>', '<button class="btn sm">审核</button>')}
+          ${review('《平价护肤品推荐》图文', '唐南乔 · 知乎', '昨天 21:07', '<span class="chip warn">待审核</span>', '<button class="btn sm">审核</button>')}
+          <tr class="sheet-group"><td colspan="4">回传异常 · 1</td></tr>
+          ${review('红果 3 条回传重复', '系统自动检测', '今天 11:20', '<span class="chip down">疑似重复</span>', '<button class="btn sm">合并</button>')}
+        </tbody></table>
+        <div class="sheet-foot"><span>已显示 6 条</span><span>队列合计 <b>16 项</b></span></div>
+      </div>
+    </div>`;
+  },
+
+  /* ----- 成员：全员多维表格 ----- */
+  members() {
+    const m = (av, color, name, role, team, perf, state, joined) => `
+      <tr data-click><td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="background:${color}">${av}</span><div><b>${name}</b><div class="muted" style="font-size:12px">${joined} 加入</div></div></div></td><td>${role}</td><td>${team}</td><td class="num">${perf}</td><td>${state}</td><td style="text-align:right"><span class="muted">›</span></td></tr>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:3;--i:0"><div class="card-h"><h3>达人</h3></div><div class="big num" style="font-size:28px">96<small>人</small></div><p class="muted" style="font-size:12px">较上周 ↑ 12</p></div>
+      <div class="card lift" style="--s:3;--i:1"><div class="card-h"><h3>团长</h3></div><div class="big num" style="font-size:28px">12<small>人</small></div><p class="muted" style="font-size:12px">3 人待提名</p></div>
+      <div class="card lift" style="--s:3;--i:2"><div class="card-h"><h3>独立达人</h3></div><div class="big num" style="font-size:28px">18<small>人</small></div><p class="muted" style="font-size:12px">平台直管</p></div>
+      <div class="card lift" style="--s:3;--i:3"><div class="card-h"><h3>本周新加入</h3></div><div class="big num" style="font-size:28px">14<small>人</small></div><p class="muted" style="font-size:12px">9 人来自成员邀请</p></div>
+      <div class="card sheetcard" style="--s:12;--i:4">
+        <div class="sheet-toolbar">
+          <div class="seg"><button class="on">全部</button><button>达人</button><button>团长</button><button>独立达人</button></div>
+          <div class="sp"></div>
+          <div class="sheet-search">⌕ 搜索成员</div>
+          <button class="btn sm">导出名单</button>
+        </div>
+        <table class="sheet-table"><thead><tr><th style="width:26%">成员</th><th>角色</th><th>团队</th><th>近 30 天业绩</th><th>状态</th><th></th></tr></thead><tbody>
+          ${m('林', '#d46b45', '林小满', '达人', '苏禾团队', '¥118.20', '<span class="chip up">活跃</span>', '06-16')}
+          ${m('苏', '#3b7dd8', '苏禾', '团长', '—', '¥486.00', '<span class="chip up">活跃</span>', '03-26')}
+          ${m('顾', '#4e9a4a', '顾知夏', '达人', '苏禾团队', '¥96.40', '<span class="chip up">活跃</span>', '07-02')}
+          ${m('江', '#8e6cc9', '江照野', '团长', '—', '¥92.10', '<span class="chip warn">晋升审核中</span>', '08-11')}
+          ${m('周', '#4e9a4a', '周时雨', '达人', '独立达人', '¥68.00', '<span class="chip clay">申请入团</span>', '09-28')}
+          ${m('陈', '#3b7dd8', '陈子衿', '达人', '苏禾团队', '¥40.55', '<span class="chip warn">3 天未活跃</span>', '08-05')}
+        </tbody></table>
+        <div class="sheet-foot"><span>已显示 6 / 126 人</span><span>点行看成员详情与关系</span></div>
+      </div>
+    </div>`;
+  },
+
+  /* ----- 关系：森林 + 检查器 ----- */
+  relations() {
+    return `<div class="home-grid"><div class="bento enter">
+      <div class="card" style="--s:12;--i:0"><div class="card-h"><h3>关系森林</h3><span class="muted" style="font-size:12.5px">实线 = 当前团队 · 虚线 = 原始邀请</span><div class="r"><div class="seg"><button class="on">按团队</button><button>按邀请</button></div><div class="sheet-search" style="width:200px">⌕ 找成员</div></div></div>
+        <svg class="chart" data-forest style="height:420px" viewBox="0 0 460 190" preserveAspectRatio="xMidYMid meet"></svg></div>
+    </div>
+    <aside class="aside">
+      <div class="card"><div class="card-h"><h3>检查器</h3><span class="chip soft r">江照野</span></div>
+        <div class="row"><span class="av" style="background:#8e6cc9">江</span><div class="t"><b>江照野</b><small>团长 · 08-11 加入</small></div></div>
+        <div style="margin-top:14px">
+          <p class="muted" style="font-size:12px;margin-bottom:6px">三种关系</p>
+          <div class="row"><div class="t"><b>当前归属</b><small>苏禾团队（晋升后独立）</small></div></div>
+          <div class="row"><div class="t"><b>原始邀请</b><small>唐知远 邀请加入</small></div></div>
+          <div class="row"><div class="t"><b>隐式上级</b><small>平台直管（无团队时）</small></div></div>
+        </div></div>
+      <div class="card"><div class="card-h"><h3>变更时间线</h3></div>
+        ${[['10-18', '晋升为团长', '运营 · 陈墨 提名，管理员 复核通过'], ['08-11', '加入苏禾团队', '团长 苏禾 邀请'], ['08-02', '注册成为达人', '唐知远 的小程序卡片']].map(x => `<div class="row"><span class="chip soft">${x[0]}</span><div class="t"><b>${x[1]}</b><small>${x[2]}</small></div></div>`).join('')}</div>
+    </aside></div>`;
+  },
+  /* ----- 晋升：候选 → 提名 → 审批 ----- */
+  promotions() {
+    const candidate = (av, color, name, days, rate, invites, ready) => `
+      <div class="row"><span class="av" style="background:${color}">${av}</span><div class="t"><b>${name}</b><small>活跃 ${days} 天 · 合格率 ${rate} · 直邀 ${invites} 人</small></div>${ready ? '<button class="btn ink sm">提名</button>' : '<span class="chip soft">未达标</span>'}</div>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:4;--i:0"><div class="card-h"><h3>候选人</h3><span class="chip clay r">3</span></div>
+        <div class="big num" style="font-size:30px">3<small>人</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">系统按公开标准筛出</p></div>
+      <div class="card lift" style="--s:4;--i:1"><div class="card-h"><h3>待审批</h3><span class="chip warn r">1</span></div>
+        <div class="big num" style="font-size:30px">1<small>人</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">需另一位运营或管理员复核</p></div>
+      <div class="card lift" style="--s:4;--i:2"><div class="card-h"><h3>本月已晋升</h3></div>
+        <div class="big num" style="font-size:30px">2<small>人</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">最近：江照野 · 10-18</p></div>
+      <div class="card" style="--s:7;--i:3"><div class="card-h"><h3>候选人</h3><span class="muted r" style="font-size:12px">达标线：活跃 ≥ 20 天 · 合格率 ≥ 92% · 直邀 ≥ 2 人</span></div>
+        ${candidate('林', '#d46b45', '林小满', 30, '95%', 3, true)}
+        ${candidate('顾', '#4e9a4a', '顾知夏', 26, '94%', 2, true)}
+        ${candidate('谢', '#3b7dd8', '谢时雨', 21, '91%', 4, false)}
+        <p class="muted" style="font-size:12px;margin-top:12px">提名后本人会收到通知；晋升需另一位运营或管理员复核通过才生效。</p></div>
+      <div class="card" style="--s:5;--i:4"><div class="card-h"><h3>待审批</h3><span class="chip warn r">1</span></div>
+        <div class="row"><span class="av" style="background:#8e6cc9">唐</span><div class="t"><b>唐南乔</b><small>陈墨 10-17 提名 · 达标 4/4</small></div></div>
+        <div style="display:grid;gap:8px;margin-top:12px;font-size:12.5px">
+          <div style="display:flex"><span class="muted">近 30 天活跃</span><b style="margin-left:auto">28 天</b></div>
+          <div style="display:flex"><span class="muted">作品合格率</span><b style="margin-left:auto">96.2%</b></div>
+          <div style="display:flex"><span class="muted">直接邀请</span><b style="margin-left:auto">5 人</b></div>
+          <div style="display:flex"><span class="muted">任务收益</span><b style="margin-left:auto">¥1,204</b></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px"><button class="btn ink" style="flex:1">复核通过</button><button class="btn">退回</button></div>
+        <p class="muted" style="font-size:12px;margin-top:10px">通过后唐南乔转为团长并平台直管，其直邀成员可选择跟随或留下。</p></div>
+    </div>`;
+  },
+
+  /* ----- 激励：团队激励月度评定 ----- */
+  incentive() {
+    const team = (name, grade, amount, rate, active, note) => `
+      <div class="card lift" style="--s:4"><div class="card-h"><h3>${name}</h3><span class="chip r" style="background:#efe9f8;color:#6e4fa8">${grade}</span></div>
+        <div class="big num" style="font-size:28px;color:#6e4fa8"><small style="color:#6e4fa8">¥</small>${amount}</div>
+        <p class="muted" style="font-size:12.5px;margin-top:6px">合格率 ${rate} · 活跃度 ${active}</p>
+        <p class="muted" style="font-size:12px;margin-top:4px">${note}</p></div>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:12;--i:0"><div class="card-h"><h3>10 月团队激励评定</h3><span class="muted" style="font-size:12.5px">按公开标准自动计算，运营拟定后财务复核发放</span><span class="chip clay r">待拟定</span></div>
+        <div class="muted" style="font-size:12.5px;line-height:1.8">A 档 ¥1,000：合格率 ≥ 94% 且活跃度 ≥ 80% · B 档 ¥600：合格率 ≥ 90% 且活跃度 ≥ 70% · 不达标不发放。评定说明随发放记录公开。</div></div>
+      ${team('温嘉树团队', 'A 档', '1,000.00', '95.1%', '84%', '连续两月 A 档')}
+      ${team('苏禾团队', 'B 档', '600.00', '92.0%', '88%', '活跃度突出，合格率差 2% 到 A 档')}
+      ${team('唐知远团队', 'B 档', '600.00', '90.4%', '71%', '首次达标')}
+      <div class="card lift" style="--s:4;--i:4" ><div class="card-h"><h3>何若溪团队</h3><span class="chip soft r">未达标</span></div>
+        <div class="big num" style="font-size:28px;color:var(--muted)">—</div>
+        <p class="muted" style="font-size:12.5px;margin-top:6px">合格率 88.2% · 活跃度 69%</p>
+        <p class="muted" style="font-size:12px;margin-top:4px">差：合格率 1.8% · 活跃度 1%</p></div>
+      <div class="card" style="--s:12;--i:5"><div class="card-h"><h3>发放记录</h3><button class="btn sm r">导出</button></div>
+        <table class="sheet-table"><thead><tr><th>月份</th><th>团队</th><th>档位</th><th>金额</th><th>状态</th></tr></thead><tbody>
+          <tr data-click><td class="muted">9 月</td><td><b>温嘉树团队</b></td><td>A 档</td><td class="num">¥1,000.00</td><td><span class="chip up">已发放</span></td></tr>
+          <tr data-click><td class="muted">9 月</td><td><b>苏禾团队</b></td><td>B 档</td><td class="num">¥600.00</td><td><span class="chip up">已发放</span></td></tr>
+          <tr data-click><td class="muted">8 月</td><td><b>温嘉树团队</b></td><td>A 档</td><td class="num">¥1,000.00</td><td><span class="chip up">已发放</span></td></tr>
+        </tbody></table></div>
+    </div>`;
+  },
+
+  /* ----- 导出：导出中心 ----- */
+  export() {
+    const rec = (name, range, size, time, state) => `
+      <tr data-click><td><b>${name}</b><div class="muted" style="font-size:12px">${range}</div></td><td class="muted">${size}</td><td class="muted">${time}</td><td>${state}</td><td style="text-align:right"><button class="btn sm">下载</button></td></tr>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:5;--i:0"><div class="card-h"><h3>新建导出</h3></div>
+        <div style="display:grid;gap:12px">
+          <label class="field">内容<select><option>业绩明细</option><option>成员名单</option><option>团队收益</option><option>作品清单</option></select></label>
+          <label class="field">范围<select><option>全部项目</option><option>知乎推文</option><option>红果短剧推荐</option></select></label>
+          <label class="field">时间<select><option>近 30 天</option><option>近 90 天</option><option>本月</option><option>上月</option></select></label>
+          <button class="btn ink">生成导出</button>
+          <p class="muted" style="font-size:12px">生成后可在下方记录中下载，文件保留 7 天。</p>
+        </div></div>
+      <div class="card" style="--s:7;--i:1"><div class="card-h"><h3>导出记录</h3><span class="muted r" style="font-size:12px">保留 7 天</span></div>
+        <table class="sheet-table"><thead><tr><th>内容</th><th>大小</th><th>生成时间</th><th>状态</th><th></th></tr></thead><tbody>
+          ${rec('业绩明细 · 全部项目', '近 30 天', '2.4 MB', '今天 14:20', '<span class="chip up">可下载</span>')}
+          ${rec('成员名单', '全部', '36 KB', '昨天 18:02', '<span class="chip up">可下载</span>')}
+          ${rec('团队收益 · 知乎推文', '上月', '812 KB', '10-01 09:40', '<span class="chip soft">已过期</span>')}
+        </tbody></table></div>
+    </div>`;
+  },
 };
 
 /* =========================================================
