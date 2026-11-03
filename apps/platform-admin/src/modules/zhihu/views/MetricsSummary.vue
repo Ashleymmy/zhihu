@@ -51,7 +51,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
       <div>
         <p class="section-index">01 / 数据看板</p>
         <h1>{{ pendingPlans.length ? `最近计划中有 ${pendingPlans.length} 条等待审核。` : '先看清增长正在往哪里走。' }}</h1>
-        <p>{{ todayLabel }}。OPC 已整理好本周的投放线索与待处理事项。</p>
+        <p>{{ todayLabel }}。本周的投放线索与待处理事项已整理好。</p>
         <RouteTrace code="ROUTE / 01" label="指标 → 计划 → 行动" style="margin-top: 20px;" />
       </div>
       <router-link to="/plans" class="ghost-aurora">全部计划 →</router-link>
@@ -97,7 +97,7 @@ function pct(a: number, b: number) { return b ? ((a / b) * 100).toFixed(2) : '0.
               <small>日预算</small>
               <strong>{{ plan.dailyBudget != null ? fm(plan.dailyBudget) : '—' }}</strong>
             </div>
-            <span :class="['status-badge', plan.status]">{{ { pending: '待审核', active: '投放中', paused: '已暂停', draft: '草稿', ended: '已结束', rejected: '已拒绝' }[plan.status] }}</span>
+            <span :class="['status-badge', plan.status]">{{ { pending: '待审核', active: '投放中', paused: '已暂停', draft: '未提交', ended: '已结束', rejected: '已拒绝' }[plan.status] }}</span>
           </div>
         </div>
         <div v-else class="empty-panel">
