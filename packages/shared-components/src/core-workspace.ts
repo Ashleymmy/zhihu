@@ -23,6 +23,8 @@ export interface WorkspaceHttp {
 export interface CoreWorkspace {
   http: WorkspaceHttp
   role: ComputedRef<string>
+  /** 登录者的显示名（首页个人卡等使用） */
+  userName?: ComputedRef<string>
   modules: Ref<WorkspaceModule[]>
   projectId: Ref<string>
   operationGuide?: ComputedRef<OperationGuideModel | null>
