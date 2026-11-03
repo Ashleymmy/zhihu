@@ -1580,8 +1580,8 @@ body:has(dialog.action-dialog[open]) .studio-page { transform: scale(0.985); fil
 .row .amt { font-weight: 650; }
 .row .amt.pos { color: var(--ok); }
 
-/* 项目卡（带抽象插画）：列数随项目数量自适应，避免半空行 */
-.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+/* 项目卡（带抽象插画）：auto-fit 折叠空轨道，项目少时卡片自然拉宽填满 */
+.projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 .proj { position: relative; overflow: hidden; border-radius: 18px; padding: 16px; background: var(--card-2); border: 1px solid var(--line-2); min-height: 168px; display: flex; flex-direction: column; justify-content: flex-end; transition: transform 0.45s var(--spring), box-shadow 0.35s; cursor: pointer; }
 .proj:hover { transform: translateY(-4px); box-shadow: var(--sh-hi); }
 .proj .art { position: absolute; inset: 0 0 auto 0; height: 92px; }

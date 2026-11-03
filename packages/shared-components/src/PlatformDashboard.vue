@@ -98,12 +98,12 @@ const month = computed(() => mine.value ? {
   amount: units(mine.value.summary.amount), pending: units(mine.value.summary.pendingAmount), confirmed: units(mine.value.summary.confirmedAmount),
 } : null)
 const heroUnits = computed(() => month.value?.amount ?? wallet.value?.units ?? 0n)
-/* 主卡底部的 14 天迷你走势（本人任务 + 团队分成） */
+/* 主卡底部的 30 天迷你走势（本人任务 + 团队分成）：取整段趋势，避免近 14 天全零时画一条平线 */
 const spark = computed(() => {
   const t = trend.value
   if (!t || !t.hasData) return ''
-  const n = t.labels.length, from = Math.max(0, n - 14)
-  const values = Array.from({ length: n - from }, (_, k) => t.series.reduce((sum, s) => sum + (s.points[from + k] ?? 0), 0))
+  const n = t.labels.length
+  const values = Array.from({ length: n }, (_, k) => t.series.reduce((sum, s) => sum + (s.points[k] ?? 0), 0))
   const max = Math.max(...values, 0.01), W = 240, H = 48
   return values.map((v, i) => `${i ? 'L' : 'M'}${(i * W / Math.max(1, values.length - 1)).toFixed(1)} ${(H - 4 - v / max * (H - 8)).toFixed(1)}`).join('')
 })
@@ -225,7 +225,7 @@ function untilt(event: PointerEvent) {
         <div class="bento enter">
           <!-- 钱包卡 -->
           <article v-if="wallet || month" class="card wallet float lift" style="--s:5;--i:0" @pointermove="tilt" @pointerleave="untilt">
-            <svg v-if="spark" class="spark" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true"><path :d="spark" pathLength="1" /></svg>
+            <svg v-if="spark" class="spark" width="110" height="22" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true"><path :d="spark" pathLength="1" fill="none" stroke="#f0b49b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <div class="lbl">{{ month ? '本月收益' : '可提现余额' }}</div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(heroUnits)" :decimals="2" :text="yuan(heroUnits)" /></div>
             <div v-if="month" class="meta">
@@ -489,10 +489,9 @@ function untilt(event: PointerEvent) {
 .relation-avatars em { margin-left: 8px; color: var(--muted); font-size: 12px; font-style: normal; }
 @media (max-width: 700px) { .relation-cols { grid-template-columns: minmax(0, 1fr); } }
 .bento-hero { display: flex; flex-direction: column; }
-.hero-spark { width: 100%; height: 48px; margin-top: auto; padding-top: 18px; overflow: visible; }
-.hero-spark path { fill: none; stroke: #f0b49b; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: spark-draw 1.4s var(--ease-out) 0.3s forwards; }
+.wallet .spark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: spark-draw 1.4s var(--ease-out) 0.3s forwards; }
 @keyframes spark-draw { to { stroke-dashoffset: 0; } }
-@media (prefers-reduced-motion: reduce) { .hero-spark path { animation: none; stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .wallet .spark path { animation: none; stroke-dashoffset: 0; } }
 .home-controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
 .home-controls label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 13px; }
 .home-controls select { max-width: 260px; }
