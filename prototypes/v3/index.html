@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIMO · 全角色工作台原型 v3</title>
+<style>
+/* ============ 令牌（与 design-direction-v2 一致） ============ */
+:root {
+  --bg: #f3f1ea; --card: #ffffff; --card-2: #faf9f5; --hover: #f5f3ec;
+  --ink: #141413; --ink-2: #3d3d3a; --ink-3: #5e5d59; --muted: #87867f; --faint: #b0aea5;
+  --line: #e8e6dc; --line-2: #f0eee6;
+  --clay: #d46b45; --clay-deep: #b5532f; --clay-soft: #f6e5dc;
+  --c1: #d46b45; --c2: #3b7dd8; --c3: #4e9a4a; --c4: #8e6cc9;
+  --ok: #2f7d4f; --ok-bg: #e3efe5; --warn: #a86a12; --warn-bg: #f5ead3; --bad: #b4402e; --bad-bg: #f6e1dc;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --r: 22px; --r-s: 14px;
+  --sh: 0 1px 2px rgba(20,20,19,.03), 0 10px 30px -8px rgba(20,20,19,.08);
+  --sh-hi: 0 2px 4px rgba(20,20,19,.04), 0 22px 48px -12px rgba(20,20,19,.16);
+  --ease: cubic-bezier(.32,.72,0,1);
+  --spring: cubic-bezier(.34,1.4,.64,1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+.serif { font-family: var(--serif); }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ============ 外框：图标侧栏 + 主区 + 右栏 ============ */
+.app { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100vh; }
+.rail { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 0 18px; z-index: 40; background: var(--bg); }
+.logo { width: 44px; height: 44px; border-radius: 14px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-family: var(--serif); font-size: 20px; font-weight: 600; margin-bottom: 18px; box-shadow: 0 8px 18px -6px rgba(20,20,19,.4); }
+.rail a { position: relative; width: 64px; padding: 9px 0 7px; border-radius: 16px; display: grid; justify-items: center; gap: 3px; color: var(--muted); font-size: 11.5px; cursor: pointer; transition: background .2s, color .2s; }
+.rail a:hover { color: var(--ink); background: rgba(255,255,255,.6); }
+.rail a.on { color: var(--ink); background: var(--card); box-shadow: var(--sh); font-weight: 600; }
+.rail a.on::before { content: ""; position: absolute; left: -12px; top: 50%; width: 4px; height: 20px; margin-top: -10px; border-radius: 0 3px 3px 0; background: var(--clay); }
+.rail a .n { position: absolute; top: 4px; right: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--clay); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.rail .sp { flex: 1; }
+.me { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; background: linear-gradient(135deg, #e08a63, #b5532f); }
+
+.main { min-width: 0; padding: 22px 28px 48px 8px; }
+.top { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+.top h1 { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.2; }
+.top .sub { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+.top .sp { flex: 1; }
+.search { display: flex; align-items: center; gap: 8px; height: 42px; width: 260px; padding: 0 14px; border-radius: 14px; background: var(--card); box-shadow: var(--sh); color: var(--muted); font-size: 13.5px; }
+.search kbd { margin-left: auto; font-size: 11px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.iconbtn { position: relative; width: 42px; height: 42px; border-radius: 14px; background: var(--card); box-shadow: var(--sh); display: grid; place-items: center; transition: transform .35s var(--spring); }
+.iconbtn:active { transform: scale(.92); }
+.iconbtn .dot { position: absolute; top: 10px; right: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); border: 2px solid var(--card); }
+
+/* 角色切换 bar（预览完成度用） */
+.rolebar { position: relative; display: inline-flex; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.65); box-shadow: inset 0 0 0 1px var(--line); max-width: 100%; overflow-x: auto; }
+.rolebar button { position: relative; z-index: 1; padding: 7px 14px; font-size: 13px; color: var(--ink-3); border-radius: 10px; transition: color .25s; white-space: nowrap; }
+.rolebar button.on { color: var(--ink); font-weight: 600; }
+.rolebar .thumb { position: absolute; top: 4px; bottom: 4px; left: 0; border-radius: 10px; background: var(--card); box-shadow: 0 1px 3px rgba(20,20,19,.1); transition: transform .45s var(--spring), width .45s var(--spring); }
+
+/* ============ Bento 网格与卡片 ============ */
+.bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; grid-auto-flow: dense; }
+.card { position: relative; grid-column: span var(--s, 4); background: var(--card); border-radius: var(--r); padding: 22px; box-shadow: var(--sh); transition: transform .45s var(--spring), box-shadow .35s var(--ease); min-width: 0; }
+.card.lift:hover { transform: translateY(-4px); box-shadow: var(--sh-hi); }
+.card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.card-h h3 { font-size: 15px; font-weight: 650; }
+.card-h .ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.card-h .r { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.big { font-family: var(--serif); font-weight: 600; font-size: 34px; line-height: 1.15; letter-spacing: -.01em; }
+.big small { font-size: .55em; margin-right: 2px; color: var(--ink-3); }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.chip.up { color: var(--ok); background: var(--ok-bg); }
+.chip.down { color: var(--bad); background: var(--bad-bg); }
+.chip.soft { color: var(--ink-3); background: var(--hover); }
+.chip.clay { color: var(--clay-deep); background: var(--clay-soft); }
+.chip.warn { color: var(--warn); background: var(--warn-bg); }
+.chip.blue { color: var(--c2); background: #e3ecf8; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 12px; font-weight: 600; font-size: 13.5px; background: var(--hover); transition: transform .35s var(--spring), background .2s; white-space: nowrap; }
+.btn:hover { background: var(--line-2); }
+.btn:active { transform: scale(.96); }
+.btn.ink { background: var(--ink); color: var(--bg); }
+.btn.ink:hover { background: #2b2b29; }
+.btn.light { background: rgba(255,255,255,.14); color: #fff; }
+.btn.white { background: #fff; color: var(--ink); }
+.btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; border-radius: 10px; }
+.seg { position: relative; display: inline-flex; padding: 3px; border-radius: 11px; background: var(--hover); }
+.seg button { position: relative; z-index: 1; padding: 4px 10px; font-size: 12.5px; color: var(--muted); border-radius: 8px; transition: color .25s; }
+.seg button.on { color: var(--ink); font-weight: 600; background: var(--card); box-shadow: 0 1px 3px rgba(20,20,19,.1); }
+.enter > * { animation: rise .7s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.985); } }
+
+/* 钱包卡 */
+.wallet { display: flex; flex-direction: column; color: #fff; background: radial-gradient(420px 220px at 100% 0%, rgba(212,107,69,.55), transparent 60%), radial-gradient(300px 200px at 0% 120%, rgba(142,108,201,.35), transparent 60%), linear-gradient(140deg, #1b1b19, #2b2a27 70%); overflow: hidden; z-index: 2; }
+.wallet::after { content: ""; position: absolute; inset: 0; background: radial-gradient(260px circle at var(--gx, 70%) var(--gy, 20%), rgba(255,255,255,.14), transparent 60%); pointer-events: none; }
+.wallet .lbl { opacity: .7; font-size: 13px; }
+.wallet .big { color: #fff; font-size: 44px; margin: 6px 0 2px; }
+.wallet .big small { color: rgba(255,255,255,.7); }
+.wallet .meta { display: flex; gap: 26px; margin-top: 18px; font-size: 12.5px; color: rgba(255,255,255,.65); }
+.wallet .meta b { display: block; color: #fff; font-size: 16px; font-weight: 650; }
+.wallet .acts { display: flex; gap: 8px; margin-top: auto; padding-top: 22px; }
+.wallet .spark { position: absolute; right: 18px; top: 22px; opacity: .9; }
+.wallet .pill { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.12); font-size: 12px; color: rgba(255,255,255,.85); width: fit-content; }
+
+/* 图表 */
+.chart { display: block; width: 100%; overflow: visible; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-3); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 1px; }
+.legend b { color: var(--ink); margin-left: 4px; }
+.ring-wrap { display: flex; align-items: center; gap: 18px; }
+.stack { display: flex; height: 12px; gap: 3px; border-radius: 6px; overflow: hidden; }
+.stack i { display: block; height: 100%; }
+.stack i:first-child { border-radius: 6px 0 0 6px; } .stack i:last-child { border-radius: 0 6px 6px 0; }
+
+/* 头像、列表行、feed */
+.avs { display: flex; }
+.avs span { width: 36px; height: 36px; margin-left: -10px; border-radius: 50%; border: 3px solid var(--card); display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700; }
+.avs span:first-child { margin-left: 0; }
+.av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; flex: none; }
+.row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line-2); }
+.row:first-of-type { border-top: 0; }
+.row .t { min-width: 0; flex: 1; }
+.row .t b { display: block; font-weight: 600; font-size: 13.5px; }
+.row .t small { color: var(--muted); font-size: 12px; }
+.row .amt { font-weight: 650; }
+.row .amt.pos { color: var(--ok); }
+
+/* 项目卡 */
+.projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.proj { position: relative; overflow: hidden; border-radius: 18px; padding: 16px; background: var(--card-2); border: 1px solid var(--line-2); min-height: 168px; display: flex; flex-direction: column; justify-content: flex-end; transition: transform .45s var(--spring), box-shadow .35s; cursor: pointer; }
+.proj:hover { transform: translateY(-4px); box-shadow: var(--sh-hi); }
+.proj .art { position: absolute; inset: 0 0 auto 0; height: 92px; }
+.proj b { font-size: 14.5px; }
+.proj small { color: var(--muted); font-size: 12px; }
+.proj .tg { position: absolute; top: 12px; right: 12px; }
+.proj.add { border-style: dashed; background: transparent; color: var(--muted); align-items: center; justify-content: center; text-align: center; }
+
+/* 右栏 */
+.aside { position: sticky; top: 0; max-height: 100vh; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 18px; min-width: 0; padding-bottom: 8px; }
+.aside::-webkit-scrollbar { display: none; }
+.aside .card { padding: 20px; }
+.profile { text-align: center; padding-top: 26px !important; }
+.profile .big-av { width: 72px; height: 72px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 26px; font-weight: 700; background: linear-gradient(135deg, #e08a63, #b5532f); box-shadow: 0 10px 24px -8px rgba(181,83,47,.6); }
+.profile h4 { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+.feed .it { display: flex; gap: 12px; align-items: center; padding: 10px 0; }
+.feed .it + .it { border-top: 1px solid var(--line-2); }
+.feed .ic2 { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: none; font-size: 15px; }
+.feed .d { font-size: 11.5px; color: var(--muted); margin: 10px 0 2px; font-weight: 600; letter-spacing: .04em; }
+.feed .amt { font-weight: 650; white-space: nowrap; }
+
+/* ============ 多维表格（核对跟进类列表） ============ */
+.sheetcard { overflow: hidden; padding: 0; }
+.sheet-toolbar { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; flex-wrap: wrap; }
+.sheet-toolbar .sp { flex: 1; }
+.sheet-search { display: flex; align-items: center; gap: 8px; height: 36px; width: 240px; padding: 0 12px; border-radius: 11px; background: var(--card-2); border: 1px solid var(--line-2); color: var(--muted); font-size: 13px; }
+.sheet-table { width: 100%; border-collapse: collapse; }
+.sheet-table th { text-align: left; padding: 10px 18px; color: var(--muted); font-size: 12px; font-weight: 600; border-top: 1px solid var(--line-2); background: var(--card-2); }
+.sheet-table td { padding: 13px 18px; border-top: 1px solid var(--line-2); font-size: 13.5px; vertical-align: middle; }
+.sheet-table tr[data-click] { cursor: pointer; transition: background .15s; }
+.sheet-table tr[data-click]:hover { background: var(--hover); }
+.sheet-group td { background: var(--card-2); color: var(--ink-3); font-size: 12px; font-weight: 650; padding: 8px 18px; }
+.sheet-foot { display: flex; justify-content: flex-end; gap: 18px; padding: 12px 18px; border-top: 1px solid var(--line-2); color: var(--muted); font-size: 12.5px; }
+.sheet-foot b { color: var(--ink); font-family: var(--serif); font-size: 16px; }
+
+/* 表单 */
+.field { display: grid; gap: 6px; font-size: 13px; color: var(--ink-3); }
+.field input, .field select, .field textarea { height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font: inherit; font-size: 13.5px; }
+.field textarea { height: auto; min-height: 84px; padding: 10px 12px; resize: vertical; }
+
+/* 空态 */
+.empty { display: grid; justify-items: center; gap: 8px; padding: 36px 18px; text-align: center; color: var(--muted); }
+.empty b { color: var(--ink); font-size: 15px; }
+
+/* 二维码占位 */
+.qr { width: 120px; height: 120px; border-radius: 12px; background:
+  linear-gradient(90deg, var(--ink) 8px, transparent 8px) 0 0/16px 16px,
+  linear-gradient(var(--ink) 8px, transparent 8px) 0 0/16px 16px, var(--card-2);
+  border: 6px solid var(--card); box-shadow: var(--sh); }
+
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+@media (max-width: 1360px) { .home-grid { grid-template-columns: 1fr; } .aside { position: static; max-height: none; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 1080px) { .bento .card { grid-column: span min(var(--s, 4) * 2, 12) !important; } }
+@media (max-width: 720px) {
+  .main { padding: 16px 14px 40px; }
+  .bento .card { grid-column: span 12 !important; padding: 18px; }
+  .aside { grid-template-columns: 1fr; }
+  .top h1 { font-size: 24px; }
+  /* 多维表格窄屏变卡片 */
+  .sheet-table thead { display: none; }
+  .sheet-table, .sheet-table tbody { display: block; }
+  .sheet-table tbody tr { display: block; padding: 12px 18px; border-top: 1px solid var(--line-2); }
+  .sheet-table tbody tr.sheet-group { padding: 8px 18px; }
+  .sheet-table td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 4px 0; border: 0; }
+  .sheet-table td:first-child { display: block; }
+  .sheet-foot { flex-wrap: wrap; gap: 8px 14px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" id="rail"></nav>
+  <div class="main">
+    <header class="top" id="top"></header>
+    <section id="view"></section>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+ * TIMO 全角色工作台原型 v3
+ * hash 路由：#/{role}/{page}
+ * ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+
+/* ---------- 角色与页面集 ---------- */
+const ROLES = {
+  creator: {
+    label: '达人', who: { name: '林小满', tag: '苏禾团队 · 达人', av: '林' },
+    pages: [
+      ['home', '首页', '⌂'], ['projects', '项目', '▦'], ['tasks', '任务', '☰'],
+      ['income', '收益', '¥'], ['invite', '邀请', '✚'], ['me', '我的', '◎'],
+    ],
+  },
+  leader: {
+    label: '团长', who: { name: '苏禾', tag: '团长 · 20 位成员', av: '苏' },
+    pages: [
+      ['home', '首页', '⌂'], ['projects', '项目', '▦'], ['team', '团队', '◉', 2],
+      ['invite', '邀请', '✚'], ['income', '收益', '¥'], ['me', '我的', '◎'],
+    ],
+  },
+  operator: {
+    label: '运营', who: { name: '陈墨', tag: '运营管理 · 数据 3 分钟前同步', av: '陈' },
+    pages: [
+      ['home', '总览', '⌂'], ['workbench', '工作台', '▤'], ['members', '成员', '◉'],
+      ['relations', '关系', '⟡'], ['promotions', '晋升', '♛', 3], ['incentive', '激励', '◈'], ['export', '导出', '⤓'],
+    ],
+  },
+  finance: {
+    label: '财务', who: { name: '王谨', tag: '财务管理', av: '王' },
+    pages: [
+      ['home', '总览', '⌂'], ['reconcile', '对账', '▤'], ['withdrawals', '提现', '¥', 4],
+      ['rates', '计费', '◈'], ['export', '导出', '⤓'],
+    ],
+  },
+  admin: {
+    label: '管理员', who: { name: '系统管理员', tag: '完整管理员', av: '系' },
+    pages: [
+      ['home', '总览', '⌂'], ['members', '成员', '◉'], ['accounts', '账号岗位', '♛'],
+      ['audit', '审计', '▤'], ['announce', '公告', '◈'], ['system', '系统', '⛭'],
+    ],
+  },
+  developer: {
+    label: '开发者', who: { name: '祁远', tag: '开发者 · 数据与队列', av: '祁' },
+    pages: [
+      ['home', '总览', '⌂'], ['data', '数据', '▦'], ['inspect', '巡检', '⟡'], ['queue', '队列', '☰'],
+    ],
+  },
+};
+
+/* ---------- 路由 ---------- */
+function route() {
+  const h = location.hash.replace(/^#\/?/, '');
+  const [r, p] = h.split('/');
+  const role = ROLES[r] ? r : 'creator';
+  const page = ROLES[role].pages.some(([k]) => k === p) ? p : ROLES[role].pages[0][0];
+  return { role, page };
+}
+function go(role, page) { location.hash = `#/${role}/${page}`; }
+addEventListener('hashchange', render);
+
+/* ---------- 外壳 ---------- */
+function shell() {
+  const { role, page } = route();
+  const R = ROLES[role];
+  $('#rail').innerHTML = `<div class="logo">T</div>` + R.pages.map(([k, t, i, n]) =>
+    `<a class="${k === page ? 'on' : ''}" href="#/${role}/${k}"><span style="font-size:18px;line-height:1">${i}</span>${t}${n ? `<span class="n">${n}</span>` : ''}</a>`).join('')
+    + `<span class="sp"></span><div class="me" title="${R.who.name}">${R.who.av}</div>`;
+  const pageLabel = R.pages.find(([k]) => k === page)?.[1] ?? '';
+  $('#top').innerHTML = `
+    <div><h1>${role === 'creator' && page === 'home' ? '下午好，' + R.who.name : pageLabel}</h1><p class="sub">${R.who.tag}${role === 'creator' && page === 'home' ? ' · 10 月 19 日 星期一' : ''}</p></div>
+    <div class="sp"></div>
+    <div class="rolebar" id="rolebar"><span class="thumb"></span>${Object.entries(ROLES).map(([k, v]) => `<button class="${k === role ? 'on' : ''}" data-role="${k}">${v.label}</button>`).join('')}</div>
+    <div class="search">⌕ 搜索成员、项目、账单<kbd>Ctrl K</kbd></div>
+    <button class="iconbtn">◔<span class="dot"></span></button>`;
+  const bar = $('#rolebar');
+  const on = $('button.on', bar), th = $('.thumb', bar);
+  requestAnimationFrame(() => { th.style.width = on.offsetWidth + 'px'; th.style.transform = `translateX(${on.offsetLeft - 4}px)`; });
+  bar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.role, ROLES[b.dataset.role].pages[0][0]); });
+}
+
+/* ---------- 公共片段 ---------- */
+const sparkline = `<svg class="spark" width="110" height="40" viewBox="0 0 110 40"><path d="M2 32 C18 30 22 12 36 16 S58 34 72 20 S94 6 108 8" fill="none" stroke="#f0b49b" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+const art = (c1, c2, seed) => `<svg class="art" viewBox="0 0 200 92" preserveAspectRatio="xMidYMid slice"><rect width="200" height="92" fill="${c2}"/><circle cx="${150 - seed * 10}" cy="${30 + seed * 6}" r="${34 + seed * 4}" fill="${c1}" opacity=".9"/><circle cx="${60 + seed * 14}" cy="78" r="${26 - seed * 3}" fill="#fff" opacity=".55"/><rect x="${20 + seed * 8}" y="22" width="56" height="10" rx="5" fill="#fff" opacity=".8"/><rect x="${20 + seed * 8}" y="38" width="34" height="8" rx="4" fill="#fff" opacity=".6"/></svg>`;
+const ring = (pct, color, size, label) => {
+  const r = (size - 14) / 2, c = 2 * Math.PI * r;
+  return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="10"/><circle class="v" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - pct)}" transform="rotate(-90 ${size / 2} ${size / 2})"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="var(--serif)" font-size="${size / 4.4}" font-weight="600" fill="var(--ink)">${label}</text></svg>`;
+};
+const trendSVG = (id, series, h = 210) => `<svg class="chart" id="${id}" data-line='${JSON.stringify(series)}' style="height:${h}px" viewBox="0 0 640 ${h}" preserveAspectRatio="none"></svg>`;
+/* 演示波形 + 平滑折线绘制（延续 v2 charts 的视觉） */
+const wave = (base, amp, k, ph, n = 30) => Array.from({ length: n }, (_, i) => Math.max(0, Math.round((base + amp * Math.sin(i / k + ph) + amp * .45 * Math.sin(i / 2.3 + ph * 2)) * 100) / 100));
+function smoothPath(pts) {
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+function paintCharts() {
+  document.querySelectorAll('svg.chart[data-line]').forEach(svg => {
+    const series = JSON.parse(svg.dataset.line), W = 640, H = +svg.getAttribute('viewBox').split(' ')[3];
+    const pl = 44, pr = 12, pt = 14, pb = 24, n = series[0].v.length;
+    const max = Math.max(10, Math.ceil(Math.max(...series.flatMap(s => s.v)) * 1.15 / 50) * 50);
+    const X = i => pl + i * (W - pl - pr) / (n - 1), Y = v => pt + (H - pt - pb) * (1 - v / max);
+    let g = '';
+    for (let k = 0; k <= 4; k++) { const v = max * k / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line-2)"/><text x="${pl - 8}" y="${Y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">¥${v}</text>`; }
+    const step = Math.ceil(n / 6);
+    for (let i = 0; i < n; i += step) g += `<text x="${X(i)}" y="${H - 4}" text-anchor="middle" fill="var(--muted)" font-size="11">9-${String(20 - (n - 1 - i)).padStart(2, '0')}</text>`;
+    series.forEach(s => {
+      const pts = s.v.map((v, i) => [X(i), Y(v)]);
+      const d = smoothPath(pts);
+      if (s.area) g += `<path d="${d}L${X(n - 1)},${Y(0)}L${X(0)},${Y(0)}Z" fill="${s.c}" opacity=".12"/>`;
+      g += `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="2.2" stroke-linecap="round"/>`;
+    });
+    svg.innerHTML = g;
+  });
+}
+const avstack = (names, colors) => `<div class="avs">${names.map((n, i) => `<span style="background:${colors[i % colors.length]}">${n[0]}</span>`).join('')}</div>`;
+
+/* =========================================================
+ * 页面：达人
+ * ========================================================= */
+const creatorPages = {
+  /* ----- 首页 ----- */
+  home() {
+    return `
+    <div class="home-grid"><div class="bento enter">
+      <div class="card wallet lift" style="--s:5;--i:0">
+        ${sparkline}
+        <div class="lbl">可提现余额</div>
+        <div class="big num"><small>¥</small>2,001.02</div>
+        <div class="pill">本月已入账 ¥708.12 · ↑ 12.4%</div>
+        <div class="meta"><div><b>¥489.25</b>待确认</div><div><b>¥0.00</b>处理中</div><div><b>¥720.00</b>累计到账</div></div>
+        <div class="acts"><button class="btn white">申请提现</button><button class="btn light">收益明细 →</button></div>
+      </div>
+      <div class="card lift" style="--s:7;--i:1">
+        <div class="card-h"><h3>收益趋势</h3><span class="muted" style="font-size:12.5px">近 30 天</span><div class="r"><div class="seg"><button>7 天</button><button class="on">30 天</button><button>90 天</button></div><button class="btn sm">⤢</button></div></div>
+        <div class="legend" style="margin-bottom:8px"><span><i style="background:var(--c1)"></i>任务收益<b>¥659.60</b></span><span><i style="background:var(--c3)"></i>邀请收益<b>¥48.52</b></span></div>
+        ${trendSVG('ct1', [{ c: 'var(--c1)', area: true, v: wave(22, 8, 3.2, 0) }, { c: 'var(--c3)', area: false, v: wave(4, 2, 2.8, 1) }])}
+      </div>
+      <div class="card lift" style="--s:4;--i:2"><div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">☰</span><h3>任务收益</h3><span class="chip up r">↑ 9.8%</span></div><div class="big num"><small>¥</small>659.60</div><p class="muted" style="font-size:12.5px;margin-top:4px">本月 · 知乎 110 单 · 红果 347 次 · 网盘 54 人</p></div>
+      <div class="card lift" style="--s:4;--i:3"><div class="card-h"><span class="ic" style="background:#e5f0e3;color:var(--c3)">✚</span><h3>邀请收益</h3><span class="chip soft r">直邀 3 人</span></div><div class="big num"><small>¥</small>48.52</div><p class="muted" style="font-size:12.5px;margin-top:4px">好友注册 180 天内的业绩 × 邀请单价</p></div>
+      <div class="card lift" style="--s:4;--i:4"><div class="card-h"><span class="ic" style="background:#efe9f8;color:var(--c4)">◷</span><h3>近 30 天活跃</h3><span class="chip clay r">连续 12 天</span></div><div class="big num">30<small style="margin-left:4px">天</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">活跃天数是晋升团长的标准之一</p></div>
+      <div class="card lift" style="--s:4;--i:5"><div class="card-h"><h3>成长进度</h3><span class="muted r" style="font-size:12.5px">晋升团长</span></div>
+        <div class="ring-wrap">${ring(.75, 'var(--c1)', 92, '3/4')}<div style="font-size:13px;line-height:1.9"><div>✓ 近 30 天活跃 ≥ 20 天</div><div>✓ 作品合格率 ≥ 92%</div><div>✓ 直接邀请 ≥ 2 人</div><div class="muted">○ 任务收益 ¥659 / ¥800</div></div></div></div>
+      <div class="card lift" style="--s:4;--i:6"><div class="card-h"><h3>收益构成</h3><span class="muted r" style="font-size:12.5px">本月</span></div>
+        <div class="stack" style="margin:10px 0 14px"><i style="background:var(--c1);flex-grow:931"></i><i style="background:var(--c3);flex-grow:69"></i></div>
+        <div class="row" style="padding:8px 0"><span class="t"><b style="font-weight:500">任务收益</b></span><b class="num">¥659.60 <small class="muted">93.1%</small></b></div>
+        <div class="row" style="padding:8px 0"><span class="t"><b style="font-weight:500">邀请收益</b></span><b class="num">¥48.52 <small class="muted">6.9%</small></b></div>
+        <p class="muted" style="font-size:12px;margin-top:10px">点任意数字可看计算过程</p></div>
+      <div class="card lift" style="--s:4;--i:7"><div class="card-h"><h3>邀请好友</h3><span class="chip clay r">注册即建立关系</span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin:4px 0 10px">${avstack(['许', '周', '程'], ['#3b7dd8', '#4e9a4a', '#8e6cc9'])}<div><b style="font-size:13.5px">直接邀请 3 人</b><div class="muted" style="font-size:12px">第二层及以下只显示人数</div></div></div>
+        <button class="btn ink" style="width:100%">复制邀请链接</button>
+        <button class="btn" style="width:100%;margin-top:8px">小程序卡片</button></div>
+      <div class="card" style="--s:12;--i:8"><div class="card-h"><h3>项目广场</h3><span class="muted" style="font-size:12.5px">我们承接的项目，统一在这里领取</span><button class="btn r sm" style="height:32px">全部任务 →</button></div>
+        <div class="projects">
+          <div class="proj">${art('#d46b45', '#f6e5dc', 0)}<span class="chip up tg">9 个任务</span><b>知乎推文</b><small>¥2.00 / 拉新</small></div>
+          <div class="proj">${art('#3b7dd8', '#e3ecf8', 1)}<span class="chip soft tg">新剧上线</span><b>红果短剧推荐</b><small>¥0.80 / 有效观看</small></div>
+          <div class="proj">${art('#4e9a4a', '#e5f0e3', 2)}<span class="chip warn tg">灰度中</span><b>网盘拉新</b><small>¥3.00 / 拉新</small></div>
+          <div class="proj add"><div style="font-size:26px;line-height:1">＋</div><b style="color:var(--ink-3);margin-top:6px">更多项目接入中</b><small>聚合平台 · 即插即用</small></div>
+        </div></div>
+    </div>
+    <aside class="aside">
+      <div class="card profile"><div class="big-av">林</div><h4>林小满</h4><p class="muted" style="font-size:12.5px">达人 · 苏禾团队</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px;text-align:center">${[['作品', '42'], ['合格率', '95%'], ['直邀', '3']].map(x => `<div style="padding:10px 0;border-radius:14px;background:var(--card-2)"><b class="serif" style="font-size:18px">${x[1]}</b><div class="muted" style="font-size:11.5px">${x[0]}</div></div>`).join('')}</div></div>
+      <div class="card"><div class="card-h"><h3>我的关系</h3><span class="muted r" style="font-size:12px">永久记录</span></div>
+        <div class="row"><span class="av" style="background:#3b7dd8">苏</span><div class="t"><b>苏禾 邀请了你</b><small>06-16 · 小程序卡片</small></div></div>
+        <div class="row"><span class="av" style="background:#3b7dd8">苏</span><div class="t"><b>你在 苏禾团队</b><small>团队收益按业绩当天归属计算</small></div></div></div>
+      <div class="card feed"><div class="card-h"><h3>最近收益</h3><span class="muted r" style="font-size:12px">● 实时</span></div>
+        <div class="d">今天</div>
+        <div class="it"><span class="ic2" style="background:var(--clay-soft);color:var(--clay-deep)">↗</span><div class="t"><b style="font-size:13px">知乎 · 3 单拉新</b><div class="muted" style="font-size:12px">任务收益 · 待确认</div></div><b class="amt">+¥6.00</b></div>
+        <div class="it"><span class="ic2" style="background:#e5f0e3;color:var(--c3)">✚</span><div class="t"><b style="font-size:13px">许南乔的业绩</b><div class="muted" style="font-size:12px">邀请收益 · 待确认</div></div><b class="amt">+¥0.92</b></div>
+        <div class="d">昨天</div>
+        <div class="it"><span class="ic2" style="background:#e3ecf8;color:var(--c2)">↗</span><div class="t"><b style="font-size:13px">红果 · 23 次观看</b><div class="muted" style="font-size:12px">任务收益 · 待确认</div></div><b class="amt">+¥18.40</b></div>
+        <div class="it"><span class="ic2" style="background:var(--hover)">↙</span><div class="t"><b style="font-size:13px">提现到微信零钱</b><div class="muted" style="font-size:12px">10-06 · 已到账</div></div><b class="amt">-¥420.00</b></div></div>
+    </aside></div>`;
+  },
+
+  /* ----- 项目 ----- */
+  projects() {
+    const card = (a, chip, name, price, desc, tasks, income) => `
+      <div class="card lift" style="--s:6">
+        <div style="border-radius:16px;overflow:hidden;margin:-6px -6px 14px">${a}</div>
+        <div class="card-h" style="margin-bottom:6px"><h3>${name}</h3><span class="r">${chip}</span></div>
+        <div class="big num" style="font-size:28px"><small>¥</small>${price}<small style="font-size:12px;color:var(--muted);font-weight:400"> / ${desc}</small></div>
+        <div style="display:flex;gap:16px;margin:12px 0 16px;font-size:12.5px;color:var(--muted)"><span>可领取 <b style="color:var(--ink)">${tasks}</b> 个任务</span><span>本月我的收益 <b style="color:var(--ink)">¥${income}</b></span></div>
+        <div style="display:flex;gap:8px"><button class="btn ink">领取任务</button><button class="btn">结算说明</button></div>
+      </div>`;
+    return `<div class="bento enter">
+      ${card(art('#d46b45', '#f6e5dc', 0), '<span class="chip up">9 个任务</span>', '知乎推文', '2.00', '拉新', 9, '486.00')}
+      ${card(art('#3b7dd8', '#e3ecf8', 1), '<span class="chip soft">新剧上线</span>', '红果短剧推荐', '0.80', '有效观看', 23, '152.20')}
+      ${card(art('#4e9a4a', '#e5f0e3', 2), '<span class="chip warn">灰度中</span>', '网盘拉新', '3.00', '拉新', 4, '21.40')}
+      <div class="card lift" style="--s:6;display:grid;place-items:center;text-align:center;border:1.5px dashed var(--line);background:transparent;box-shadow:none">
+        <div><div style="font-size:30px">＋</div><b style="display:block;margin:8px 0 4px">更多项目接入中</b><p class="muted" style="font-size:12.5px">聚合平台 · 即插即用，新项目上线会在首页通知你</p></div>
+      </div>
+    </div>`;
+  },
+
+  /* ----- 任务 ----- */
+  tasks() {
+    const row = (kw, proj, price, perf, status, next) => `
+      <tr data-click><td><b>${kw}</b><div class="muted" style="font-size:12px">${proj}</div></td><td class="num">${price}</td><td class="num">${perf}</td><td>${status}</td><td style="text-align:right">${next}</td></tr>`;
+    return `<div class="bento enter">
+      <div class="card sheetcard" style="--s:12">
+        <div class="sheet-toolbar">
+          <div class="seg"><button class="on">全部 12</button><button>进行中 7</button><button>待审核 3</button><button>已完成 2</button></div>
+          <div class="sp"></div>
+          <div class="sheet-search">⌕ 搜索关键词</div>
+          <button class="btn ink sm">自主创建任务</button>
+        </div>
+        <table class="sheet-table"><thead><tr><th style="width:32%">关键词</th><th>单价</th><th>近 30 天业绩</th><th>状态</th><th style="text-align:right">下一步</th></tr></thead><tbody>
+          <tr class="sheet-group"><td colspan="5">进行中 · 7</td></tr>
+          ${row('考研英语怎么学', '知乎推文', '¥2.00 / 拉新', '38 单 · ¥76.00', '<span class="chip up">投放中</span>', '<button class="btn sm">登记作品</button>')}
+          ${row('平价护肤品推荐', '知乎推文', '¥2.00 / 拉新', '26 单 · ¥52.00', '<span class="chip up">投放中</span>', '<button class="btn sm">登记作品</button>')}
+          ${row('剧荒救星', '红果短剧推荐', '¥0.80 / 有效观看', '214 次 · ¥171.20', '<span class="chip up">投放中</span>', '<button class="btn sm">登记作品</button>')}
+          <tr class="sheet-group"><td colspan="5">待审核 · 3</td></tr>
+          ${row('大学生兼职避坑', '知乎推文', '¥2.00 / 拉新', '12 单 · ¥24.00', '<span class="chip warn">审核中</span>', '<span class="muted" style="font-size:12.5px">预计今天出结果</span>')}
+          ${row('高效学习计划表', '知乎推文', '¥2.00 / 拉新', '9 单 · ¥18.00', '<span class="chip warn">审核中</span>', '<span class="muted" style="font-size:12.5px">预计明天出结果</span>')}
+          <tr class="sheet-group"><td colspan="5">需要处理 · 1</td></tr>
+          ${row('宿舍好物清单', '知乎推文', '¥2.00 / 拉新', '0 单', '<span class="chip down">被驳回</span>', '<button class="btn sm">查看原因</button>')}
+        </tbody></table>
+        <div class="sheet-foot"><span>已显示 9 条</span><span>近 30 天合计 <b>¥341.20</b></span></div>
+      </div>
+    </div>`;
+  },
+
+  /* ----- 收益 ----- */
+  income() {
+    const line = (date, name, type, qty, price, amount, state) => `
+      <tr data-click><td class="muted">${date}</td><td><b>${name}</b></td><td>${type}</td><td class="num">${qty}</td><td class="num muted">${price}</td><td class="num"><b>${amount}</b></td><td>${state}</td></tr>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:3;--i:0"><div class="card-h"><h3>任务收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>659.60</div><p class="muted" style="font-size:12px">本月 · 93.1%</p></div>
+      <div class="card lift" style="--s:3;--i:1"><div class="card-h"><h3>邀请收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>48.52</div><p class="muted" style="font-size:12px">本月 · 6.9%</p></div>
+      <div class="card lift" style="--s:3;--i:2"><div class="card-h"><h3>团队收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>0.00</div><p class="muted" style="font-size:12px">晋升团长后开始有</p></div>
+      <div class="card lift" style="--s:3;--i:3"><div class="card-h"><h3>激励</h3></div><div class="big num" style="font-size:26px"><small>¥</small>0.00</div><p class="muted" style="font-size:12px">按月度评定发放</p></div>
+      <div class="card sheetcard" style="--s:12;--i:4">
+        <div class="sheet-toolbar">
+          <div class="seg"><button class="on">全部</button><button>任务收益</button><button>邀请收益</button><button>团队收益</button><button>激励</button></div>
+          <div class="sp"></div>
+          <div class="seg"><button>7 天</button><button class="on">30 天</button><button>90 天</button></div>
+        </div>
+        <table class="sheet-table"><thead><tr><th>日期</th><th>内容</th><th>类型</th><th>数量</th><th>单价</th><th>金额</th><th>状态</th></tr></thead><tbody>
+          ${line('10-19', '考研英语怎么学', '<span class="chip clay">任务</span>', '3 单', '¥2.00', '+¥6.00', '<span class="chip warn">待确认</span>')}
+          ${line('10-19', '许南乔的业绩', '<span class="chip up">邀请</span>', '分成', '—', '+¥0.92', '<span class="chip warn">待确认</span>')}
+          ${line('10-18', '剧荒救星', '<span class="chip clay">任务</span>', '23 次', '¥0.80', '+¥18.40', '<span class="chip warn">待确认</span>')}
+          ${line('10-18', '平价护肤品推荐', '<span class="chip clay">任务</span>', '4 单', '¥2.00', '+¥8.00', '<span class="chip up">已确认</span>')}
+          ${line('10-17', '考研英语怎么学', '<span class="chip clay">任务</span>', '5 单', '¥2.00', '+¥10.00', '<span class="chip up">已确认</span>')}
+          ${line('10-17', '周时雨的业绩', '<span class="chip up">邀请</span>', '分成', '—', '+¥1.36', '<span class="chip up">已确认</span>')}
+        </tbody></table>
+        <div class="sheet-foot"><span>已显示 6 条 · 点任意一行看计算过程</span><span>合计 <b>+¥44.68</b></span></div>
+      </div>
+    </div>`;
+  },
+
+  /* ----- 邀请 ----- */
+  invite() {
+    const member = (av, color, name, date, perf, income) => `
+      <div class="row"><span class="av" style="background:${color}">${av}</span><div class="t"><b>${name}</b><small>${date} 加入</small></div><div style="text-align:right"><b class="num">${perf}</b><div class="muted" style="font-size:12px">我的邀请收益 ${income}</div></div></div>`;
+    return `<div class="home-grid"><div class="bento enter">
+      <div class="card lift" style="--s:7;--i:0"><div class="card-h"><h3>邀请链接</h3><span class="chip clay r">注册即建立关系</span></div>
+        <div style="display:flex;gap:8px;margin:6px 0 12px"><div class="sheet-search" style="flex:1;height:42px;font-size:13px">timo.cn/i/lin-8x2k</div><button class="btn ink">复制链接</button></div>
+        <p class="muted" style="font-size:12.5px">好友通过链接注册后，180 天内的业绩你都拿邀请收益；关系永久记录，不受团队变动影响。</p>
+        <div style="display:flex;gap:14px;margin-top:18px;align-items:center"><div class="qr"></div><div><b>小程序卡片</b><p class="muted" style="font-size:12.5px;margin:4px 0 10px">转发到微信聊天，点开直接注册</p><button class="btn">发送小程序卡片</button></div></div></div>
+      <div class="card lift" style="--s:5;--i:1"><div class="card-h"><h3>邀请收益</h3><span class="chip soft r">近 30 天</span></div>
+        <div class="big num"><small>¥</small>48.52</div>
+        <p class="muted" style="font-size:12.5px;margin-top:4px">好友注册 180 天内的业绩 × 邀请单价</p>
+        <div class="ring-wrap" style="margin-top:14px">${ring(.6, 'var(--c3)', 76, '3/5')}<div class="muted" style="font-size:12.5px">再邀请 2 位活跃好友<br>可得 ¥10 邀请奖励</div></div></div>
+      <div class="card" style="--s:12;--i:2"><div class="card-h"><h3>直邀成员</h3><span class="chip soft r">3 人</span><span class="muted r" style="font-size:12px">第二层及以下只显示人数（2 人）</span></div>
+        ${member('许', '#3b7dd8', '许南乔', '09-02', '近 30 天 ¥46.00', '¥0.92')}
+        ${member('周', '#4e9a4a', '周时雨', '09-28', '近 30 天 ¥68.00', '¥1.36')}
+        ${member('程', '#8e6cc9', '程星河', '10-11', '近 30 天 ¥22.40', '¥0.45')}
+      </div>
+    </div>
+    <aside class="aside">
+      <div class="card"><div class="card-h"><h3>怎么算邀请收益</h3></div>
+        <div class="row"><span class="av" style="background:var(--c3)">1</span><div class="t"><b>好友注册</b><small>通过你的链接或小程序卡片</small></div></div>
+        <div class="row"><span class="av" style="background:var(--c3)">2</span><div class="t"><b>180 天内业绩分成</b><small>好友每笔任务业绩按邀请单价分成给你</small></div></div>
+        <div class="row"><span class="av" style="background:var(--c3)">3</span><div class="t"><b>永久记录</b><small>关系不因团队变动而断开，后台永久可查</small></div></div></div>
+    </aside></div>`;
+  },
+
+  /* ----- 我的 ----- */
+  me() {
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:5;--i:0"><div class="card-h"><h3>个人资料</h3><button class="btn sm r">编辑</button></div>
+        <div style="display:flex;gap:16px;align-items:center"><div class="profile" style="padding:0;text-align:center"><div class="big-av" style="width:64px;height:64px;font-size:22px;margin:0">林</div></div>
+        <div><b style="font-size:17px">林小满</b><p class="muted" style="font-size:12.5px;margin-top:2px">达人 · 苏禾团队<br>达人编号 10086 · 2026-06-16 加入</p></div></div></div>
+      <div class="card lift" style="--s:7;--i:1"><div class="card-h"><h3>账号安全</h3></div>
+        <div class="row"><div class="t"><b>手机号</b><small>138****6602 · 登录与提现验证用</small></div><button class="btn sm">更换</button></div>
+        <div class="row"><div class="t"><b>登录密码</b><small>上次修改于 60 天前</small></div><button class="btn sm">修改</button></div>
+        <div class="row"><div class="t"><b>微信</b><small>已绑定 · 提现到零钱（林*满）</small></div><button class="btn sm">解绑</button></div></div>
+      <div class="card lift" style="--s:7;--i:2"><div class="card-h"><h3>偏好</h3></div>
+        <div class="row"><div class="t"><b>新任务通知</b><small>有新项目或可领取任务时提醒我</small></div><div class="seg"><button class="on">开</button><button>关</button></div></div>
+        <div class="row"><div class="t"><b>收益到账通知</b><small>收益确认和提现到账时提醒我</small></div><div class="seg"><button class="on">开</button><button>关</button></div></div>
+        <div class="row"><div class="t"><b>深色模式</b><small>工作台界面外观</small></div><div class="seg"><button class="on">跟随系统</button><button>浅色</button><button>深色</button></div></div></div>
+      <div class="card lift" style="--s:5;--i:3"><div class="card-h"><h3>我的数据</h3></div>
+        <div class="row"><div class="t"><b>导出我的收益明细</b><small>CSV · 含计算过程</small></div><button class="btn sm">导出</button></div>
+        <div class="row"><div class="t"><b>注销账号</b><small>结清收益后可申请注销</small></div><button class="btn sm" style="color:var(--bad)">申请</button></div></div>
+    </div>`;
+  },
+};
+
+/* ---------- 页面注册表 ---------- */
+const PAGES = {
+  creator: creatorPages,
+  leader: {}, operator: {}, finance: {}, admin: {}, developer: {},
+};
+
+/* ---------- 渲染 ---------- */
+function render() {
+  const { role, page } = route();
+  shell();
+  const fn = PAGES[role][page];
+  $('#view').innerHTML = fn ? fn() : `<div class="card" style="--s:12"><div class="empty"><b>「${ROLES[role].pages.find(([k]) => k === page)?.[1] ?? page}」设计稿制作中</b><span>这个角色页还在绘制，先去看别的角色。</span></div></div>`;
+  paintCharts();
+  window.scrollTo(0, 0);
+}
+render();
+</script>
+</body>
+</html>
