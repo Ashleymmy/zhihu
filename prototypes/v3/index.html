@@ -54,11 +54,17 @@ a { color: inherit; text-decoration: none; }
 .iconbtn:active { transform: scale(.92); }
 .iconbtn .dot { position: absolute; top: 10px; right: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); border: 2px solid var(--card); }
 
-/* 角色切换 bar（预览完成度用） */
-.rolebar { position: relative; display: inline-flex; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.65); box-shadow: inset 0 0 0 1px var(--line); max-width: 100%; overflow-x: auto; }
-.rolebar button { position: relative; z-index: 1; padding: 7px 14px; font-size: 13px; color: var(--ink-3); border-radius: 10px; transition: color .25s; white-space: nowrap; }
-.rolebar button.on { color: var(--ink); font-weight: 600; }
-.rolebar .thumb { position: absolute; top: 4px; bottom: 4px; left: 0; border-radius: 10px; background: var(--card); box-shadow: 0 1px 3px rgba(20,20,19,.1); transition: transform .45s var(--spring), width .45s var(--spring); }
+/* 角色切换胶囊（预览完成度用）：收成一枚，点开出菜单 */
+.rolepick { position: relative; }
+.rp-btn { display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 14px; border-radius: 14px; background: var(--card); box-shadow: var(--sh); font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.rp-btn b { color: var(--ink); }
+.rp-btn::after { content: "▾"; color: var(--muted); font-size: 11px; }
+.rp-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; min-width: 180px; padding: 6px; border-radius: 16px; background: var(--card); box-shadow: var(--sh-hi); display: grid; gap: 2px; }
+.rp-menu[hidden] { display: none; }
+.rp-menu button { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 11px; font-size: 13px; color: var(--ink-3); text-align: left; }
+.rp-menu button:hover { background: var(--hover); color: var(--ink); }
+.rp-menu button.on { color: var(--ink); font-weight: 650; background: var(--card-2); }
+.rp-menu button.on::after { content: "✓"; color: var(--clay); font-weight: 700; }
 
 /* ============ Bento 网格与卡片 ============ */
 .bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; grid-auto-flow: dense; }
@@ -280,13 +286,16 @@ function shell() {
   $('#top').innerHTML = `
     <div><h1>${role === 'creator' && page === 'home' ? '下午好，' + R.who.name : pageLabel}</h1><p class="sub">${R.who.tag}${role === 'creator' && page === 'home' ? ' · 10 月 19 日 星期一' : ''}</p></div>
     <div class="sp"></div>
-    <div class="rolebar" id="rolebar"><span class="thumb"></span>${Object.entries(ROLES).map(([k, v]) => `<button class="${k === role ? 'on' : ''}" data-role="${k}">${v.label}</button>`).join('')}</div>
+    <div class="rolepick">
+      <button class="rp-btn" id="rpBtn"><b>${R.label}</b>&nbsp;${R.who.name}</button>
+      <div class="rp-menu" id="rpMenu" hidden>${Object.entries(ROLES).map(([k, v]) => `<button class="${k === role ? 'on' : ''}" data-role="${k}"><span>${v.label} · ${v.who.name}</span></button>`).join('')}</div>
+    </div>
     <div class="search">⌕ 搜索成员、项目、账单<kbd>Ctrl K</kbd></div>
     <button class="iconbtn">◔<span class="dot"></span></button>`;
-  const bar = $('#rolebar');
-  const on = $('button.on', bar), th = $('.thumb', bar);
-  requestAnimationFrame(() => { th.style.width = on.offsetWidth + 'px'; th.style.transform = `translateX(${on.offsetLeft - 4}px)`; });
-  bar.addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.role, ROLES[b.dataset.role].pages[0][0]); });
+  const rpBtn = $('#rpBtn'), rpMenu = $('#rpMenu');
+  rpBtn.addEventListener('click', e => { e.stopPropagation(); rpMenu.hidden = !rpMenu.hidden; });
+  rpMenu.addEventListener('click', e => { const b = e.target.closest('button[data-role]'); if (b) { rpMenu.hidden = true; go(b.dataset.role, ROLES[b.dataset.role].pages[0][0]); } });
+  document.addEventListener('click', () => { rpMenu.hidden = true; }, { once: true });
 }
 
 /* ---------- 公共片段 ---------- */
@@ -392,19 +401,19 @@ const creatorPages = {
   /* ----- 项目 ----- */
   projects() {
     const card = (a, chip, name, price, desc, tasks, income) => `
-      <div class="card lift" style="--s:6">
-        <div style="border-radius:16px;overflow:hidden;margin:-6px -6px 14px">${a}</div>
+      <div class="card lift" style="--s:4">
+        <div style="border-radius:14px;overflow:hidden;margin:-4px -4px 12px">${a}</div>
         <div class="card-h" style="margin-bottom:6px"><h3>${name}</h3><span class="r">${chip}</span></div>
         <div class="big num" style="font-size:28px"><small>¥</small>${price}<small style="font-size:12px;color:var(--muted);font-weight:400"> / ${desc}</small></div>
-        <div style="display:flex;gap:16px;margin:12px 0 16px;font-size:12.5px;color:var(--muted)"><span>可领取 <b style="color:var(--ink)">${tasks}</b> 个任务</span><span>本月我的收益 <b style="color:var(--ink)">¥${income}</b></span></div>
+        <div style="display:flex;gap:14px;margin:12px 0 14px;font-size:12.5px;color:var(--muted)"><span>可领取 <b style="color:var(--ink)">${tasks}</b> 个任务</span><span>本月 <b style="color:var(--ink)">¥${income}</b></span></div>
         <div style="display:flex;gap:8px"><button class="btn ink">领取任务</button><button class="btn">结算说明</button></div>
       </div>`;
     return `<div class="bento enter">
       ${card(art('#d46b45', '#f6e5dc', 0), '<span class="chip up">9 个任务</span>', '知乎推文', '2.00', '拉新', 9, '486.00')}
       ${card(art('#3b7dd8', '#e3ecf8', 1), '<span class="chip soft">新剧上线</span>', '红果短剧推荐', '0.80', '有效观看', 23, '152.20')}
       ${card(art('#4e9a4a', '#e5f0e3', 2), '<span class="chip warn">灰度中</span>', '网盘拉新', '3.00', '拉新', 4, '21.40')}
-      <div class="card lift" style="--s:6;display:grid;place-items:center;text-align:center;border:1.5px dashed var(--line);background:transparent;box-shadow:none">
-        <div><div style="font-size:30px">＋</div><b style="display:block;margin:8px 0 4px">更多项目接入中</b><p class="muted" style="font-size:12.5px">聚合平台 · 即插即用，新项目上线会在首页通知你</p></div>
+      <div class="card lift" style="--s:4;display:grid;place-items:center;text-align:center;border:1.5px dashed var(--line);background:transparent;box-shadow:none">
+        <div><div style="font-size:30px">＋</div><b style="display:block;margin:8px 0 4px">更多项目接入中</b><p class="muted" style="font-size:12.5px">聚合平台 · 即插即用</p></div>
       </div>
     </div>`;
   },
@@ -444,11 +453,11 @@ const creatorPages = {
     return `<div class="bento enter">
       <div class="card lift" style="--s:3;--i:0"><div class="card-h"><h3>任务收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>659.60</div><p class="muted" style="font-size:12px">本月 · 93.1%</p></div>
       <div class="card lift" style="--s:3;--i:1"><div class="card-h"><h3>邀请收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>48.52</div><p class="muted" style="font-size:12px">本月 · 6.9%</p></div>
-      <div class="card lift" style="--s:3;--i:2"><div class="card-h"><h3>团队收益</h3></div><div class="big num" style="font-size:26px"><small>¥</small>0.00</div><p class="muted" style="font-size:12px">晋升团长后开始有</p></div>
-      <div class="card lift" style="--s:3;--i:3"><div class="card-h"><h3>激励</h3></div><div class="big num" style="font-size:26px"><small>¥</small>0.00</div><p class="muted" style="font-size:12px">按月度评定发放</p></div>
-      <div class="card sheetcard" style="--s:12;--i:4">
+      <div class="card lift" style="--s:6;--i:2"><div class="card-h"><h3>提现</h3><span class="muted r" style="font-size:12px">可提现 ¥2,001.02</span></div>
+        <div style="display:flex;align-items:center;gap:14px"><div style="flex:1"><div class="stack" style="margin-bottom:10px"><i style="background:var(--ok);flex-grow:80"></i><i style="background:var(--warn);flex-grow:20"></i></div><p class="muted" style="font-size:12px">已确认 ¥1,600.82 · 待确认 ¥400.20，确认后即可提现</p></div><button class="btn ink">申请提现</button></div></div>
+      <div class="card sheetcard" style="--s:12;--i:3">
         <div class="sheet-toolbar">
-          <div class="seg"><button class="on">全部</button><button>任务收益</button><button>邀请收益</button><button>团队收益</button><button>激励</button></div>
+          <div class="seg"><button class="on">全部</button><button>任务收益</button><button>邀请收益</button></div>
           <div class="sp"></div>
           <div class="seg"><button>7 天</button><button class="on">30 天</button><button>90 天</button></div>
         </div>
