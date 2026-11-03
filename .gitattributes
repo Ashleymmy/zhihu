@@ -1,0 +1,5 @@
+# These artifacts are compared and hashed byte-for-byte by the contract audit.
+contracts/operations/operation-registry.json text eol=lf
+contracts/operations/a001-spec-registry.json text eol=lf
+contracts/openapi/schemas/shared-target-schemas.json text eol=lf
+contracts/openapi/policies/a001-crosscut-policies.json text eol=lf
