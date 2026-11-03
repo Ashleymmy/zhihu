@@ -44,19 +44,27 @@ function window30() {
 const idText = (v: unknown) => (v === null || v === undefined ? null : String(v));
 
 /** 近 30 天（截至昨天）本人完成的业绩：有业绩的天数、业绩条数、各类数量；不含金额和邀请人数 */
-export async function promotionMetrics(c: Queryable, userId: string): Promise<PromotionMetrics> {
+export async function promotionMetrics(c: Queryable, userId: string, visibleModules?: string[]): Promise<PromotionMetrics> {
   const { from, to } = window30();
+  // 成员首页只展示当前可见项目；运营提名仍使用完整的历史业绩作为人工审核参考。
+  const visibility = visibleModules === undefined ? '' : `
+      AND EXISTS(SELECT 1 FROM projects p
+        JOIN project_integrations pi ON pi.project_id=p.id AND pi.account_id=s.account_id
+        JOIN integration_accounts a ON a.id=pi.account_id AND a.module_id=s.module_id
+        WHERE p.id=s.project_id AND p.is_enabled=1 AND a.status='active' AND a.module_id IN (?)
+          AND EXISTS(SELECT 1 FROM project_members pm WHERE pm.project_id=p.id AND pm.user_id=? AND pm.left_at IS NULL))`;
+  const args = [userId, from, to, ...(visibleModules === undefined ? [] : [visibleModules.length ? visibleModules : [''], userId])];
   const base = `FROM opc_earning_lines l JOIN opc_earning_sources s ON s.id=l.source_id
     WHERE l.performer_id=? AND l.payee_id=l.performer_id AND l.source_version=s.current_version AND l.is_internal=0
-      AND s.business_date BETWEEN ? AND ?`;
+      AND s.business_date BETWEEN ? AND ?${visibility}`;
   const [[summary]] = await c.query<RowDataPacket[]>(
     `SELECT COUNT(DISTINCT s.business_date) active_days,COUNT(DISTINCT s.id) records ${base}`,
-    [userId, from, to],
+    args,
   );
   const [byMetric] = await c.query<RowDataPacket[]>(
     `SELECT s.metric_label label,s.quantity_unit unit,SUM(l.quantity) quantity ${base}
      GROUP BY s.metric_type,s.metric_label,s.quantity_unit ORDER BY s.metric_type LIMIT 8`,
-    [userId, from, to],
+    args,
   );
   const [[user]] = await c.query<RowDataPacket[]>(
     'SELECT GREATEST(DATEDIFF(NOW(),COALESCE(r.registered_at,u.created_at)),0) days FROM users u LEFT JOIN member_referrals r ON r.user_id=u.id WHERE u.id=?',

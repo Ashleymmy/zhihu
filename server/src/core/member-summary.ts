@@ -55,7 +55,7 @@ export async function memberSummary(runtime: ModuleRuntime, user: AuthUser) {
       const amounts = { total: String(row.total), today: String(row.today), yesterday: String(row.yesterday) };
       add(row.kind === 'direct' ? direct : reward, amounts);
     }
-    if (user.role !== 'leader') return { businessDate: today, direct, team: null, metrics: await promotionMetrics(c, user.sub) };
+    if (user.role !== 'leader') return { businessDate: today, direct, team: null, metrics: await promotionMetrics(c, user.sub, modules) };
     const [[count]] = await c.query<RowDataPacket[]>(
       "SELECT COUNT(*) total FROM users WHERE parent_id=? AND role='creator' AND is_active=1",
       [user.sub],
@@ -93,7 +93,7 @@ export async function memberSummary(runtime: ModuleRuntime, user: AuthUser) {
       businessDate: today,
       direct,
       team: { memberCount: Number(count.total), reward, turnover: unavailable ? null : turnover },
-      metrics: await promotionMetrics(c, user.sub),
+      metrics: await promotionMetrics(c, user.sub, modules),
     };
   });
 }

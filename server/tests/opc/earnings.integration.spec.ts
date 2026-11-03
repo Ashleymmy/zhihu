@@ -20,6 +20,8 @@ const people = [
   { sub: '3', role: 'leader', adminDuty: 'all' },
   { sub: '4', role: 'admin', adminDuty: 'operations' },
   { sub: '5', role: 'creator', adminDuty: 'all' },
+  { sub: '6', role: 'creator', adminDuty: 'all' },
+  { sub: '7', role: 'leader', adminDuty: 'all' },
 ] as const;
 const admin: AuthUser = {
   ...people[0],
@@ -112,7 +114,7 @@ beforeAll(async () => {
   await c.query(
     "INSERT INTO projects(id,name,slug) VALUES(1,'项目一','one'),(2,'项目二','two'),(3,'他人项目','private')",
   );
-  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,5),(2,2),(3,5)');
+  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,5),(2,2),(3,5),(1,6),(1,7)');
   await c.query("INSERT INTO module_installations(module_id,version) VALUES('sample-earnings','1')");
   await c.query(
     "INSERT INTO integration_accounts(id,module_id,account_key,name,created_by) VALUES(1,'sample-earnings','one','项目一来源',1),(2,'sample-earnings','two','项目二来源',1),(3,'sample-earnings','three','私有来源',1)",
@@ -439,9 +441,11 @@ it('成员概览按业绩日期汇总已确认净额，直推和团队分成分�
   await c.query('UPDATE users SET parent_id=3 WHERE id=2');
   const result = await request(app).get('/api/v1/core/member-summary').set(headers['3']);
   expect(result.status,result.text).toBe(200);
-  expect(result.body.data).toEqual({businessDate:today,
+  const { metrics, ...summary } = result.body.data;
+  expect(summary).toEqual({businessDate:today,
     direct:{total:'10.0012',today:'8.0001',yesterday:'2.0011'},
     team:{memberCount:1,reward:{total:'7.1234',today:'0.0000',yesterday:'7.1234'},turnover:null}});
+  expect(metrics).toMatchObject({ activeDays: expect.any(Number), quantities: expect.any(Array) });
   expect(result.text).not.toContain('999.0000');
   expect(result.text).not.toContain('90.0000');
   const creator = await request(app).get('/api/v1/core/member-summary').set(headers['2']);
@@ -496,4 +500,53 @@ it('成员分类导出按净额计历史更正，保留当前已移除收款人�
   const uid=(id:number)=>ids.find(r=>Number(r.public_user)===id)!.identifier;
   expect(exported.find(r=>r['用户ID']===uid(2)&&r['业绩类型']==='拉新')).toMatchObject({'当前应得金额（元）':'12000.0001','已确认净额（元）':'12007.0001','待确认差额（元）':'-7.0000'});
   expect(exported.find(r=>r['用户ID']===uid(3))).toMatchObject({'收益归属':'团队分成','业绩类型':'拉活','已确认净额（元）':'555.5555'});
+});
+
+it('首页成长指标仅统计当前可见项目的本人业绩，退出、停用和未加载模块均不能绕过范围', async () => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+  const day = (offset: number) => new Date(Date.parse(today) + offset * 86400000).toISOString().slice(0, 10);
+  const value = (key: string, quantity: string, offset = -1): EarningSourceInput => ({
+    ...input('growth-' + key, '1.0000'), date: day(offset), metricType: 'growth_fixture', metricLabel: '首页业绩',
+    lines: [{ ...input(key).lines[0], payeeId: '6', performerId: '6', quantity, amount: '1.0000' }],
+  });
+  const old = value('version', '99');
+  await write(old);
+  await write({ ...old, version: '2', lines: [{ ...old.lines[0], quantity: '3' }] });
+  const shared = value('self-and-team', '2');
+  shared.lines.push({ ...shared.lines[0], payeeId: '7', amount: '0.5000', ruleCode: 'leader' });
+  await write(shared);
+  await write(value('window-start', '7', -30));
+  await write(value('too-old', '1000', -31));
+  await write(value('today', '1000', 0));
+  const internal = value('internal', '1000');
+  internal.lines[0].internal = true;
+  await write(internal);
+  const other = value('other-member', '88');
+  other.lines[0] = { ...other.lines[0], payeeId: '5', performerId: '5' };
+  await write(other);
+  await write(value('outside-project', '777'), { ...scope, projectId: '2', accountId: '2' });
+  const readMetrics = async (who = '6', target = app) => {
+    const res = await request(target).get('/api/v1/core/member-summary').set(headers[who]);
+    expect(res.status, res.text).toBe(200);
+    return res.body.data.metrics;
+  };
+  expect(await readMetrics()).toEqual({
+    from: day(-30), to: day(-1), activeDays: 2, records: 3, memberDays: 0,
+    quantities: [{ label: '首页业绩', unit: '单', quantity: '12' }],
+  });
+  expect(await readMetrics('7')).toMatchObject({ activeDays: 0, records: 0, quantities: [] });
+  expect(await readMetrics('6', emptyApp)).toMatchObject({ activeDays: 0, records: 0, quantities: [] });
+  for (const [hide, restore] of [
+    ['UPDATE project_members SET left_at=NOW() WHERE project_id=1 AND user_id=6', 'UPDATE project_members SET left_at=NULL WHERE project_id=1 AND user_id=6'],
+    ['UPDATE projects SET is_enabled=0 WHERE id=1', 'UPDATE projects SET is_enabled=1 WHERE id=1'],
+    ["UPDATE integration_accounts SET status='disabled' WHERE id=1", "UPDATE integration_accounts SET status='active' WHERE id=1"],
+    ['DELETE FROM project_integrations WHERE project_id=1 AND account_id=1', 'INSERT INTO project_integrations(project_id,account_id) VALUES(1,1)'],
+  ]) {
+    await c.query(hide);
+    try { expect(await readMetrics()).toMatchObject({ activeDays: 0, records: 0, quantities: [] }); }
+    finally { await c.query(restore); }
+  }
+  // Staff nomination previews retain their separate historical-data scope.
+  const { promotionMetrics } = await import('../../src/core/member-promotions');
+  expect((await promotionMetrics(c, '6')).quantities).toEqual([{ label: '首页业绩', unit: '单', quantity: '789' }]);
 });
