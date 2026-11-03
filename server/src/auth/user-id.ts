@@ -21,7 +21,7 @@ async function reserveAlias(c: ConnectionLike, id: string, identifier: string) {
   const [[other]] = await c.query<RowDataPacket[]>('SELECT id FROM users WHERE username=? AND id<>? LIMIT 1', [identifier,id]);
   if (other) throw new Error('Legacy username conflicts with an existing user ID; migration stopped');
   await c.query("INSERT INTO user_identifiers(identifier,user_id,kind) VALUES(?,?,'legacy') ON DUPLICATE KEY UPDATE identifier=identifier", [identifier, id]);
-  const [[row]] = await c.query<RowDataPacket[]>('SELECT user_id FROM user_identifiers WHERE identifier=?', [identifier]);
+  const [[row]] = await c.query<RowDataPacket[]>('SELECT user_id FROM user_identifiers WHERE identifier=? FOR UPDATE', [identifier]);
   if (String(row.user_id) !== id) throw new Error('User identifier namespace conflict; migration stopped');
 }
 
@@ -40,7 +40,18 @@ export async function assignUserId(c: ConnectionLike, id: string, candidate = ra
       await c.query("INSERT INTO user_identifiers(identifier,user_id,kind) VALUES(?,?,'public')", [identifier, id]);
       return identifier;
     } catch (error) {
-      if ((error as { code?: string }).code !== 'ER_DUP_ENTRY') throw error;
+      const duplicate = error as { code?: string; sqlMessage?: string };
+      if (duplicate.code !== 'ER_DUP_ENTRY') throw error;
+      if (/for key '(?:user_identifiers\.)?uk_public_user'/.test(duplicate.sqlMessage ?? '')) {
+        // A repeatable-read snapshot may predate another allocator's commit.
+        // Read the current row only after its unique key proves it exists;
+        // locking an absent key here would gap-lock unrelated allocations.
+        const [[current]] = await c.query<RowDataPacket[]>(
+          'SELECT identifier FROM user_identifiers WHERE public_user=? FOR UPDATE', [id],
+        );
+        if (current) return String(current.identifier);
+        throw error;
+      }
     }
   }
   throw new AppError(503, 50300, '用户 ID 暂时无法分配，请稍后重试');
@@ -78,7 +89,7 @@ export async function userIdMap(c: ConnectionLike, rawIds: unknown[]): Promise<M
   if (missing.length) {
     // Existing provisioning scripts and staged deployments may still insert old-style accounts.
     await backfillUserIds(c, missing);
-    [found] = await c.query<RowDataPacket[]>('SELECT CAST(user_id AS CHAR) id,identifier FROM user_identifiers WHERE public_user IN (?)', [ids]);
+    [found] = await c.query<RowDataPacket[]>('SELECT CAST(user_id AS CHAR) id,identifier FROM user_identifiers WHERE public_user IN (?) FOR SHARE', [ids]);
   }
   if (found.length !== ids.length) throw new AppError(409, 40900, '成员资料已变化，请刷新后重试');
   return new Map(found.map(r => [String(r.id), String(r.identifier)]));

@@ -81,6 +81,33 @@ it('serializes concurrent allocation for the same user and retries collisions be
   const values=await Promise.all([tx(conn=>assignUserId(conn,x,()=>attempts++===0?collide:fallback)),tx(conn=>assignUserId(conn,y,()=>retries++===0?collide:fallback))]);
   expect(new Set(values).size).toBe(2);
 });
+it('reads a concurrently backfilled ID even when the caller already opened a repeatable-read snapshot',async()=>{
+  const id = await fresh();
+  const stale = await db.getConnection();
+  try {
+    await stale.beginTransaction();
+    await stale.query('SELECT identifier FROM user_identifiers WHERE public_user=?', [id]);
+    const [created] = await tx(conn => backfillUserIds(conn, [id]));
+    expect((await userIdMap(stale, [id])).get(id)).toBe(created.userId);
+    expect((await c.query<RowDataPacket[]>('SELECT identifier FROM user_identifiers WHERE public_user=?', [id]))[0]).toHaveLength(1);
+  } finally {
+    await stale.rollback();
+    stale.release();
+  }
+});
+it('reuses an ID allocated after the caller opened its snapshot instead of exhausting collision retries',async()=>{
+  const id = await fresh();
+  const stale = await db.getConnection();
+  try {
+    await stale.beginTransaction();
+    await stale.query('SELECT identifier FROM user_identifiers WHERE public_user=?', [id]);
+    const created = await tx(conn => assignUserId(conn, id));
+    expect(await assignUserId(stale, id)).toBe(created);
+  } finally {
+    await stale.rollback();
+    stale.release();
+  }
+});
 it('never parses random ID digits as an internal key and allocates no sequential aliases for new accounts',async()=>{
   const publicId=await freeId(700000), id=await fresh();
   await tx(conn=>assignUserId(conn,id,()=>publicId));
