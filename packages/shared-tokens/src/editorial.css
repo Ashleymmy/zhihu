@@ -106,15 +106,16 @@ code, kbd, pre, samp { font-family: var(--font-code); }
   letter-spacing: 0.06em;
 }
 
-/* ===== 外框：可收起的图标侧栏 + 磨砂顶栏 + 手机底部标签栏 ===== */
+/* ===== 外框：88px 图标侧栏 + 衬线问候顶部 + 手机底部标签栏 ===== */
 .studio-app {
-  --nav-w: 228px;
+  --nav-w: 88px;
+  --page-w: 1600px;
   display: flex;
   min-height: 100vh;
   background: var(--paper);
 }
-.studio-app[data-collapsed="true"] { --nav-w: 76px; }
 
+/* 桌面端：图标在上、文字在下的窄栏；底部是账号头像 */
 .studio-nav {
   position: fixed;
   inset: 0 auto 0 0;
@@ -122,54 +123,54 @@ code, kbd, pre, samp { font-family: var(--font-code); }
   display: flex;
   width: var(--nav-w);
   flex-direction: column;
-  padding: 18px 12px 12px;
-  border-right: 1px solid var(--line);
+  align-items: center;
+  padding: 22px 12px 18px;
   color: var(--ink);
-  background: var(--paper-deep);
-  transition: width 0.42s var(--ease-out);
-  overflow: hidden;
+  background: var(--paper);
 }
 
-.studio-brand { display: flex; align-items: center; gap: 11px; padding: 2px 6px 16px; min-height: 58px; }
+.studio-brand { display: grid; justify-items: center; padding-bottom: 18px; }
 .studio-mark {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   flex: none;
   place-items: center;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--paper);
   background: var(--ink);
-  box-shadow: 0 8px 18px -8px rgba(20, 20, 19, 0.55);
+  box-shadow: 0 8px 18px -6px rgba(20, 20, 19, 0.4);
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   transition: transform 0.36s var(--spring);
 }
 .studio-mark:active { transform: scale(0.94); }
-.studio-brand .shell-label { display: grid; min-width: 0; }
+.studio-brand .shell-label { display: none; min-width: 0; }
 .studio-brand strong { font-size: 15px; font-weight: 650; letter-spacing: 0.06em; }
 .studio-brand span { margin-top: 1px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 .nav-close { display: none; margin-left: auto; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 10px; color: var(--ink-soft); background: transparent; }
-.studio-nav-scroll { flex: 1; overflow-x: hidden; overflow-y: auto; padding: 2px 0 0; scrollbar-width: thin; }
-.studio-nav-group { padding-bottom: 10px; }
+.studio-nav-scroll { display: grid; flex: 1; width: 100%; align-content: start; justify-items: center; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+.studio-nav-scroll::-webkit-scrollbar { display: none; }
+.studio-nav-group { display: grid; justify-items: center; gap: 6px; }
 
+/* 第二组起（如「系统」）用一条细线 + 组名分隔，可点开收起 */
 .nav-group-trigger {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 28px;
-  padding: 6px 10px 4px;
+  display: grid;
+  width: 64px;
+  justify-items: center;
+  gap: 2px;
+  margin: 8px 0 2px;
+  padding: 10px 0 0;
   border: 0;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   background: transparent;
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-align: left;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 .nav-group-trigger[data-state="open"] svg { transform: rotate(180deg); }
@@ -177,105 +178,74 @@ code, kbd, pre, samp { font-family: var(--font-code); }
 
 .studio-nav-item {
   position: relative;
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 11px;
-  min-height: 40px;
-  margin-bottom: 2px;
-  padding: 0 11px;
+  display: grid;
+  width: 64px;
+  justify-items: center;
+  gap: 3px;
+  padding: 9px 0 7px;
   border: 0;
-  border-radius: 11px;
-  color: var(--ink-soft);
+  border-radius: 16px;
+  color: var(--muted);
   background: transparent;
-  font-size: 14px;
+  font-size: 11.5px;
   font-weight: 500;
-  text-align: left;
+  text-align: center;
   white-space: nowrap;
   transition: background var(--dur-fast) ease, color var(--dur-fast) ease, transform 0.36s var(--spring);
 }
-.studio-nav-item:hover { color: var(--ink); background: var(--hover); }
-.studio-nav-item:active { transform: scale(0.98); }
-.studio-nav-item[data-active="true"] { color: var(--ink); background: var(--white); box-shadow: 0 1px 2px rgba(20, 20, 19, 0.06), 0 0 0 0.5px rgba(20, 20, 19, 0.04); font-weight: 600; }
-.studio-nav-item[data-active="true"]::before { content: ""; position: absolute; left: -12px; top: 50%; width: 4px; height: 18px; margin-top: -9px; border-radius: 0 3px 3px 0; background: var(--clay); }
-.shell-icon { flex: none; color: var(--muted); transition: color var(--dur-fast) ease; }
-.studio-nav-item:hover .shell-icon, .studio-nav-item[data-active="true"] .shell-icon { color: var(--ink); }
-.studio-nav-item .shell-label { overflow: hidden; text-overflow: ellipsis; }
+.studio-nav-item:hover { color: var(--ink); background: rgba(255, 255, 255, 0.6); }
+.studio-nav-item:active { transform: scale(0.96); }
+.studio-nav-item[data-active="true"] { color: var(--ink); background: var(--white); box-shadow: var(--shadow); font-weight: 600; }
+.studio-nav-item[data-active="true"]::before { content: ""; position: absolute; left: -12px; top: 50%; width: 4px; height: 20px; margin-top: -10px; border-radius: 0 3px 3px 0; background: var(--clay); }
+.shell-icon { flex: none; color: inherit; }
+.studio-nav-item .shell-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.studio-nav-item .n { position: absolute; top: 4px; right: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--clay); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
 
-.nav-utility { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line); }
-.utility-link {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 36px;
-  padding: 0 11px;
-  border: 0;
-  border-radius: 10px;
-  color: var(--muted);
-  background: transparent;
-  font-size: 13px;
-  text-align: left;
-  white-space: nowrap;
-  transition: color var(--dur-fast) ease, background var(--dur-fast) ease;
-}
-.utility-link svg { flex: none; }
-.utility-link:hover { color: var(--ink); background: var(--hover); }
-
-/* 收起成图标栏：文字只在视觉上隐藏，读屏与按名称查找按钮仍然可用 */
-.studio-app[data-collapsed="true"] .studio-nav .shell-label {
-  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-}
-.studio-app[data-collapsed="true"] .studio-brand { justify-content: center; padding-inline: 0; }
-.studio-app[data-collapsed="true"] .studio-nav-item,
-.studio-app[data-collapsed="true"] .utility-link { justify-content: center; padding: 0; }
-.studio-app[data-collapsed="true"] .nav-group-trigger { justify-content: center; padding: 8px 0 4px; }
-.studio-app[data-collapsed="true"] .nav-group-trigger::before { content: ""; width: 22px; height: 1px; background: var(--line); }
-.studio-app[data-collapsed="true"] .nav-group-trigger svg { display: none; }
-.studio-app[data-collapsed="true"] .nav-children { margin-left: 0; padding-left: 0; border-left: 0; }
+.nav-utility { display: grid; width: 100%; justify-items: center; padding-top: 12px; }
+.rail-me { display: grid; justify-items: center; }
+.rail-me-name { display: none; min-width: 0; }
+.rail-me-name b { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rail-me-name small { color: var(--muted); font-size: 12px; }
+.rail-me .shell-popover { top: auto; right: auto; bottom: 0; left: calc(100% + 14px); transform-origin: bottom left; }
 
 .studio-content-shell {
   width: calc(100% - var(--nav-w));
   min-height: 100vh;
   margin-left: var(--nav-w);
-  transition: margin-left 0.42s var(--ease-out), width 0.42s var(--ease-out);
 }
 
-/* 顶栏：半透明磨砂材质 */
+/* 顶部一行：首页是衬线大问候 + 日期，其他页是当前页名；右侧搜索与待办 */
 .studio-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
   display: flex;
-  min-height: 64px;
+  max-width: var(--page-w);
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 0 32px;
-  border-bottom: 1px solid rgba(232, 230, 220, 0.7);
-  background: rgba(250, 249, 245, 0.72);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  gap: 14px;
+  margin: 0 auto;
+  padding: 22px 28px 0 10px;
 }
 .header-context { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .menu-toggle { display: none; width: 38px; height: 38px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--ink-soft); background: var(--white); }
-.shell-greet { display: grid; min-width: 0; line-height: 1.35; }
-.shell-greet strong { overflow: hidden; font-size: 15px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-.shell-greet span { overflow: hidden; color: var(--muted); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.shell-greet { display: grid; min-width: 0; }
+.shell-greet h1 { margin: 0; overflow: hidden; font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+.shell-greet p { margin: 2px 0 0; overflow: hidden; color: var(--muted); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
+.shell-greet strong { overflow: hidden; font-size: 15px; font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.shell-greet span { overflow: hidden; color: var(--muted); font-size: 12.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .header-controls { display: flex; align-items: center; gap: 10px; }
 
 .quiet-search {
   display: flex;
-  width: 220px;
+  width: 260px;
   align-items: center;
   gap: 8px;
-  height: 40px;
-  padding: 0 12px;
+  height: 42px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 14px;
   color: var(--muted);
   background: var(--white);
   box-shadow: var(--shadow);
-  font-size: 13px;
+  font-size: 13.5px;
   transition: color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 .quiet-search:hover { color: var(--ink); box-shadow: 0 0 0 1px var(--line), var(--shadow); }
@@ -285,11 +255,11 @@ code, kbd, pre, samp { font-family: var(--font-code); }
 .shell-icon-btn {
   position: relative;
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border: 0;
-  border-radius: 13px;
+  border-radius: 14px;
   color: var(--ink-soft);
   background: var(--white);
   box-shadow: var(--shadow);
@@ -393,8 +363,8 @@ button.header-initials:active { transform: scale(0.92); }
 
 
 .studio-page {
-  max-width: 1440px;
-  padding: 32px 40px 64px;
+  max-width: var(--page-w);
+  padding: 22px 28px 56px 10px;
   margin: 0 auto;
   animation: page-enter 0.42s var(--ease-out) both;
 }
@@ -1182,35 +1152,31 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 /* ===== Responsive ===== */
-/* 平板宽度：自动收成图标栏，把空间留给内容 */
-@media (min-width: 951px) and (max-width: 1180px) {
-  .studio-app { --nav-w: 76px; }
-  .studio-app .studio-nav .shell-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .studio-app .studio-brand { justify-content: center; padding-inline: 0; }
-  .studio-app .studio-nav-item, .studio-app .utility-link { justify-content: center; padding: 0; }
-  .studio-app .nav-group-trigger { justify-content: center; padding: 8px 0 4px; }
-  .studio-app .nav-group-trigger::before { content: ""; width: 22px; height: 1px; background: var(--line); }
-  .studio-app .nav-group-trigger svg, .shell-collapse { display: none; }
-  .studio-app .nav-children { margin-left: 0; padding-left: 0; border-left: 0; }
-}
 @media (max-width: 950px) {
-  /* 侧栏变成从左侧滑出的抽屉，始终显示文字 */
-  .studio-app, .studio-app[data-collapsed="true"] { --nav-w: 264px; }
-  .studio-nav { transform: translateX(-102%); transition: transform 0.42s var(--ease-out), box-shadow 0.42s var(--ease-out); }
+  /* 侧栏变成从左侧滑出的抽屉：图标在左、文字在右 */
+  .studio-app { --nav-w: 264px; }
+  .studio-nav { align-items: stretch; padding: 18px 12px 12px; border-right: 1px solid var(--line); background: var(--paper-deep); transform: translateX(-102%); transition: transform 0.42s var(--ease-out), box-shadow 0.42s var(--ease-out); }
   .studio-app[data-menu-open="true"] .studio-nav { transform: translateX(0); box-shadow: var(--shadow-float); }
-  .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .studio-nav .shell-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
-  .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .studio-brand { justify-content: flex-start; padding: 2px 6px 16px; }
-  .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .studio-nav-item, .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .utility-link { justify-content: flex-start; padding: 0 11px; }
-  .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .nav-group-trigger { justify-content: space-between; padding: 6px 10px 4px; }
-  .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .nav-group-trigger::before { display: none; }
-  .studio-app:is([data-collapsed="true"], [data-collapsed="false"]) .nav-group-trigger svg { display: block; }
-  .shell-collapse { display: none; }
+  .studio-brand { display: flex; align-items: center; gap: 11px; padding: 2px 6px 16px; }
+  .studio-brand .shell-label { display: grid; }
+  .studio-mark { width: 38px; height: 38px; border-radius: 12px; font-size: 18px; }
+  .studio-nav-scroll, .studio-nav-group { justify-items: stretch; }
+  .studio-nav-group { gap: 2px; }
+  .nav-group-trigger { display: flex; width: 100%; align-items: center; justify-content: space-between; margin: 8px 0 2px; padding: 10px 10px 4px; font-size: 12px; letter-spacing: 0.06em; }
+  .studio-nav-item { display: flex; width: 100%; align-items: center; gap: 11px; min-height: 40px; padding: 0 11px; border-radius: 11px; color: var(--ink-soft); font-size: 14px; text-align: left; }
+  .studio-nav-item:hover { background: var(--hover); }
+  .studio-nav-item .shell-icon { color: var(--muted); }
+  .studio-nav-item:hover .shell-icon, .studio-nav-item[data-active="true"] .shell-icon { color: var(--ink); }
+  .nav-utility { justify-items: stretch; padding-top: 10px; border-top: 1px solid var(--line); }
+  .rail-me { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
+  .rail-me-name { display: grid; }
+  .rail-me .shell-popover { top: auto; right: auto; bottom: calc(100% + 8px); left: 0; transform-origin: bottom left; }
   .studio-backdrop { position: fixed; z-index: 25; inset: 0; pointer-events: none; background: rgba(20, 20, 19, 0.24); opacity: 0; transition: opacity 0.3s ease; }
   .studio-app[data-menu-open="true"] .studio-backdrop { pointer-events: auto; opacity: 1; }
   .studio-content-shell { width: 100%; margin-left: 0; }
   .nav-close, .menu-toggle { display: grid; }
-  .studio-header { padding: 0 20px; }
-  .studio-page { padding: 24px 20px 48px; }
+  .studio-header { padding: 18px 20px 0; }
+  .studio-page { padding: 20px 20px 48px; }
   .login-editorial { grid-template-columns: 1fr; }
   .login-manifesto { min-height: 320px; padding: 30px 36px; border-right: 0; border-bottom: 1px solid var(--line); }
   .login-access { min-height: 500px; }
@@ -1226,14 +1192,16 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
   .workspace-grid { grid-template-columns: 1fr; }
   .workspace-rail { border-left: 0; padding-left: 0; }
 
-  .studio-header { min-height: 58px; padding: 0 14px; gap: 10px; }
+  .studio-header { padding: 14px 14px 0; gap: 10px; }
   .header-controls { gap: 8px; }
-  .quiet-search { width: 40px; padding: 0; justify-content: center; }
-  .quiet-search span, .quiet-search kbd { display: none; }
+  .quiet-search { display: none; }
+  .shell-greet h1 { font-size: 24px; white-space: normal; }
+  .shell-greet p { font-size: 12.5px; }
   .shell-greet strong { font-size: 14px; }
-  .shell-popover, .shell-todos { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
+  .shell-popover, .shell-todos { position: fixed; top: 72px; left: 12px; right: 12px; width: auto; }
+  .rail-me .shell-popover { position: absolute; top: auto; right: auto; bottom: calc(100% + 8px); left: 0; width: 240px; }
   .header-create { padding: 0 12px; font-size: 13px; }
-  .studio-page { padding: 18px 14px 40px; }
+  .studio-page { padding: 16px 14px 40px; }
   /* 达人、团长：底部悬浮标签栏 */
   .studio-app[data-has-tabs="true"] .studio-page { padding-bottom: 104px; }
   .shell-tabbar {

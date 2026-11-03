@@ -10,7 +10,22 @@ const auth = useAuthStore(),
   route = useRoute(),
   router = useRouter(),
   announcements = ref<ShellAnnouncement[]>([])
-const navigation = computed<NavGroup[]>(() => workspaceNavigation(auth.user, workspace.modules.value.some(m => m.status === 'enabled')))
+/** 侧栏角标：把待办数按路径聚合到导航项（精确或前缀匹配） */
+const navigation = computed<NavGroup[]>(() => {
+  const base = workspaceNavigation(auth.user, workspace.modules.value.some(m => m.status === 'enabled'))
+  const list = todos.value
+  if (!list?.length) return base
+  return base.map(group => ({
+    ...group,
+    items: group.items.map(item => {
+      let badge = 0
+      for (const todo of list) {
+        if (todo.path && (todo.path === item.path || todo.path.startsWith(item.path + '/'))) badge += todo.count
+      }
+      return badge ? { ...item, badge } : item
+    }),
+  }))
+})
 const tabs = computed(() => mobileTabs(auth.user, navigation.value))
 
 /* 顶栏待办：复用首页的待办接口；读取失败时不显示铃铛，切换页面时最多每分钟刷新一次 */

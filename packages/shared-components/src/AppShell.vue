@@ -6,7 +6,8 @@ export interface NavItem {
   key: string
   label: string
   path: string
-  children?: NavItem[]
+  /** 侧栏角标（待处理数），由使用方按待办路径聚合后传入 */
+  badge?: number
 }
 
 export interface NavGroup {
@@ -72,30 +73,15 @@ const ICONS: Record<string, string> = {
 }
 const iconOf = (key: string): string => ICONS[key] ?? ICONS[key.split(/[-_.]/)[0] ?? ''] ?? ICONS.dot ?? ''
 
-/* ---------- 侧栏：分组折叠 + 整体收起成图标栏（偏好记在本机） ---------- */
+/* ---------- 侧栏：桌面端固定为图标栏，第一组常开，其余组可折叠；手机端变抽屉 ---------- */
 const mobileOpen = ref(false)
-/** 顶栏弹出层（待办 / 账号菜单）；切换页面时由下方的路径监听关闭，所以要先声明 */
+/** 弹出层（待办 / 账号菜单）；切换页面时由下方的路径监听关闭，所以要先声明 */
 const popover = ref<'todos' | 'account' | null>(null)
-const railKey = 'timo.shell.collapsed'
-const collapsed = ref(readCollapsed())
-function readCollapsed() { try { return localStorage.getItem(railKey) === '1' } catch { return false } }
-function toggleCollapsed() {
-  collapsed.value = !collapsed.value
-  try { localStorage.setItem(railKey, collapsed.value ? '1' : '0') } catch { /* 隐私模式下不记住偏好 */ }
-}
-
 const openGroups = ref<Set<number>>(new Set(props.groups.flatMap((group, i) => group.collapsed ? [] : [i])))
-const openItems = ref(new Set<string>())
-watch(() => props.currentPath, path => {
-  for (const group of props.groups) for (const item of group.items)
-    if (item.children?.some(child => path === child.path || path.startsWith(child.path + '/'))) openItems.value.add(item.key)
+watch(() => props.currentPath, () => {
   mobileOpen.value = false
   popover.value = null
-}, { immediate: true })
-function toggleItem(key: string) {
-  if (openItems.value.has(key)) openItems.value.delete(key)
-  else openItems.value.add(key)
-}
+})
 watch(
   () => props.groups.map((group) => group.label).join('|'),
   () => { openGroups.value = new Set(props.groups.flatMap((group, i) => group.collapsed ? [] : [i])) },
@@ -105,10 +91,10 @@ function toggleGroup(index: number) {
   else openGroups.value.add(index)
 }
 
-const flatItems = computed(() =>
-  props.groups.flatMap((group) => group.items.flatMap((item) => [...(item.children ?? []), item].map(child => ({ ...child, group: group.label })))),
-)
-const currentItem = computed(() => flatItems.value.filter((item) => isActive(item.path)).sort((a, b) => b.path.length - a.path.length)[0] ?? flatItems.value[0])
+const flatItems = computed(() => props.groups.flatMap((group) => group.items.map(item => ({ ...item, group: group.label }))))
+const homeItem = computed(() => flatItems.value[0])
+const currentItem = computed(() => flatItems.value.filter((item) => isActive(item.path)).sort((a, b) => b.path.length - a.path.length)[0] ?? homeItem.value)
+const isHome = computed(() => !!homeItem.value && currentItem.value?.key === homeItem.value.key)
 function isActive(path: string) {
   return props.currentPath === path || props.currentPath.startsWith(path + '/')
 }
@@ -120,10 +106,14 @@ function handleNav(path: string) {
   searchQuery.value = ''
 }
 
-/* ---------- 顶栏：问候、待办、账号菜单 ---------- */
+/* ---------- 顶部：问候、日期、待办、账号菜单 ---------- */
 const greeting = computed(() => {
   const h = new Date().getHours()
   return h < 6 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好'
+})
+const today = computed(() => {
+  const d = new Date()
+  return `${d.getMonth() + 1} 月 ${d.getDate()} 日 星期${'日一二三四五六'[d.getDay()]}`
 })
 const initials = computed(() => props.userName.slice(0, 1) || '我')
 const todoTotal = computed(() => (props.todos ?? []).reduce((sum, todo) => sum + todo.count, 0))
@@ -181,10 +171,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="studio-app" :data-menu-open="mobileOpen" :data-collapsed="collapsed" :data-has-tabs="!!mobileTabs?.length">
+  <div class="studio-app" :data-menu-open="mobileOpen" :data-has-tabs="!!mobileTabs?.length">
     <aside class="studio-nav" aria-label="主导航">
       <div class="studio-brand">
-        <button type="button" class="studio-mark" aria-label="回到首页" @click="handleNav(flatItems[0]?.path ?? '/dashboard')">T</button>
+        <button type="button" class="studio-mark" aria-label="回到首页" @click="handleNav(homeItem?.path ?? '/dashboard')">T</button>
         <div class="shell-label">
           <strong>TIMO</strong><span>{{ roleLabel }}</span>
         </div>
@@ -195,76 +185,63 @@ onBeforeUnmount(() => {
       <nav class="studio-nav-scroll">
         <div v-for="(group, gi) in groups" :key="group.label" class="studio-nav-group">
           <button
+            v-if="gi > 0"
             type="button"
             class="nav-group-trigger"
             :data-state="openGroups.has(gi) ? 'open' : 'closed'"
+            :aria-expanded="openGroups.has(gi)"
             @click="toggleGroup(gi)"
           >
-            <span class="shell-label">{{ group.label }}</span>
+            <span>{{ group.label }}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
-          <template v-if="openGroups.has(gi)">
-            <template v-for="item in group.items" :key="item.key">
-              <button
-                type="button"
-                class="studio-nav-item"
-                :data-active="item.children ? isActive(item.path) : currentItem?.key === item.key"
-                :aria-current="!item.children && currentItem?.key === item.key ? 'page' : undefined"
-                :aria-expanded="item.children ? openItems.has(item.key) : undefined"
-                :title="collapsed ? item.label : undefined"
-                @click="item.children ? toggleItem(item.key) : handleNav(item.path)"
-              >
-                <svg class="shell-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="iconOf(item.key)" /></svg>
-                <span class="shell-label">{{ item.label }}</span>
-                <span v-if="item.children" class="nav-chevron shell-label" aria-hidden="true">{{ openItems.has(item.key) ? '⌄' : '›' }}</span>
-              </button>
-              <div v-if="item.children && openItems.has(item.key)" class="nav-children">
-                <button
-                  v-for="child in item.children"
-                  :key="child.key"
-                  type="button"
-                  class="studio-nav-item"
-                  :data-active="isActive(child.path)"
-                  :aria-current="isActive(child.path) ? 'page' : undefined"
-                  :title="collapsed ? child.label : undefined"
-                  @click="handleNav(child.path)"
-                >
-                  <svg class="shell-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="iconOf(child.key)" /></svg>
-                  <span class="shell-label">{{ child.label }}</span>
-                </button>
-              </div>
-            </template>
+          <template v-if="gi === 0 || openGroups.has(gi)">
+            <button
+              v-for="item in group.items"
+              :key="item.key"
+              type="button"
+              class="studio-nav-item"
+              :data-active="currentItem?.key === item.key"
+              :aria-current="currentItem?.key === item.key ? 'page' : undefined"
+              @click="handleNav(item.path)"
+            >
+              <svg class="shell-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="iconOf(item.key)" /></svg>
+              <span class="shell-label">{{ item.label }}</span>
+              <span v-if="item.badge" class="n">{{ item.badge > 99 ? '99+' : item.badge }}</span>
+            </button>
           </template>
         </div>
       </nav>
       <div class="nav-utility">
-        <button type="button" class="utility-link shell-collapse" :aria-pressed="collapsed" @click="toggleCollapsed">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></svg>
-          <span class="shell-label">{{ collapsed ? '展开侧栏' : '收起侧栏' }}</span>
-        </button>
-        <button type="button" class="utility-link" @click="emit('logout')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          <span class="shell-label">退出登录</span>
-        </button>
+        <div class="shell-pop-anchor rail-me">
+          <button type="button" class="header-initials" data-popover-trigger :aria-expanded="popover === 'account'" aria-label="账号菜单" @click="togglePopover('account')">{{ initials }}</button>
+          <span class="shell-label rail-me-name"><b>{{ userName }}</b><small>{{ roleLabel }}</small></span>
+          <div v-if="popover === 'account'" class="shell-popover shell-account" role="menu">
+            <div class="shell-account-head"><span class="header-initials" aria-hidden="true">{{ initials }}</span><div><b>{{ userName }}</b><small>{{ roleLabel }}</small></div></div>
+            <button type="button" role="menuitem" @click="handleNav('/me')">我的</button>
+            <button type="button" role="menuitem" @click="handleNav('/account/security')">账号安全</button>
+            <button type="button" role="menuitem" class="danger" @click="popover = null; emit('logout')">退出登录</button>
+          </div>
+        </div>
       </div>
     </aside>
     <div class="studio-backdrop" @click="mobileOpen = false" />
 
     <section class="studio-content-shell">
-      <header class="studio-header">
+      <header class="studio-header" :data-home="isHome">
         <div class="header-context">
           <button type="button" class="menu-toggle" aria-label="打开菜单" @click="mobileOpen = !mobileOpen">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <div class="shell-greet">
-            <strong>{{ greeting }}，{{ userName }}</strong>
-            <span>{{ currentItem?.group ? currentItem.group + ' · ' : '' }}{{ currentItem?.label ?? roleLabel }}</span>
+          <div v-if="isHome" class="shell-greet">
+            <h1>{{ greeting }}，{{ userName }}</h1>
+            <p>{{ roleLabel }} · {{ today }}</p>
+          </div>
+          <div v-else class="shell-greet shell-greet-compact">
+            <strong>{{ currentItem?.label ?? roleLabel }}</strong>
+            <span>{{ currentItem?.group ? currentItem.group + ' · ' : '' }}{{ userName }}</span>
           </div>
         </div>
         <div class="header-controls">
@@ -288,17 +265,8 @@ onBeforeUnmount(() => {
               <div v-if="!todos.length" class="shell-pop-empty">
                 <b>都处理完了</b>
                 <span>新的待办会出现在这里。</span>
-                <button type="button" class="ghost-aurora" @click="handleNav(flatItems[0]?.path ?? '/dashboard')">回到首页</button>
+                <button type="button" class="ghost-aurora" @click="handleNav(homeItem?.path ?? '/dashboard')">回到首页</button>
               </div>
-            </div>
-          </div>
-          <div class="shell-pop-anchor">
-            <button type="button" class="header-initials" data-popover-trigger :aria-expanded="popover === 'account'" aria-label="账号菜单" @click="togglePopover('account')">{{ initials }}</button>
-            <div v-if="popover === 'account'" class="shell-popover shell-account" role="menu">
-              <div class="shell-account-head"><span class="header-initials" aria-hidden="true">{{ initials }}</span><div><b>{{ userName }}</b><small>{{ roleLabel }}</small></div></div>
-              <button type="button" role="menuitem" @click="handleNav('/me')">我的</button>
-              <button type="button" role="menuitem" @click="handleNav('/account/security')">账号安全</button>
-              <button type="button" role="menuitem" class="danger" @click="popover = null; emit('logout')">退出登录</button>
             </div>
           </div>
         </div>
@@ -374,4 +342,3 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
-<style scoped>.nav-chevron{margin-left:auto}.nav-children{margin-left:18px;border-left:1px solid var(--line);padding-left:8px}.nav-children .studio-nav-item{font-size:13px}</style>
