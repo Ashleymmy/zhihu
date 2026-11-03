@@ -8,6 +8,7 @@ import { ok } from '../utils/response';
 import type { AmountPeriods, TeamTurnover } from './contracts';
 import type { ModuleRuntime } from './module-runtime';
 import { cash, cashText } from './money';
+import { promotionMetrics } from './member-promotions';
 
 const periods = ['total', 'today', 'yesterday'] as const;
 const zero = (): AmountPeriods => ({ total: '0.0000', today: '0.0000', yesterday: '0.0000' });
@@ -54,7 +55,7 @@ export async function memberSummary(runtime: ModuleRuntime, user: AuthUser) {
       const amounts = { total: String(row.total), today: String(row.today), yesterday: String(row.yesterday) };
       add(row.kind === 'direct' ? direct : reward, amounts);
     }
-    if (user.role !== 'leader') return { businessDate: today, direct, team: null };
+    if (user.role !== 'leader') return { businessDate: today, direct, team: null, metrics: await promotionMetrics(c, user.sub) };
     const [[count]] = await c.query<RowDataPacket[]>(
       "SELECT COUNT(*) total FROM users WHERE parent_id=? AND role='creator' AND is_active=1",
       [user.sub],
@@ -92,6 +93,7 @@ export async function memberSummary(runtime: ModuleRuntime, user: AuthUser) {
       businessDate: today,
       direct,
       team: { memberCount: Number(count.total), reward, turnover: unavailable ? null : turnover },
+      metrics: await promotionMetrics(c, user.sub),
     };
   });
 }
