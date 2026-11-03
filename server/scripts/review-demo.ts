@@ -12,7 +12,7 @@ if (process.env.NODE_ENV === 'production') throw new Error('演示数据禁止�
 process.env.OPC_MODULES = 'zhihu';
 process.env.QUEUE_DRIVER = 'memory';
 process.env.ZHIHU_API_BASE = 'https://open.zhihu.com';
-const DEMO_USERS = ['leader_wang', 'creator_li', 'creator_zhang', 'creator_chen'];
+const DEMO_USERS = ['leader_wang', 'creator_li', 'creator_zhang', 'creator_chen', 'operator_chen', 'finance_wang'];
 
 let planSeq = 2071265453767400;
 async function main() {
@@ -39,6 +39,11 @@ async function main() {
       (2,'leader_wang',?,'leader','王团长',NULL),(3,'creator_li',?,'creator','小李',2),
       (4,'creator_zhang',?,'creator','小张',2),(5,'creator_chen',?,'creator','小陈',NULL)`,
       [hash, hash, hash, hash],
+    );
+    await c.query(
+      `INSERT INTO users(id,username,password_hash,role,display_name,parent_id,admin_duty) VALUES
+      (6,'operator_chen',?,'operator','陈运营',NULL,'all'),(7,'finance_wang',?,'admin','王财务',NULL,'finance')`,
+      [hash, hash],
     );
     await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,4),(1,5)');
     await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'ch-1',1,'知乎故事一代渠道')");
