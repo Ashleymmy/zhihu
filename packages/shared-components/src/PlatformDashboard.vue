@@ -13,7 +13,7 @@ interface Metric { key: string; label: string; value: string | null; unit: strin
 interface Service { moduleId: string; accountId: string; status: string; todos: Todo[]; metrics: Metric[] }
 interface Overview { period: { from: string; to: string }; projects: { id: string; name: string }[]; groups: { id: string; name: string; services: Service[] }[]; todos?: Todo[] }
 interface MineGroup { projectId: string; projectName?: string; metricType: string; metricLabel: string; amount: string; quantity?: string; quantityUnit?: string }
-interface MineLine { id: string; taskName: string | null; businessDate: string; metricLabel: string; quantity: string; amount: string; confirmedAt: string | null }
+interface MineLine { id: string; taskName: string | null; businessDate: string; metricLabel: string; quantity: string; amount: string; confirmedAt: string | null; performerName?: string | null }
 interface Mine { summary: { amount: string; confirmedAmount: string; pendingAmount: string }; groups: MineGroup[]; list?: MineLine[] }
 interface Daily { from: string; to: string; days: { date: string; group: 'self' | 'team'; amount: string }[] }
 interface Periods { total: string; today: string; yesterday: string }
@@ -22,7 +22,7 @@ interface MemberSummary { direct: Periods; team: null | { memberCount: number; r
 interface RelationMine { inviter: { name: string } | null; channel: string | null; team: { leaderName: string | null } | null; counts: { direct: number; indirect: number }; directList: { name: string; active: boolean }[]; indirectList?: { name: string; depth: number; active: boolean }[] }
 
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
-const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([])
+const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([]), teamLines = ref<MineLine[]>([])
 const isMember = computed(() => ['creator', 'leader'].includes(w.role.value))
 let revision = 0
 
@@ -70,6 +70,14 @@ async function loadMoney(version: number) {
   summary.value = s.status === 'fulfilled' ? s.value : null
   relation.value = r.status === 'fulfilled' ? r.value : null
   recent.value = feed.status === 'fulfilled' ? (feed.value.list ?? []) : []
+  /* 团长加取近 30 天团队业绩明细：成员贡献按业绩人聚合 */
+  if (w.role.value === 'leader') {
+    try {
+      const from = new Date(Date.parse(today) - 29 * 86400000).toISOString().slice(0, 10)
+      const team = await w.http.get<Mine>('/earnings/mine', { ...scope, from, to: today, group: 'team', pageSize: 100 })
+      if (version === revision) teamLines.value = team.list ?? []
+    } catch { /* 团队明细读不到时成员贡献卡给空态 */ }
+  }
 }
 onMounted(load)
 
@@ -196,6 +204,20 @@ const projectCards = computed(() => (data.value?.groups ?? []).map(project => {
   return { id: project.id, name: project.name, art: art(project.name), quantity, amount }
 }))
 
+/* 团长专属：成员贡献（本月团队业绩按业绩人聚合，取前 8） */
+const isLeader = computed(() => w.role.value === 'leader')
+const contributors = computed(() => {
+  const byName = new Map<string, bigint>()
+  for (const line of teamLines.value) {
+    const name = line.performerName ?? '成员'
+    byName.set(name, (byName.get(name) ?? 0n) + units(line.amount))
+  }
+  const list = [...byName.entries()].map(([name, amount]) => ({ name, amount, value: toNumber(amount) }))
+    .sort((a, b) => b.value - a.value).slice(0, 8)
+  const max = Math.max(1, ...list.map(item => item.value))
+  return { list, max, total: list.reduce((sum, item) => sum + item.amount, 0n) }
+})
+
 /* 主卡倾斜：只是视觉反馈 */
 function tilt(event: PointerEvent) {
   const el = event.currentTarget as HTMLElement, box = el.getBoundingClientRect()
@@ -249,6 +271,31 @@ function untilt(event: PointerEvent) {
             <div v-else class="bento-empty"><b>最近 30 天还没有收益</b><p>完成任务、报表核对后，每天的收益会画在这里。</p><router-link class="btn ink" to="/task-hall" style="margin-top:10px">去任务大厅</router-link></div>
           </article>
 
+          <!-- 团长专属：直邀成员 -->
+          <article v-if="isLeader && relation" class="card lift" style="--s:4;--i:2">
+            <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">◉</span><h3>直邀成员</h3><span class="chip soft r">显性</span></div>
+            <div class="big num"><AnimatedNumber :value="relation.counts.direct" :decimals="0" /><small style="margin-left:4px">人</small></div>
+            <div v-if="relation.directList.length" class="avs" style="margin-top:10px">
+              <span v-for="(p, i) in relation.directList.slice(0, 5)" :key="i" :style="{ background: PROJECT_PALETTES[i % 4]![0], '--k': i }" :title="p.name">{{ p.name.slice(0, 1) }}</span>
+              <span v-if="relation.counts.direct > 5" style="background:var(--hover);color:var(--ink-3)">+{{ relation.counts.direct - 5 }}</span>
+            </div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">直接邀请的成员，业绩与名单都可查</p>
+          </article>
+
+          <!-- 团长专属：团队下级（隐性，只显示人数） -->
+          <article v-if="isLeader && relation" class="card lift" style="--s:4;--i:3">
+            <div class="card-h"><span class="ic" style="background:var(--hover)">🔒</span><h3>团队下级</h3><span class="chip soft r">隐性</span></div>
+            <div class="big num"><AnimatedNumber :value="relation.counts.indirect" :decimals="0" /><small style="margin-left:4px">人</small></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">由你的成员邀请加入，属于你的团队，只显示人数<template v-if="relation.indirectList?.length">：{{ relation.indirectList.slice(0, 6).map(p => p.name).join('、') }}{{ relation.indirectList.length > 6 ? ' 等' : '' }}</template></p>
+          </article>
+
+          <!-- 团长专属：本月团队收益 -->
+          <article v-if="isLeader && summary?.team" class="card lift" style="--s:4;--i:4">
+            <div class="card-h"><h3>本月团队收益</h3><span class="chip soft r">团队 {{ summary.team.memberCount }} 人</span></div>
+            <div class="big num"><small>¥</small><AnimatedNumber :value="Number(summary.team.reward.total)" :decimals="2" /></div>
+            <p class="muted" style="font-size:12.5px;margin-top:4px">成员业绩 × 团长单价，按业绩当天归属计算</p>
+          </article>
+
           <!-- 任务收益 -->
           <article v-if="month" class="card lift" style="--s:4;--i:2">
             <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">☰</span><h3>任务收益</h3><span class="chip soft r">本月</span></div>
@@ -270,8 +317,8 @@ function untilt(event: PointerEvent) {
             <p class="muted" style="font-size:12.5px;margin-top:4px">活跃天数是晋升团长的标准之一</p>
           </article>
 
-          <!-- 成长进度 -->
-          <article v-if="growth.total" class="card lift" style="--s:4;--i:5">
+          <!-- 成长进度（团长已晋升，不再显示） -->
+          <article v-if="growth.total && !isLeader" class="card lift" style="--s:4;--i:5">
             <div class="card-h"><h3>成长进度</h3><span class="muted r" style="font-size:12.5px">晋升团长</span></div>
             <div class="ring-wrap">
               <RingProgress :value="growth.ratio" :size="92" :thickness="8" :label="`${growth.met}/${growth.total}`">{{ growth.met }}/{{ growth.total }}</RingProgress>
@@ -302,6 +349,19 @@ function untilt(event: PointerEvent) {
             </div>
             <p class="muted" style="font-size:12.5px">好友注册 180 天内的业绩，你都有邀请收益</p>
             <router-link class="btn ink" to="/invite-center" style="margin-top:14px">去邀请好友</router-link>
+          </article>
+
+          <!-- 团长专属：成员贡献（近 30 天团队业绩按业绩人，前 8） -->
+          <article v-if="isLeader" class="card lift" style="--s:12;--i:8">
+            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span v-if="contributors.list.length" class="chip clay r">合计 ¥{{ yuan(contributors.total) }}</span></div>
+            <svg v-if="contributors.list.length" class="chart contrib-chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="成员贡献柱状图">
+              <g v-for="(item, i) in contributors.list" :key="item.name">
+                <rect class="bar" :style="{ '--i': i }" :x="20 + i * 86" :y="150 - (item.value / contributors.max) * 120" width="44" :height="Math.max(3, (item.value / contributors.max) * 120)" rx="8" fill="var(--c1)" :opacity="0.45 + 0.55 * (item.value / contributors.max)" />
+                <text class="ax" :x="42 + i * 86" y="170" text-anchor="middle">{{ item.name }}</text>
+                <text class="ax" :x="42 + i * 86" :y="140 - (item.value / contributors.max) * 120" text-anchor="middle" style="font-weight:650;fill:var(--ink)">¥{{ Math.round(item.value) }}</text>
+              </g>
+            </svg>
+            <p v-else class="muted" style="font-size:12.5px">近 30 天还没有团队业绩，成员完成任务后这里会按人拆开。</p>
           </article>
 
           <!-- 现在要做（有待办才显示） -->
@@ -455,7 +515,10 @@ function untilt(event: PointerEvent) {
 .home-toolbar label { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }
 .home-toolbar select { max-width: 220px; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font-size: 13px; }
 .home-v2 { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
-.home-aside { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+/* 右栏吸附顶部独立滚动：主区滚动时右栏不跟着走（v2 原型行为） */
+.home-aside { position: sticky; top: 0; max-height: 100vh; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 18px; min-width: 0; padding-bottom: 8px; }
+.home-aside::-webkit-scrollbar { display: none; }
+@media (max-width: 1360px) { .home-aside { position: static; max-height: none; overflow: visible; } }
 .home-aside .card { padding: 20px; }
 .profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; text-align: center; }
 .profile-stats > div { padding: 10px 0; border-radius: 14px; background: var(--card-2); }
@@ -465,6 +528,10 @@ function untilt(event: PointerEvent) {
 .growth-rules > div { color: var(--muted); }
 .growth-rules > div.met { color: var(--ink); }
 .growth-mark { display: inline-block; width: 18px; color: var(--clay-deep); font-weight: 700; }
+.contrib-chart { width: 100%; height: 190px; }
+.contrib-chart .bar { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0); animation: contrib-grow 0.8s var(--spring) forwards; animation-delay: calc(var(--i) * 45ms + 0.1s); }
+@keyframes contrib-grow { to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .contrib-chart .bar { animation: none; transform: none; } }
 .feed .amt { font-weight: 650; white-space: nowrap; }
 .feed .it + .it { border-top: 1px solid var(--line-2); }
 @media (max-width: 1360px) {
