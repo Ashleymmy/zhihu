@@ -539,9 +539,11 @@ async function copy(value: string) {
   font-size: 13px;
   min-width: 0;
 }
+/* 宽屏下输入区限宽，避免筛选条被拉成超长一行 */
 .task-filters label {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 160px;
+  width: min(100%, 300px);
 }
 .task-filters input,
 .task-filters select,

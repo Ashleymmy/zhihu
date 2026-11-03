@@ -131,37 +131,40 @@ function toggle() {
 </template>
 
 <style scoped>
+/* 操作引导：与 v2 卡片语言统一（白卡大圆角柔影 + 浅底步骤卡 + btn 语言） */
 .operation-guide {
   min-width: 0;
-  border: 1px solid var(--line, #e8e6dc);
-  border-radius: 12px;
-  background: var(--paper, #fff);
-  color: var(--ink, #2b2b29);
+  border-radius: var(--r, 22px);
+  background: var(--card, #fff);
+  box-shadow: var(--sh);
+  color: var(--ink, #141413);
 }
 .guide-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 24px;
+  padding: 22px;
 }
 .guide-header > div {
   min-width: 0;
 }
 .guide-audience {
   margin: 0 0 6px;
-  color: var(--ink-soft, #6f6e68);
+  color: var(--muted, #87867f);
   font-size: 12px;
 }
 .operation-guide h2 {
   margin: 0;
-  font-size: 21px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
 }
 .operation-guide h3,
 .operation-guide h4 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
   line-height: 1.5;
   font-family: inherit;
 }
@@ -170,38 +173,46 @@ function toggle() {
   overflow-wrap: anywhere;
 }
 .guide-intro {
-  margin: 8px 0 0;
-  color: var(--ink-soft, #6f6e68);
-  font-size: 14px;
+  margin: 6px 0 0;
+  color: var(--ink-soft, #5e5d59);
+  font-size: 13.5px;
 }
 .operation-guide .guide-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
-  padding: 8px 12px;
-  min-height: 44px;
-  border: 1px solid var(--line, #e8e6dc);
-  border-radius: 7px;
-  background: transparent;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--hover, #f5f3ec);
   font: inherit;
   font-size: 13px;
+  font-weight: 600;
   color: inherit;
   cursor: pointer;
+  transition: background 0.2s, transform 0.35s var(--spring);
+}
+.guide-toggle:hover {
+  background: var(--line-2, #f0eee6);
+}
+.guide-toggle:active {
+  transform: scale(0.96);
 }
 .guide-toggle span {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
 .guide-content {
-  padding: 0 24px 24px;
+  padding: 0 22px 22px;
 }
 .guide-steps,
 .guide-management-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 .guide-steps {
   margin: 0;
@@ -213,35 +224,46 @@ function toggle() {
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
-  padding: 20px;
-  border: 1px solid var(--line, #e8e6dc);
-  border-radius: 8px;
+  padding: 18px;
+  border: 1px solid var(--line-2, #f0eee6);
+  border-radius: var(--r-s, 14px);
+  background: var(--card-2, #faf9f5);
+  transition: transform 0.45s var(--spring), box-shadow 0.35s var(--ease);
+}
+.guide-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh);
 }
 .guide-card-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .guide-number {
-  color: #141413;
-  font:
-    600 14px/1.5 ui-monospace,
-    monospace;
+  color: var(--clay-deep, #b5532f);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
 }
 .guide-card > p {
-  margin: 12px 0;
-  font-size: 14px;
-  color: var(--ink-soft, #6f6e68);
+  margin: 10px 0;
+  font-size: 13.5px;
+  color: var(--ink-soft, #5e5d59);
 }
 .guide-instructions {
-  margin: 0 0 16px;
+  margin: 0 0 14px;
   width: 100%;
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.7;
+  color: var(--ink-soft, #5e5d59);
 }
 .guide-instructions summary {
-  padding: 8px 0;
+  padding: 6px 0;
   cursor: pointer;
+  color: var(--muted, #87867f);
+}
+.guide-instructions summary:hover {
+  color: var(--ink, #141413);
 }
 .guide-instructions ol {
   margin: 8px 0 0;
@@ -261,45 +283,50 @@ function toggle() {
 .guide-actions a {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  color: #141413;
-  font-size: 14px;
-  text-underline-offset: 4px;
-}
-.guide-actions .guide-primary {
-  padding: 8px 14px;
-  border: 1px solid #141413;
-  border-radius: 7px;
-  background: #141413;
-  color: #fff;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--ink, #141413);
+  font-size: 13.5px;
+  font-weight: 600;
   text-decoration: none;
-}
-.guide-primary:hover {
-  background: #141413;
 }
 .guide-actions a:hover {
   text-decoration: underline;
+  text-underline-offset: 4px;
 }
-.guide-toggle:hover {
-  border-color: #141413;
+.guide-actions .guide-primary {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink, #141413);
+  color: var(--card-2, #faf9f5);
+  transition: transform 0.35s var(--spring), background 0.2s;
+}
+.guide-primary:hover {
+  background: #2b2b29;
+  text-decoration: none;
+}
+.guide-primary:active {
+  transform: scale(0.96);
 }
 .operation-guide :is(a, button, summary):focus-visible {
-  outline: 2px solid #141413;
-  outline-offset: 3px;
+  outline: 2px solid var(--clay, #d46b45);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 .guide-management {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid var(--line, #e8e6dc);
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-2, #f0eee6);
 }
 .guide-management-intro {
   margin: 8px 0 16px;
   font-size: 13px;
-  color: var(--ink-soft, #6f6e68);
+  color: var(--muted, #87867f);
 }
 .guide-management-card {
-  padding: 16px 20px;
+  padding: 16px 18px;
 }
 @media (max-width: 1000px) {
   .guide-steps,
