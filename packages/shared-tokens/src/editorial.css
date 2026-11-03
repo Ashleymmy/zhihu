@@ -1527,14 +1527,14 @@ body:has(dialog.action-dialog[open]) .studio-page { transform: scale(0.985); fil
 @keyframes v2-rise { from { opacity: 0; transform: translateY(18px) scale(0.985); } }
 
 /* 钱包卡：深墨底 + 陶土/紫罗兰光晕，跟随鼠标轻微倾斜 */
-.wallet { color: #fff; background: radial-gradient(420px 220px at 100% 0%, rgba(212, 107, 69, 0.55), transparent 60%), radial-gradient(300px 200px at 0% 120%, rgba(142, 108, 201, 0.35), transparent 60%), linear-gradient(140deg, #1b1b19, #2b2a27 70%); overflow: hidden; transform-style: preserve-3d; z-index: 2; }
+.wallet { display: flex; flex-direction: column; color: #fff; background: radial-gradient(420px 220px at 100% 0%, rgba(212, 107, 69, 0.55), transparent 60%), radial-gradient(300px 200px at 0% 120%, rgba(142, 108, 201, 0.35), transparent 60%), linear-gradient(140deg, #1b1b19, #2b2a27 70%); overflow: hidden; transform-style: preserve-3d; z-index: 2; }
 .wallet::after { content: ""; position: absolute; inset: 0; background: radial-gradient(260px circle at var(--gx, 70%) var(--gy, 20%), rgba(255, 255, 255, 0.14), transparent 60%); pointer-events: none; transition: opacity 0.3s; }
 .wallet .lbl { opacity: 0.7; font-size: 13px; }
 .wallet .big { color: #fff; font-size: 44px; margin: 6px 0 2px; }
 .wallet .big small { color: rgba(255, 255, 255, 0.7); }
 .wallet .meta { display: flex; gap: 26px; margin-top: 18px; font-size: 12.5px; color: rgba(255, 255, 255, 0.65); }
 .wallet .meta b { display: block; color: #fff; font-size: 16px; font-weight: 650; }
-.wallet .acts { display: flex; gap: 8px; margin-top: 22px; }
+.wallet .acts { display: flex; gap: 8px; margin-top: auto; padding-top: 22px; }
 .wallet .spark { position: absolute; right: 18px; top: 22px; opacity: 0.9; }
 .float { box-shadow: 0 30px 60px -20px rgba(20, 20, 19, 0.45), 0 8px 18px -8px rgba(20, 20, 19, 0.3); }
 
@@ -1580,8 +1580,8 @@ body:has(dialog.action-dialog[open]) .studio-page { transform: scale(0.985); fil
 .row .amt { font-weight: 650; }
 .row .amt.pos { color: var(--ok); }
 
-/* 项目卡（带抽象插画） */
-.projects { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+/* 项目卡（带抽象插画）：列数随项目数量自适应，避免半空行 */
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
 .proj { position: relative; overflow: hidden; border-radius: 18px; padding: 16px; background: var(--card-2); border: 1px solid var(--line-2); min-height: 168px; display: flex; flex-direction: column; justify-content: flex-end; transition: transform 0.45s var(--spring), box-shadow 0.35s; cursor: pointer; }
 .proj:hover { transform: translateY(-4px); box-shadow: var(--sh-hi); }
 .proj .art { position: absolute; inset: 0 0 auto 0; height: 92px; }
@@ -1623,6 +1623,7 @@ body.sheet-on .sheet { transform: translate(-50%, -50%); opacity: 1; pointer-eve
 }
 @media (max-width: 720px) {
   .bento .card { grid-column: span 12 !important; padding: 18px; }
+  .projects { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wallet .big { font-size: 36px; }
   .sheet { top: auto; bottom: 0; left: 0; width: 100%; border-radius: 26px 26px 0 0; transform: translateY(100%); padding-bottom: 34px; }
   body.sheet-on .sheet { transform: none; }

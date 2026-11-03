@@ -339,7 +339,7 @@ function untilt(event: PointerEvent) {
           </div>
           <div v-if="relation" class="card">
             <div class="card-h"><h3>我的关系</h3><span class="muted r" style="font-size:12px">永久记录</span></div>
-            <div class="row"><span class="av" style="background:var(--c2)">{{ (relation.inviter?.name ?? '自').slice(0, 1) }}</span><div class="t"><b>{{ relation.inviter?.name ?? '自行注册' }}{{ relation.inviter ? ' 邀请了你' : '' }}</b><small>{{ relation.channel ?? '直接加入平台' }}</small></div></div>
+            <div class="row"><span class="av" style="background:var(--c2)">{{ (relation.inviter?.name ?? '自').slice(0, 1) }}</span><div class="t"><b>{{ relation.inviter ? relation.inviter.name + ' 邀请了你' : '自行注册' }}</b><small>{{ relation.inviter ? (relation.channel ?? '邀请加入') : '直接加入平台，没有邀请人' }}</small></div></div>
             <div class="row"><span class="av" style="background:var(--c2)">{{ (relation.team?.leaderName ?? '平').slice(0, 1) }}</span><div class="t"><b>{{ relation.team?.leaderName ? `你在 ${relation.team.leaderName} 的团队` : '平台直管' }}</b><small>团队收益按业绩当天的归属计算</small></div></div>
             <router-link class="row" to="/invite-center" style="text-decoration:none;color:inherit"><span class="av" style="background:var(--c3)">{{ relation.counts.direct }}</span><div class="t"><b>你直接邀请了 {{ relation.counts.direct }} 位好友</b><small>好友注册 180 天内的业绩都有邀请收益</small></div></router-link>
           </div>
