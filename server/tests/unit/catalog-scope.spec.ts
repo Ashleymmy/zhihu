@@ -10,11 +10,11 @@ const member: AuthUser = {
   jti: 'test-jti',
 };
 
-describe('渠道分级可见性', () => {
-  it('达人可见本人和直属团长拥有的渠道', () => {
+describe('共享渠道目录', () => {
+  it('达人可读取当前知乎账号的共享渠道目录，不再按渠道所有人筛选', () => {
     expect(channelVisibility(member)).toEqual({
-      clause: "(c.owner_id=? OR c.owner_id=? OR EXISTS (SELECT 1 FROM plans p WHERE p.channel_id=c.zhihu_channel_id AND p.owner_id=? AND p.status<>'ended'))",
-      bindings: ['4', '2', '4'],
+      clause: '1=1',
+      bindings: [],
     });
   });
 });

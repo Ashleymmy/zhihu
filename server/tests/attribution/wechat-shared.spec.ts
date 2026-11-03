@@ -259,7 +259,6 @@ it('a mini invitation registers the same website creator, leader provenance, and
   expect(invite.body.data).toMatchObject({ rewardsEnabled: false, rewardAmount: '0.00' });
   const registered = await verifiedSignup('invited', {
     phone: '13900008881',
-    password,
     inviteCode,
     displayName: '新达人',
   });
@@ -274,11 +273,20 @@ it('a mini invitation registers the same website creator, leader provenance, and
     invitedId,
   ]);
   expect(rewards.n).toBe(0);
-  expect(
-    (await call('invited', '/core/auth/register', 'POST', { phone: '13900008882', password, inviteCode })).status,
-  ).toBe(422);
-  const [[rolled]] = await c.query<RowDataPacket[]>("SELECT COUNT(*) n FROM users WHERE username='13900008882'");
-  expect(rolled.n).toBe(0);
+  // Registration verifies the phone; persistent WeChat login requires a
+  // separate, explicit binding flow even when registration used the mini app.
+  const [[linked]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM wechat_identities WHERE user_id=?', [invitedId]);
+  expect(linked.n).toBe(0);
+  expect((await call('invited', '/core/auth/wechat-login', 'POST')).body.data).toEqual({ needsBind: true });
+  expect((await verifiedSignup('duplicate_phone', { phone: '13900008881', inviteCode })).status).toBe(409);
+  expect(registered.body.data.user.hasPassword).toBe(false);
+  const configured = await call('invited', '/core/auth/set-password', 'POST', { newPassword: 'Invited123456' });
+  expect(configured.status, JSON.stringify(configured.body)).toBe(200);
+  const relogin = await call('invited', '/core/auth/login', 'POST', {
+    username: '13900008881', password: 'Invited123456', loginMethod: 'phone',
+  });
+  expect(relogin.status, JSON.stringify(relogin.body)).toBe(200);
+  tokens.invited = relogin.body.data.token;
 });
 it('unchanged project access preserves the session; changing access requires relogin and is shared with the website', async () => {
   const grant = await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] });
@@ -287,7 +295,7 @@ it('unchanged project access preserves the session; changing access requires rel
   const removed = await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: [] });
   expect(removed.status, JSON.stringify(removed.body)).toBe(200);
   expect((await call('invited', '/core/projects')).status).toBe(401);
-  const reduced = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
+  const reduced = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password: 'Invited123456', loginMethod: 'phone' });
   expect(reduced.status).toBe(200);
   tokens.invited = reduced.body.data.token;
   expect((await call('invited', '/core/projects')).body.data).toEqual([]);
@@ -295,7 +303,7 @@ it('unchanged project access preserves the session; changing access requires rel
     (await call('leader', '/core/team/members/' + invitedId + '/access', 'PATCH', { projectIds: ['1'] })).status,
   ).toBe(200);
   expect((await call('invited', '/core/projects')).status).toBe(401);
-  const fast = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password });
+  const fast = await call('invited', '/core/auth/login', 'POST', { username: '13900008881', password: 'Invited123456', loginMethod: 'phone' });
   tokens.invited = fast.body.data.token;
   expect((await call('invited', '/core/projects')).body.data.some((p: any) => p.id === '1')).toBe(true);
   const members = await call('leader', '/core/team/members');
@@ -430,9 +438,9 @@ it('revoked invitation codes cannot register and do not create half-bound users'
     [inviteCode],
   );
   expect(
-    (await call('fresh', '/core/auth/register', 'POST', { phone: '13900008883', password, inviteCode })).status,
+    (await verifiedSignup('fresh', { phone: '13900008883', inviteCode })).status,
   ).toBe(422);
-  const [[saved]] = await c.query<RowDataPacket[]>("SELECT COUNT(*) n FROM users WHERE username='13900008883'");
+  const [[saved]] = await c.query<RowDataPacket[]>("SELECT COUNT(*) n FROM users WHERE phone='13900008883'");
   expect(saved.n).toBe(0);
 });
 
@@ -441,7 +449,6 @@ it('creator referrals preserve the actual leader and expire when that relationsh
   expect(own.status).toBe(200);
   const child = await verifiedSignup('referral', {
     phone: '13900008885',
-    password,
     inviteCode: own.body.data.code,
   });
   expect(child.status, JSON.stringify(child.body)).toBe(201);
@@ -449,9 +456,8 @@ it('creator referrals preserve the actual leader and expire when that relationsh
   await c.query('UPDATE users SET parent_id=NULL WHERE id=?', [invitedId]);
   expect(
     (
-      await call('moved', '/core/auth/register', 'POST', {
+      await verifiedSignup('moved', {
         phone: '13900008886',
-        password,
         inviteCode: own.body.data.code,
       })
     ).status,
@@ -460,7 +466,6 @@ it('creator referrals preserve the actual leader and expire when that relationsh
   expect(staff.status).toBe(200);
   const independent = await verifiedSignup('platform', {
     phone: '13900008887',
-    password,
     inviteCode: staff.body.data.code,
   });
   expect(independent.status, JSON.stringify(independent.body)).toBe(201);

@@ -1,3 +1,4 @@
+import { unitClientId, unitSessionId } from '../support/unitAuthSession';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { request as nodeRequest } from 'node:http';
@@ -28,7 +29,10 @@ import {
 import { buildMinimalXlsxFixture } from '../support/allianceXlsxFixture';
 import { installAllianceAuditTestSink } from '../support/allianceAuditFixture';
 
-vi.mock('../../src/db', async (original) => ({...await original<typeof import('../../src/db')>(), rows: vi.fn(async (sql:string, bindings:unknown[]) => {if(sql==='SELECT role,is_active,admin_duty,parent_id FROM users WHERE id=?')return [{role:bindings[0]==='1'?'admin':bindings[0],is_active:1,admin_duty:'all',parent_id:null}];throw new Error('Unexpected database query in isolated proxy test');})}));
+vi.mock('../../src/db', async (original) => {
+  const { unitAuthRows } = await import('../support/unitAuthSession');
+  return { ...await original<typeof import('../../src/db')>(), rows: vi.fn(unitAuthRows({ '1': { role: 'admin' }, admin: { role: 'admin' }, leader: { role: 'leader' }, creator: { role: 'creator' } })) };
+});
 
 const multerMock = vi.hoisted(() => ({ single: vi.fn() }));
 const signMock = vi.hoisted(() => ({ inject: vi.fn(), build: vi.fn() }));
@@ -285,11 +289,11 @@ afterEach(async () => {
 afterAll(() => upstream.close());
 
 async function bossToken(): Promise<string> {
-  return signToken({ id: '1', role: 'admin', parentId: null, username: 'admin', displayName: 'Boss' });
+  return signToken({ sessionId: unitSessionId('1'), id: '1', role: 'admin', parentId: null, username: 'admin', displayName: 'Boss' });
 }
 
 async function roleToken(role: 'admin' | 'leader' | 'creator'): Promise<string> {
-  return signToken({ id: role, role, parentId: null, username: role, displayName: role });
+  return signToken({ sessionId: unitSessionId(role), id: role, role, parentId: null, username: role, displayName: role });
 }
 
 async function rawRequest(app: ReturnType<typeof createApp>, method: string, path: string) {
@@ -407,7 +411,7 @@ describe('知乎联盟严格代理', () => {
   it('P0007-R6-AUDIT-001 / P0007-R6-REDACT-001 audits an allowlist rejection once without sensitive input', async () => {
     const response = await request(app)
       .post('/api/alliance/api/not-registered?secret=query-sentinel')
-      .set('Authorization', 'Bearer token-sentinel')
+      .set('X-Client-Id', unitClientId).set('Authorization', 'Bearer token-sentinel')
       .set('Cookie', 'secret=cookie-sentinel')
       .send({ secret: 'body-sentinel', signature: 'signature-sentinel' });
     expectErrorEnvelope(response, 404, 40400, '接口不存在');
@@ -447,7 +451,7 @@ describe('知乎联盟严格代理', () => {
     try {
       const response = await request(app)
         .post('/api/alliance/api/popularize_plan')
-        .set('Authorization', `Bearer ${await bossToken()}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${await bossToken()}`)
         .send(validPlan);
       expectErrorEnvelope(response, 502, 50200, '知乎服务暂时不可用，请稍后重试');
       expect(auditSink.calls).toBe(1);
@@ -469,7 +473,7 @@ describe('知乎联盟严格代理', () => {
     try {
       const response = await request(app)
         .post('/api/alliance/api/popularize_plan')
-        .set('Authorization', `Bearer ${await bossToken()}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${await bossToken()}`)
         .send(validPlan);
       expectErrorEnvelope(response, 500, 50000, '服务器内部错误');
       expect(auditSink.calls).toBe(1);
@@ -496,7 +500,7 @@ describe('知乎联盟严格代理', () => {
     try {
       const response = await request(app)
         .post('/api/alliance/api/popularize_plan')
-        .set('Authorization', `Bearer ${token}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
         .send(validPlan);
       expectErrorEnvelope(response, 500, 50000, '服务器内部错误');
       expect(auditSink.calls).toBe(1);
@@ -525,7 +529,7 @@ describe('知乎联盟严格代理', () => {
     const leader = await roleToken('leader');
     const forbidden = await request(app)
       .get('/api/alliance/api/data_report/real_time_data?type=1&timeScale=1&fields=search_num,order_num,created_at')
-      .set('Authorization', `Bearer ${leader}`);
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${leader}`);
     expectErrorEnvelope(forbidden, 403, 40301, '无权执行此操作');
     expect(auditSink.events.at(-1)).toMatchObject({
       requestId: forbidden.body.requestId,
@@ -547,7 +551,7 @@ describe('知乎联盟严格代理', () => {
     });
     const response = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${await bossToken()}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${await bossToken()}`)
       .send(validPlan);
     expectErrorEnvelope(response, 429, 42910, '今日请求配额已用尽，请稍后重试');
     expect(auditSink.calls).toBe(1);
@@ -569,7 +573,7 @@ describe('知乎联盟严格代理', () => {
     try {
       const response = await request(app)
         .post('/api/alliance/api/popularize_plan')
-        .set('Authorization', `Bearer ${await bossToken()}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${await bossToken()}`)
         .send(validPlan);
       expectErrorEnvelope(response, 503, 50320, '知乎配额服务暂不可用');
       expect(auditSink.calls).toBe(1);
@@ -586,7 +590,7 @@ describe('知乎联盟严格代理', () => {
     const token = await bossToken();
     const response = await request(app)
       .put('/api/alliance/api/popularize_composition/v2/2071266138193975100')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send({ planId: 'bad' });
     expectErrorEnvelope(response, 422, 42200, '请求参数不正确');
     expect(auditSink.events.at(-1)).toMatchObject({
@@ -655,14 +659,14 @@ describe('知乎联盟严格代理', () => {
         method: 'post',
         path: '/api/alliance/api/popularize_plan',
         body: validPlan,
-        permission: 'write',
+        permission: 'plan',
         expectedStatus: 200,
       },
       {
         method: 'post',
         path: '/api/alliance/api/popularize_plans',
         body: undefined,
-        permission: 'write',
+        permission: 'plan',
         expectedStatus: 415,
       },
       {
@@ -701,7 +705,7 @@ describe('知乎联盟严格代理', () => {
         expectedStatus: 200,
       },
     ] as const;
-    const expectedForbidden = new Set(['leader:project', 'leader:earning', 'creator:project', 'creator:earning']);
+    const expectedForbidden = new Set(['leader:project', 'leader:earning', 'creator:project', 'creator:earning', 'creator:plan']);
 
     for (const role of ['admin', 'leader', 'creator'] as const) {
       for (const endpoint of endpoints) {
@@ -711,7 +715,7 @@ describe('知乎联盟严格代理', () => {
         signMock.build.mockClear();
         outboundRequests.length = 0;
         const token = await roleToken(role);
-        const builder = request(app)[endpoint.method](endpoint.path).set('Authorization', `Bearer ${token}`);
+        const builder = request(app)[endpoint.method](endpoint.path).set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`);
         const response = endpoint.body === undefined ? await builder : await builder.send(endpoint.body);
         const key = `${role}:${endpoint.permission}`;
         if (expectedForbidden.has(key)) {
@@ -739,7 +743,7 @@ describe('知乎联盟严格代理', () => {
       const token = await roleToken(role);
       const response = await request(app)
         .get('/api/alliance/api/data_report/real_time_data')
-        .set('Authorization', `Bearer ${token}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
         .set('X-Permission', 'earning.view_all')
         .set('X-Project-Id', 'project-forged')
         .query({ type: 1, timeScale: 1, fields: 'search_num', permission: 'earning.view_all' });
@@ -764,7 +768,7 @@ describe('知乎联盟严格代理', () => {
       .send('{"broken":');
     const authenticated = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
       .send('{"broken":');
 
@@ -780,24 +784,24 @@ describe('知乎联盟严格代理', () => {
     const responses = await Promise.all([
       request(app)
         .post('/api/alliance/api/popularize_plan')
-        .set('Authorization', `Bearer ${token}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
         .send({ ...validPlan, task_id: 'bad' }),
       request(app)
         .post('/api/alliance/api/popularize_composition/v2')
-        .set('Authorization', `Bearer ${token}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
         .send({ planId: 'missing' }),
       request(app)
         .put('/api/alliance/api/popularize_composition/v2/2071266138193975100')
-        .set('Authorization', `Bearer ${token}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
         .send({ ...validComposition, signature: 'client-forged' }),
       request(app)
         .get(
           '/api/alliance/api/popularize_compositions?channelId=channel-1&keyword=%E5%85%B3%E9%94%AE%E8%AF%8D&pageSize=101',
         )
-        .set('Authorization', `Bearer ${token}`),
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`),
       request(app)
         .get('/api/alliance/api/data_report/real_time_data?type=1&timeScale=1&fields=search_num&timestamp=forged')
-        .set('Authorization', `Bearer ${token}`),
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`),
     ]);
 
     for (const response of responses) expectErrorEnvelope(response, 422, 42200, '请求参数不正确');
@@ -811,14 +815,14 @@ describe('知乎联盟严格代理', () => {
     const fixture = buildMinimalXlsxFixture();
     const planBatch = await request(app)
       .post('/api/alliance/api/popularize_plans')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .field('taskId', 'task-1')
       .field('channelId', 'channel-1')
       .field('popularizeType', '0')
       .attach('file', fixture, { filename: 'plans.xlsx', contentType: XLSX_MIME });
     const compositionBatch = await request(app)
       .post('/api/alliance/api/popularize_compositions/v2')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .field('bindType', '1')
       .field('channelId', 'channel-1')
       .attach('file', buildMinimalXlsxFixture(), { filename: 'compositions.xlsx', contentType: XLSX_MIME });
@@ -839,22 +843,22 @@ describe('知乎联盟严格代理', () => {
     const token = await bossToken();
     const plan = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     const create = await request(app)
       .post('/api/alliance/api/popularize_composition/v2')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validComposition);
     const update = await request(app)
       .put('/api/alliance/api/popularize_composition/v2/2071266138193975100')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validComposition);
     const list = await request(app)
       .get('/api/alliance/api/popularize_compositions?channelId=channel-1&keyword=%E5%85%B3%E9%94%AE%E8%AF%8D')
-      .set('Authorization', `Bearer ${token}`);
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`);
     const realtime = await request(app)
       .get('/api/alliance/api/data_report/real_time_data?type=1&timeScale=1&fields=search_num,order_num,created_at')
-      .set('Authorization', `Bearer ${token}`);
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`);
 
     expect([plan.status, create.status, update.status, list.status, realtime.status]).toEqual([
       200, 200, 200, 200, 200,
@@ -911,7 +915,7 @@ describe('知乎联盟严格代理', () => {
       );
       const response = await request(app)
         .post('/api/alliance/api/popularize_plan')
-        .set('Authorization', `Bearer ${token}`)
+        .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
         .send(validPlan);
       expectErrorEnvelope(response, 502, 50200, '知乎服务暂时不可用，请稍后重试');
       expect(response.headers.location).toBeUndefined();
@@ -952,7 +956,7 @@ describe('知乎联盟严格代理', () => {
     );
     const business = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     assertFailure(business, 0, 'upstream', 'business', 'secret');
 
@@ -964,7 +968,7 @@ describe('知乎联盟严格代理', () => {
     );
     const malformed = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     assertFailure(malformed, 1, 'upstream', 'protocol', 'secret');
 
@@ -976,7 +980,7 @@ describe('知乎联盟严格代理', () => {
     );
     const httpFailure = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     assertFailure(httpFailure, 2, 'upstream', 'transport', 'secret');
     expect(auditSink.calls).toBe(3);
@@ -988,7 +992,7 @@ describe('知乎联盟严格代理', () => {
     const token = await bossToken();
     const successful = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     expect(successful.status).toBe(200);
     expect(quota.decisions.map((decision) => decision.action)).toEqual(['reserve', 'confirm']);
@@ -996,7 +1000,7 @@ describe('知乎联盟严格代理', () => {
     quota.decisions.length = 0;
     const invalid = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send({ ...validPlan, signature: 'forged' });
     expectErrorEnvelope(invalid, 422, 42200, '请求参数不正确');
     expect(quota.decisions.map((decision) => decision.action)).toEqual(['reserve', 'release']);
@@ -1009,7 +1013,7 @@ describe('知乎联盟严格代理', () => {
     );
     const business = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     expectErrorEnvelope(business, 503, 50300, '知乎请求被拒绝，请稍后重试');
     expect(quota.decisions.map((decision) => decision.action)).toEqual(['reserve', 'release']);
@@ -1023,7 +1027,7 @@ describe('知乎联盟严格代理', () => {
     );
     const protocol = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     expectErrorEnvelope(protocol, 502, 50200, '知乎服务暂时不可用，请稍后重试');
     expect(quota.decisions.map((decision) => decision.action)).toEqual(['reserve', 'release']);
@@ -1037,7 +1041,7 @@ describe('知乎联盟严格代理', () => {
     );
     const transport = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
     expectErrorEnvelope(transport, 502, 50200, '知乎服务暂时不可用，请稍后重试');
     expect(quota.decisions.map((decision) => decision.action)).toEqual(['reserve', 'release']);
@@ -1060,7 +1064,7 @@ describe('知乎联盟严格代理', () => {
 
     const response = await request(app)
       .post('/api/alliance/api/popularize_plan')
-      .set('Authorization', `Bearer ${token}`)
+      .set('X-Client-Id', unitClientId).set('Authorization', `Bearer ${token}`)
       .send(validPlan);
 
     expectErrorEnvelope(response, 503, 50320, '知乎配额服务暂不可用');
@@ -1106,6 +1110,7 @@ describe('知乎联盟严格代理', () => {
       method: 'POST',
       path: '/api/alliance/api/popularize_plan',
       headers: {
+        'X-Client-Id': unitClientId,
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),

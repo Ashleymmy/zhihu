@@ -8,14 +8,20 @@ import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 import { runOpcMigrations } from '../../scripts/opcMigrations';
 vi.mock('../../src/modules/zhihu/queue', () => ({ enqueue: vi.fn() }));
+vi.mock('../../src/sms/aliyun', () => ({ sendRegistrationSms: vi.fn(async () => undefined) }));
 let container: StartedMySqlContainer, c: Connection, pool: typeof import('../../src/db').db, app: express.Express;
-const password = 'isolated_invitation_password';
+const password = 'Invitation123';
 let serial = 0;
+let phoneSerial = 0;
+const registeredAccounts = new Map<string, { phone: string; id: string }>();
 const sessions: Record<string, { token: string; headers: Record<string, string> }> = {};
 const headers = () => ({ 'X-Client-Id': randomUUID(), 'X-Forwarded-For': '10.2.0.' + ((++serial % 250) + 1) });
 async function login(name: string) {
   const h = headers();
-  const res = await request(app).post('/auth/login').set(h).send({ username: name, password });
+  const account = registeredAccounts.get(name);
+  const res = await request(app).post('/auth/login').set(h).send({
+    username: account?.phone ?? name, password, loginMethod: account ? 'phone' : 'username',
+  });
   expect(res.status, JSON.stringify(res.body)).toBe(200);
   return (sessions[name] = { token: res.body.data.token, headers: h });
 }
@@ -27,8 +33,23 @@ async function invite(name = 'leader', maxUses = 20) {
   expect(r.status, JSON.stringify(r.body)).toBe(201);
   return r.body.data as { id: string; token: string };
 }
-const register = (token: string, username = 'invited_' + ++serial) =>
-  request(app).post('/auth/register').set(headers()).send({ username, password, invitationToken: token });
+async function register(token?: string, name = 'invited_' + ++serial) {
+  const h = headers();
+  const phone = name === 'creator' ? '13900000005' : '13901' + String(++phoneSerial).padStart(6, '0');
+  const sent = await request(app).post('/auth/registration-code').set(h).send({ phone, invitationToken: token });
+  if (sent.status !== 200) return sent;
+  const provider = vi.mocked((await import('../../src/sms/aliyun')).sendRegistrationSms);
+  const smsCode = [...provider.mock.calls].reverse().find(([recipient]) => recipient === phone)![1];
+  const registered = await request(app).post('/auth/register').set(h)
+    .send({ phone, smsCode, displayName: name, invitationToken: token });
+  if (registered.status === 201) {
+    registeredAccounts.set(name, { phone, id: String(registered.body.data.id) });
+    const configured = await request(app).post('/auth/set-password').set(h)
+      .auth(registered.body.data.token, { type: 'bearer' }).send({ newPassword: password });
+    expect(configured.status, JSON.stringify(configured.body)).toBe(200);
+  }
+  return registered;
+}
 const preview = (token: string) => request(app).post('/auth/invitation').send({ token });
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
@@ -51,6 +72,13 @@ beforeAll(async () => {
     DB_PASS: target.password,
     DEV_DEMO_AUTH: '0',
     OPC_MODULES: 'zhihu',
+    SMS_REGISTRATION_ENABLED: '1',
+    SMS_LOGIN_ENABLED: '0',
+    SMS_REGISTRATION_PILOT_INVITATIONS: '',
+    SMS_SIGN_NAME: '测试签名',
+    SMS_TEMPLATE_CODE: 'SMS_123456',
+    SMS_VERIFICATION_SECRET: 'isolated_invitation_verification_secret_32_chars',
+    SMS_DAILY_LIMIT: '100',
   });
   await runOpcMigrations(target, ['zhihu']);
   c = await mysql.createConnection(target);
@@ -69,6 +97,7 @@ beforeAll(async () => {
         i === 6 ? 'finance' : role === 'operator' ? 'operations' : 'all',
       ],
     );
+  await c.query("UPDATE users SET phone='13900000005',phone_verified_at=NOW() WHERE id=5");
   await c.query("INSERT INTO project_members(project_id,user_id) SELECT p.id,u.id FROM projects p CROSS JOIN (SELECT 4 id UNION SELECT 6 id) u WHERE p.slug='zhihu'");
   pool = (await import('../../src/db')).db;
   const { authRouter } = await import('../../src/routes/auth');
@@ -96,14 +125,20 @@ it('only authorized roles create invitations; malformed and privilege-bearing re
     expect((await call(name, 'post', '/team/invitations').send({ label: 'x' })).status).toBe(403);
   expect((await preview('invalid')).status).toBe(422);
   const i = await invite();
+  const h = headers(), phone = '13900000999';
+  const sent = await request(app).post('/auth/registration-code').set(h).send({ phone, invitationToken: i.token });
+  expect(sent.status, JSON.stringify(sent.body)).toBe(200);
+  const smsCode = vi.mocked((await import('../../src/sms/aliyun')).sendRegistrationSms).mock.calls.at(-1)![1];
   expect(
     (
       await request(app)
         .post('/auth/register')
-        .set(headers())
-        .send({ username: 'escalation', password, invitationToken: i.token, role: 'developer' })
+        .set(h)
+        .send({ phone, smsCode, invitationToken: i.token, role: 'developer' })
     ).status,
   ).toBe(422);
+  const [[saved]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM users WHERE phone=?', [phone]);
+  expect(saved.n).toBe(0);
 });
 it('leader invitation records provenance and joins only the correct team, with default project access', async () => {
   const i = await invite();
@@ -445,7 +480,7 @@ it('operator can allocate business projects to platform-invited creators without
 });
 
 it('scoped managers cannot strip project administration and legacy staff parents are not shown as leaders', async () => {
-  const [[u]] = await c.query<RowDataPacket[]>("SELECT id FROM users WHERE username='scoped_creator'");
+  const u = registeredAccounts.get('scoped_creator')!;
   for (const memberRole of ['owner','admin']) {
     await c.query('INSERT INTO project_members(project_id,user_id,member_role) VALUES(910,?,?) ON DUPLICATE KEY UPDATE member_role=VALUES(member_role),left_at=NULL',[u.id,memberRole]);
     for (const actor of ['leader','operator']) {
@@ -455,13 +490,13 @@ it('scoped managers cannot strip project administration and legacy staff parents
     const [[kept]] = await c.query<RowDataPacket[]>('SELECT member_role,left_at FROM project_members WHERE project_id=910 AND user_id=?',[u.id]);
     expect(kept.member_role).toBe(memberRole);expect(kept.left_at).toBeNull();
   }
-  await c.query("UPDATE users SET parent_id=3 WHERE username='platform_creator'");
+  await c.query('UPDATE users SET parent_id=3 WHERE id=?', [registeredAccounts.get('platform_creator')!.id]);
   expect((await call('platform_creator','get','/team/my')).body.data).toBeNull();
   expect((await call('platform_creator','get','/team/affiliation')).body.data.team).toBeNull();
 });
 
 it('independent registration and managed leader creation open the default project without granting management', async () => {
-  const created = await request(app).post('/auth/register').set(headers()).send({username:'onboarding_solo',password});
+  const created = await register(undefined, 'onboarding_solo');
   expect(created.status,JSON.stringify(created.body)).toBe(201);
   await login('onboarding_solo');
   const projects=(await call('onboarding_solo','get','/projects')).body.data;
@@ -494,7 +529,7 @@ it('an existing creator accepts an invitation once, keeps registration provenanc
   expect(count.used_count).toBe(1);
   expect((await call('onboarding_solo','get','/team/my')).body.data.leaderName).toBe('邀请团长');
   expect((await call('onboarding_solo','get','/projects')).body.data.map((p:any)=>p.slug).sort()).toEqual(['leader-scope','zhihu']);
-  const [[u]]=await c.query<RowDataPacket[]>('SELECT u.created_by,iu.invitation_id FROM users u LEFT JOIN member_invitation_uses iu ON iu.user_id=u.id WHERE u.username=?',['onboarding_solo']);
+  const [[u]]=await c.query<RowDataPacket[]>('SELECT u.created_by,iu.invitation_id FROM users u LEFT JOIN member_invitation_uses iu ON iu.user_id=u.id WHERE u.id=?',[registeredAccounts.get('onboarding_solo')!.id]);
   expect(u.created_by).toBeNull();expect(u.invitation_id).toBeNull();
   expect((await call('onboarding_solo','get','/team/applications/mine')).body.data[0].status).toBe('cancelled');
 });
@@ -508,7 +543,7 @@ it('existing-account invitations cannot replace a team, elevate roles or ignore 
 });
 
 it('approval grants team projects while preserving an explicit project removal',async()=>{
-  const r=await request(app).post('/auth/register').set(headers()).send({username:'onboarding_apply',password});
+  const r=await register(undefined, 'onboarding_apply');
   expect(r.status).toBe(201);await login('onboarding_apply');
   await c.query("UPDATE project_members SET left_at=NOW() WHERE user_id=?",[r.body.data.id]);
   const a=await call('onboarding_apply','post','/team/applications').send({leaderUsername:'leader'});
@@ -520,7 +555,7 @@ it('approval grants team projects while preserving an explicit project removal',
 
 it('two existing creators cannot consume the same final invitation slot',async()=>{
   for(const username of ['slot_creator_a','slot_creator_b']) {
-    expect((await request(app).post('/auth/register').set(headers()).send({username,password})).status).toBe(201);
+    expect((await register(undefined, username)).status).toBe(201);
     await login(username);
   }
   const i=await invite('leader',1);

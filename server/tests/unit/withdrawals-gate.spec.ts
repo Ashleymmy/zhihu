@@ -1,3 +1,4 @@
+import { unitClientId, unitSessionId } from '../support/unitAuthSession';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,23 +8,37 @@ import { errorHandler } from '../../src/middleware/errors';
 import { withdrawalsRouter } from '../../src/modules/zhihu/routes/withdrawals';
 import type { AuthUser } from '../../src/types';
 
+vi.mock('../../src/db', async (original) => {
+  const { unitAuthRows } = await import('../support/unitAuthSession');
+  return {
+    ...(await original<typeof import('../../src/db')>()),
+    rows: vi.fn(
+      unitAuthRows({
+        '4': { role: 'creator', parent_id: '2' },
+        '2': { role: 'leader', parent_id: '1' },
+        '1': { role: 'admin' },
+      }),
+    ),
+  };
+});
+
 const serviceMocks = vi.hoisted(() => ({
   listWithdrawals: vi.fn(),
-  createWithdrawal: vi.fn(),
-  approveWithdrawal: vi.fn(),
-  rejectWithdrawal: vi.fn(),
+  applyWithdrawal: vi.fn(),
+  cancelWithdrawal: vi.fn(),
+  reviewWithdrawal: vi.fn(),
+  decideWithdrawal: vi.fn(),
+  uploadInvoice: vi.fn(),
+  getInvoice: vi.fn(),
+  getStatement: vi.fn(),
 }));
 
-vi.mock('../../src/modules/zhihu/services/earnings.service', () => ({
-  listWithdrawals: serviceMocks.listWithdrawals,
-  createWithdrawal: serviceMocks.createWithdrawal,
-  approveWithdrawal: serviceMocks.approveWithdrawal,
-  rejectWithdrawal: serviceMocks.rejectWithdrawal,
-}));
+vi.mock('../../src/modules/zhihu/services/finance-approvals.service', () => serviceMocks);
 
 const users: Record<string, AuthUser> = {
   creator: {
     sub: '4',
+    sessionId: unitSessionId('4'),
     role: 'creator',
     parentId: '2',
     username: 'member-a',
@@ -32,6 +47,7 @@ const users: Record<string, AuthUser> = {
   },
   leader: {
     sub: '2',
+    sessionId: unitSessionId('2'),
     role: 'leader',
     parentId: '1',
     username: 'leader-a',
@@ -40,6 +56,7 @@ const users: Record<string, AuthUser> = {
   },
   admin: {
     sub: '1',
+    sessionId: unitSessionId('1'),
     role: 'admin',
     parentId: null,
     username: 'admin',
@@ -48,15 +65,9 @@ const users: Record<string, AuthUser> = {
   },
 };
 
-const FINANCE_GATE_ORDER = ['D-001-DECISION', 'D-001-READINESS', 'P0-008', 'M6'];
-
-/** 50310 契约：精确 failedGates（非空、去重、稳定顺序）+ 单次拒绝审计所用的 requestId。 */
-function expectGateResponse(body: Record<string, unknown>) {
-  expect(body).toMatchObject({ code: 50310, data: null, message: '资金链启动 Gate 未关闭' });
-  expect(body.failedGates).toEqual(FINANCE_GATE_ORDER);
-  expect(typeof body.requestId).toBe('string');
-  expect(String(body.requestId).length).toBeGreaterThan(0);
-  expect(typeof body.timestamp).toBe('number');
+/** Historical finance writes remain closed after platform finance took over. */
+function expectReadOnlyResponse(body: Record<string, unknown>) {
+  expect(body).toEqual({ code: 41001, data: null, message: '历史账目仅供查询，请到财务或我的收益办理。' });
 }
 
 function createWithdrawalsApp(): Express {
@@ -72,12 +83,17 @@ function authorization(token: keyof typeof users) {
 }
 
 function expectNoWriteServices() {
-  expect(serviceMocks.createWithdrawal).not.toHaveBeenCalled();
-  expect(serviceMocks.approveWithdrawal).not.toHaveBeenCalled();
-  expect(serviceMocks.rejectWithdrawal).not.toHaveBeenCalled();
+  for (const service of [
+    'applyWithdrawal',
+    'cancelWithdrawal',
+    'reviewWithdrawal',
+    'decideWithdrawal',
+    'uploadInvoice',
+  ] as const)
+    expect(serviceMocks[service]).not.toHaveBeenCalled();
 }
 
-describe('legacy 提现写路径 Gate', () => {
+describe('历史提现入口只读', () => {
   let app: Express;
 
   beforeEach(() => {
@@ -110,44 +126,51 @@ describe('legacy 提现写路径 Gate', () => {
     expectNoWriteServices();
   });
 
-  it('member 和 leader 对 approve/reject 保持 40301 且不调用写 Service', async () => {
-    for (const token of ['creator', 'leader'] as const) {
-      for (const path of ['/api/v1/withdrawals/1/approve', '/api/v1/withdrawals/1/reject']) {
+  it('达人、团长和管理员均不能通过现有或已移除的历史入口写账', async () => {
+    for (const token of ['creator', 'leader', 'admin'] as const) {
+      for (const action of ['cancel', 'review', 'decide', 'invoice', 'approve', 'reject']) {
         const response = await request(app)
-          .post(path)
+          .post('/api/v1/withdrawals/1/' + action)
+          .set('X-Client-Id', unitClientId)
           .set('Authorization', authorization(token))
           .send({ remark: '拒绝原因' });
-        expect(response.status).toBe(403);
-        expect(response.body.code).toBe(40301);
+        expect(response.status).toBe(410);
+        expectReadOnlyResponse(response.body);
       }
     }
     expectNoWriteServices();
   });
 
-  it('合法 member/leader 申请稳定返回 50310 且不调用 Service', async () => {
+  it('达人和团长 申请稳定返回 41001 且不调用 Service', async () => {
     for (const token of ['creator', 'leader'] as const) {
       const response = await request(app)
         .post('/api/v1/withdrawals')
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization(token))
         .send({ amount: 10, payMethod: 'alipay', payAccount: 'a@example.com' });
-      expect(response.status).toBe(503);
-      expectGateResponse(response.body);
+      expect(response.status).toBe(410);
+      expectReadOnlyResponse(response.body);
     }
     expectNoWriteServices();
   });
 
-  it('合法 boss approve/reject 稳定返回 50310 且不调用 Service', async () => {
+  it('管理员 approve/reject 稳定返回 41001 且不调用 Service', async () => {
     const responses = await Promise.all([
-      request(app).post('/api/v1/withdrawals/1/approve').set('Authorization', authorization('admin')).send({}),
+      request(app)
+        .post('/api/v1/withdrawals/1/approve')
+        .set('X-Client-Id', unitClientId)
+        .set('Authorization', authorization('admin'))
+        .send({}),
       request(app)
         .post('/api/v1/withdrawals/1/reject')
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('admin'))
         .send({ remark: '拒绝原因' }),
     ]);
 
     for (const response of responses) {
-      expect(response.status).toBe(503);
-      expectGateResponse(response.body);
+      expect(response.status).toBe(410);
+      expectReadOnlyResponse(response.body);
     }
     expectNoWriteServices();
   });
@@ -158,6 +181,7 @@ describe('legacy 提现写路径 Gate', () => {
       request(app)
         .post('/api/v1/withdrawals')
         .query(bypass)
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('creator'))
         .set('x-finance-gate', 'open')
         .set('Cookie', 'financeGate=open')
@@ -165,6 +189,7 @@ describe('legacy 提现写路径 Gate', () => {
       request(app)
         .post('/api/v1/withdrawals/1/approve')
         .query(bypass)
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('admin'))
         .set('x-finance-gate', 'open')
         .set('Cookie', 'financeGate=open')
@@ -172,6 +197,7 @@ describe('legacy 提现写路径 Gate', () => {
       request(app)
         .post('/api/v1/withdrawals/1/reject')
         .query(bypass)
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('admin'))
         .set('x-finance-gate', 'open')
         .set('Cookie', 'financeGate=open')
@@ -179,35 +205,39 @@ describe('legacy 提现写路径 Gate', () => {
     ]);
 
     for (const response of responses) {
-      expect(response.status).toBe(503);
-      expectGateResponse(response.body);
+      expect(response.status).toBe(410);
+      expectReadOnlyResponse(response.body);
     }
     expectNoWriteServices();
   });
 
-  it('合法 JSON 的非法业务字段或 id 仍先返回 50310，Malformed JSON 保持 40000', async () => {
+  it('合法 JSON 的非法业务字段或 id 仍先返回 41001，Malformed JSON 保持 40000', async () => {
     const gatedResponses = await Promise.all([
       request(app)
         .post('/api/v1/withdrawals')
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('creator'))
         .send({ amount: 0, payMethod: 'alipay', payAccount: '' }),
       request(app)
         .post('/api/v1/withdrawals/not-a-number/approve')
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('admin'))
         .send({}),
       request(app)
         .post('/api/v1/withdrawals/not-a-number/reject')
+        .set('X-Client-Id', unitClientId)
         .set('Authorization', authorization('admin'))
         .send({ remark: '' }),
     ]);
 
     for (const response of gatedResponses) {
-      expect(response.status).toBe(503);
-      expectGateResponse(response.body);
+      expect(response.status).toBe(410);
+      expectReadOnlyResponse(response.body);
     }
 
     const malformed = await request(app)
       .post('/api/v1/withdrawals')
+      .set('X-Client-Id', unitClientId)
       .set('Authorization', authorization('creator'))
       .set('Content-Type', 'application/json')
       .send('{"amount":');
@@ -216,7 +246,7 @@ describe('legacy 提现写路径 Gate', () => {
     expectNoWriteServices();
   });
 
-  it('GET /withdrawals 保持读行为且三个写 Service 均为 0 次', async () => {
+  it('GET /withdrawals 保持读行为且全部写 Service 均为 0 次', async () => {
     serviceMocks.listWithdrawals.mockResolvedValue({
       list: [{ id: '1', amount: 10, pay_account: '13****00' }],
       total: 1,
@@ -226,6 +256,7 @@ describe('legacy 提现写路径 Gate', () => {
 
     const response = await request(app)
       .get('/api/v1/withdrawals?page=1&pageSize=20')
+      .set('X-Client-Id', unitClientId)
       .set('Authorization', authorization('creator'));
 
     expect(response.status).toBe(200);

@@ -1,9 +1,21 @@
+import { unitClientId, unitSessionId } from '../support/unitAuthSession';
 import { vi } from 'vitest';
-vi.mock('../../src/db', async (original) => ({ ...await original<typeof import('../../src/db')>(), rows: vi.fn(async (sql: string) => { if (sql === 'SELECT role,is_active,admin_duty,parent_id FROM users WHERE id=?') return [{role:'creator',is_active:1,admin_duty:'all',parent_id:'2'}]; throw new Error('Unexpected query in isolated contract test'); }) }));
+vi.mock('../../src/db', async (original) => {
+  const { unitAuthRows } = await import('../support/unitAuthSession');
+  return {
+    ...(await original<typeof import('../../src/db')>()),
+    rows: vi.fn(unitAuthRows({ '1': { role: 'creator', parent_id: '2' } })),
+  };
+});
 import request from 'supertest';
 import { createApp } from '../support/legacyApp';
 import { signToken } from '../../src/auth/jwt';
-import { isCompositionCategoryValid, isZonedIsoDateTime, normalizeMediaType, normalizeZonedIsoDateTime } from '../../src/modules/zhihu/zhihu/composition';
+import {
+  isCompositionCategoryValid,
+  isZonedIsoDateTime,
+  normalizeMediaType,
+  normalizeZonedIsoDateTime,
+} from '../../src/modules/zhihu/zhihu/composition';
 
 describe('作品 v2 契约', () => {
   it('兼容旧数字媒体类型并统一为知乎字符串', () => {
@@ -22,7 +34,14 @@ describe('作品 v2 契约', () => {
   });
 
   it('创建作品要求带时区发布时间且校验分类组合', async () => {
-    const token = await signToken({ id: '1', role: 'creator', parentId: '2', username: 'creator', displayName: '成员' });
+    const token = await signToken({
+      sessionId: unitSessionId('1'),
+      id: '1',
+      role: 'creator',
+      parentId: '2',
+      username: 'creator',
+      displayName: '成员',
+    });
     const base = {
       planId: '1',
       mediaType: 'KOC定向',
@@ -33,12 +52,14 @@ describe('作品 v2 契约', () => {
     };
     const missingTime = await request(createApp())
       .post('/api/v1/compositions')
+      .set('X-Client-Id', unitClientId)
       .set('Authorization', `Bearer ${token}`)
       .send(base);
     expect(missingTime.status).toBe(422);
 
     const invalidCategory = await request(createApp())
       .post('/api/v1/compositions')
+      .set('X-Client-Id', unitClientId)
       .set('Authorization', `Bearer ${token}`)
       .send({ ...base, compositionSubType: 1, releaseTime: '2026-08-13T16:05:00+08:00' });
     expect(invalidCategory.status).toBe(422);
@@ -48,7 +69,6 @@ describe('作品 v2 契约', () => {
     expect(isZonedIsoDateTime('2026-08-13T16:05:00.123Z')).toBe(true);
     expect(isZonedIsoDateTime('2026-08-13T16:05:00.1234567+08:00')).toBe(true);
     expect(isZonedIsoDateTime('2026-08-13T16:05:00')).toBe(false);
-    expect(normalizeZonedIsoDateTime('2026-08-13T16:05:00.1234567+08:00'))
-      .toBe('2026-08-13T16:05:00.123+08:00');
+    expect(normalizeZonedIsoDateTime('2026-08-13T16:05:00.1234567+08:00')).toBe('2026-08-13T16:05:00.123+08:00');
   });
 });
