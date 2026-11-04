@@ -75,6 +75,11 @@ const iconOf = (key: string): string => ICONS[key] ?? ICONS[key.split(/[-_.]/)[0
 
 /* ---------- 侧栏：桌面端固定为图标栏，第一组常开，其余组可折叠；手机端变抽屉 ---------- */
 const mobileOpen = ref(false)
+/* 顶栏：大标题随页面滚动收进半透明磨砂顶栏（交互原则 01） */
+const scrolled = ref(false)
+function onScroll() { scrolled.value = window.scrollY > 56 }
+onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }); onScroll() })
+onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 /** 弹出层（待办 / 账号菜单）；切换页面时由下方的路径监听关闭，所以要先声明 */
 const popover = ref<'todos' | 'account' | null>(null)
 const openGroups = ref<Set<number>>(new Set(props.groups.flatMap((group, i) => group.collapsed ? [] : [i])))
@@ -253,7 +258,7 @@ onBeforeUnmount(() => {
     <div class="studio-backdrop" @click="mobileOpen = false" />
 
     <section class="studio-content-shell">
-      <header class="studio-header" :data-home="isHome">
+      <header class="studio-header" :data-home="isHome" :data-scrolled="scrolled">
         <div class="header-context">
           <button type="button" class="menu-toggle" aria-label="打开菜单" @click="mobileOpen = !mobileOpen">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>

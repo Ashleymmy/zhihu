@@ -239,14 +239,28 @@ code, kbd, pre, samp { font-family: var(--font-code); }
 
 /* 顶部一行：首页是衬线大问候 + 日期，其他页是当前页名；右侧搜索与待办 */
 .studio-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   max-width: var(--page-w);
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   margin: 0 auto;
-  padding: 22px 28px 0 10px;
+  padding: 22px 28px 10px 10px;
+  transition: background 0.3s, backdrop-filter 0.3s, box-shadow 0.3s;
 }
+.studio-header[data-scrolled="true"] {
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  box-shadow: 0 1px 0 var(--line-soft);
+}
+.shell-greet h1 { transition: font-size 0.35s var(--ease-out); }
+.studio-header[data-scrolled="true"] .shell-greet h1 { font-size: 19px; }
+.shell-greet p { max-height: 24px; transition: opacity 0.22s, max-height 0.3s, margin 0.3s; }
+.studio-header[data-scrolled="true"] .shell-greet p { max-height: 0; margin-top: 0; opacity: 0; }
 .header-context { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .menu-toggle { display: none; width: 38px; height: 38px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--ink-soft); background: var(--white); }
 .shell-greet { display: grid; min-width: 0; }
