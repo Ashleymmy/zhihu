@@ -1091,7 +1091,7 @@ describe('关键词与推广作品使用同一计划关联', () => {
     const result=await listWorks(creator,linkedScope,1,200);
     const joined=result.list.filter(w=>w.plan_id===created.planId);
     expect(result.total).toBe(131);expect(joined).toHaveLength(1);
-    expect(joined[0]).toMatchObject({id:evidence.id,source:'evidence',status:'pending',verification_status:'pending'});
+    expect(joined[0]).toMatchObject({id:evidence.id,source:'evidence',status:'passed',verification_status:'passed'});
     expect(joined[0].composition_id).not.toBeNull();
     expect((await listWorks(creator,linkedScope,1,25,{search:'联动核验'})).total).toBe(1);
     await c.query('UPDATE compositions SET title=? WHERE id=?',['原作品标题独立检索',joined[0].composition_id]);

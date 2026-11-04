@@ -13,6 +13,7 @@ import { assertKeywordReady } from './keyword-usability';
 import { blockIncome } from '../../../core/finance';
 import { refreshUnconfirmedKeyword } from './automatic-repair';
 import { internalPerformance } from './executor';
+import { reconcileWorkReceipts, reconcileWorkReview, recordWorkReview, rejectedWork, submittedWorkSql } from './work-receipts';
 
 export async function submitEvidence(
   user: AuthUser,
@@ -46,6 +47,7 @@ export async function insertEvidence(
     user.sub,
   ]);
   await audit(c, user, 'evidence.submit', id, { bindingId: input.bindingId });
+  await reconcileWorkReceipts(c, scope, String(word.id), 'evidence.submit', user.sub);
   await refreshUnconfirmedKeyword(c,scope,String(word.id));
   return { id };
 }
@@ -69,18 +71,29 @@ export async function reviewEvidence(
     )
       fail('仅管理员或非本人作品的所属团长可核验', 403);
     const [e] = await select(c, 'SELECT * FROM zh_evidence WHERE id=? FOR UPDATE', [id]);
-    if (e.status !== 'pending') fail('作品已核验', 409);
+    if (accept && e.status === 'passed') return { id };
+    if (e.status === 'rejected') fail('作品已退回，请先更正作品', 409);
+    if (accept) {
+      const linked = await select(c, `SELECT co.*,(${submittedWorkSql}) has_receipt FROM compositions co
+        JOIN zh_keywords k ON k.plan_id=co.plan_id WHERE k.id=? AND BINARY co.promo_url=BINARY ? FOR UPDATE`,
+        [binding.keyword_id, e.work_url]);
+      if (linked.some(work => String(work.owner_id) !== String(binding.executor_id))) fail('作品属于其他执行人，请先核实原作品归属', 409);
+      if (linked.some(rejectedWork)) fail('作品已被退回，请先更正原作品', 409);
+      if (linked.some(work => Number(work.has_receipt) !== 1)) fail('作品尚未报送成功，请先处理报送结果', 409);
+    }
     await c.query('UPDATE zh_evidence SET status=?,reviewed_by=?,reason=?,reviewed_at=NOW(3) WHERE id=?', [
       accept ? 'passed' : 'rejected',
       user.sub,
       reason,
       id,
     ]);
-    if (accept && binding.verification_status !== 'disputed')
-      await c.query("UPDATE zh_keyword_bindings SET verification_status='passed',version=version+1 WHERE id=?", [
-        binding.id,
+    if (binding.verification_status !== 'disputed')
+      await c.query('UPDATE zh_keyword_bindings SET verification_status=?,version=version+1 WHERE id=? AND verification_status<>?', [
+        accept ? 'passed' : 'pending', binding.id, accept ? 'passed' : 'pending',
       ]);
-    await audit(c, user, 'evidence.review', id, { accept, reason });
+    await recordWorkReview(c, String(binding.id), 'manual-evidence-review-v1', accept ? 'passed' : 'rejected', {
+      userId: user.sub, action: 'zhihu.evidence.review', resourceType: 'zh_attribution', resourceId: id, detail: { accept, reason },
+    }, { evidenceId: id });
     await refreshUnconfirmedKeyword(c,scope,String(binding.keyword_id));
     return { id };
   });
@@ -269,6 +282,11 @@ async function confirmEntry(
   if (String(previous?.id ?? '') !== String(entry.previous_entry_id ?? '')) fail('应付基数已变化，请刷新草稿', 409);
   const [binding] = await select(c, 'SELECT * FROM zh_keyword_bindings WHERE id=? FOR SHARE', [entry.binding_id]);
   if (binding.verification_status !== 'passed' && currentResult?.reason_code!=='REPORT_WITHDRAWN') fail('首次作品尚未通过核验或绑定存在争议', 409);
+  if (currentResult?.reason_code !== 'REPORT_WITHDRAWN') {
+    const workReview = await reconcileWorkReview(c, scope, String(fact.keyword_id), { apply: false, lock: true, trigger: 'finance.confirm' });
+    const currentWork = workReview.find(item => item.bindingId === String(entry.binding_id));
+    if (currentWork?.status === 'blocked') fail('作品资料已变化，请先处理作品问题后确认', 409);
+  }
   const pending = await select(c, "SELECT id FROM zh_metric_revisions WHERE fact_id=? AND status='pending' LIMIT 1", [
     fact.id,
   ]);

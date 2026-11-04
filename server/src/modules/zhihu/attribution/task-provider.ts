@@ -55,7 +55,6 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
     word.legacy_mode === 'historical_registered' &&
     word.binding_id &&
     word.used_ever_at &&
-    word.verification_status !== 'passed' &&
     !word.released_at &&
     !word.stop_new_use_at &&
     word.release_status !== 'requested'
@@ -67,12 +66,12 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
           label: '核实作品争议',
           fields: [{ key: 'reason', label: '核实结果', type: 'textarea', required: true }],
         });
-    } else if (word.evidence_status === 'pending') {
+    } else if (['pending', 'passed'].includes(String(word.evidence_status))) {
       if (
         staff ||
         (user.role === 'leader' && String(word.leader_id) === user.sub && String(word.executor_id) !== user.sub)
       ) {
-        result.push({ key: 'history-accept', label: '历史作品核验通过' });
+        if (word.evidence_status === 'pending') result.push({ key: 'history-accept', label: '历史作品核验通过' });
         result.push({
           key: 'history-return',
           label: '退回补充历史作品',
@@ -80,6 +79,7 @@ function actions(word: RecordRow, user: AuthUser, scope: TaskScope, options: Opt
         });
       }
     } else if (
+      word.verification_status !== 'passed' &&
       word.plan_status === 'active' &&
       (staff || String(word.executor_id) === user.sub || String(word.leader_id) === user.sub)
     )
@@ -595,7 +595,9 @@ export const zhihuTaskProvider: ModuleTaskProvider = {
   async execute(scope, user, id, action, input, key) {
     const word = await one(scope, user, id),
       config = await resources.options(user, scope);
-    if (!actions(word, user, scope, config).some((a) => a.key === action && !a.path))
+    const acceptedReplay = action === 'history-accept' && word.legacy_mode === 'historical_registered'
+      && word.evidence_status === 'passed' && word.verification_status === 'passed';
+    if (!acceptedReplay && !actions(word, user, scope, config).some((a) => a.key === action && !a.path))
       throw new AppError(403, 40301, '当前任务不能执行此操作，请刷新查看');
     if (action === 'history-submit')
       await submitEvidence(user, scope, key, {

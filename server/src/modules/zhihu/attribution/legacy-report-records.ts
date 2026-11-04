@@ -7,6 +7,7 @@ import {audit,insert,select} from './store';
 import {normalizedName} from './matching';
 import {lockKeywordSpace} from './resources';
 import {teamLeader} from './relationships';
+import {reconcileWorkReceipts} from './work-receipts';
 
 // Discover the original record before suggesting a different spelling. No money
 // or other project's records are exposed in the operations analysis.
@@ -40,15 +41,15 @@ export async function adoptLegacyReportRecord(c:PoolConnection,user:AuthUser,sco
  if(!owner||!['developer','admin','operator','leader','creator'].includes(String(owner.role)))fail('原执行人记录无效，请先核对',409);
  const staff=isStaffRole(String(owner.role)),leaderId=staff?null:owner.role==='leader'?owners[0]:await teamLeader(c,scope,owner);
  const path=staff?'staff_self':owner.role==='leader'?'leader_self':leaderId?'team_creator':'direct_creator';
- const passed=works.some(w=>w.sync_status==='synced'&&String(w.zhihu_composition_id??'').trim()&&w.status!=='ended');
  if(!works[0].release_day)fail('旧作品未登记实际发布日期，请先核对原作品日期',409);
  const id=await insert(c,`INSERT INTO zh_keywords(account_id,project_id,task_id,channel_mapping_id,plan_id,keyword,created_by,upstream_status,legacy_mode,lifecycle_status,used_ever_at)
    VALUES(?,?,?,?,?,?,?,'created','historical_registered','active',NOW(3))`,[scope.accountId,scope.projectId,candidates[0].task_id,mappingId,planId,plan.keyword,plan.created_by]);
  const bindingId=await insert(c,`INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,assigned_at,used_at,activated_on,verification_status,relation_snapshot)
-   VALUES(?,?,?,?,?,NOW(3),?,?,?)`,[id,path,leaderId,owners[0],works[0].release_time,works[0].release_day,passed?'passed':'pending',JSON.stringify({source:'original-record',planId,ownerId:owners[0],confirmedBy:user.sub})]);
+   VALUES(?,?,?,?,?,NOW(3),?,?,?)`,[id,path,leaderId,owners[0],works[0].release_time,works[0].release_day,'pending',JSON.stringify({source:'original-record',planId,ownerId:owners[0],confirmedBy:user.sub})]);
  await c.query('UPDATE zh_keywords SET current_binding_id=? WHERE id=?',[bindingId,id]);
  // Repair the old pending flag only when a successful create receipt exists.
  await c.query("UPDATE plans SET status='active' WHERE id=? AND status='pending'",[planId]);
+ const passed=await reconcileWorkReceipts(c,scope,id,'keyword.adopt-original',user.sub);
  if(!passed)await insert(c,'INSERT INTO zh_evidence(binding_id,work_url,description,submitted_by) VALUES(?,?,?,?)',[bindingId,works[0].promo_url,'沿用原记录中的历史作品，待核验',user.sub]);
  await audit(c,user,'keyword.adopt-original',id,{planId,bindingId,executorId:owners[0],workIds:works.map(w=>String(w.id)),verification:passed?'passed':'pending'});
  return id;

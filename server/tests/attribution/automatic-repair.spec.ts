@@ -75,15 +75,15 @@ it('历史作品待办按项目和实际执行人隔离，财务不能读取运�
  expect(await todos(creator)).toContainEqual(expect.objectContaining({kind:'work.historical.submit',count:1,path:expect.stringContaining('/works?')}));
  expect((await todos(finance)).some((todo:any)=>todo.kind.startsWith('work.historical.'))).toBe(false);
 });
-it('提交历史作品不触发推送，核验同一事务更新拉新、拉活且拒绝越权核验',async()=>{
+it('历史作品登记时默认通过并更新拉新拉活，旧核验入口仍拒绝越权',async()=>{
  process.env.ZHIHU_ACTIVATION_ENABLED='true';
  const activation=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,拉活量,结算金额\n${date},分析渠道,${current.keyword},5,10`),'activation')).id;
  const before=await q('SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[current.wordId]);
  const {enqueue}=await import('../../src/modules/zhihu/queue');vi.mocked(enqueue).mockClear();
  const submitted=await submit(current.bindingId);expect(submitted.status,submitted.text).toBe(201);evidenceId=submitted.body.data.id;
- expect(await todos(ops)).toContainEqual(expect.objectContaining({kind:'work.historical.review',count:1}));
+ expect((await todos(ops)).some((todo:any)=>todo.kind==='work.historical.review')).toBe(false);
  expect((await todos(creator)).some((todo:any)=>todo.kind.startsWith('work.historical.'))).toBe(false);
- expect((await get(current.id)).body.data.totals.confirmableAmount).toBe('0.0000');
+ expect((await get(current.id)).body.data.totals.confirmableAmount).toBe('32.0000');
  for(const actor of [finance,creator,leader])expect((await review(evidenceId,actor)).status).toBe(403);
  const accepted=await review(evidenceId);expect(accepted.status,accepted.text).toBe(200);
  const after=await q('SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? ORDER BY id',[current.wordId]);expect(after.map(row=>row.id)).toEqual(before.map(row=>row.id));expect(after.every((row,index)=>row.current_result_id!==before[index].current_result_id)).toBe(true);
@@ -99,14 +99,24 @@ it('核验后的新作品不改写已经确认的报表结果、账单和资金'
  const before=await snapshot(),added=await submit(current.bindingId);expect(added.status).toBe(201);
  expect((await review(added.body.data.id)).status).toBe(200);expect(await snapshot()).toEqual(before);
 });
-it('自动更新失败会撤回核验结果，重试和并发核验只成功一次',async()=>{
- const work=await history(),added=await submit(work.bindingId),id=added.body.data.id;
+it('登记自动更新失败回滚作品审核审计和核算，重试并发登记保持幂等',async()=>{
+ const work=await history();
  const before=await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId]);
+ const audits=await q('SELECT * FROM audit_logs ORDER BY id');
  await c.query("CREATE TRIGGER fail_work_repair BEFORE INSERT ON zh_attribution_results FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated work repair rollback'");
- try{expect((await review(id)).status).toBe(500);}finally{await c.query('DROP TRIGGER fail_work_repair');}
- expect((await q('SELECT status FROM zh_evidence WHERE id=?',[id]))[0].status).toBe('pending');expect(await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId])).toEqual(before);
- const savedKey=key(),responses=await Promise.all([review(id,ops,true,savedKey),review(id)]);expect(responses.map(response=>response.status).sort()).toEqual([200,409]);
- const winner=responses[0].status===200?savedKey:null;if(winner)expect((await review(id,ops,true,winner)).status).toBe(200);
+ try{expect((await submit(work.bindingId)).status).toBe(500);}finally{await c.query('DROP TRIGGER fail_work_repair');}
+ expect(await q('SELECT * FROM zh_evidence WHERE binding_id=?',[work.bindingId])).toHaveLength(0);
+ expect(await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId])).toEqual(before);
+ expect(await q('SELECT * FROM audit_logs ORDER BY id')).toEqual(audits);
+ const nonce=key(),body={...scope,bindingId:work.bindingId,url:'https://example.com/retry-work',description:'重试作品',requestKey:nonce};
+ const retry=()=>request(app).post('/api/v1/modules/zhihu/evidence').set(headers[creator.sub]).send(body);
+ const responses=await Promise.all([retry(),retry()]);expect(responses.map(response=>response.status)).toEqual([201,201]);
+ expect(responses[0].body.data).toEqual(responses[1].body.data);expect((await retry()).body.data).toEqual(responses[0].body.data);
+ expect(await q('SELECT * FROM zh_evidence WHERE binding_id=?',[work.bindingId])).toHaveLength(1);
+ const saved=await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId]);
+ const reviewed=await Promise.all([review(responses[0].body.data.id),review(responses[0].body.data.id)]);
+ expect(reviewed.map(response=>response.status)).toEqual([200,200]);
+ expect(await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[work.bindingId])).toEqual(saved);
 });
 it('收到真实知乎回执后自动核验作品并更新未确认金额，重复回执保持不变',async()=>{
  const resources=await import('../../src/modules/zhihu/attribution/resources');
@@ -170,7 +180,7 @@ it.each(['2026-10-01 12:00:00',null])('同期多人或日期不清时直接核�
  const done=await reviewExisting(ops);expect(done.status,done.text).toBe(200);
  view=await workbench.overview(finance,scope,{from:'2026-10-04',to:'2026-10-04'});
  expect(view.entries.find(e=>e.keywordId===word.id)).toMatchObject({ready:true,amount:'8.0000'});
- expect(await q('SELECT * FROM compositions WHERE plan_id=?',[word.planId])).toEqual(before);expect((await reviewExisting(ops)).status).toBe(409);
+ expect(await q('SELECT * FROM compositions WHERE plan_id=?',[word.planId])).toEqual(before);const acceptedBinding=await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[binding.id]);expect((await reviewExisting(ops)).status).toBe(200);expect(await q('SELECT * FROM zh_keyword_bindings WHERE id=?',[binding.id])).toEqual(acceptedBinding);
 });
 it('上游明确退回的作品不被自动或人工绕过，部署修复可预览且不改变已确认账',async()=>{
  const {word,binding,compositionId}=await receiptCase('保留真实退回状态','2026-09-23 12:00:00');

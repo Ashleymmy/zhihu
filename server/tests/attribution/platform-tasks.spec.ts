@@ -358,9 +358,13 @@ it('continues historical work submission, return and verification inside task de
     ).status,
   ).toBe(200);
   const waiting = (await detail(historicalId, independent)).body.data;
-  expect(waiting.status.label).toBe('历史作品待核验');
+  expect(waiting.status.label).toBe('生效中');
   expect(waiting.actions.some((a: { key: string }) => a.key === 'history-accept')).toBe(false);
   expect((await action(historicalId, 'history-accept', {}, independent)).status).toBe(403);
+  for (const actor of [independent, finance])
+    expect((await action(historicalId, 'history-return', { reason: '越权退回' }, actor)).status).toBe(403);
+  expect((await action(historicalId, 'history-accept', {}, ops)).status).toBe(200);
+  expect((await action(historicalId, 'history-accept', {}, ops)).status).toBe(200);
   expect((await action(historicalId, 'history-return', { reason: '补充完整作品链接' }, ops)).status).toBe(200);
   const returned = (await detail(historicalId, independent)).body.data;
   expect(returned.next.text).toBe('补充完整作品链接');

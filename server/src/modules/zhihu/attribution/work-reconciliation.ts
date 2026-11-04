@@ -3,10 +3,10 @@ import { withTransaction } from '../../../db';
 import { assertDuty } from '../../../core/duties';
 import type { Scope } from './domain';
 import { audit, authorize, scopeLock, select } from './store';
-import { unconfirmedFactSql } from './keyword-usability';
 import { refreshUnconfirmedKeyword } from './automatic-repair';
+import { reconcileWorkReview, type WorkReviewItem } from './work-receipts';
 
-/** Explicit release repair. Default is read-only; no upstream calls or bill confirmation. */
+/** Release repair is read-only by default and never confirms financial entries. */
 export async function reconcileRegisteredWorks(user: AuthUser, scope: Scope, apply = false) {
   assertDuty(user, 'finance');
   await authorize(user, scope);
@@ -15,21 +15,43 @@ export async function reconcileRegisteredWorks(user: AuthUser, scope: Scope, app
     const words = await select(
       c,
       `SELECT CAST(k.id AS CHAR) id FROM zh_keywords k
-    WHERE k.account_id=? AND k.project_id=? AND k.current_binding_id IS NOT NULL
-    AND EXISTS(SELECT 1 FROM compositions co WHERE co.plan_id=k.plan_id)
-    AND EXISTS(SELECT 1 FROM zh_metric_facts f JOIN zh_engine_routes route ON route.account_id=f.account_id AND route.project_id=f.project_id
-      WHERE f.keyword_id=k.id AND route.mode<>'stopped' AND f.business_date>=route.exclusive_from AND ${unconfirmedFactSql()})
-    ORDER BY k.id`,
+      WHERE k.account_id=? AND k.project_id=? AND EXISTS(
+        SELECT 1 FROM zh_keyword_bindings b WHERE b.keyword_id=k.id AND (b.used_at IS NOT NULL OR EXISTS(SELECT 1 FROM zh_evidence e WHERE e.binding_id=b.id)))
+      ORDER BY k.id${apply ? ' FOR UPDATE' : ''}`,
       [scope.accountId, scope.projectId],
     );
+    const items: WorkReviewItem[] = [];
     let refreshed = 0;
-    if (apply) {
-      for (const word of words) refreshed += await refreshUnconfirmedKeyword(c, scope, String(word.id));
+    for (const word of words) {
+      const decisions = await reconcileWorkReview(c, scope, String(word.id), {
+        apply,
+        trigger: 'work.reconcile-existing',
+        actorId: user.sub,
+      });
+      items.push(...decisions);
+      if (decisions.some((item) => item.changed))
+        refreshed += await refreshUnconfirmedKeyword(c, scope, String(word.id));
+    }
+    const changed = items.filter((item) => item.changed).length;
+    if (changed)
       await audit(c, user, 'work.reconcile-existing', scope.projectId, {
-        keywordIds: words.map((w) => w.id),
+        keywordIds: words.map((word) => word.id),
+        changed,
         refreshed,
       });
-    }
-    return { apply, keywordIds: words.map((w) => String(w.id)), records: words.length, refreshed };
+    return {
+      apply,
+      keywordIds: words.map((word) => String(word.id)),
+      records: words.length,
+      refreshed,
+      changed,
+      eligible: items.filter((item) => item.status === 'ready' || item.status === 'applied').length,
+      blocked: items.filter((item) => item.status === 'blocked').length,
+      blockedSources: items.reduce(
+        (total, item) => total + item.sources.filter((source) => source.status === 'blocked').length,
+        0,
+      ),
+      items,
+    };
   });
 }

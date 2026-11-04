@@ -14,6 +14,7 @@ import { compositionPlanScope } from './composition-access';
 import { assertKeywordReady } from '../attribution/keyword-usability';
 import { compositionLinkProblem, submissionFailure } from './submission-feedback';
 import { businessDay } from '../attribution/domain';
+import { compositionVerificationSql } from '../attribution/work-receipts';
 
 interface CountRow extends RowDataPacket {
   total: number;
@@ -126,7 +127,7 @@ export async function listCompositions(user: AuthUser, query: Record<string, unk
   const clause = where.join(' AND ');
   const [count] = await rows<CountRow>(`SELECT COUNT(*) total FROM compositions c JOIN plans p ON p.id=c.plan_id WHERE ${clause}`, bindings);
   const list = await rows<ItemRow>(
-    `SELECT c.*, p.keyword, p.channel_id, ch.name channel_name,p.sync_status plan_sync_status,p.sync_error plan_sync_error,
+    `SELECT c.*, ${compositionVerificationSql} platform_verification_status, p.keyword, p.channel_id, ch.name channel_name,p.sync_status plan_sync_status,p.sync_error plan_sync_error,
             CAST(p.project_id AS CHAR) keyword_project_id,
             CAST(${planAccountSql()} AS CHAR) keyword_account_id,
             u.display_name assignee_name
@@ -169,7 +170,7 @@ export async function getComposition(user: AuthUser, id: string) {
   }
 
   const scope = compositionVisibility(user);
-  const [item] = await rows<ItemRow>(`SELECT c.* FROM compositions c WHERE c.id = ? AND ${scope.clause} LIMIT 1`, [
+  const [item] = await rows<ItemRow>(`SELECT c.*, ${compositionVerificationSql} platform_verification_status FROM compositions c WHERE c.id = ? AND ${scope.clause} LIMIT 1`, [
     id,
     ...scope.bindings,
   ]);

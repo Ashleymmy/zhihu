@@ -244,6 +244,9 @@ it('团队流水使用上游报表并保留原执行归属，缺金额和撤销�
   }
 });
 it('全部阻塞时确认不启用、不写启用审计，并缓存零确认回执', async () => {
+  const blockedBindings = await q('SELECT CAST(id AS CHAR) id FROM zh_keyword_bindings WHERE used_at IS NOT NULL');
+  for (const binding of blockedBindings)
+    await statements.disputeBinding(ops, scope, binding.id, key(), false, '隔离验证真实争议阻塞');
   const period = { from: day, to: day },
     v = await workbench.overview(fin, scope, period),
     k = key();
@@ -252,8 +255,8 @@ it('全部阻塞时确认不启用、不写启用审计，并缓存零确认回�
   expect((await q('SELECT mode FROM zh_engine_routes'))[0].mode).toBe('trial');
   expect(await workbench.confirmBills(fin, scope, period, k, v.reviewHash)).toEqual(first);
   await expect(workbench.confirmBills(fin, scope, period, k, '0'.repeat(64))).rejects.toThrow('同一幂等键');
-  for (const e of (await statements.listEvidence(admin, scope, 1, 100)).list)
-    await statements.reviewEvidence(ops, scope, String(e.id), key(), true, '测试核验');
+  for (const binding of blockedBindings)
+    await statements.disputeBinding(ops, scope, binding.id, key(), true, '隔离争议已核实');
 });
 it('金额异议归属于收益本人，公共确认不能绕过，允许多轮回复', async () => {
   const mine = await get(a, '/api/v1/core/earnings/mine', { ...scope, from: day, to: day });

@@ -10,9 +10,10 @@ export async function confirmSubmittedWorks(compositionId: string | null = null)
     const scopes = await select(
       c,
       `SELECT DISTINCT k.account_id,k.project_id FROM zh_keywords k
-      JOIN compositions co ON co.plan_id=k.plan_id JOIN projects p ON p.id=k.project_id AND p.is_enabled=1
+      JOIN projects p ON p.id=k.project_id AND p.is_enabled=1
       JOIN integration_accounts a ON a.id=k.account_id AND a.status='active'
-      WHERE (? IS NULL OR co.id=?) ORDER BY k.account_id,k.project_id`,
+      WHERE (? IS NULL OR EXISTS(SELECT 1 FROM compositions co WHERE co.plan_id=k.plan_id AND co.id=?))
+      AND EXISTS(SELECT 1 FROM zh_keyword_bindings b WHERE b.keyword_id=k.id) ORDER BY k.account_id,k.project_id`,
       [compositionId, compositionId],
     );
     let changed = 0;
@@ -21,12 +22,12 @@ export async function confirmSubmittedWorks(compositionId: string | null = null)
       await scopeLock(c, scope);
       const words = await select(
         c,
-        `SELECT DISTINCT k.id FROM zh_keywords k JOIN compositions co ON co.plan_id=k.plan_id
-        WHERE k.account_id=? AND k.project_id=? AND (? IS NULL OR co.id=?) ORDER BY k.id`,
+        `SELECT k.id FROM zh_keywords k
+        WHERE k.account_id=? AND k.project_id=? AND (? IS NULL OR EXISTS(SELECT 1 FROM compositions co WHERE co.plan_id=k.plan_id AND co.id=?)) ORDER BY k.id`,
         [scope.accountId, scope.projectId, compositionId, compositionId],
       );
       for (const word of words)
-        if (await reconcileWorkReceipts(c, scope, String(word.id))) {
+        if (await reconcileWorkReceipts(c, scope, String(word.id), 'work.receipt')) {
           changed++;
           await refreshUnconfirmedKeyword(c, scope, String(word.id));
         }

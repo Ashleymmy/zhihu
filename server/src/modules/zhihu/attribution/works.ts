@@ -9,7 +9,7 @@ import { compositionLinkProblem, submissionFailure } from '../services/submissio
 import { dutyAllows } from '../../../core/duties';
 import { AppError } from '../../../middleware/errors';
 import { authorize, select } from './store';
-import { submittedWorkSql } from './work-receipts';
+import { compositionVerificationSql, submittedWorkSql } from './work-receipts';
 import type { WorkRegistrationFilter, WorkRegistrationReport } from '../../../core/contracts';
 import { userIdMap } from '../../../auth/user-id';
 import { COMPOSITION_TYPES, COMPOSITION_SUB_TYPES } from '../zhihu/composition';
@@ -52,7 +52,7 @@ function workQuery(user: AuthUser, scope: Scope) {
       UNION ALL
       SELECT CONCAT('composition:',c.id) id,'composition' source,NULL binding_id,
         CAST(p.id AS CHAR) plan_id,p.keyword,c.promo_url work_url,c.title description,c.title work_title,
-        c.status,c.reject_reason reason,NULL verification_status,
+        c.status,c.reject_reason reason,${compositionVerificationSql} verification_status,
         CAST(c.owner_id AS CHAR) executor_id,u.display_name executor_name,
         CAST(c.id AS CHAR) composition_id,c.sync_status,c.sync_error,p.sync_status plan_sync_status,p.sync_error plan_sync_error,c.zhihu_status_json,c.media_type,c.media_account,c.composition_type,c.composition_sub_type,c.release_time,c.created_at,c.status composition_status,
         (SELECT MAX(t.name) FROM tasks t WHERE t.project_id=p.project_id AND t.zhihu_task_id=p.zhihu_task_id) task_name,

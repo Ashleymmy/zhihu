@@ -3,9 +3,9 @@ import { isStaffRole } from '../../../auth/roles';
 import { assertDuty, dutyAllows } from '../../../core/duties';
 import { withTransaction } from '../../../db';
 import { fail, type Scope } from './domain';
-import { authorize, select, ownBinding, mutate, bindingLock, audit } from './store';
+import { authorize, select, ownBinding, mutate, bindingLock } from './store';
 import { refreshUnconfirmedKeyword } from './automatic-repair';
-import { rejectedWork } from './work-receipts';
+import { rejectedWork, submittedWorkSql, recordWorkReview } from './work-receipts';
 
 export async function executionProgress(user: AuthUser, scope: Scope, keywordId: string) {
   await authorize(user, scope);
@@ -83,23 +83,24 @@ export async function reviewRegisteredWork(
       (user.role !== 'leader' || String(binding.leader_id) !== user.sub || String(binding.executor_id) === user.sub)
     )
       fail('仅运营或所属团长可核验作品', 403);
-    if (binding.verification_status !== 'pending' || binding.released_at || !binding.used_at)
+    if (!['pending', 'passed'].includes(String(binding.verification_status)) || binding.released_at || !binding.used_at)
       fail('执行状态已更新，请重新查看', 409);
     const [work] = await select(
       c,
-      "SELECT * FROM compositions WHERE id=? AND plan_id=? AND owner_id=? AND status<>'ended' FOR UPDATE",
+      `SELECT co.*,(${submittedWorkSql}) has_receipt FROM compositions co WHERE co.id=? AND co.plan_id=? AND co.owner_id=? AND co.status<>'ended' FOR UPDATE`,
       [input.compositionId, word.plan_id, binding.executor_id],
     );
     if (!work) fail('没有找到这位执行人的原作品', 404);
     if (rejectedWork(work)) fail('作品已被退回，请先更正原作品后再核验', 409);
+    if (Number(work.has_receipt) !== 1) fail('作品尚未报送成功，请先处理原作品的报送问题', 409);
+    if (binding.verification_status === 'passed') return { keywordId, compositionId: input.compositionId };
     await c.query("UPDATE zh_keyword_bindings SET verification_status='passed',version=version+1 WHERE id=?", [
       binding.id,
     ]);
-    await audit(c, user, 'work.review-existing', String(work.id), {
-      bindingId: input.bindingId,
-      url: work.promo_url,
-      reason: '已核对原作品和当前执行归属',
-    });
+    await recordWorkReview(c, input.bindingId, 'manual-registered-work-v1', 'passed', {
+      userId: user.sub, action: 'zhihu.work.review-existing', resourceType: 'zh_attribution', resourceId: String(work.id),
+      detail: { bindingId: input.bindingId, url: work.promo_url, reason: '已核对原作品和当前执行归属' },
+    }, { compositionId: String(work.id) });
     await refreshUnconfirmedKeyword(c, scope, keywordId);
     return { keywordId, compositionId: input.compositionId };
   });

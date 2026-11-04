@@ -47,6 +47,7 @@ async function failLocally(id: string, message: string) {
     "UPDATE compositions SET sync_status = 'failed', sync_error = ? WHERE id = ? AND sync_status = 'syncing'",
     [message, id],
   );
+  await confirmSubmittedWorks(id);
 }
 
 export async function pushComposition(data: Record<string, unknown>) {
@@ -109,10 +110,7 @@ export async function pushComposition(data: Record<string, unknown>) {
     );
   } catch (error) {
     const message = zhihuSyncErrorDetail(error);
-    await db.query(
-      "UPDATE compositions SET sync_status = 'failed', sync_error = ? WHERE id = ? AND sync_status = 'syncing'",
-      [message, id],
-    );
+    await failLocally(id, message);
     throw error;
   }
   await confirmSubmittedWorks(id);

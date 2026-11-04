@@ -82,10 +82,10 @@ it('历史执行可就地补齐并自动更新，保持原归属、岗位权限�
  expect((await post(ops,{bindingId:'999999'})).status).toBe(404);
  const nonce=key(),saved=await post(ops,{},nonce);expect(saved.status,saved.text).toBe(200);
  expect((await post(ops,{},nonce)).body.data).toEqual(saved.body.data);
- expect(await entry()).toMatchObject({amount:'24.0000',reasonCode:'WORK_UNVERIFIED',ready:false});
+ expect(await entry()).toMatchObject({amount:'24.0000',reasonCode:'',ready:true});
  expect(await q('SELECT executor_id FROM zh_keyword_bindings WHERE id=?',[binding.id])).toEqual([{executor_id:2}]);
  const jobs=await request(app).get('/api/v1/modules/zhihu/evidence/historical-tasks').set(headers[ops.sub]).query({...scope,keywordId:word.id,page:1,pageSize:25});
- expect(jobs.body.data.list).toHaveLength(1);expect(jobs.body.data.list[0].canReview).toBe(true);
+ expect(jobs.body.data.list).toHaveLength(0);
  const verified=await request(app).post('/api/v1/modules/zhihu/evidence/'+saved.body.data.evidenceId+'/review').set(headers[ops.sub]).send({...scope,accept:true,reason:'已核对原作品',requestKey:key()});expect(verified.status,verified.text).toBe(200);
  expect(await entry()).toMatchObject({ready:true,reasonCode:''});
  const before=await workbench.overview(finance,scope,{from:date,to:date});await workbench.confirmBills(finance,scope,{from:date,to:date},key(),before.reviewHash);

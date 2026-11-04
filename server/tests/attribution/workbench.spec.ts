@@ -89,12 +89,12 @@ describe('简化工作台完整资金流程',()=>{
   expect((await request(app).patch('/api/v1/core/staff/1').set('X-Client-Id','workbench-client-1').set('Authorization','Bearer '+tokens['1']).send({duty:'finance'})).status).toBe(409);
   expect((await post(fin,'/api/v1/core/staff',{username:'bad',displayName:'越权',duty:'operations'})).status).toBe(403);
  });
- it('上传后自动读取65单，待审核作品不能提前入账',async()=>{
+ it('上传后读取65单并复用默认通过作品，财务确认前不入账',async()=>{
   const file=report();
   const result=await request(app).post(path('/workbench/import')).set('X-Client-Id','workbench-client-8').set('Authorization','Bearer '+tokens['8']).field('projectId',scope.projectId).field('accountId',scope.accountId).attach('file',file.buffer,'联测.xlsx');
   expect(result.status,result.text).toBe(202);batch=result.body.data.id;
   const v=await workbench.overview(fin,scope,{from:day,to:day});
-  expect(v.summary.orders).toBe('65');expect(v.summary.payable).toBe('547.5000');expect(v.entries.every(e=>!e.ready)).toBe(true);
+  expect(v.summary.orders).toBe('65');expect(v.summary.payable).toBe('547.5000');expect(v.entries.every(e=>e.ready)).toBe(true);
   expect((await finance.financeOverview(a,common())).balance?.confirmed).toBe('0.0000');
  });
  it('部分错误与汇总行不影响正常订单，全部错误也保留读取结果',async()=>{
@@ -196,6 +196,25 @@ describe('简化工作台完整资金流程',()=>{
   await expect(finance.paymentProof(b,common(),withdrawal)).rejects.toThrow('无权');
   await expect(finance.paymentProof(leader,common(),withdrawal)).rejects.toThrow('无权');
   await expect(finance.recordPayment(fin,common(),withdrawal,{reference:'changed',paidOn:day},proof)).rejects.toThrow('不能重复修改');
+ });
+ it('存量默认审核处理保留已付款、已确认账目及资金来源原值',async()=>{
+  const tables=['zh_statement_entries','opc_income_sources','opc_income_entries','opc_withdrawals','opc_withdrawal_terms','opc_payment_changes'];
+  const snapshot=()=>Promise.all(tables.map(table=>q('SELECT * FROM '+table+' ORDER BY 1')));
+  const before=await snapshot();
+  const {readFile}=await import('node:fs/promises');
+  const migration=await readFile('schema/zhihu/041_work_review_records.sql','utf8');
+  for(let repeat=0;repeat<2;repeat++)for(const statement of migration.split(';').filter(text=>text.trim()))await c.query(statement);
+  expect(await snapshot()).toEqual(before);
+  await c.query("UPDATE zh_keyword_bindings SET verification_status='pending' WHERE id=?",[bindingA]);
+  await c.query("UPDATE zh_evidence SET status='pending',reviewed_at=NULL,reviewed_by=NULL WHERE binding_id=?",[bindingA]);
+  const {reconcileRegisteredWorks}=await import('../../src/modules/zhihu/attribution/work-reconciliation');
+  const preview=await reconcileRegisteredWorks(fin,scope);
+  expect(preview.items.find(item=>item.bindingId===bindingA)?.status).toBe('ready');
+  expect(await snapshot()).toEqual(before);
+  const applied=await reconcileRegisteredWorks(fin,scope,true);expect(applied.changed).toBeGreaterThan(0);
+  expect(await snapshot()).toEqual(before);
+  await reconcileRegisteredWorks(fin,scope,true);expect(await snapshot()).toEqual(before);
+  expect((await finance.financeOverview(a,common())).balance?.paid).toBe('232.0000');
  });
  it('同一来源部分已开放、部分待开放的减额保持准确，旧收入不可覆盖',async()=>{
   const {withTransaction}=await import('../../src/db');
