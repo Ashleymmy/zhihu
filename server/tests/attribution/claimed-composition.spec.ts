@@ -119,6 +119,10 @@ const admin = user('1', 'admin'),
   team = user('3', 'creator', '2'),
   direct = user('4', 'creator'),
   other = user('5', 'creator');
+const operator = { ...user('6', 'operator'), adminDuty: 'operations' as const };
+const operationsAdmin = { ...user('7', 'admin'), adminDuty: 'operations' as const };
+const developer = user('8', 'developer');
+const finance = { ...user('9', 'admin'), adminDuty: 'finance' as const };
 let container: StartedMySqlContainer, c: Connection, pool: typeof import('../../src/db').db;
 let resources: typeof import('../../src/modules/zhihu/attribution/resources');
 let works: typeof import('../../src/modules/zhihu/services/compositions.service');
@@ -191,6 +195,10 @@ beforeAll(async () => {
     "INSERT INTO users(id,username,password_hash,role,display_name,parent_id) VALUES(1,'admin','unused','admin','管理员',NULL),(2,'leader','unused','leader','团长',NULL),(3,'team','unused','creator','团队达人',2),(4,'direct','unused','creator','天舒回归',NULL),(5,'other','unused','creator','他人',NULL)",
   );
   await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,4),(1,5)');
+  for (const staff of [operator, operationsAdmin, developer, finance]) {
+    await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',
+      [staff.sub, staff.username, 'unused', staff.role, staff.displayName, staff.adminDuty ?? 'all']);
+  }
   const [accounts] = await c.query<RowDataPacket[]>('SELECT id FROM integration_accounts LIMIT 1');
   scope.accountId = String(accounts[0].id);
   await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'channel',1,'渠道')");
@@ -383,6 +391,106 @@ describe('领取关键词后登记作品', () => {
     } finally {
       await connection.rollback();
       connection.release();
+    }
+  });
+});
+
+describe('管理员本人领取后登记作品', () => {
+  function spreadsheet(keywordText: string) {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      ['日期', '平台id', '平台', '视频链接', '关键词'],
+      ['2026-09-29', 'isolated-staff', '小红书', 'https://xhslink.cn/o/staff-' + ++serial, keywordText],
+    ]), '作品');
+    return { originalname: 'staff-works.xlsx', buffer: XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer };
+  }
+  const importOptions = { categoryMode: 'rotate-video' };
+
+  it.each([['完整管理员', admin], ['运营管理员', operator], ['运营职责管理员', operationsAdmin], ['开发者', developer]] as const)(
+    '%s无需普通成员记录即可选择、单条提交及批量导入本人已领关键词', async (_name, staff) => {
+      const word = await keyword(staff);
+      expect((await c.query<RowDataPacket[]>('SELECT user_id FROM project_members WHERE user_id=?', [staff.sub]))[0]).toHaveLength(0);
+      actor = staff;
+      const picker = await request(app).get('/plans').query({ purpose: 'composition', keyword: '登记回归' + serial, pageSize: 100 });
+      expect(picker.status, picker.text).toBe(200);
+      expect(picker.body.data.list.some((p: { id: string }) => String(p.id) === word.planId)).toBe(true);
+      const single = await request(app).post('/compositions').send(input(word.planId));
+      expect(single.status, single.text).toBe(201);
+      const [words] = await c.query<RowDataPacket[]>('SELECT keyword FROM plans WHERE id=?', [word.planId]);
+      const file = spreadsheet(words[0].keyword);
+      const sendImport = (mode: string) => request(app).post('/compositions/import/' + mode)
+        .field('options', JSON.stringify(importOptions)).attach('file', file.buffer, file.originalname);
+      const preview = await sendImport('analyze');
+      expect(preview.status, preview.text).toBe(200);
+      expect(preview.body.data.ready).toBe(1);
+      const committed = await sendImport('commit');
+      expect(committed.status, committed.text).toBe(201);
+      expect(committed.body.data.created).toBe(1);
+      expect((await sendImport('commit')).body.data.created).toBe(0);
+      const [saved] = await c.query<RowDataPacket[]>('SELECT owner_id FROM compositions WHERE plan_id=?', [word.planId]);
+      expect(saved).toHaveLength(2);
+      expect(saved.every(row => String(row.owner_id) === staff.sub)).toBe(true);
+      const [bindings] = await c.query<RowDataPacket[]>('SELECT path_type,executor_id,used_at FROM zh_keyword_bindings WHERE id=?', [word.bindingId]);
+      expect(bindings[0].path_type).toBe('staff_self');
+      expect(String(bindings[0].executor_id)).toBe(staff.sub);
+      expect(bindings[0].used_at).not.toBeNull();
+      expect((await c.query<RowDataPacket[]>('SELECT user_id FROM project_members WHERE user_id=?', [staff.sub]))[0]).toHaveLength(0);
+    },
+  );
+
+  it('其他管理员、团长、达人和纯财务不能使用运营本人领取的词', async () => {
+    const word = await keyword(operator);
+    const [words] = await c.query<RowDataPacket[]>('SELECT keyword FROM plans WHERE id=?', [word.planId]);
+    for (const viewer of [admin, operationsAdmin, developer, leader, direct, finance]) {
+      actor = viewer;
+      const picker = await request(app).get('/plans').query({ purpose: 'composition', keyword: words[0].keyword });
+      expect(picker.status).toBe(200);
+      expect(picker.body.data.list).toHaveLength(0);
+      expect((await request(app).post('/compositions').send(input(word.planId))).status).toBe(viewer === finance ? 403 : 404);
+      const file = spreadsheet(words[0].keyword);
+      const preview = await request(app).post('/compositions/import/analyze')
+        .field('options', JSON.stringify(importOptions)).attach('file', file.buffer, file.originalname);
+      if (viewer === finance) expect(preview.status).toBe(403);
+      else { expect(preview.status, preview.text).toBe(200); expect(preview.body.data.ready).toBe(0); }
+    }
+    expect((await works.listCompositions(operator, { planId: word.planId })).total).toBe(0);
+  });
+
+  it.each(['stopped', 'released', 'release-requested', 'disabled-user', 'finance-duty', 'changed-role', 'ended', 'upstream-pending', 'conflicting-owner'])(
+    '本人执行仍拒绝不可用状态：%s', async reason => {
+      const word = await keyword(operationsAdmin);
+      const resets: (() => Promise<unknown>)[] = [];
+      if (reason === 'stopped') await c.query('UPDATE zh_keyword_bindings SET stop_new_use_at=NOW() WHERE id=?', [word.bindingId]);
+      if (reason === 'released') await c.query('UPDATE zh_keyword_bindings SET released_at=NOW() WHERE id=?', [word.bindingId]);
+      if (reason === 'release-requested') await c.query("UPDATE zh_keyword_bindings SET release_status='requested' WHERE id=?", [word.bindingId]);
+      if (reason === 'disabled-user') { await c.query('UPDATE users SET is_active=0 WHERE id=7'); resets.push(() => c.query('UPDATE users SET is_active=1 WHERE id=7')); }
+      if (reason === 'finance-duty') { await c.query("UPDATE users SET admin_duty='finance' WHERE id=7"); resets.push(() => c.query("UPDATE users SET admin_duty='operations' WHERE id=7")); }
+      if (reason === 'changed-role') { await c.query("UPDATE users SET role='creator' WHERE id=7"); resets.push(() => c.query("UPDATE users SET role='admin' WHERE id=7")); }
+      if (reason === 'ended') await c.query("UPDATE plans SET status='ended' WHERE id=?", [word.planId]);
+      if (reason === 'upstream-pending') await c.query("UPDATE plans SET sync_status='local',zhihu_plan_id=NULL WHERE id=?", [word.planId]);
+      if (reason === 'conflicting-owner') await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url) VALUES(?,4,'KOC抖音','isolated',1,1,?)", [word.planId, 'https://example.com/conflict/' + ++serial]);
+      try {
+        actor = operationsAdmin;
+        const picker = await request(app).get('/plans').query({ purpose: 'composition', pageSize: 100 });
+        expect(picker.status).toBe(200);
+        expect(picker.body.data.list.some((p: { id: string }) => String(p.id) === word.planId)).toBe(false);
+        const submitted = await request(app).post('/compositions').send(input(word.planId));
+        expect(submitted.status, submitted.text).toBe(['upstream-pending', 'conflicting-owner'].includes(reason) ? 409 : 404);
+      } finally { for (const reset of resets) await reset(); }
+    },
+  );
+
+  it('预览之后岗位发生变化，提交读取当前岗位并拒绝旧权限', async () => {
+    const word = await keyword(operationsAdmin), connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query('SELECT * FROM users WHERE id=7');
+      await connection.query('SELECT * FROM zh_keyword_bindings WHERE id=?', [word.bindingId]);
+      await c.query("UPDATE users SET admin_duty='finance' WHERE id=7");
+      await expect(works.insertComposition(operationsAdmin, input(word.planId), connection)).rejects.toMatchObject({ httpStatus: 404 });
+    } finally {
+      await connection.rollback(); connection.release();
+      await c.query("UPDATE users SET admin_duty='operations' WHERE id=7");
     }
   });
 });
