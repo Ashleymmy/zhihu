@@ -235,7 +235,7 @@ const ROLES = {
     label: '团长', who: { name: '苏禾', tag: '团长 · 20 位成员', av: '苏' },
     pages: [
       ['home', '首页', '⌂'], ['projects', '项目', '▦'], ['team', '团队', '◉', 2],
-      ['invite', '邀请', '✚'], ['income', '收益', '¥'], ['me', '我的', '◎'],
+      ['tasks', '任务', '☰'], ['invite', '邀请', '✚'], ['income', '收益', '¥'], ['me', '我的', '◎'],
     ],
   },
   operator: {
@@ -618,6 +618,40 @@ const leaderPages = {
     </div>`;
   },
   projects: () => creatorPages.projects(),
+
+  /* 团队任务：成员任务分配与作品进度（M-T04：团长导航补回任务入口） */
+  tasks() {
+    const row = (member, kw, proj, perf, state, next) => `
+      <tr data-click><td><b>${kw}</b><div class="muted" style="font-size:12px">${proj}</div></td><td>${member}</td><td class="num">${perf}</td><td>${state}</td><td style="text-align:right">${next}</td></tr>`;
+    return `<div class="bento enter">
+      <div class="card lift" style="--s:3;--i:0"><div class="card-h"><h3>待分配</h3></div><div class="big num" style="font-size:28px">3<small>个</small></div><p class="muted" style="font-size:12px">新同步的关键词，还没分配给成员</p></div>
+      <div class="card lift" style="--s:3;--i:1"><div class="card-h"><h3>进行中</h3></div><div class="big num" style="font-size:28px">14<small>个</small></div><p class="muted" style="font-size:12px">成员正在做的任务</p></div>
+      <div class="card lift" style="--s:3;--i:2"><div class="card-h"><h3>待交作品</h3></div><div class="big num" style="font-size:28px">5<small>件</small></div><p class="muted" style="font-size:12px">已分配未登记，最早分配于 3 天前</p></div>
+      <div class="card lift" style="--s:3;--i:3"><div class="card-h"><h3>退回修改</h3></div><div class="big num" style="font-size:28px;color:var(--bad)">1<small>件</small></div><p class="muted" style="font-size:12px">需要成员修改后重新提交</p></div>
+      <div class="card sheetcard" style="--s:12;--i:4">
+        <div class="sheet-toolbar">
+          <div class="seg"><button class="on">全部任务</button><button>待分配</button><button>待交作品</button><button>退回修改</button></div>
+          <div class="sp"></div>
+          <div class="sheet-search">⌕ 搜索关键词、成员</div>
+          <button class="btn ink sm">分配任务</button>
+        </div>
+        <table class="sheet-table"><thead><tr><th style="width:28%">关键词</th><th>成员</th><th>近 30 天业绩</th><th>状态</th><th style="text-align:right">下一步</th></tr></thead><tbody>
+          <tr class="sheet-group"><td colspan="5">待分配 · 3</td></tr>
+          ${row('—', '大学生职业规划', '知乎推文', '—', '<span class="chip clay">待分配</span>', '<button class="btn sm">分配</button>')}
+          ${row('—', '考研复试经验', '知乎推文', '—', '<span class="chip clay">待分配</span>', '<button class="btn sm">分配</button>')}
+          <tr class="sheet-group"><td colspan="5">待交作品 · 5</td></tr>
+          ${row('林小满', '考研英语怎么学', '知乎推文', '38 单 · ¥76.00', '<span class="chip warn">3 天未交</span>', '<button class="btn sm">提醒</button>')}
+          ${row('顾知夏', '平价护肤品推荐', '知乎推文', '26 单 · ¥52.00', '<span class="chip warn">2 天未交</span>', '<button class="btn sm">提醒</button>')}
+          <tr class="sheet-group"><td colspan="5">退回修改 · 1</td></tr>
+          ${row('唐南乔', '宿舍好物清单', '知乎推文', '0 单', '<span class="chip down">被退回</span>', '<button class="btn sm">查看原因</button>')}
+          <tr class="sheet-group"><td colspan="5">进行中 · 14</td></tr>
+          ${row('林小满', '剧荒救星', '红果短剧推荐', '214 次 · ¥171.20', '<span class="chip up">投放中</span>', '<span class="muted" style="font-size:12.5px">正常</span>')}
+          ${row('宋初九', '高效学习计划表', '知乎推文', '9 单 · ¥18.00', '<span class="chip up">投放中</span>', '<span class="muted" style="font-size:12.5px">正常</span>')}
+        </tbody></table>
+        <div class="sheet-foot"><span>已显示 8 / 23 个任务</span><span>近 30 天团队业绩合计 <b>¥335.20</b></span></div>
+      </div>
+    </div>`;
+  },
   invite: () => creatorPages.invite(),
   /* 团长收益页：任务/邀请/团队/激励四类齐全（团队收益与激励是团长核心收入） */
   income() {
