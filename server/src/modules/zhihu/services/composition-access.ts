@@ -1,5 +1,6 @@
 import { isStaffRole } from '../../../auth/roles';
 import type { AuthUser } from '../../../types';
+import { dutyAllows } from '../../../core/duties';
 import { scopeFilter } from '../../../utils/scopeFilter';
 import { readyPlanSql, ownershipConflictSql } from '../attribution/keyword-usability';
 import { independentCreatorSql } from '../attribution/relationships';
@@ -26,6 +27,12 @@ export function compositionPlanScope(user: AuthUser, currentRead = false, requir
         ? '(cb.executor_id=? OR cb.leader_id=?)'
         : 'cb.executor_id=?';
   const actorBindings = isStaffRole(user.role) ? [] : user.role === 'leader' ? [user.sub, user.sub] : [user.sub];
+  // Match resolveExecutor: operations staff execute only their own claimed words,
+  // without a synthetic project membership. Recheck their current role and duty
+  // inside the same locking read used by submission, not just the caller token.
+  const canExecuteSelf = dutyAllows(user, 'operations');
+  const staffExecution = canExecuteSelf ? `(cb.path_type='staff_self' AND cb.executor_id=? AND cb.leader_id IS NULL
+    AND executor.role=? AND (executor.role IN ('developer','operator') OR executor.admin_duty IN ('all','operations')))` : '0=1';
   const platformRegistration = isStaffRole(user.role) ? `OR (
     ck.current_binding_id IS NULL AND ck.lifecycle_status IN ('available','active')
     AND EXISTS(SELECT 1 FROM users platform_owner WHERE platform_owner.id=p.owner_id AND platform_owner.role IN ('developer','admin','operator')${lock})
@@ -51,12 +58,13 @@ export function compositionPlanScope(user: AuthUser, currentRead = false, requir
         AND ((ck.lifecycle_status IN ('assigned','active') AND cb.released_at IS NULL
             AND cb.stop_new_use_at IS NULL AND cb.release_status<>'requested'
             AND executor.id IS NOT NULL AND ${actor}
-            AND EXISTS(SELECT 1 FROM project_members member WHERE member.project_id=ck.project_id AND member.user_id=cb.executor_id AND member.left_at IS NULL${lock})
+            AND ((EXISTS(SELECT 1 FROM project_members member WHERE member.project_id=ck.project_id AND member.user_id=cb.executor_id AND member.left_at IS NULL${lock})
             AND (cb.access_preserved_at IS NOT NULL OR (cb.path_type='direct_creator' AND executor.role='creator' AND ${independentCreatorSql('executor', lock)})
               OR (cb.path_type='team_creator' AND executor.role='creator' AND executor.parent_id=cb.leader_id)
-              OR (cb.path_type='leader_self' AND executor.role='leader' AND executor.id=cb.leader_id))) ${platformRegistration})${lock}
+              OR (cb.path_type='leader_self' AND executor.role='leader' AND executor.id=cb.leader_id))) OR ${staffExecution})) ${platformRegistration})${lock}
       )
     ))`,
-    bindings: [...legacy.bindings, ...(isStaffRole(user.role) ? [] : [user.sub, user.sub]), ...actorBindings],
+    bindings: [...legacy.bindings, ...(isStaffRole(user.role) ? [] : [user.sub, user.sub]), ...actorBindings,
+      ...(canExecuteSelf ? [user.sub, user.role] : [])],
   };
 }
