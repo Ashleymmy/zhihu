@@ -258,9 +258,6 @@ function untilt(event: PointerEvent) {
 </script>
 <template>
   <section class="page-stack home-page" :aria-busy="loading">
-    <header v-if="!isMember" class="page-header"><div><h1>首页</h1><p>{{ data ? `${data.period.from} 至 ${data.period.to}` : '先处理待办，再看看这个月的进展。' }}</p></div>
-      <div class="home-controls"><label>项目<select v-model="projectId" @change="load"><option value="">全部项目</option><option v-for="project in data?.projects" :key="project.id" :value="project.id">{{ project.name }}</option></select></label><button class="ghost-aurora" @click="load" :disabled="loading">{{ loading ? '刷新中…' : '刷新' }}</button></div>
-    </header>
     <div v-if="error || unavailable" class="home-error" role="alert"><p>{{ error || '部分项目暂时没加载出来，已加载的待办仍可处理。' }}</p><button class="ghost-aurora" @click="load" :disabled="loading">重新加载</button></div>
 
     <!-- ===== 成员视图：v2 三栏（钱包+趋势+小卡矩阵+项目广场 | 右栏） ===== -->
@@ -447,91 +444,63 @@ function untilt(event: PointerEvent) {
       </div>
     </template>
 
-    <!-- ===== 员工视图：保留现有结构 ===== -->
+    <!-- ===== 员工视图：v2 三栏（职务主卡用非金额业务量，金额卡等财务账源接入后点亮） ===== -->
     <template v-else>
-    <div class="bento bento-enter">
-      <!-- 悬浮主卡 -->
-      <article v-if="isMember && (wallet || month)" class="bento-card bento-hero span-5" style="--i:0" @pointermove="tilt" @pointerleave="untilt">
-        <div class="hero-label">{{ month ? '本月收益' : '可提现余额' }}</div>
-        <div class="bento-figure"><small>¥</small><AnimatedNumber :value="toNumber(heroUnits)" :decimals="2" :text="yuan(heroUnits)" /></div>
-        <div v-if="month" class="hero-meta">
-          <div v-if="wallet"><b>¥{{ yuan(wallet.units) }}</b>可提现</div>
-          <div><b>¥{{ yuan(month.confirmed) }}</b>已确认</div>
-          <div><b>¥{{ yuan(month.pending) }}</b>待确认</div>
-        </div>
-        <svg v-if="spark" class="hero-spark" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true"><path :d="spark" pathLength="1" /></svg>
-        <div class="hero-actions">
-          <router-link class="hero-btn solid" :to="wallet?.path ?? '/income'">{{ wallet ? '去提现' : '查看收益' }}</router-link>
-          <router-link class="hero-btn glass" to="/income">收益明细 →</router-link>
-        </div>
-      </article>
+    <div class="home-toolbar">
+      <label>项目 <select v-model="projectId" @change="load"><option value="">全部项目</option><option v-for="project in data?.projects" :key="project.id" :value="project.id">{{ project.name }}</option></select></label>
+      <button class="btn" @click="load" :disabled="loading">{{ loading ? '刷新中…' : '刷新' }}</button>
+    </div>
+    <div class="home-v2">
+      <div class="bento enter">
+        <!-- 职务主卡：待办与业务概览（非金额，金额卡待 BE-08 账源） -->
+        <article class="card wallet float lift" style="--s:5;--i:0">
+          <div class="lbl">现在要做</div>
+          <div class="big num"><AnimatedNumber :value="todoTotal" :decimals="0" /><small style="font-size:16px;margin-left:4px">项待办</small></div>
+          <div class="pill">{{ todoByActor.length ? todoByActor.map(a => `${a.actor} ${a.count}`).join(' · ') : '都处理完了' }}</div>
+          <div class="acts"><router-link v-if="todos[0]" class="btn white" :to="todos[0].path">{{ todos[0].actionLabel || '去处理' }}</router-link><router-link v-else class="btn light" to="/dashboard">查看工作台</router-link></div>
+        </article>
 
-      <!-- 收益趋势 -->
-      <article v-if="isMember && trend" class="bento-card lift span-7" style="--i:1">
-        <div class="bento-head"><h2>收益趋势</h2><span class="sub">近 30 天 · 含待确认</span></div>
-        <template v-if="trend.hasData">
-          <div class="bento-legend"><span v-for="s in trend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}<b>¥{{ yuan(s.total) }}</b></span></div>
-          <TrendChart :labels="trend.labels" :series="trend.series" :height="210" :format="money" caption="近 30 天每日收益" />
-        </template>
-        <div v-else class="bento-empty"><b>最近 30 天还没有收益</b><p>完成任务、报表核对后，每天的收益会画在这里。</p><router-link class="ghost-aurora" to="/task-hall">去任务大厅</router-link></div>
-      </article>
-
-      <!-- 现在要做 -->
-      <section class="bento-card" :class="isMember && !showShareCard ? 'span-12' : 'span-8'" style="--i:2" aria-labelledby="home-todos">
-        <div class="bento-head"><h2 id="home-todos">现在要做</h2><span v-if="todos.length" class="chip clay">{{ todos.length }} 项</span></div>
-        <div v-if="todos.length" class="home-todos"><router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="home-todo"><span class="home-todo-count">{{ todo.count }}</span><div><h3>{{ todo.label }}</h3><p>{{ todo.projectName }} · {{ todo.actor }}</p></div><span class="home-todo-action">{{ todo.actionLabel }} →</span></router-link></div>
-        <div v-else-if="!loading && !error && !unavailable && data?.groups.some(group=>group.services.length)" class="bento-empty home-empty"><b>都处理完了</b><p>新的任务和需要你处理的事项会显示在这里。</p><router-link v-if="isMember" class="ghost-aurora" to="/task-hall">去任务大厅看看 →</router-link></div>
-        <p v-else-if="loading && !data" role="status">正在整理你的待办…</p>
-      </section>
-
-      <!-- 右侧：成员看收益构成，后台看待办分布 -->
-      <article v-if="showShareCard" class="bento-card lift span-4" style="--i:3">
-        <div class="bento-head"><h2>收益构成</h2><span class="sub">本月</span><span v-if="summary?.team" class="chip soft end">团队 {{ summary.team.memberCount }} 人</span></div>
-        <ShareBar v-if="composition.length" :items="composition" />
-        <p v-else class="bento-note">本月还没有收益记录。</p>
-        <template v-if="teamShare.length">
-          <div class="bento-head" style="margin-top:18px"><h3>任务与团队管理收益</h3><span class="sub">累计已确认</span></div>
-          <ShareBar :items="teamShare" />
-        </template>
-      </article>
-      <article v-else-if="!isMember" class="bento-card lift span-4" style="--i:3">
-        <div class="bento-head"><h2>待办合计</h2></div>
-        <div class="bento-figure"><AnimatedNumber :value="todoTotal" /><small style="margin-left:4px">项</small></div>
-        <ul v-if="todoByActor.length" class="home-actors"><li v-for="item in todoByActor" :key="item.actor"><span>{{ item.actor }}</span><b>{{ item.count }}</b></li></ul>
-        <p v-else class="bento-note">新的待办会实时出现在这里和顶栏铃铛里。</p>
-      </article>
-
-      <!-- 我的关系：邀请人、所在团队、我邀请的人（第二层及以下只给人数） -->
-      <article v-if="isMember && relation" class="bento-card lift span-12 home-relation" style="--i:4">
-        <div class="bento-head"><h2>我的关系</h2><span class="sub">注册即建立，永久记录</span><router-link to="/invite-center" class="bento-link">邀请中心 →</router-link></div>
-        <div class="relation-cols">
-          <div><small>谁邀请了我</small><b>{{ relation.inviter?.name ?? '自行注册' }}</b><span>{{ relation.channel }}</span></div>
-          <div><small>我所在的团队</small><b>{{ relation.team?.leaderName ? relation.team.leaderName + ' 的团队' : '平台直管' }}</b><span>团队收益按业绩当天的归属计算</span></div>
-          <div>
-            <small>我邀请的人</small><b><AnimatedNumber :value="relation.counts.direct" /><em> 人</em></b>
-            <span v-if="relation.indirectList">第二层及以下 {{ relation.counts.indirect }} 人<template v-if="relation.indirectList.length">：{{ relation.indirectList.slice(0, 8).map(p => p.name).join('、') }}{{ relation.indirectList.length > 8 ? ' 等' : '' }}</template></span><span v-else>第二层及以下 {{ relation.counts.indirect }} 人，只显示人数</span>
-            <div v-if="relation.directList.length" class="relation-avatars"><i v-for="(p, i) in relation.directList.slice(0, 6)" :key="i" :title="p.name">{{ p.name.slice(0, 1) }}</i><em v-if="relation.counts.direct > 6">+{{ relation.counts.direct - 6 }}</em></div>
-          </div>
-        </div>
-      </article>
-
-      <!-- 项目卡片 -->
-      <article v-for="(project, pi) in data?.groups ?? []" :key="project.id" class="bento-card span-12 home-project" :style="{ '--i': 4 + pi }">
-        <div class="bento-head"><h3>{{ project.name }}</h3><span class="sub">{{ data?.period.from }} 至 {{ data?.period.to }}</span></div>
-        <div v-for="service in project.services" :key="service.accountId" class="home-metrics">
-          <template v-if="service.status === 'ready'">
-            <router-link v-for="metric in service.metrics" :key="metric.key" :to="metric.path">
-              <span>{{ metric.label }}</span>
-              <strong><AnimatedNumber v-if="metric.value !== null" :value="metricNumber(metric)" :decimals="metric.unit === '元' ? 2 : 0" :text="display(metric)" /><template v-else>待核对</template><small>{{ metric.unit }}</small></strong>
-              <span class="home-metric-link">查看明细 →</span>
+        <!-- 待办列表 -->
+        <section class="card" style="--s:7;--i:1" aria-labelledby="home-todos">
+          <div class="card-h"><h3 id="home-todos">待办</h3><span v-if="todos.length" class="chip clay r">{{ todos.length }} 项</span></div>
+          <template v-if="todos.length">
+            <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row" style="text-decoration:none;color:inherit">
+              <span class="home-todo-count">{{ todo.count }}</span>
+              <div class="t"><b>{{ todo.label }}</b><small>{{ todo.projectName }} · {{ todo.actor }}</small></div>
+              <span class="home-todo-action">{{ todo.actionLabel }} →</span>
             </router-link>
           </template>
-          <p v-else-if="service.status === 'unavailable'">数据暂未加载，点击上方“重新加载”。</p>
-          <p v-else>项目首页数据暂未开放。</p>
+          <div v-else-if="!loading && !error && !unavailable" class="bento-empty home-empty"><b>都处理完了</b><p>新的待办会实时出现在这里和顶栏铃铛里。</p></div>
+          <p v-else-if="loading && !data" role="status">正在整理你的待办…</p>
+        </section>
+
+        <!-- 项目业务量 -->
+        <article v-for="(project, pi) in data?.groups ?? []" :key="project.id" class="card" style="--s:12;--i:2" :style="{ '--i': 2 + pi }">
+          <div class="card-h"><h3>{{ project.name }}</h3><span class="muted r" style="font-size:12.5px">{{ data?.period.from }} 至 {{ data?.period.to }}</span></div>
+          <div v-for="service in project.services" :key="service.accountId" class="home-metrics">
+            <template v-if="service.status === 'ready'">
+              <router-link v-for="metric in service.metrics" :key="metric.key" :to="metric.path">
+                <span>{{ metric.label }}</span>
+                <strong><AnimatedNumber v-if="metric.value !== null" :value="metricNumber(metric)" :decimals="metric.unit === '元' ? 2 : 0" :text="display(metric)" /><template v-else>待核对</template><small>{{ metric.unit }}</small></strong>
+                <span class="home-metric-link">查看明细 →</span>
+              </router-link>
+            </template>
+            <p v-else-if="service.status === 'unavailable'">数据暂未加载，点击上方「刷新」。</p>
+            <p v-else>项目首页数据暂未开放。</p>
+          </div>
+          <p v-if="!project.services.length">项目正在准备中。</p>
+        </article>
+        <article v-if="data && !data.projects.length" class="card" style="--s:12"><div class="bento-empty home-empty"><b>还没有参与的项目</b><router-link class="btn ink" to="/projects" style="margin-top:8px">设置项目 →</router-link></div></article>
+      </div>
+
+      <!-- 右栏：职务资料 + Worker（管理/开发者） -->
+      <aside class="home-aside">
+        <div class="card profile">
+          <div class="big-av">{{ (w.userName?.value ?? '我').slice(0, 1) }}</div>
+          <h4>{{ w.userName?.value ?? '我' }}</h4>
+          <p class="muted" style="font-size:12.5px">{{ w.role.value === 'operator' ? '运营管理' : w.role.value === 'developer' ? '开发者' : '管理员' }}</p>
         </div>
-        <p v-if="!project.services.length">项目正在准备中。</p>
-      </article>
-      <article v-if="data && !data.projects.length" class="bento-card span-12 home-empty"><h2>还没有参与的项目</h2><router-link :to="isMember ? '/me' : '/projects'">{{ isMember ? '查看我的团队' : '设置项目' }} →</router-link></article>
+      </aside>
     </div>
     </template>
     <OperationGuide v-if="noActivity && w.operationGuide?.value" :guide="w.operationGuide.value" />
