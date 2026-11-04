@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware';
 import { requirePermission } from '../auth/permissions';
+import { requireDuty } from '../core/duties';
 import { asyncHandler } from '../middleware/errors';
 import { validateBody } from '../middleware/validate';
 import { ok, okList } from '../utils/response';
@@ -33,7 +34,7 @@ const settleInput = z.object({
 
 /** 操作日志（admin 审计） */
 export const auditLogsRouter = Router();
-auditLogsRouter.use(requireAuth, requirePermission('audit.view'));
+auditLogsRouter.use(requireAuth, requirePermission('audit.view'), requireDuty('staff'));
 auditLogsRouter.get(
   '/',
   asyncHandler(async (req, res) => {
