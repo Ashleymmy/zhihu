@@ -78,6 +78,23 @@ const mobileOpen = ref(false)
 /** 弹出层（待办 / 账号菜单）；切换页面时由下方的路径监听关闭，所以要先声明 */
 const popover = ref<'todos' | 'account' | null>(null)
 const openGroups = ref<Set<number>>(new Set(props.groups.flatMap((group, i) => group.collapsed ? [] : [i])))
+
+/* ---------- 外观：跟随系统 / 浅色 / 深色，选择记在本机 ---------- */
+const theme = ref<'system' | 'light' | 'dark'>(readTheme())
+function readTheme(): 'system' | 'light' | 'dark' {
+  try { const v = localStorage.getItem('timo.theme'); return v === 'light' || v === 'dark' ? v : 'system' } catch { return 'system' }
+}
+function applyTheme() {
+  const dark = theme.value === 'dark' || (theme.value === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.dataset.theme = dark ? 'dark' : ''
+}
+function setTheme(next: 'system' | 'light' | 'dark') {
+  theme.value = next
+  try { localStorage.setItem('timo.theme', next) } catch { /* 隐私模式下不记住偏好 */ }
+  applyTheme()
+}
+applyTheme()
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (theme.value === 'system') applyTheme() })
 watch(() => props.currentPath, () => {
   mobileOpen.value = false
   popover.value = null
@@ -222,6 +239,12 @@ onBeforeUnmount(() => {
             <div class="shell-account-head"><span class="header-initials" aria-hidden="true">{{ initials }}</span><div><b>{{ userName }}</b><small>{{ roleLabel }}</small></div></div>
             <button type="button" role="menuitem" @click="handleNav('/me')">我的</button>
             <button type="button" role="menuitem" @click="handleNav('/account/security')">账号安全</button>
+            <div class="shell-theme" role="group" aria-label="外观">
+              <span>外观</span>
+              <div class="seg">
+                <button v-for="t in ([['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']] as const)" :key="t[0]" type="button" :class="{ on: theme === t[0] }" @click="setTheme(t[0])">{{ t[1] }}</button>
+              </div>
+            </div>
             <button type="button" role="menuitem" class="danger" @click="popover = null; emit('logout')">退出登录</button>
           </div>
         </div>

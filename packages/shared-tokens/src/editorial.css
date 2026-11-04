@@ -343,6 +343,9 @@ button.header-initials:active { transform: scale(0.92); }
 .shell-account-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line-soft); }
 .shell-account-head .header-initials { width: 36px; height: 36px; font-size: 14px; box-shadow: none; }
 .shell-account-head div { display: grid; min-width: 0; }
+.shell-theme { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 4px 4px; margin-top: 4px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12.5px; }
+.shell-theme .seg { padding: 2px; }
+.shell-theme .seg button { min-height: 26px; padding: 0 8px; font-size: 12px; }
 .shell-account-head b { font-size: 14px; }
 .shell-account-head small { color: var(--muted); font-size: 12px; }
 .shell-account button { display: block; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font-size: 14px; text-align: left; transition: background var(--dur-fast) ease; }
@@ -1491,6 +1494,48 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
 @media (prefers-reduced-motion: reduce) {
   .bento-enter > * { animation: none; }
   .bento-hero { transform: none; }
+}
+
+/* 深色下的浮层与交互态：弹层用卡片色，hover 用令牌色，移动 tabbar 深色磨砂 */
+[data-theme="dark"] .shell-popover,
+[data-theme="dark"] .quicknav-panel { background: var(--white); }
+[data-theme="dark"] .studio-nav-item:hover,
+[data-theme="dark"] .announce-close:hover { background: var(--hover); }
+@media (max-width: 950px) {
+  [data-theme="dark"] .shell-tabbar { background: rgba(36, 36, 34, 0.86); }
+}
+
+/* ===== 深色模式：跟随系统，手动覆盖并记住选择（规范 6 已确认） ===== */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #1b1b19;
+  --paper-deep: #141413;
+  --white: #242422;
+  --hover: #2b2a27;
+  --ink: #eceae4;
+  --ink-soft: #b0aea5;
+  --muted: #8a887f;
+  --line: #35342f;
+  --line-soft: #2b2a27;
+  --clay-soft: #3d2b23;
+  --sun: #d19a3a;
+  --ok-bg: #1d3325;
+  --warn-bg: #38301c;
+  --danger-bg: #3a211c;
+  --info-bg: #1d2a3d;
+  --primary-soft: var(--paper-deep);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+  /* v2 基座别名同步覆盖 */
+  --bg: var(--paper-deep);
+  --card: var(--white);
+  --card-2: #26251f;
+  --ink-2: #d6d4cd;
+  --ink-3: var(--ink-soft);
+  --faint: #5e5d59;
+  --line-2: var(--line-soft);
+  --sh: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -8px rgba(0, 0, 0, 0.42);
+  --sh-hi: 0 2px 4px rgba(0, 0, 0, 0.35), 0 22px 48px -12px rgba(0, 0, 0, 0.52);
 }
 
 /* 对话面板打开时，背后的页面轻微后退（只作用于内容区，侧栏与顶栏不动） */
