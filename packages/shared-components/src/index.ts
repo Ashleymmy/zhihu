@@ -33,6 +33,7 @@ export type { CoreWorkspace } from "./core-workspace";
 export { default as CashWallet } from "./CashWallet.vue";
 export { default as StaffManager } from "./StaffManager.vue";
 export { default as ActionDialog } from "./ActionDialog.vue";
+export { default as Sheet } from "./Sheet.vue";
 export { default as OperationGuide } from "./OperationGuide.vue";
 export type { GuideCard, OperationGuideModel } from "./operation-guide";
 

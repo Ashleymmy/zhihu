@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed,onMounted,reactive,ref,watch} from 'vue'
-import ActionDialog from './ActionDialog.vue'
+import Sheet from './Sheet.vue'
 import {createRequestKey} from '@zhihu-koc/shared-utils'
 import {cashAmount as amount,cashUnits} from './platform-earnings'
 interface Http{get<T>(path:string,params?:object):Promise<T>;post<T>(path:string,data?:unknown):Promise<T>;postForm<T>(path:string,data:FormData):Promise<T>;getBlob(path:string):Promise<Blob>}
@@ -103,7 +103,7 @@ onMounted(()=>run(load))
         </tr>
       </tbody></table></div><p v-if="!view.withdrawals.length" class="cash-empty">还没有提现申请。</p>
       <div v-if="view.total>25" class="cash-actions"><button :disabled="page===1||busy" @click="page--;run(load)">上一页</button><span>第 {{page}} 页</span><button :disabled="page*25>=view.total||busy" @click="page++;run(load)">下一页</button></div>
-      <ActionDialog :open="modalOpen" :title="modalTitle" :busy="busy" @close="closeDialog"><p v-if="error" class="cash-error" role="alert">{{error}}</p>
+      <Sheet :open="modalOpen" :title="modalTitle" @close="closeDialog"><p v-if="error" class="cash-error" role="alert">{{error}}</p>
         <form v-if="fundOpen" class="cash-dialog" @submit.prevent="run(release)"><p>资金备妥后，本次开放 ¥{{amount(view.funding.amount)}} 供成员申请提现。</p><label>单号或说明（选填）<input v-model="reference" maxlength="255" /></label><button class="cash-primary primary" :disabled="busy">确认款项可用</button><button type="button" :disabled="busy" @click="fundOpen=false">取消</button></form>
         <form v-if="applyOpen" class="cash-dialog" @submit.prevent="run(apply)">
           <div v-if="policy?.enabled" class="cash-rules"><p v-for="line in policy.lines" :key="line">{{line}}</p></div>
@@ -127,7 +127,7 @@ onMounted(()=>run(load))
           </template><button :disabled="busy" @click="selected=null">关闭</button>
         </section>
         <section v-if="selected&&action==='history'" class="cash-dialog"><p v-for="(h,i) in history" :key="i">{{new Date(h.createdAt).toLocaleString('zh-CN')}} · {{h.action==='void'?'撤销发放标记':h.action==='amend'?'更正资料':'登记发放'}} · {{h.reason||'线下发放登记'}}</p><button @click="selected=null">关闭记录</button></section>
-      </ActionDialog>
+      </Sheet>
     </template>
   </section>
 </template>
