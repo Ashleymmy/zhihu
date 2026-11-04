@@ -54,12 +54,12 @@
   --chart-3: #4e9a4a;
   --chart-4: #8e6cc9;
 
-  /* 形状与层次 */
-  --radius: 10px;
-  --radius-card: 16px;
+  /* 形状与层次（v2：大圆角、无边框、柔和扩散阴影） */
+  --radius: 12px;
+  --radius-card: 22px;
   --radius-sheet: 20px;
-  --shadow: 0 1px 2px rgba(20, 20, 19, 0.04), 0 8px 24px rgba(20, 20, 19, 0.05);
-  --shadow-float: 0 24px 60px rgba(20, 20, 19, 0.16), 0 2px 6px rgba(20, 20, 19, 0.06);
+  --shadow: 0 1px 2px rgba(20, 20, 19, 0.03), 0 10px 30px -8px rgba(20, 20, 19, 0.08);
+  --shadow-float: 0 2px 4px rgba(20, 20, 19, 0.04), 0 22px 48px -12px rgba(20, 20, 19, 0.16);
 
   /* 字体：--font-mono 旧名保留给标签、日期、金额，改用黑体 + 等宽数字；真正的代码用 --font-code */
   --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
@@ -381,8 +381,8 @@ button.header-initials:active { transform: scale(0.92); }
   gap: 7px;
   min-height: 36px;
   padding: 0 16px;
-  border: 1px solid var(--ink);
-  border-radius: 10px;
+  border: 0;
+  border-radius: var(--radius);
   color: var(--paper);
   background: var(--ink);
   box-shadow: none;
@@ -471,7 +471,7 @@ button.header-initials:active { transform: scale(0.92); }
 
 .metric-card,
 .panel {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-card);
   background: var(--white);
   box-shadow: var(--shadow);
