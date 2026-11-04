@@ -5,7 +5,6 @@ import OperationGuide from './OperationGuide.vue'
 import AnimatedNumber from './AnimatedNumber.vue'
 import TrendChart, { type TrendSeries } from './TrendChart.vue'
 import ShareBar, { type ShareItem } from './ShareBar.vue'
-import RingProgress from './RingProgress.vue'
 const w = inject<CoreWorkspace>('opc')!
 
 interface Todo { kind: string; count: number; label: string; actor: string; actionLabel: string; path: string }
@@ -23,6 +22,7 @@ interface RelationMine { inviter: { name: string } | null; channel: string | nul
 
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
 const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([]), teamLines = ref<MineLine[]>([])
+const selfMine = ref<Mine | null>(null), teamSummary = ref<Mine | null>(null), availableTasks = ref<{ projectId: string; total: number | null }[]>([])
 const isMember = computed(() => ['creator', 'leader'].includes(w.role.value))
 let revision = 0
 
@@ -57,12 +57,16 @@ async function load() {
 async function loadMoney(version: number) {
   if (!isMember.value) return
   const today = shanghaiToday(), scope = projectId.value ? { projectId: projectId.value } : {}
-  const [m, d, s, r, feed] = await Promise.allSettled([
+  const [m, d, s, r, feed, self, avail] = await Promise.allSettled([
     w.http.get<Mine>('/earnings/mine', { ...scope, from: today.slice(0, 8) + '01', to: today, pageSize: 1 }),
     w.http.get<Daily>('/earnings/mine/daily', scope),
     w.http.get<MemberSummary>('/member-summary'),
     w.http.get<RelationMine>('/relations/mine', { pageSize: 6 }),
     w.http.get<Mine>('/earnings/mine', { ...scope, from: '2020-01-01', to: today, pageSize: 6 }),
+    // M-H03：任务收益卡只看本人执行的业绩（group=self），团队分成不得混入
+    w.http.get<Mine>('/earnings/mine', { ...scope, from: today.slice(0, 8) + '01', to: today, group: 'self', pageSize: 1 }),
+    // M-H10：项目卡可领任务数取 tasks available，不用业绩数量冒充
+    w.http.get<{ groups: { projectId: string; total: number | null }[] }>('/tasks', { view: 'available' }),
   ])
   if (version !== revision) return
   mine.value = m.status === 'fulfilled' ? m.value : null
@@ -70,12 +74,14 @@ async function loadMoney(version: number) {
   summary.value = s.status === 'fulfilled' ? s.value : null
   relation.value = r.status === 'fulfilled' ? r.value : null
   recent.value = feed.status === 'fulfilled' ? (feed.value.list ?? []) : []
+  selfMine.value = self.status === 'fulfilled' ? self.value : null
+  availableTasks.value = avail.status === 'fulfilled' ? (avail.value.groups ?? []) : []
   /* 团长加取近 30 天团队业绩明细：成员贡献按业绩人聚合 */
   if (w.role.value === 'leader') {
     try {
       const from = new Date(Date.parse(today) - 29 * 86400000).toISOString().slice(0, 10)
       const team = await w.http.get<Mine>('/earnings/mine', { ...scope, from, to: today, group: 'team', pageSize: 100 })
-      if (version === revision) teamLines.value = team.list ?? []
+      if (version === revision) { teamLines.value = team.list ?? []; teamSummary.value = team }
     } catch { /* 团队明细读不到时成员贡献卡给空态 */ }
   }
 }
@@ -165,28 +171,30 @@ const teamShare = computed<ShareItem[]>(() => {
 const showShareCard = computed(() => isMember.value && (composition.value.length > 0 || teamShare.value.length > 0 || !!summary.value?.team))
 
 /* ===== v2 成员视图 ===== */
-/* 成长进度：活跃 ≥20 天、直邀 ≥2 人、任务收益 ≥¥800（方向稿 3.4 节的晋升标准） */
+/* 成长参考：展示真实统计，不生成达标结论（M-H07：晋升阈值未正式确认，只列运营提名时的参考指标） */
 const growth = computed(() => {
   const activeDays = summary.value?.metrics?.activeDays ?? null
   const direct = relation.value?.counts.direct ?? null
-  const monthAmount = month.value ? toNumber(month.value.amount) : null
-  const rules = [
-    { label: '近 30 天活跃 ≥ 20 天', current: activeDays, target: 20, text: activeDays === null ? '' : `${activeDays} 天`, met: activeDays !== null && activeDays >= 20 },
-    { label: '直接邀请 ≥ 2 人', current: direct, target: 2, text: direct === null ? '' : `${direct} 人`, met: direct !== null && direct >= 2 },
-    { label: '本月任务收益 ≥ ¥800', current: monthAmount, target: 800, text: monthAmount === null ? '' : `¥${money(monthAmount).slice(1)}`, met: monthAmount !== null && monthAmount >= 800 },
+  const monthAmount = selfTaskUnits.value !== null ? toNumber(selfTaskUnits.value) : null
+  const stats = [
+    { label: '近 30 天活跃', text: activeDays === null ? '' : `${activeDays} 天` },
+    { label: '直接邀请', text: direct === null ? '' : `${direct} 人` },
+    { label: '本月任务收益', text: monthAmount === null ? '' : `¥${money(monthAmount).slice(1)}` },
   ]
-  const known = rules.filter(rule => rule.current !== null)
-  const met = known.filter(rule => rule.met).length
-  return { rules, met, total: known.length, ratio: known.length ? met / known.length : 0 }
+  return { stats, hasData: stats.some(s => s.text) }
 })
-/* 任务收益小卡的拆分说明：知乎 110 单 · 红果 347 次 */
+/* 任务收益小卡的拆分说明：知乎 110 单 · 红果 347 次（仅本人执行的业绩，拉新/拉活各自带单位） */
 const taskSplit = computed(() => {
-  if (!mine.value) return ''
-  return mine.value.groups
+  if (!selfMine.value) return ''
+  return selfMine.value.groups
     .filter(group => Number(group.quantity ?? 0) > 0)
     .map(group => `${group.projectName ?? ''} ${Number(group.quantity).toLocaleString('zh-CN')} ${group.quantityUnit ?? group.metricLabel}`.trim())
     .join(' · ')
 })
+/* 任务收益小卡金额：本人执行的业绩（M-H03：group=self，不含收到的团队分成） */
+const selfTaskUnits = computed(() => selfMine.value ? units(selfMine.value.summary.amount) : null)
+/* 近 30 天团队收益（M-L02：与成员贡献同口径，不再用累计冒充本月） */
+const teamMonthUnits = computed(() => teamSummary.value ? units(teamSummary.value.summary.amount) : null)
 /* 最近收益 feed：最近 6 笔（不限月份） */
 const recentLines = computed(() => recent.value.slice(0, 6))
 /* 项目广场：已开通项目 + 抽象插画（按项目名取色与形状） */
@@ -199,9 +207,9 @@ function art(projectName: string) {
 }
 const projectCards = computed(() => (data.value?.groups ?? []).map(project => {
   const groups = mine.value?.groups.filter(group => group.projectId === project.id) ?? []
-  const quantity = groups.reduce((sum, group) => sum + Number(group.quantity ?? 0), 0)
   const amount = groups.reduce((sum, group) => sum + units(group.amount), 0n)
-  return { id: project.id, name: project.name, art: art(project.name), quantity, amount }
+  const available = availableTasks.value.find(group => group.projectId === project.id)?.total ?? null
+  return { id: project.id, name: project.name, art: art(project.name), available, amount }
 }))
 
 /* 团长专属：成员贡献（本月团队业绩按业绩人聚合，取前 8） */
@@ -289,45 +297,34 @@ function untilt(event: PointerEvent) {
             <p class="muted" style="font-size:12.5px;margin-top:10px">由你的成员邀请加入，属于你的团队，只显示人数<template v-if="relation.indirectList?.length">：{{ relation.indirectList.slice(0, 6).map(p => p.name).join('、') }}{{ relation.indirectList.length > 6 ? ' 等' : '' }}</template></p>
           </article>
 
-          <!-- 团长专属：本月团队收益 -->
-          <article v-if="isLeader && summary?.team" class="card lift" style="--s:4;--i:4">
-            <div class="card-h"><h3>本月团队收益</h3><span class="chip soft r">团队 {{ summary.team.memberCount }} 人</span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="Number(summary.team.reward.total)" :decimals="2" /></div>
+          <!-- 团长专属：近 30 天团队收益（M-L02：与贡献图同口径，不再用累计冒充本月） -->
+          <article v-if="isLeader && teamMonthUnits !== null" class="card lift" style="--s:4;--i:4">
+            <div class="card-h"><h3>近 30 天团队收益</h3><span class="chip soft r">团队 {{ summary?.team?.memberCount ?? 0 }} 人</span></div>
+            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(teamMonthUnits)" :decimals="2" :text="yuan(teamMonthUnits)" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:4px">成员业绩 × 团长单价，按业绩当天归属计算</p>
           </article>
 
-          <!-- 任务收益 -->
-          <article v-if="month" class="card lift" style="--s:4;--i:2">
+          <!-- 任务收益（本人执行的业绩） -->
+          <article v-if="selfTaskUnits !== null" class="card lift" style="--s:4;--i:2">
             <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">☰</span><h3>任务收益</h3><span class="chip soft r">本月</span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(month.amount)" :decimals="2" :text="yuan(month.amount)" /></div>
+            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(selfTaskUnits)" :decimals="2" :text="yuan(selfTaskUnits)" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:4px">{{ taskSplit || '本月还没有任务收益记录' }}</p>
           </article>
 
-          <!-- 邀请收益 -->
-          <article v-if="summary" class="card lift" style="--s:4;--i:3">
-            <div class="card-h"><span class="ic" style="background:#e5f0e3;color:var(--c3)">✚</span><h3>邀请收益</h3><span class="chip soft r">直邀 {{ relation?.counts.direct ?? 0 }} 人</span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="Number(summary.direct.total)" :decimals="2" /></div>
-            <p class="muted" style="font-size:12.5px;margin-top:4px">好友注册 180 天内的业绩 × 邀请单价</p>
-          </article>
-
-          <!-- 近 30 天活跃 -->
-          <article v-if="summary?.metrics" class="card lift" style="--s:4;--i:4">
-            <div class="card-h"><span class="ic" style="background:#efe9f8;color:var(--c4)">◷</span><h3>近 30 天活跃</h3><span class="chip clay r">{{ summary.metrics.records }} 单</span></div>
+          <!-- 近 30 天活跃（M-H04：邀请分成规则未确认，不再用本人收益冒充邀请收益） -->
+          <article v-if="summary?.metrics" class="card lift" style="--s:4;--i:3">
+            <div class="card-h"><span class="ic" style="background:#efe9f8;color:var(--c4)">◷</span><h3>近 30 天活跃</h3><span class="chip clay r">{{ summary.metrics.records }} 条记录</span></div>
             <div class="big num"><AnimatedNumber :value="summary.metrics.activeDays" :decimals="0" /><small style="margin-left:4px">天</small></div>
-            <p class="muted" style="font-size:12.5px;margin-top:4px">活跃天数是晋升团长的标准之一</p>
+            <p class="muted" style="font-size:12.5px;margin-top:4px">活跃天数是晋升团长的参考之一</p>
           </article>
 
-          <!-- 成长进度（团长已晋升，不再显示） -->
-          <article v-if="growth.total && !isLeader" class="card lift" style="--s:4;--i:5">
-            <div class="card-h"><h3>成长进度</h3><span class="muted r" style="font-size:12.5px">晋升团长</span></div>
-            <div class="ring-wrap">
-              <RingProgress :value="growth.ratio" :size="92" :thickness="8" :label="`${growth.met}/${growth.total}`">{{ growth.met }}/{{ growth.total }}</RingProgress>
-              <div class="growth-rules">
-                <div v-for="rule in growth.rules" :key="rule.label" :class="{ met: rule.met }">
-                  <span class="growth-mark">{{ rule.met ? '✓' : '○' }}</span>{{ rule.label }}<template v-if="!rule.met && rule.text"> · {{ rule.text }}</template>
-                </div>
-              </div>
+          <!-- 成长参考：展示真实统计，不出达标结论（团长已晋升不显示） -->
+          <article v-if="growth.hasData && !isLeader" class="card lift" style="--s:4;--i:5">
+            <div class="card-h"><h3>成长参考</h3><span class="muted r" style="font-size:12.5px">晋升由运营提名</span></div>
+            <div class="growth-rules">
+              <div v-for="stat in growth.stats" :key="stat.label"><b style="color:var(--ink)">{{ stat.text }}</b><span class="muted" style="margin-left:6px">{{ stat.label }}</span></div>
             </div>
+            <p class="muted" style="font-size:12px;margin-top:12px">这些是运营提名晋升时的参考指标，不是自动达标线。</p>
           </article>
 
           <!-- 收益构成 -->
@@ -353,7 +350,7 @@ function untilt(event: PointerEvent) {
 
           <!-- 团长专属：成员贡献（近 30 天团队业绩按业绩人，前 8） -->
           <article v-if="isLeader" class="card lift" style="--s:12;--i:8">
-            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span v-if="contributors.list.length" class="chip clay r">合计 ¥{{ yuan(contributors.total) }}</span></div>
+            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span v-if="contributors.list.length" class="chip soft r">前 8 名</span></div>
             <svg v-if="contributors.list.length" class="chart contrib-chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="成员贡献柱状图">
               <g v-for="(item, i) in contributors.list" :key="item.name">
                 <rect class="bar" :style="{ '--i': i }" :x="20 + i * 86" :y="150 - (item.value / contributors.max) * 120" width="44" :height="Math.max(3, (item.value / contributors.max) * 120)" rx="8" fill="var(--c1)" :opacity="0.45 + 0.55 * (item.value / contributors.max)" />
@@ -374,9 +371,9 @@ function untilt(event: PointerEvent) {
           <article v-if="projectCards.length" class="card" style="--s:12;--i:9">
             <div class="card-h"><h3>项目广场</h3><span class="muted" style="font-size:12.5px">我们承接的项目，统一在这里领取</span><router-link class="btn r" to="/task-hall" style="height:32px">全部任务 →</router-link></div>
             <div class="projects">
-              <router-link v-for="project in projectCards" :key="project.id" class="proj" to="/task-hall">
+              <router-link v-for="project in projectCards" :key="project.id" class="proj" :to="{ path: '/task-hall', query: project.id ? { projectId: project.id } : {} }">
                 <svg class="art" viewBox="0 0 200 92" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="200" height="92" :fill="project.art.c2" /><circle :cx="150 - project.art.seed * 10" :cy="30 + project.art.seed * 6" :r="34 + project.art.seed * 4" :fill="project.art.c1" opacity=".9" /><circle :cx="60 + project.art.seed * 14" cy="78" :r="26 - project.art.seed * 3" fill="#fff" opacity=".55" /><rect :x="20 + project.art.seed * 8" y="22" width="56" height="10" rx="5" fill="#fff" opacity=".8" /><rect :x="20 + project.art.seed * 8" y="38" width="34" height="8" rx="4" fill="#fff" opacity=".6" /></svg>
-                <span v-if="project.quantity" class="chip up tg">本月 {{ project.quantity.toLocaleString('zh-CN') }} 单</span>
+                <span v-if="project.available" class="chip up tg">{{ project.available }} 个任务可领取</span>
                 <b>{{ project.name }}</b>
                 <small>按业绩计酬 · 本月 ¥{{ yuan(project.amount) }}</small>
               </router-link>
