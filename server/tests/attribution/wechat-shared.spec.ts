@@ -15,6 +15,10 @@ vi.mock('../../src/sms/aliyun', () => ({
   sendAccountSms: vi.fn(async () => undefined),
 }));
 vi.mock('../../src/modules/zhihu/queue', () => ({ enqueue: vi.fn(async () => ({ id: 'isolated' })) }));
+vi.mock('../../src/modules/zhihu/zhihu/client', async (original) => ({
+  ...(await original<typeof import('../../src/modules/zhihu/zhihu/client')>()),
+  zhihuPost: vi.fn(),
+}));
 let container: StartedMySqlContainer, c: Connection, app: express.Express, pool: typeof import('../../src/db').db;
 const secret = 'isolated_wechat_bridge_signing_secret_32_chars',
   appId = 'wx0000000000000001',
@@ -362,6 +366,32 @@ it('mini keyword creation, unique ownership and canonical composition submission
   const evidence = listed.body.data.list.find((w: any) => w.compositionId === submitted.body.data.id);
   expect(evidence.source).toBe('evidence');
   expect(evidence.status).toBe('pending');
+  const beforeReceipt = await call('leader', '/modules/zhihu/evidence/' + evidence.id + '/review', 'POST', {
+    ...scope,
+    requestKey: crypto.randomUUID(),
+    accept: true,
+    reason: '报送前核验不能代替成功回执',
+  });
+  expect(beforeReceipt.status, JSON.stringify(beforeReceipt.body)).toBe(409);
+  // The queue is isolated in this suite. Exercise the real worker with a
+  // successful create receipt before asserting shared platform review state.
+  const { zhihuPost } = await import('../../src/modules/zhihu/zhihu/client');
+  const { pushComposition } = await import('../../src/modules/zhihu/jobs/pushComposition');
+  vi.mocked(zhihuPost).mockResolvedValueOnce({ data: { composition_id: '1234567890123456789' } });
+  await pushComposition({ compositionId: submitted.body.data.id });
+  expect(vi.mocked(zhihuPost)).toHaveBeenCalledExactlyOnceWith(
+    '/alliance/api/popularize_composition/v2',
+    expect.objectContaining({ composition_url: payload.promoUrl, media_account: payload.mediaAccount }),
+  );
+  const afterReceipt = await call('invited', '/modules/zhihu/workbench/works', 'GET', scope);
+  expect(
+    afterReceipt.body.data.list.find(
+      (work: { compositionId: string }) => work.compositionId === submitted.body.data.id,
+    ),
+  ).toMatchObject({ status: 'passed', verificationStatus: 'passed', syncStatus: 'synced' });
+  await pushComposition({ compositionId: submitted.body.data.id });
+  expect(vi.mocked(zhihuPost)).toHaveBeenCalledTimes(1);
+  expect((await call('invited', '/modules/zhihu/mini-works', 'POST', payload)).body.data.id).toBe(submitted.body.data.id);
   const reviewed = await call('leader', '/modules/zhihu/evidence/' + evidence.id + '/review', 'POST', {
     ...scope,
     requestKey: crypto.randomUUID(),
