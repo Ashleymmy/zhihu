@@ -23,6 +23,19 @@ interface RelationMine { inviter: { name: string } | null; channel: string | nul
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
 const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([]), teamLines = ref<MineLine[]>([])
 const selfMine = ref<Mine | null>(null), teamSummary = ref<Mine | null>(null), availableTasks = ref<{ projectId: string; total: number | null }[]>([])
+/* 入团申请（团长）：待审批列表与审批动作 */
+interface TeamApplication { id: string; creatorId: string; creatorName: string; creatorUsername: string; message: string | null; status: string; createdAt: string }
+const applications = ref<TeamApplication[]>([]), applicationBusy = ref('')
+const pendingApplications = computed(() => applications.value.filter(a => a.status === 'pending'))
+async function reviewApplication(id: string, action: 'approve' | 'reject') {
+  if (applicationBusy.value) return
+  applicationBusy.value = id
+  try {
+    await w.http.post(`/team/applications/${id}/review`, { action })
+    applications.value = applications.value.filter(a => a.id !== id)
+  } catch { /* 失败时保留申请项，用户可重试 */ }
+  finally { applicationBusy.value = '' }
+}
 const isMember = computed(() => ['creator', 'leader'].includes(w.role.value))
 let revision = 0
 
@@ -82,6 +95,11 @@ async function loadMoney(version: number) {
       const from = new Date(Date.parse(today) - 29 * 86400000).toISOString().slice(0, 10)
       const team = await w.http.get<Mine>('/earnings/mine', { ...scope, from, to: today, group: 'team', pageSize: 100 })
       if (version === revision) { teamLines.value = team.list ?? []; teamSummary.value = team }
+      // 入团申请列表（M-L04：团长首页接回申请审批）
+      try {
+        const apps = await w.http.get<TeamApplication[]>('/team/applications')
+        if (version === revision) applications.value = apps ?? []
+      } catch { /* 申请列表读不到时卡不显示 */ }
     } catch { /* 团队明细读不到时成员贡献卡给空态 */ }
   }
 }
@@ -359,6 +377,20 @@ function untilt(event: PointerEvent) {
               </g>
             </svg>
             <p v-else class="muted" style="font-size:12.5px">近 30 天还没有团队业绩，成员完成任务后这里会按人拆开。</p>
+          </article>
+
+          <!-- 团长专属：入团申请（待审批才显示） -->
+          <article v-if="isLeader && pendingApplications.length" class="card lift" style="--s:4;--i:8">
+            <div class="card-h"><h3>入团申请</h3><span class="chip clay r">{{ pendingApplications.length }}</span></div>
+            <div v-for="app in pendingApplications.slice(0, 3)" :key="app.id" class="row">
+              <span class="av" style="background:var(--c3)">{{ app.creatorName.slice(0, 1) }}</span>
+              <div class="t"><b>{{ app.creatorName }}</b><small>{{ app.message || '申请加入你的团队' }}</small></div>
+              <div style="display:flex;gap:6px;flex:none">
+                <button class="btn ink" style="height:30px;padding:0 12px" :disabled="applicationBusy === app.id" @click="reviewApplication(app.id, 'approve')">同意</button>
+                <button class="btn" style="height:30px;padding:0 12px" :disabled="applicationBusy === app.id" @click="reviewApplication(app.id, 'reject')">拒绝</button>
+              </div>
+            </div>
+            <p class="muted" style="font-size:12px;margin-top:10px">同意后从今天起计入团队，历史业绩不受影响。</p>
           </article>
 
           <!-- 现在要做（有待办才显示） -->
