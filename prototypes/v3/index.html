@@ -308,7 +308,7 @@ const ring = (pct, color, size, label) => {
   const r = (size - 14) / 2, c = 2 * Math.PI * r;
   return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="10"/><circle class="v" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - pct)}" transform="rotate(-90 ${size / 2} ${size / 2})"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="var(--serif)" font-size="${size / 4.4}" font-weight="600" fill="var(--ink)">${label}</text></svg>`;
 };
-const trendSVG = (id, series, h = 210) => `<svg class="chart" id="${id}" data-line='${JSON.stringify(series)}' style="height:${h}px" viewBox="0 0 640 ${h}" preserveAspectRatio="none"></svg>`;
+const trendSVG = (id, series, h = 210, unit = '¥') => `<svg class="chart" id="${id}" data-line='${JSON.stringify(series)}' data-unit="${unit}" style="height:${h}px" viewBox="0 0 640 ${h}" preserveAspectRatio="none"></svg>`;
 /* 演示波形 + 平滑折线绘制（延续 v2 charts 的视觉） */
 const wave = (base, amp, k, ph, n = 30) => Array.from({ length: n }, (_, i) => Math.max(0, Math.round((base + amp * Math.sin(i / k + ph) + amp * .45 * Math.sin(i / 2.3 + ph * 2)) * 100) / 100));
 function smoothPath(pts) {
@@ -346,8 +346,9 @@ function paintCharts() {
     const pl = 44, pr = 12, pt = 14, pb = 24, n = series[0].v.length;
     const max = Math.max(10, Math.ceil(Math.max(...series.flatMap(s => s.v)) * 1.15 / 50) * 50);
     const X = i => pl + i * (W - pl - pr) / (n - 1), Y = v => pt + (H - pt - pb) * (1 - v / max);
+    const unit = svg.dataset.unit ?? '¥';
     let g = '';
-    for (let k = 0; k <= 4; k++) { const v = max * k / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line-2)"/><text x="${pl - 8}" y="${Y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">¥${v}</text>`; }
+    for (let k = 0; k <= 4; k++) { const v = max * k / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line-2)"/><text x="${pl - 8}" y="${Y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">${unit}${v}</text>`; }
     const step = Math.ceil(n / 6);
     for (let i = 0; i < n; i += step) g += `<text x="${X(i)}" y="${H - 4}" text-anchor="middle" fill="var(--muted)" font-size="11">9-${String(20 - (n - 1 - i)).padStart(2, '0')}</text>`;
     series.forEach(s => {
@@ -383,10 +384,11 @@ const creatorPages = {
         ${trendSVG('ct1', [{ c: 'var(--c1)', area: true, v: wave(22, 8, 3.2, 0) }, { c: 'var(--c3)', area: false, v: wave(4, 2, 2.8, 1) }])}
       </div>
       <div class="card lift" style="--s:4;--i:2"><div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">☰</span><h3>任务收益</h3><span class="chip up r">↑ 9.8%</span></div><div class="big num"><small>¥</small>659.60</div><p class="muted" style="font-size:12.5px;margin-top:4px">本月 · 知乎 110 单 · 红果 347 次 · 网盘 54 人</p></div>
-      <div class="card lift" style="--s:4;--i:3"><div class="card-h"><span class="ic" style="background:#e5f0e3;color:var(--c3)">✚</span><h3>邀请收益</h3><span class="chip soft r">直邀 3 人</span></div><div class="big num"><small>¥</small>48.52</div><p class="muted" style="font-size:12.5px;margin-top:4px">好友注册 180 天内的业绩 × 邀请单价</p></div>
+      <div class="card lift" style="--s:4;--i:3"><div class="card-h"><span class="ic" style="background:#e5f0e3;color:var(--c3)">✚</span><h3>邀请收益</h3><span class="chip warn r">规则待确认</span></div><div class="big num"><small>¥</small>48.52</div><p class="muted" style="font-size:12.5px;margin-top:4px">好友注册 180 天内的业绩 × 邀请单价（演示数值，计酬规则待确认后生效）</p></div>
       <div class="card lift" style="--s:4;--i:4"><div class="card-h"><span class="ic" style="background:#efe9f8;color:var(--c4)">◷</span><h3>近 30 天活跃</h3><span class="chip clay r">连续 12 天</span></div><div class="big num">30<small style="margin-left:4px">天</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">活跃天数是晋升团长的标准之一</p></div>
-      <div class="card lift" style="--s:4;--i:5"><div class="card-h"><h3>成长进度</h3><span class="muted r" style="font-size:12.5px">晋升团长</span></div>
-        <div class="ring-wrap">${ring(.75, 'var(--c1)', 92, '3/4')}<div style="font-size:13px;line-height:1.9"><div>✓ 近 30 天活跃 ≥ 20 天</div><div>✓ 作品合格率 ≥ 92%</div><div>✓ 直接邀请 ≥ 2 人</div><div class="muted">○ 任务收益 ¥659 / ¥800</div></div></div></div>
+      <div class="card lift" style="--s:4;--i:5"><div class="card-h"><h3>成长参考</h3><span class="muted r" style="font-size:12.5px">晋升由运营提名</span></div>
+        <div style="font-size:13px;line-height:1.9"><div><b>26 天</b><span class="muted"> · 近 30 天活跃</span></div><div><b>3 人</b><span class="muted"> · 直接邀请</span></div><div><b>¥659.60</b><span class="muted"> · 本月任务收益</span></div></div>
+        <p class="muted" style="font-size:12px;margin-top:10px">这些是运营提名时的参考指标，不是自动达标线。</p></div>
       <div class="card lift" style="--s:4;--i:6"><div class="card-h"><h3>收益构成</h3><span class="muted r" style="font-size:12.5px">本月</span></div>
         <div class="stack" style="margin:10px 0 14px"><i style="background:var(--c1);flex-grow:931"></i><i style="background:var(--c3);flex-grow:69"></i></div>
         <div class="row" style="padding:8px 0"><span class="t"><b style="font-weight:500">任务收益</b></span><b class="num">¥659.60 <small class="muted">93.1%</small></b></div>
@@ -406,7 +408,7 @@ const creatorPages = {
     </div>
     <aside class="aside">
       <div class="card profile"><div class="big-av">林</div><h4>林小满</h4><p class="muted" style="font-size:12.5px">达人 · 苏禾团队</p>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px;text-align:center">${[['作品', '42'], ['合格率', '95%'], ['直邀', '3']].map(x => `<div style="padding:10px 0;border-radius:14px;background:var(--card-2)"><b class="serif" style="font-size:18px">${x[1]}</b><div class="muted" style="font-size:11.5px">${x[0]}</div></div>`).join('')}</div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px;text-align:center">${[['直邀', '3'], ['活跃天', '26'], ['注册天', '126']].map(x => `<div style="padding:10px 0;border-radius:14px;background:var(--card-2)"><b class="serif" style="font-size:18px">${x[1]}</b><div class="muted" style="font-size:11.5px">${x[0]}</div></div>`).join('')}</div></div>
       <div class="card"><div class="card-h"><h3>我的关系</h3><span class="muted r" style="font-size:12px">永久记录</span></div>
         <div class="row"><span class="av" style="background:#3b7dd8">苏</span><div class="t"><b>苏禾 邀请了你</b><small>06-16 · 小程序卡片</small></div></div>
         <div class="row"><span class="av" style="background:#3b7dd8">苏</span><div class="t"><b>你在 苏禾团队</b><small>团队收益按业绩当天归属计算</small></div></div></div>
@@ -500,8 +502,8 @@ const creatorPages = {
 
   /* ----- 邀请 ----- */
   invite() {
-    const member = (av, color, name, date, perf, income) => `
-      <div class="row"><span class="av" style="background:${color}">${av}</span><div class="t"><b>${name}</b><small>${date} 加入</small></div><div style="text-align:right"><b class="num">${perf}</b><div class="muted" style="font-size:12px">我的邀请收益 ${income}</div></div></div>`;
+    const member = (av, color, name, date, state) => `
+      <div class="row"><span class="av" style="background:${color}">${av}</span><div class="t"><b>${name}</b><small>${date} 加入</small></div><span class="chip soft">${state}</span></div>`;
     return `<div class="home-grid"><div class="bento enter">
       <div class="card lift" style="--s:7;--i:0"><div class="card-h"><h3>邀请链接</h3><span class="chip clay r">注册即建立关系</span></div>
         <div style="display:flex;gap:8px;margin:6px 0 12px"><div class="sheet-search" style="flex:1;height:42px;font-size:13px">timo.cn/i/lin-8x2k</div><button class="btn ink">复制链接</button></div>
@@ -510,11 +512,11 @@ const creatorPages = {
       <div class="card lift" style="--s:5;--i:1"><div class="card-h"><h3>邀请收益</h3><span class="chip soft r">近 30 天</span></div>
         <div class="big num"><small>¥</small>48.52</div>
         <p class="muted" style="font-size:12.5px;margin-top:4px">好友注册 180 天内的业绩 × 邀请单价</p>
-        <div class="ring-wrap" style="margin-top:14px">${ring(.6, 'var(--c3)', 76, '3/5')}<div class="muted" style="font-size:12.5px">再邀请 2 位活跃好友<br>可得 ¥10 邀请奖励</div></div></div>
+        <div class="ring-wrap" style="margin-top:14px">${ring(.6, 'var(--c3)', 76, '3 人')}<div class="muted" style="font-size:12.5px">直邀 3 人<br>邀请奖励规则待确认</div></div></div>
       <div class="card" style="--s:12;--i:2"><div class="card-h"><h3>直邀成员</h3><span class="chip soft r">3 人</span><span class="muted r" style="font-size:12px">第二层及以下只显示人数（2 人）</span></div>
-        ${member('许', '#3b7dd8', '许南乔', '09-02', '近 30 天 ¥46.00', '¥0.92')}
-        ${member('周', '#4e9a4a', '周时雨', '09-28', '近 30 天 ¥68.00', '¥1.36')}
-        ${member('程', '#8e6cc9', '程星河', '10-11', '近 30 天 ¥22.40', '¥0.45')}
+        ${member('许', '#3b7dd8', '许南乔', '09-02', '活跃')}
+        ${member('周', '#4e9a4a', '周时雨', '09-28', '活跃')}
+        ${member('程', '#8e6cc9', '程星河', '10-11', '3 天未活跃')}
       </div>
     </div>
     <aside class="aside">
@@ -567,7 +569,7 @@ const leaderPages = {
       <div class="card lift" style="--s:4;--i:2"><div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">◉</span><h3>直邀成员</h3><span class="chip soft r">显性</span></div><div class="big num">9<small style="margin-left:4px">人</small></div>
         <div class="avs" style="margin-top:12px">${['林', '顾', '唐', '陈', '宋'].map((n, k) => `<span style="background:${['#d46b45', '#4e9a4a', '#8e6cc9', '#3b7dd8', '#b5532f'][k]}">${n}</span>`).join('')}<span style="background:var(--hover);color:var(--ink-3);font-size:12px">+4</span></div></div>
       <div class="card lift" style="--s:4;--i:3"><div class="card-h"><span class="ic" style="background:var(--hover)">🔒</span><h3>团队下级</h3><span class="chip soft r">隐性</span></div><div class="big num">11<small style="margin-left:4px">人</small></div><p class="muted" style="font-size:12.5px;margin-top:10px">由你的成员邀请加入，属于你的团队，只显示人数（可在设置中开放姓名）</p></div>
-      <div class="card lift" style="--s:4;--i:4"><div class="card-h"><span class="ic" style="background:#efe9f8;color:var(--c4)">◈</span><h3>9 月团队激励</h3><span class="chip r" style="background:#efe9f8;color:#6e4fa8">B 档</span></div><div class="big num" style="color:#6e4fa8"><small style="color:#6e4fa8">¥</small>600.00</div><p class="muted" style="font-size:12.5px;margin-top:10px">作品合格率 92.0% · 团队活跃度 88%（A 档需 ≥ 94% 且 ≥ 80%）</p></div>
+      <div class="card lift" style="--s:4;--i:4"><div class="card-h"><span class="ic" style="background:#efe9f8;color:var(--c4)">◈</span><h3>9 月团队激励</h3><span class="chip r" style="background:#efe9f8;color:#6e4fa8">B 档</span></div><div class="big num" style="color:#6e4fa8"><small style="color:#6e4fa8">¥</small>600.00</div><p class="muted" style="font-size:12.5px;margin-top:10px">作品合格率 92.0% · 团队活跃度 88%（演示数值，A/B 档规则待确认）</p></div>
       <div class="card lift" style="--s:8;--i:5"><div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><div class="r"><div class="seg"><button class="on">收益</button><button>活跃</button></div><button class="btn sm">⤢</button></div></div>
         <svg class="chart" data-bars='[{"l":"林小满","v":118.2,"c":"var(--c1)","t":"¥118"},{"l":"顾知夏","v":96.4,"c":"var(--c1)","t":"¥96"},{"l":"唐南乔","v":71.1,"c":"var(--c1)","t":"¥71"},{"l":"陈子衿","v":40.55,"c":"var(--c1)","dim":1},{"l":"宋初九","v":36.2,"c":"var(--c1)","dim":1},{"l":"何半夏","v":28.9,"c":"var(--c1)","dim":1},{"l":"韩岁宁","v":21.4,"c":"var(--c1)","dim":1},{"l":"谢时雨","v":12.6,"c":"var(--c1)","dim":1}]' style="height:190px" viewBox="0 0 640 190" preserveAspectRatio="none"></svg></div>
       <div class="card lift" style="--s:4;--i:6"><div class="card-h"><h3>入团申请</h3><span class="chip clay r">2</span></div>
@@ -658,28 +660,28 @@ const operatorPages = {
     <div class="home-grid"><div class="bento enter">
       <div class="card wallet lift" style="--s:5;--i:0">
         ${sparkline}
-        <div class="lbl">本月上游收入</div>
-        <div class="big num"><small>¥</small>62,480</div>
-        <div class="pill">较上月 ↑ 32.9% · 数据 3 分钟前同步</div>
-        <div class="meta"><div><b>¥48,360</b>成员支出</div><div><b>¥14,120</b>平台留存</div><div><b>108</b>活跃成员</div></div>
-        <div class="acts"><button class="btn white">查看数据大屏</button><button class="btn light">导出周报 →</button></div>
+        <div class="lbl">本月全站业绩</div>
+        <div class="big num">12,406<small style="font-size:16px">单</small></div>
+        <div class="pill">较上月 ↑ 18.2% · 数据 3 分钟前同步</div>
+        <div class="meta"><div><b>108</b>活跃成员</div><div><b>12</b>活跃团队</div><div><b>14</b>本周新增</div></div>
+        <div class="acts"><button class="btn white">查看工作台</button><button class="btn light">成员管理 →</button></div>
       </div>
-      <div class="card lift" style="--s:7;--i:1"><div class="card-h"><h3>上游收入</h3><span class="muted" style="font-size:12.5px">按项目 · 每日</span><div class="r"><div class="seg"><button>7 天</button><button class="on">30 天</button><button>90 天</button></div><button class="btn sm">⤢</button></div></div>
-        <div class="legend" style="margin-bottom:6px"><span><i style="background:var(--c1)"></i>知乎<b>¥2.9 万</b></span><span><i style="background:var(--c2)"></i>红果<b>¥2.5 万</b></span><span><i style="background:var(--c3)"></i>网盘<b>¥7.2k</b></span></div>
-        ${trendSVG('ot1', [{ c: 'var(--c1)', area: true, v: wave(980, 220, 3.2, .2) }, { c: 'var(--c2)', area: false, v: wave(820, 180, 2.7, 1.1) }, { c: 'var(--c3)', area: false, v: wave(240, 60, 2.2, 2.2) }], 230)}</div>
+      <div class="card lift" style="--s:7;--i:1"><div class="card-h"><h3>业绩量趋势</h3><span class="muted" style="font-size:12.5px">按项目 · 每日</span><div class="r"><div class="seg"><button>7 天</button><button class="on">30 天</button><button>90 天</button></div><button class="btn sm">⤢</button></div></div>
+        <div class="legend" style="margin-bottom:6px"><span><i style="background:var(--c1)"></i>知乎<b>6.2k 单</b></span><span><i style="background:var(--c2)"></i>红果<b>4.8k 次</b></span><span><i style="background:var(--c3)"></i>网盘<b>1.4k 人</b></span></div>
+        ${trendSVG('ot1', [{ c: 'var(--c1)', area: true, v: wave(980, 220, 3.2, .2) }, { c: 'var(--c2)', area: false, v: wave(820, 180, 2.7, 1.1) }, { c: 'var(--c3)', area: false, v: wave(240, 60, 2.2, 2.2) }], 230, '')}</div>
       <div class="card lift" style="--s:4;--i:2"><div class="card-h"><h3>待办</h3><span class="chip clay r">3</span></div>
         ${[['♛', '3 位晋升候选人待提名', '系统按公开标准筛出', 'var(--clay-soft)', 'var(--clay-deep)'], ['◈', '10 月团队激励待拟定', '已按公开标准生成', '#efe9f8', '#6e4fa8'], ['⚠', '2 条疑似重复作品', '可一键合并，5 秒内可撤销', 'var(--warn-bg)', 'var(--warn)']].map(x => `<div class="row" style="cursor:pointer"><span class="ic2" style="width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:${x[3]};color:${x[4]};flex:none">${x[0]}</span><div class="t"><b>${x[1]}</b><small>${x[2]}</small></div><span class="muted">›</span></div>`).join('')}</div>
       <div class="card lift" style="--s:5;--i:3"><div class="card-h"><h3>关系森林</h3><span class="muted r" style="font-size:12px">实线 = 当前团队 · 虚线 = 原始邀请</span></div><svg class="chart" data-forest style="height:190px" viewBox="0 0 460 190"></svg></div>
-      <div class="card lift" style="--s:4;--i:4"><div class="card-h"><h3>团队排行</h3><span class="muted r" style="font-size:12px">上游贡献</span></div>
-        <svg class="chart" data-bars='[{"l":"温嘉树","v":13.1,"c":"var(--c2)","t":"13.1k"},{"l":"苏禾","v":12.2,"c":"var(--c2)","t":"12.2k"},{"l":"唐知远","v":9.5,"c":"var(--c2)"},{"l":"宋北辰","v":9.0,"c":"var(--c2)"},{"l":"何若溪","v":8.9,"c":"var(--c2)"},{"l":"江照野","v":2.9,"c":"var(--c4)"}]' style="height:190px" viewBox="0 0 640 190" preserveAspectRatio="none"></svg></div>
-      <div class="card lift" style="--s:3;--i:5"><div class="card-h"><h3>留存构成</h3></div><div style="display:grid;place-items:center">${ring(.226, 'var(--c3)', 128, '22.6%')}</div>
-        <div style="font-size:12.5px;margin-top:10px;line-height:1.9">${[['项目单价差', '¥1.3 万'], ['无团长差价', '¥601'], ['邀请满 180 天', '¥21']].map(x => `<div style="display:flex"><span class="muted">${x[0]}</span><b style="margin-left:auto">${x[1]}</b></div>`).join('')}</div></div>
+      <div class="card lift" style="--s:4;--i:4"><div class="card-h"><h3>团队排行</h3><span class="muted r" style="font-size:12px">本月业绩量</span></div>
+        <svg class="chart" data-bars='[{"l":"温嘉树","v":1310,"c":"var(--c2)","t":"1,310"},{"l":"苏禾","v":1220,"c":"var(--c2)","t":"1,220"},{"l":"唐知远","v":950,"c":"var(--c2)"},{"l":"宋北辰","v":900,"c":"var(--c2)"},{"l":"何若溪","v":890,"c":"var(--c2)"},{"l":"江照野","v":290,"c":"var(--c4)"}]' style="height:190px" viewBox="0 0 640 190" preserveAspectRatio="none"></svg></div>
+      <div class="card lift" style="--s:3;--i:5"><div class="card-h"><h3>团队规模</h3></div><div style="display:grid;place-items:center">${ring(.62, 'var(--c3)', 128, '12 个')}</div>
+        <div style="font-size:12.5px;margin-top:10px;line-height:1.9">${[['活跃团队', '12 个'], ['本月新成立', '2 个'], ['独立达人', '18 人']].map(x => `<div style="display:flex"><span class="muted">${x[0]}</span><b style="margin-left:auto">${x[1]}</b></div>`).join('')}</div></div>
     </div>
     <aside class="aside">
       <div class="card profile"><div class="big-av" style="background:linear-gradient(135deg,#8e6cc9,#6e4fa8);box-shadow:0 10px 24px -8px rgba(110,79,168,.55)">陈</div><h4>陈墨</h4><p class="muted" style="font-size:12.5px">运营管理 · 入职 1 年</p>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px;text-align:center">${[['处理', '26'], ['提名', '5'], ['审核', '38']].map(x => `<div style="padding:10px 0;border-radius:14px;background:var(--card-2)"><b class="serif" style="font-size:18px">${x[1]}</b><div class="muted" style="font-size:11.5px">本周${x[0]}</div></div>`).join('')}</div></div>
       <div class="card feed"><div class="card-h"><h3>实时动态</h3><span class="muted r" style="font-size:12px">● 自动刷新</span></div>
-        ${[['#4e9a4a', '孟*宁 · 网盘 2 人', '+¥9.00'], ['#3b7dd8', '许*念 · 红果 23 次', '+¥27.60'], ['#d46b45', '袁*宁 · 知乎 8 单', '+¥24.00'], ['#4e9a4a', '孟*宁 · 网盘 2 人', '+¥9.00'], ['#d46b45', '林*满 · 知乎 3 单', '+¥9.00']].map(x => `<div class="it"><span class="ic2" style="background:${x[0]}22;color:${x[0]}">↗</span><div class="t"><b style="font-size:13px">${x[1]}</b><div class="muted" style="font-size:12px">15:09</div></div><b class="amt">${x[2]}</b></div>`).join('')}</div>
+        ${[['#4e9a4a', '孟*宁 完成 2 个拉新', '网盘'], ['#3b7dd8', '许*念 获得 23 次观看', '红果'], ['#d46b45', '袁*宁 完成 8 单', '知乎'], ['#4e9a4a', '孟*宁 完成 2 个拉新', '网盘'], ['#d46b45', '林*满 完成 3 单', '知乎']].map(x => `<div class="it"><span class="ic2" style="background:${x[0]}22;color:${x[0]}">↗</span><div class="t"><b style="font-size:13px">${x[1]}</b><div class="muted" style="font-size:12px">${x[2]} · 15:09</div></div></div>`).join('')}</div>
     </aside></div>`;
   },
   /* ----- 工作台：报表核对 + 作品审核队列 ----- */
@@ -768,7 +770,7 @@ const operatorPages = {
   /* ----- 晋升：候选 → 提名 → 审批 ----- */
   promotions() {
     const candidate = (av, color, name, days, rate, invites, ready) => `
-      <div class="row"><span class="av" style="background:${color}">${av}</span><div class="t"><b>${name}</b><small>活跃 ${days} 天 · 合格率 ${rate} · 直邀 ${invites} 人</small></div>${ready ? '<button class="btn ink sm">提名</button>' : '<span class="chip soft">未达标</span>'}</div>`;
+      <div class="row"><span class="av" style="background:${color}">${av}</span><div class="t"><b>${name}</b><small>活跃 ${days} 天 · 合格率 ${rate} · 直邀 ${invites} 人</small></div>${ready ? '<button class="btn ink sm">提名</button>' : '<span class="chip soft">观察中</span>'}</div>`;
     return `<div class="bento enter">
       <div class="card lift" style="--s:4;--i:0"><div class="card-h"><h3>候选人</h3><span class="chip clay r">3</span></div>
         <div class="big num" style="font-size:30px">3<small>人</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">系统按公开标准筛出</p></div>
@@ -776,13 +778,13 @@ const operatorPages = {
         <div class="big num" style="font-size:30px">1<small>人</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">需另一位运营或管理员复核</p></div>
       <div class="card lift" style="--s:4;--i:2"><div class="card-h"><h3>本月已晋升</h3></div>
         <div class="big num" style="font-size:30px">2<small>人</small></div><p class="muted" style="font-size:12.5px;margin-top:4px">最近：江照野 · 10-18</p></div>
-      <div class="card" style="--s:7;--i:3"><div class="card-h"><h3>候选人</h3><span class="muted r" style="font-size:12px">达标线：活跃 ≥ 20 天 · 合格率 ≥ 92% · 直邀 ≥ 2 人</span></div>
+      <div class="card" style="--s:7;--i:3"><div class="card-h"><h3>候选人</h3><span class="muted r" style="font-size:12px">候选由运营人工提名 · 参考指标见右侧（达标线规则待确认）</span></div>
         ${candidate('林', '#d46b45', '林小满', 30, '95%', 3, true)}
         ${candidate('顾', '#4e9a4a', '顾知夏', 26, '94%', 2, true)}
         ${candidate('谢', '#3b7dd8', '谢时雨', 21, '91%', 4, false)}
         <p class="muted" style="font-size:12px;margin-top:12px">提名后本人会收到通知；晋升需另一位运营或管理员复核通过才生效。</p></div>
       <div class="card" style="--s:5;--i:4"><div class="card-h"><h3>待审批</h3><span class="chip warn r">1</span></div>
-        <div class="row"><span class="av" style="background:#8e6cc9">唐</span><div class="t"><b>唐南乔</b><small>陈墨 10-17 提名 · 达标 4/4</small></div></div>
+        <div class="row"><span class="av" style="background:#8e6cc9">唐</span><div class="t"><b>唐南乔</b><small>陈墨 10-17 提名 · 参考指标见下</small></div></div>
         <div style="display:grid;gap:8px;margin-top:12px;font-size:12.5px">
           <div style="display:flex"><span class="muted">近 30 天活跃</span><b style="margin-left:auto">28 天</b></div>
           <div style="display:flex"><span class="muted">作品合格率</span><b style="margin-left:auto">96.2%</b></div>
@@ -803,7 +805,7 @@ const operatorPages = {
         <p class="muted" style="font-size:12px;margin-top:4px">${note}</p></div>`;
     return `<div class="bento enter">
       <div class="card lift" style="--s:12;--i:0"><div class="card-h"><h3>10 月团队激励评定</h3><span class="muted" style="font-size:12.5px">按公开标准自动计算，运营拟定后财务复核发放</span><span class="chip clay r">待拟定</span></div>
-        <div class="muted" style="font-size:12.5px;line-height:1.8">A 档 ¥1,000：合格率 ≥ 94% 且活跃度 ≥ 80% · B 档 ¥600：合格率 ≥ 90% 且活跃度 ≥ 70% · 不达标不发放。评定说明随发放记录公开。</div></div>
+        <div class="muted" style="font-size:12.5px;line-height:1.8">A 档 ¥1,000：合格率 ≥ 94% 且活跃度 ≥ 80% · B 档 ¥600：合格率 ≥ 90% 且活跃度 ≥ 70% · 不达标不发放。<b style="color:var(--warn)">以下档位与数值均为演示，正式规则待确认后生效。</b></div></div>
       ${team('温嘉树团队', 'A 档', '1,000.00', '95.1%', '84%', '连续两月 A 档')}
       ${team('苏禾团队', 'B 档', '600.00', '92.0%', '88%', '活跃度突出，合格率差 2% 到 A 档')}
       ${team('唐知远团队', 'B 档', '600.00', '90.4%', '71%', '首次达标')}
@@ -876,7 +878,7 @@ const financePages = {
       <div class="card profile"><div class="big-av" style="background:linear-gradient(135deg,#4e9a4a,#2f7d4f);box-shadow:0 10px 24px -8px rgba(47,125,79,.55)">王</div><h4>王谨</h4><p class="muted" style="font-size:12.5px">财务管理 · 入职 2 年</p>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px;text-align:center">${[['打款', '42'], ['对账', '86%'], ['差异', '0']].map(x => `<div style="padding:10px 0;border-radius:14px;background:var(--card-2)"><b class="serif" style="font-size:18px">${x[1]}</b><div class="muted" style="font-size:11.5px">本月${x[0]}</div></div>`).join('')}</div></div>
       <div class="card"><div class="card-h"><h3>今日打款</h3><span class="chip soft r">3 笔</span></div>
-        ${[['林小满', '¥420.00 · 微信零钱', '已到账', 'var(--ok)'], ['顾知夏', '¥1,204.60 · 银行卡', '银行处理中', 'var(--warn)'], ['唐南乔', '¥86.00 · 微信零钱', '已到账', 'var(--ok)']].map(x => `<div class="row"><div class="t"><b>${x[0]}</b><small>${x[1]}</small></div><b style="font-size:12.5px;color:${x[3]}">${x[2]}</b></div>`).join('')}</div>
+        ${[['林小满', '¥420.00 · 微信零钱', '已登记发放', 'var(--ok)'], ['顾知夏', '¥1,204.60 · 银行卡', '待发放', 'var(--warn)'], ['唐南乔', '¥86.00 · 微信零钱', '已登记发放', 'var(--ok)']].map(x => `<div class="row"><div class="t"><b>${x[0]}</b><small>${x[1]}</small></div><b style="font-size:12.5px;color:${x[3]}">${x[2]}</b></div>`).join('')}</div>
     </aside></div>`;
   },
   /* ----- 对账：上游账单 vs 平台记录 ----- */
@@ -902,7 +904,7 @@ const financePages = {
   /* ----- 提现：审批队列 + 打款 ----- */
   withdrawals() {
     const w = (av, color, name, amount, method, time, risk) => `
-      <tr data-click><td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="background:${color}">${av}</span><div><b>${name}</b><div class="muted" style="font-size:12px">${time}</div></div></div></td><td class="num"><b>${amount}</b></td><td>${method}</td><td>${risk}</td><td style="text-align:right"><button class="btn ink sm">通过并打款</button> <button class="btn sm">拒绝</button></td></tr>`;
+      <tr data-click><td><div style="display:flex;align-items:center;gap:10px"><span class="av" style="background:${color}">${av}</span><div><b>${name}</b><div class="muted" style="font-size:12px">${time}</div></div></div></td><td class="num"><b>${amount}</b></td><td>${method}</td><td>${risk}</td><td style="text-align:right"><button class="btn ink sm">审核通过</button> <button class="btn sm">拒绝</button></td></tr>`;
     return `<div class="bento enter">
       <div class="card lift" style="--s:3;--i:0"><div class="card-h"><h3>待审批</h3></div><div class="big num" style="font-size:28px"><small>¥</small>3,286.00</div><p class="muted" style="font-size:12px">4 笔 · 最早今天 09:12</p></div>
       <div class="card lift" style="--s:3;--i:1"><div class="card-h"><h3>今日已打款</h3></div><div class="big num" style="font-size:28px"><small>¥</small>1,710.60</div><p class="muted" style="font-size:12px">3 笔 · 全部到账</p></div>
@@ -915,7 +917,7 @@ const financePages = {
           ${w('何', '#d46b45', '何半夏', '¥206.00', '微信零钱（何*夏）', '今天 09:36', '<span class="chip up">通过校验</span>')}
           ${w('江', '#8e6cc9', '江照野', '¥800.00', '银行卡 ··· 0933', '今天 09:12', '<span class="chip warn">大额 · 复核</span>')}
         </tbody></table>
-        <div class="sheet-foot"><span>通过后实时打款并通知成员</span><span>合计 <b>¥3,286.00</b></span></div></div>
+        <div class="sheet-foot"><span>审核通过后登记发放并通知成员</span><span>合计 <b>¥3,286.00</b></span></div></div>
     </div>`;
   },
 
@@ -927,7 +929,7 @@ const financePages = {
       <div class="card lift" style="--s:12;--i:0"><div class="card-h"><h3>计费规则</h3><span class="muted" style="font-size:12.5px">已确认的账永远不改；调价只对未来业绩生效</span><button class="btn ink sm r">新增规则</button></div>
         <table class="sheet-table"><thead><tr><th style="width:30%">项目 / 计价单位</th><th>达人单价</th><th>团长单价</th><th>生效时间</th><th>状态</th><th></th></tr></thead><tbody>
           ${rate('知乎推文', '拉新 / 单', '¥2.00', '¥0.80', '08-01', '<span class="chip up">生效中</span>')}
-          ${rate('知乎推文', '拉活 / 次', '¥0.40', '¥0.16', '08-01', '<span class="chip up">生效中</span>')}
+          ${rate('知乎推文', '拉活 / 个', '¥0.40', '¥0.16', '08-01', '<span class="chip up">生效中</span>')}
           ${rate('红果短剧推荐', '有效观看 / 次', '¥0.80', '¥0.32', '09-15', '<span class="chip up">生效中</span>')}
           ${rate('网盘拉新', '拉新 / 人', '¥3.00', '¥1.20', '10-01', '<span class="chip warn">灰度中</span>')}
           ${rate('知乎推文', '拉新 / 单', '¥2.20', '¥0.88', '11-01 起', '<span class="chip soft">已排期</span>')}
@@ -944,7 +946,11 @@ const financePages = {
  * 页面：管理员（总览复用运营，加系统管理面）
  * ========================================================= */
 const adminPages = {
-  home: () => operatorPages.home(),
+  /* 管理员总览：完整管理员可读金额，复用财务金额版结构，身份换为当前管理员 */
+  home() {
+    const html = financePages.home();
+    return html.replace('王谨', '系统管理员').replace('财务管理 · 入职 2 年', '完整管理员');
+  },
   members: () => operatorPages.members(),
 
   accounts() {
@@ -978,7 +984,7 @@ const adminPages = {
           ${log('10-18 17:33', '王谨', '导出账单', '10 月知乎对账', 'CSV · 1.2 MB · 已留档')}
           ${log('10-18 16:05', '系统管理员', '关闭账号', '达人 吴某', '存在作弊行为，收益冻结待结清')}
         </tbody></table>
-        <div class="sheet-foot"><span>已显示 5 条</span><span>日志保留 3 年</span></div></div>
+        <div class="sheet-foot"><span>已显示 5 条</span><span>保留策略以正式规定为准</span></div></div>
     </div>`;
   },
 
@@ -1028,7 +1034,7 @@ const developerPages = {
         <div class="acts"><button class="btn white">查看队列</button><button class="btn light">巡检记录 →</button></div>
       </div>
       <div class="card lift" style="--s:7;--i:1"><div class="card-h"><h3>处理量趋势</h3><span class="muted" style="font-size:12.5px">业绩条数 · 按日</span><div class="r"><div class="seg"><button>7 天</button><button class="on">30 天</button></div></div></div>
-        ${trendSVG('dt1', [{ c: 'var(--c2)', area: true, v: wave(9000, 2400, 3.1, .3) }], 230)}</div>
+        ${trendSVG('dt1', [{ c: 'var(--c2)', area: true, v: wave(9000, 2400, 3.1, .3) }], 230, '')}</div>
       <div class="card lift" style="--s:4;--i:2"><div class="card-h"><h3>Worker 状态</h3><span class="r" style="display:flex;align-items:center;gap:6px;color:var(--ok);font-size:12.5px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 2.2s infinite"></span>正常</span></div>
         ${[['知乎同步', '3 分钟前'], ['红果同步', '11 分钟前'], ['收益计算队列', '0 条'], ['归属一致性巡检', '0 条差异']].map(x => `<div style="display:flex;font-size:13px;padding:6px 0"><span class="muted">${x[0]}</span><b style="margin-left:auto">${x[1]}</b></div>`).join('')}</div>
       <div class="card lift" style="--s:4;--i:3"><div class="card-h"><h3>队列</h3><span class="chip up r">无积压</span></div>
