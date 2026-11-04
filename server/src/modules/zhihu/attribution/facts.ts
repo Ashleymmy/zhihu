@@ -168,21 +168,29 @@ export async function importDetail(user: AuthUser, scope: Scope, id: string, pag
     };
   });
 }
-export async function listImports(user: AuthUser, scope: Scope, page: number, pageSize: number, archived=false) {
+export async function listImports(user: AuthUser, scope: Scope, page: number, pageSize: number, archived=false, period?:string) {
   if (!isStaffRole(user.role)) fail('原始报告仅管理员可见', 403);
   await authorize(user, scope);
   return withTransaction(async (c) => {
+    // Match the report's business dates, not its upload month. A cross-month
+    // file remains visible in every period whose rows it contains.
+    const periodFilter=period?" AND EXISTS(SELECT 1 FROM zh_import_rows pr WHERE pr.batch_id=b.id AND JSON_UNQUOTE(JSON_EXTRACT(pr.normalized_json,'$.date')) LIKE ?)":'';
+    const args=[scope.accountId,scope.projectId,archived,...(period?[period+'-%']:[])];
+    const dates="SELECT JSON_UNQUOTE(JSON_EXTRACT(dr.normalized_json,'$.date')) FROM zh_import_rows dr WHERE dr.batch_id=b.id AND JSON_UNQUOTE(JSON_EXTRACT(dr.normalized_json,'$.date')) REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'";
     const list = await select(
       c,
-      "SELECT CAST(b.id AS CHAR) id,file_name,report_kind,b.status,b.created_at,a.archived_at,j.status job_status,j.attempts,j.last_error FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND b.status<>'withdrawn' AND (a.batch_id IS NOT NULL)=? ORDER BY b.id DESC LIMIT ? OFFSET ?",
-      [scope.accountId, scope.projectId, archived, pageSize, (page - 1) * pageSize],
+      `SELECT CAST(b.id AS CHAR) id,file_name,report_kind,b.status,b.created_at,a.archived_at,j.status job_status,j.attempts,j.last_error,
+       (${dates} ORDER BY 1 LIMIT 1) period_from,(${dates} ORDER BY 1 DESC LIMIT 1) period_to,
+       (SELECT COUNT(*) FROM zh_import_rows cr WHERE cr.batch_id=b.id) row_count
+       FROM zh_import_batches b LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND b.status<>'withdrawn' AND (a.batch_id IS NOT NULL)=?${periodFilter} ORDER BY b.id DESC LIMIT ? OFFSET ?`,
+      [...args, pageSize, (page - 1) * pageSize],
     );
     const [total] = await select(
       c,
-      "SELECT COUNT(*) total FROM zh_import_batches b LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND b.status<>'withdrawn' AND (a.batch_id IS NOT NULL)=?",
-      [scope.accountId, scope.projectId, archived],
+      `SELECT COUNT(*) total FROM zh_import_batches b LEFT JOIN zh_import_history_archive a ON a.batch_id=b.id WHERE b.account_id=? AND b.project_id=? AND b.status<>'withdrawn' AND (a.batch_id IS NOT NULL)=?${periodFilter}`,
+      args,
     );
-    return { list, total: Number(total.total), page, pageSize };
+    return { list:list.map(row=>({...row,row_count:Number(row.row_count)})), total: Number(total.total), page, pageSize };
   });
 }
 export async function originalFile(user: AuthUser, scope: Scope, id: string) {

@@ -1,6 +1,6 @@
 import {computed,onScopeDispose,ref,reactive} from 'vue'
 import {errorText,requestKey,type EngineContext} from '../../context'
-import {useFinanceApi,moneyValue,type WorkbenchView,type ExceptionItem,type ObjectionItem,type RevisionItem,type WithdrawalRow,type ConfirmProgress} from './useFinanceApi'
+import {useFinanceApi,moneyValue,type WorkbenchView,type ExceptionItem,type ObjectionItem,type RevisionItem,type WithdrawalRow,type ConfirmProgress,type ImportBatch} from './useFinanceApi'
 export type PeriodStep=1|2|3|4|5
 export const STEPS=[{n:1 as PeriodStep,name:'上传与识别',sub:'预览后导入'},{n:2 as PeriodStep,name:'待处理',sub:'补齐本期资料'},{n:3 as PeriodStep,name:'核对与确认',sub:'核对后计入收入'},{n:4 as PeriodStep,name:'线下发放',sub:'实际转账后登记'},{n:5 as PeriodStep,name:'记录与导出',sub:'账单与发放留痕'}]
 export function periodRange(id:string){const [y,m]=id.split('-').map(Number),mm=String(m).padStart(2,'0');return {from:`${y}-${mm}-01`,to:`${y}-${mm}-${new Date(y!,m!,0).getDate()}`}}
@@ -15,6 +15,7 @@ export function usePeriodState(context:EngineContext){
  const funding=reactive({amount:'0',hash:'',funded:false,reference:''}),timeline=ref<{t:string;actor:string;text:string}[]>([])
  const confirmation=ref<ConfirmProgress|null>(null),confirmError=ref(''),confirmBusy=ref(false),importing=ref(false)
  const activeImport=ref<{id:string;from:string;to:string}|null>(null)
+ const reportRequest=ref<{batch:ImportBatch;action:'resume'|'analyze'}|null>(null)
  const processingImports=computed(()=>workbench.value?.processingImports??[])
  let generation=0,disposed=false,timer:ReturnType<typeof setTimeout>|undefined,importTimer:ReturnType<typeof setTimeout>|undefined
  let attempt:{from:string;to:string;reviewHash:string;key:string}|null=null
@@ -68,6 +69,6 @@ export function usePeriodState(context:EngineContext){
  async function retryConfirmation(){if(!confirmation.value?.jobId)return;confirmation.value=await api.retryConfirm(confirmation.value.jobId);save();await pollConfirmation()}
  async function resumeConfirmation(){try{const saved=JSON.parse(sessionStorage.getItem(storage+'.confirm')||'null');if(saved?.attempt?.from!==periodRange(periodId.value).from)return;attempt=saved.attempt;confirmation.value=saved.progress;if(confirmation.value?.status==='pending'||confirmation.value?.status==='failed')await pollConfirmation()}catch(e){confirmError.value=errorText(e)}}
  onScopeDispose(()=>{disposed=true;generation++;if(timer)clearTimeout(timer);if(importTimer)clearTimeout(importTimer)})
- return {api,context,storage,view,periodId,step,loading,error,workbench,exceptions,revisions,objections,withdrawals,funding,timeline,closed,todoCount,totalRecords,totalPayable,written,statusKey,statusLabel,statusBadgeClass,stepOfStatus,blockedEntries,internalOnly,skippedSteps,hasReady,importing,activeImport,processingImports,confirmation,confirmError,confirmBusy,log,loadPeriod,openPeriod,backToPeriods,gotoStep,confirm,pollConfirmation,retryConfirmation}
+ return {api,context,storage,view,periodId,step,loading,error,workbench,exceptions,revisions,objections,withdrawals,funding,timeline,closed,todoCount,totalRecords,totalPayable,written,statusKey,statusLabel,statusBadgeClass,stepOfStatus,blockedEntries,internalOnly,skippedSteps,hasReady,importing,activeImport,reportRequest,processingImports,confirmation,confirmError,confirmBusy,log,loadPeriod,openPeriod,backToPeriods,gotoStep,confirm,pollConfirmation,retryConfirmation}
 }
 export type PeriodState=ReturnType<typeof usePeriodState>

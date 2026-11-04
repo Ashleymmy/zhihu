@@ -225,6 +225,11 @@ export interface Page<T> {
   pageSize: number
 }
 
+export interface ImportBatch {
+  id:string;fileName:string;reportKind:string;status:string;createdAt:string;archivedAt:string|null
+  periodFrom:string|null;periodTo:string|null;rowCount:number;jobStatus?:string|null
+}
+
 // ==================== 金额工具（BigInt，对齐 bill-entry.ts） ====================
 
 /** 4 位小数字符串 → BigInt 万分值 */

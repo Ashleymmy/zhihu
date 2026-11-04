@@ -18,6 +18,7 @@ import {
 
 const state = inject<PeriodState>('financeState')!
 const toast = inject<(text: string) => void>('financeToast')!
+const openReports=inject<(period?:string)=>void>('financeOpenReports')!
 
 interface PeriodCard {
   row: PeriodRow
@@ -99,11 +100,11 @@ onUnmounted(() => generation++)
 
 <template>
   <div>
-    <div class="row-actions" style="margin-bottom:16px"><button class="primary" @click="state.openPeriod(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}).slice(0,7)).then(()=>{state.step.value=1})">上传报表</button></div><div class="banner">
+    <div class="row-actions" style="margin-bottom:16px"><button class="primary" @click="state.openPeriod(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}).slice(0,7)).then(()=>{state.step.value=1})">上传报表</button><button @click="openReports()">上传记录 / 撤销</button></div><div class="banner">
       <div class="grow">
-        <b>按账期工作，而不是面对一屏功能。</b>
+        <b>选择账期，继续核对。</b>
         <div class="small muted">
-          每个账期都是一条有状态的流水线：上传 → 待处理 → 确认 → 放款 → 归档。点击进入「{{ cards[0] ? periodTitle(cards[0].row.id) : '本月' }}」开始。
+          传错报表可在“上传记录 / 撤销”中处理；按月份查看原文件并核对撤销影响。
         </div>
       </div>
     </div>

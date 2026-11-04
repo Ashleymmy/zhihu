@@ -118,6 +118,27 @@ it('拉活重传保持类型隔离，重复运行清理记录迁移保留原账�
 });
 
 const withdrawalPreview=(id:string,actor=finance)=>request(app).get(endpoint(id)+'/withdrawal').set(headers[actor.sub]).query(scope);
+it('按业务月份查找原报表，跨月、隐藏、预览及分页保持一致且不泄露越权数据',async()=>{
+ const source=file('日期,渠道,关键词,订单量\n2026-09-30,分析渠道,分析关键词,2\n2026-10-01,分析渠道,分析关键词,3');
+ const cross=await workbench.uploadReport(finance,scope,source,'new_user');
+ const pending=await facts.previewImport(finance,scope,file('日期,渠道,关键词,订单量\n2026-10-02,分析渠道,分析关键词,4'),'order');
+ const list=(period:string,extra:Record<string,unknown>={},who=finance)=>request(app).get('/api/v1/modules/zhihu/imports').set(headers[who.sub]).query({...scope,page:1,pageSize:100,period,...extra});
+ const october=await list('2026-10');expect(october.status,october.text).toBe(200);
+ expect(october.body.data.list.find((b:{id:string})=>b.id===cross.id)).toMatchObject({periodFrom:'2026-09-30',periodTo:'2026-10-01',rowCount:2});
+ expect(october.body.data.list.find((b:{id:string})=>b.id===pending.id)).toMatchObject({status:'preview',periodFrom:'2026-10-02'});
+ expect((await list('2026-09')).body.data.list.some((b:{id:string})=>b.id===cross.id)).toBe(true);
+ expect((await list('2026-08')).body.data.list.some((b:{id:string})=>b.id===cross.id)).toBe(false);
+ const paged=await list('2026-10',{pageSize:1});expect(paged.body.data.total).toBe(october.body.data.total);expect(paged.body.data.list).toHaveLength(1);
+ await action(cross.id,'archive',{archived:true});
+ expect((await list('2026-10')).body.data.list.some((b:{id:string})=>b.id===cross.id)).toBe(false);
+ expect((await list('2026-10',{archived:'true'})).body.data.list.some((b:{id:string})=>b.id===cross.id)).toBe(true);
+ const removal=await withdrawalPreview(cross.id);expect(removal.body.data.period).toEqual({from:'2026-09-30',to:'2026-10-01'});
+ expect((await action(cross.id,'withdrawal',{reviewHash:removal.body.data.reviewHash})).status).toBe(200);
+ expect((await list('2026-10',{archived:'true'})).body.data.list.some((b:{id:string})=>b.id===cross.id)).toBe(false);
+ expect((await list('2026-13')).status).toBe(422);
+ expect((await list('2026-10',{projectId:'999'})).status).toBe(403);
+ for(const who of [creator,leader])expect((await list('2026-10',{},who)).status).toBe(403);
+});
 const withdraw=async(id:string)=>{const preview=await withdrawalPreview(id);expect(preview.status,preview.text).toBe(200);const result=await action(id,'withdrawal',{reviewHash:preview.body.data.reviewHash});expect(result.status,result.text).toBe(200);return result.body.data;};
 it('撤销未确认报表清除金额和待办，同文件可重新上传且不被旧任务恢复',async()=>{
  const day='2026-09-20',id=await upload(day,'分析渠道','分析关键词');
