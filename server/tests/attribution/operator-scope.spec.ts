@@ -151,6 +151,17 @@ describe('运营跨团队业务范围', () => {
   it('运营可核验另一团队及独立达人作品，团长不能跨团队，达人不能自审', async () => {
     for (const executor of [otherTeam, direct]) {
       const saved = await evidence(executor);
+      const [before] = await c.query<RowDataPacket[]>(
+        'SELECT status,reviewed_by,reason,reviewed_at FROM zh_evidence WHERE id=?', [saved.id],
+      );
+      const [sourceBefore] = await c.query<RowDataPacket[]>(
+        'SELECT * FROM zh_work_review_records WHERE binding_id=? ORDER BY id', [saved.bindingId],
+      );
+      expect(before[0]).toMatchObject({ status: 'passed', reviewed_by: null });
+      expect(before[0].reviewed_at).not.toBeNull();
+      expect(sourceBefore).toEqual([
+        expect.objectContaining({ policy: 'R7-default-review-v1', status: 'passed', decided_by: null }),
+      ]);
       const review = (body = scope) => request(app).post(`/evidence/${saved.id}/review`).set('Idempotency-Key', key()).send({ ...body, accept: true, reason: '隔离库核验' });
       actor = leader;
       expect((await review()).status).toBe(403);
@@ -160,8 +171,16 @@ describe('运营跨团队业务范围', () => {
       expect((await review(secondScope)).status).toBe(404);
       const result = await review();
       expect(result.status, JSON.stringify(result.body)).toBe(200);
-      const [rows] = await c.query<RowDataPacket[]>('SELECT status,reviewed_by FROM zh_evidence WHERE id=?', [saved.id]);
-      expect(rows[0]).toMatchObject({ status: 'passed', reviewed_by: 7 });
+      expect((await review()).status).toBe(200);
+      const [rows] = await c.query<RowDataPacket[]>(
+        'SELECT status,reviewed_by,reason,reviewed_at FROM zh_evidence WHERE id=?', [saved.id],
+      );
+      expect(rows[0]).toMatchObject({ status: 'passed', reviewed_by: null });
+      expect(rows).toEqual(before);
+      const [sourceAfter] = await c.query<RowDataPacket[]>(
+        'SELECT * FROM zh_work_review_records WHERE binding_id=? ORDER BY id', [saved.bindingId],
+      );
+      expect(sourceAfter).toEqual(sourceBefore);
     }
   });
   it('运营可处理另一团长的分配及释放审核，仍不能破坏团队归属', async () => {
