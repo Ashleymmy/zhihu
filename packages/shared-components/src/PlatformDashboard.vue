@@ -449,13 +449,6 @@ function untilt(event: PointerEvent) {
             <p class="muted" style="font-size:12.5px;margin-top:10px">直接邀请的成员，业绩与名单都可查</p>
           </article>
 
-          <!-- 团长专属：团队下级（隐性，只显示人数） -->
-          <article v-if="isLeader && relation" class="card lift" style="--s:4;--i:3">
-            <div class="card-h"><span class="ic" style="background:var(--hover)">🔒</span><h3>团队下级</h3><span class="chip soft r">隐性</span></div>
-            <div class="big num"><AnimatedNumber :value="relation.counts.indirect" :decimals="0" /><small style="margin-left:4px">人</small></div>
-            <p class="muted" style="font-size:12.5px;margin-top:10px">由你的成员邀请加入，属于你的团队，只显示人数<template v-if="relation.indirectList?.length">：{{ relation.indirectList.slice(0, 6).map(p => p.name).join('、') }}{{ relation.indirectList.length > 6 ? ' 等' : '' }}</template></p>
-          </article>
-
           <!-- 团长专属：近 30 天团队收益（M-L02：与贡献图同口径，不再用累计冒充本月） -->
           <article v-if="isLeader && teamMonthUnits !== null" class="card lift" style="--s:4;--i:4">
             <div class="card-h"><h3>近 30 天团队收益</h3><span class="r"><span class="chip soft">团队 {{ summary?.team?.memberCount ?? 0 }} 人</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
@@ -510,13 +503,13 @@ function untilt(event: PointerEvent) {
           <!-- 团长专属：成员贡献（近 30 天团队业绩按业绩人，前 8） -->
           <article v-if="isLeader" class="card lift" style="--s:12;--i:8">
             <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span class="r"><span v-if="contributors.list.length" class="chip soft">前 8 名</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
-            <svg v-if="contributors.list.length" class="chart contrib-chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="成员贡献柱状图">
-              <g v-for="(item, i) in contributors.list" :key="item.name">
-                <rect class="bar" :style="{ '--i': i }" :x="20 + i * 86" :y="150 - (item.value / contributors.max) * 120" width="44" :height="Math.max(3, (item.value / contributors.max) * 120)" rx="8" fill="var(--c1)" :opacity="0.45 + 0.55 * (item.value / contributors.max)"><title>{{ item.name }}：¥{{ yuan(item.amount) }}</title></rect>
-                <text class="ax" :x="42 + i * 86" y="170" text-anchor="middle">{{ item.name }}</text>
-                <text class="ax" :x="42 + i * 86" :y="140 - (item.value / contributors.max) * 120" text-anchor="middle" style="font-weight:650;fill:var(--ink)">¥{{ Math.round(item.value) }}</text>
-              </g>
-            </svg>
+            <div v-if="contributors.list.length" class="cbars" role="img" aria-label="成员贡献柱状图">
+              <div v-for="item in contributors.list" :key="item.name" class="cb-col" :title="`${item.name}：¥${yuan(item.amount)}`">
+                <span class="cb-val">¥{{ Math.round(item.value) }}</span>
+                <div class="cb-track"><i class="cb-bar" :style="{ height: `${Math.max(4, (item.value / contributors.max) * 100)}%` }" /></div>
+                <span class="cb-name">{{ item.name }}</span>
+              </div>
+            </div>
             <p v-else class="muted" style="font-size:12.5px">近 30 天还没有团队业绩，成员完成任务后这里会按人拆开。</p>
           </article>
 
@@ -912,10 +905,22 @@ function untilt(event: PointerEvent) {
 .growth-rules > div { color: var(--muted); }
 .growth-rules > div.met { color: var(--ink); }
 .growth-mark { display: inline-block; width: 18px; color: var(--clay-deep); font-weight: 700; }
-.contrib-chart { width: 100%; height: 190px; }
-.contrib-chart .bar { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0); animation: contrib-grow 0.8s var(--spring) forwards; animation-delay: calc(var(--i) * 45ms + 0.1s); }
-@keyframes contrib-grow { to { transform: scaleY(1); } }
-@media (prefers-reduced-motion: reduce) { .contrib-chart .bar { animation: none; transform: none; } }
+/* 成员贡献：自适应柱列（值在柱顶、名字在柱底，宽度随人数均分，挂载即生长） */
+.cbars { display: flex; align-items: stretch; gap: 18px; height: 190px; padding-top: 4px; }
+.cb-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cb-val { font-size: 12px; font-weight: 650; color: var(--ink); }
+.cb-track { display: flex; flex: 1; width: 100%; max-width: 54px; align-items: flex-end; }
+.cb-bar { display: block; width: 100%; border-radius: 10px 10px 4px 4px; background: linear-gradient(180deg, #e8a587, var(--c1)); transform-origin: bottom; animation: contrib-grow 0.7s var(--spring) both; }
+.cb-col:nth-child(2) .cb-bar { animation-delay: 60ms; }
+.cb-col:nth-child(3) .cb-bar { animation-delay: 120ms; }
+.cb-col:nth-child(4) .cb-bar { animation-delay: 180ms; }
+.cb-col:nth-child(5) .cb-bar { animation-delay: 240ms; }
+.cb-col:nth-child(6) .cb-bar { animation-delay: 300ms; }
+.cb-col:nth-child(7) .cb-bar { animation-delay: 360ms; }
+.cb-col:nth-child(8) .cb-bar { animation-delay: 420ms; }
+.cb-name { max-width: 100%; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes contrib-grow { from { transform: scaleY(0); } }
+@media (prefers-reduced-motion: reduce) { .cb-bar { animation: none; } }
 .feed .amt { font-weight: 650; white-space: nowrap; }
 .feed .it + .it { border-top: 1px solid var(--line-2); }
 @media (max-width: 1360px) {
