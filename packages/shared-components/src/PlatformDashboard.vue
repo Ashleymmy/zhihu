@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { CoreWorkspace } from './core-workspace'
 import type { AccountMonitorItem, MiniMonitor } from '@zhihu-koc/shared-contracts/core'
 import OperationGuide from './OperationGuide.vue'
@@ -33,13 +33,19 @@ const announcements = ref<Announcement[]>([])
 interface InsightsSummary { upstream?: string; memberPayout?: string; retention?: string; activeMembers: number; upstreamChange?: string; payoutRatio?: string; retentionRate?: string; taskCount?: number; activeTeams?: number; newMembers?: number }
 interface InsightsDaily { labels: string[]; series: { key: string; label: string; unit: string; values: string[] }[] }
 interface TeamTop { list: { name: string; quantity: number; amount?: string }[] }
-interface Retention { rate?: number; parts?: { label: string; amount: string }[]; teamCount?: number; newTeams?: number; soloCreators?: number }
+interface Retention { rate?: number; parts?: { label: string; amount: string }[]; teamCount?: number; newTeams?: number; soloCreators?: number; activeRate?: number }
 interface TodayPayouts { count: number; list: { name: string; amount: string; method: string; status: string }[] }
 interface ReconcileProgress { rate: number; checkedDays: number; totalDays: number; byProject: { name: string; checked: number; total: number }[] }
+/* 关系森林（员工共享，含隐性荐邀层快照）与实时动态 */
+interface ForestNode { name: string; via?: 'team' | 'invite'; children?: ForestNode[] }
+interface RelationForest { roots: ForestNode[] }
+interface LiveFeed { list: { name: string; project: string; quantity: string; at: string }[] }
 interface PendingWithdrawals { totalAmount: string; count: number; earliest: string; todayPaid: string; monthPaid: string; failedCount: number }
 const insightsSummary = ref<InsightsSummary | null>(null), insightsDaily = ref<InsightsDaily | null>(null), teamTop = ref<TeamTop | null>(null),
   retention = ref<Retention | null>(null), todayPayouts = ref<TodayPayouts | null>(null), reconcile = ref<ReconcileProgress | null>(null),
-  pendingWithdrawals = ref<PendingWithdrawals | null>(null)
+  pendingWithdrawals = ref<PendingWithdrawals | null>(null), relationForest = ref<RelationForest | null>(null), liveFeed = ref<LiveFeed | null>(null)
+/** 实时动态自动刷新开关（30s 轮询，页面卸载即停） */
+const liveOn = ref(true)
 /** 员工（非成员）才需要总览可视化；运营收窄到非金额字段由接口按岗位控制 */
 const isStaff = computed(() => !isMember.value)
 const canSeeAmount = computed(() => w.role.value === 'developer' || (w.role.value === 'admin' && (w.duty?.value ?? 'all') !== 'operations'))
@@ -90,6 +96,12 @@ watch(reconcile, v => {
 })
 const RING_C = 2 * Math.PI * 40
 const ringOffset = computed(() => RING_C * (1 - (ringOn.value ? reconcile.value?.rate ?? 0 : 0)))
+/** 运营留存环：同样的入场扫动 */
+const ringOnRet = ref(false)
+watch(retention, v => {
+  if (v && !ringOnRet.value) requestAnimationFrame(() => requestAnimationFrame(() => { ringOnRet.value = true }))
+})
+const ringOffsetRet = computed(() => RING_C * (1 - (ringOnRet.value ? retention.value?.activeRate ?? 0 : 0)))
 const TEAM_PALETTE = ['#d46b45', '#5b8fe0', '#8e6cc9', '#4e9a4a', '#c9a23f', '#b3557a']
 
 /* ===== 开发者首页可视化（系统视角：处理量/队列/Worker/巡检，无金额） ===== */
@@ -207,7 +219,7 @@ async function loadStaffInsights(version: number) {
   const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
   const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
     r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
-  const [sum, daily, top, ret, payouts, rec, pending] = await Promise.allSettled([
+  const [sum, daily, top, ret, payouts, rec, pending, forest, feed] = await Promise.allSettled([
     get<InsightsSummary>('/insights/summary'),
     get<InsightsDaily>('/insights/daily'),
     get<TeamTop>('/insights/team-top'),
@@ -215,6 +227,8 @@ async function loadStaffInsights(version: number) {
     get<TodayPayouts>('/finance/today-payouts'),
     get<ReconcileProgress>('/finance/reconcile-progress'),
     get<PendingWithdrawals>('/finance/withdrawals/pending'),
+    get<RelationForest>('/insights/relation-forest'),
+    get<LiveFeed>('/insights/live-feed'),
   ])
   if (version !== revision) return
   insightsSummary.value = unwrap(sum)
@@ -224,7 +238,21 @@ async function loadStaffInsights(version: number) {
   todayPayouts.value = unwrap(payouts)
   reconcile.value = unwrap(rec)
   pendingWithdrawals.value = unwrap(pending)
+  relationForest.value = unwrap(forest)
+  liveFeed.value = unwrap(feed)
 }
+/* 实时动态 30s 轮询：只刷新动态卡，开关关闭即停 */
+async function refreshLive() {
+  try {
+    const r = await w.http.get<{ code: number; data: LiveFeed } | LiveFeed>('/insights/live-feed')
+    liveFeed.value = ('data' in r && r.data !== undefined ? r.data : r) as LiveFeed
+  } catch { /* 动态刷新失败不影响页面 */ }
+}
+let liveTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  liveTimer = setInterval(() => { if (liveOn.value && isStaff.value && !isDeveloper.value) void refreshLive() }, 30000)
+})
+onBeforeUnmount(() => { if (liveTimer) clearInterval(liveTimer) })
 /* 开发者首页可视化（系统视角，demo mock 契约） */
 async function loadDevInsights(version: number) {
   if (!isDeveloper.value) return
@@ -817,14 +845,51 @@ function untilt(event: PointerEvent) {
           <BarChart :items="teamTopItems" :format="teamTopFormat" :max-items="6" />
         </article>
 
-        <!-- 运营：团队形态（非金额） -->
+        <!-- 运营：成员留存与形态（非金额，环形） -->
         <article v-if="isOperator && retention?.teamCount !== undefined" class="card lift" style="--s:6;--i:9">
-          <div class="card-h"><h3>团队形态</h3><span class="r"><span class="chip soft">当前</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
-          <div class="profile-stats" style="margin-top:6px">
+          <div class="card-h"><h3>成员留存与形态</h3><span class="r"><span class="chip soft">当前</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
+          <div class="ring-wrap" style="margin-top:6px">
+            <svg class="ring" width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
+              <circle cx="46" cy="46" r="40" fill="none" stroke="var(--card-2)" stroke-width="10" />
+              <circle class="v" cx="46" cy="46" r="40" fill="none" stroke="#4e9a4a" stroke-width="10" stroke-linecap="round"
+                :stroke-dasharray="RING_C" :stroke-dashoffset="ringOffsetRet" transform="rotate(-90 46 46)" />
+            </svg>
+            <div><div class="big num" style="font-size:26px"><AnimatedNumber :value="Math.round((retention.activeRate ?? 0) * 100)" :decimals="0" /><small style="font-size:14px">%</small></div><p class="muted" style="font-size:12.5px">成员活跃率</p></div>
+          </div>
+          <div class="profile-stats" style="margin-top:14px">
             <div><b>{{ retention.teamCount }}</b><span>团队</span></div>
             <div><b>{{ retention.newTeams }}</b><span>本月新建</span></div>
             <div><b>{{ retention.soloCreators }}</b><span>独立达人</span></div>
           </div>
+        </article>
+
+        <!-- 员工共享：关系森林（实线=当前团队，虚线=原始邀请；隐性层只在员工端可见） -->
+        <article v-if="relationForest" class="card lift" style="--s:7;--i:10">
+          <div class="card-h"><h3>关系森林</h3><span class="muted" style="font-size:12.5px">演示数据</span><router-link class="card-go r" to="/team/relations">关系图 →</router-link></div>
+          <div class="forest">
+            <div v-for="root in relationForest.roots" :key="root.name" class="forest-tree">
+              <span class="f-node f-root">{{ root.name }}</span>
+              <div class="f-col">
+                <div v-for="ch in root.children" :key="ch.name" class="f-item">
+                  <span class="f-node" :data-via="ch.via">{{ ch.name }}</span>
+                  <div v-if="ch.children?.length" class="f-col">
+                    <span v-for="gc in ch.children" :key="gc.name" class="f-node" :data-via="gc.via">{{ gc.name }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:12px">实线 = 当前团队 · 虚线 = 原始邀请（隐性，仅员工可见）</p>
+        </article>
+
+        <!-- 员工共享：实时动态（30s 自动刷新） -->
+        <article v-if="liveFeed" class="card lift" style="--s:5;--i:11">
+          <div class="card-h"><h3>实时动态</h3><span class="r"><button type="button" class="live-toggle" :aria-pressed="liveOn" @click="liveOn = !liveOn"><i :class="{ on: liveOn }" />自动刷新</button></span></div>
+          <div v-for="(x, i) in liveFeed.list" :key="i" class="row">
+            <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: TEAM_PALETTE[i % TEAM_PALETTE.length], flex: 'none' }"></span>
+            <div class="t"><b>{{ x.name }} · {{ x.project }} {{ x.quantity }}</b><small>{{ x.at }}</small></div>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:8px">业绩产生即出现在这里，名字已脱敏 · 演示数据</p>
         </article>
 
         <!-- 待办列表 -->
@@ -921,6 +986,24 @@ function untilt(event: PointerEvent) {
 .cb-name { max-width: 100%; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes contrib-grow { from { transform: scaleY(0); } }
 @media (prefers-reduced-motion: reduce) { .cb-bar { animation: none; } }
+/* 关系森林：横向树，实线=当前团队，虚线=原始邀请 */
+.forest { display: grid; gap: 14px; }
+.forest-tree { display: flex; align-items: flex-start; }
+.f-col { position: relative; display: grid; gap: 8px; padding-left: 30px; }
+.f-col::before { position: absolute; top: 14px; bottom: 14px; left: 10px; border-left: 1.5px solid var(--line-2); content: ""; }
+.f-item { display: flex; align-items: flex-start; }
+.f-node { position: relative; display: inline-block; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.f-node::before { position: absolute; top: 50%; left: -20px; width: 20px; border-top: 1.5px solid var(--line-2); content: ""; }
+.f-root { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.f-root::before { display: none; }
+.f-node[data-via="invite"] { border-style: dashed; color: var(--ink-soft); }
+.f-node[data-via="invite"]::before { border-top-style: dashed; }
+/* 实时动态开关 */
+.live-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; }
+.live-toggle i { position: relative; width: 26px; height: 15px; border-radius: 999px; background: var(--line-2); transition: background 0.2s; }
+.live-toggle i::after { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; content: ""; transition: left 0.25s var(--spring); }
+.live-toggle i.on { background: #4e9a4a; }
+.live-toggle i.on::after { left: 13px; }
 .feed .amt { font-weight: 650; white-space: nowrap; }
 .feed .it + .it { border-top: 1px solid var(--line-2); }
 @media (max-width: 1360px) {

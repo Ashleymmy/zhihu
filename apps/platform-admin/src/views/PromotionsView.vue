@@ -162,7 +162,7 @@ onMounted(async () => {
 
     <p v-if="listError" class="promo-error" role="alert">{{ listError }} <button type="button" @click="load()">重试</button></p>
     <p v-else-if="!items" role="status" class="bento-note">正在加载…</p>
-    <div v-else-if="!items.length" class="bento-card bento-empty">
+    <div v-else-if="!items.length" class="bento-card bento-empty promo-empty">
       <b>{{ view === 'open' ? '没有待审核的提名' : '还没有处理过的提名' }}</b>
       <p>{{ view === 'open' ? '在成员关系图里选中一位达人，点「提名晋升」。' : '审核通过、退回或撤回的提名会留在这里。' }}</p>
       <router-link v-if="view === 'open'" to="/team/relations" class="primary-action">去成员关系图</router-link>
@@ -308,6 +308,11 @@ onMounted(async () => {
 textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; resize: vertical; }
 textarea:focus-visible { outline: none; border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
 .promo-actions { display: flex; gap: 10px; }
+/* 空态：居中、限宽、正文可换行，避免文字贴边被裁 */
+.promo-empty { justify-items: center; padding: 52px 22px; text-align: center; }
+.promo-empty b { font-size: 16px; }
+.promo-empty p { max-width: 460px; line-height: 1.7; }
+.promo-empty .primary-action { margin-top: 12px; }
 @media (max-width: 700px) {
   .promo-card { grid-column: span 12; }
 }

@@ -91,7 +91,7 @@ export function mountDemoInsights(app: Express) {
   /** 平台留存构成（财务/管理员） */
   app.get('/api/v1/core/insights/retention', ...guard, (req, res) => {
     if (noAmount(authed(req))) {
-      return res.json({ code: 0, data: { teamCount: 12, newTeams: 2, soloCreators: 18 } });
+      return res.json({ code: 0, data: { teamCount: 12, newTeams: 2, soloCreators: 18, activeRate: 0.78 } });
     }
     res.json({
       code: 0,
@@ -228,6 +228,45 @@ export function mountDemoInsights(app: Express) {
           { task: '红果 10-19 回传入库', type: '回传', at: '14:58', status: '完成', duration: '2.8s' },
           { task: '收益重算 · 唐南乔晋升', type: '重算', at: '14:26', status: '完成', duration: '1.6s' },
           { task: '红果同步重试', type: '同步', at: '11:12', status: '重试后成功', duration: '12s' },
+        ],
+      },
+    });
+  });
+
+  /** 关系森林（员工）：当前团队实线 + 原始邀请虚线的关系树快照，含隐性层 */
+  app.get('/api/v1/core/insights/relation-forest', ...guard, (_req, res) => {
+    res.json({
+      code: 0,
+      data: {
+        roots: [
+          { name: '唐知远', children: [
+            { name: '江照野', via: 'team', children: [
+              { name: '韩岁宁', via: 'team' }, { name: '谢时雨', via: 'team' }, { name: '方见山', via: 'invite' },
+            ] },
+            { name: '宋初九', via: 'team' },
+          ] },
+          { name: '苏禾', children: [
+            { name: '林小满', via: 'team', children: [{ name: '许南乔', via: 'invite' }] },
+          ] },
+        ],
+      },
+    });
+  });
+
+  /** 实时动态（员工）：最近业绩流水，名字脱敏、不含金额，运营可读 */
+  app.get('/api/v1/core/insights/live-feed', ...guard, (_req, res) => {
+    const now = new Date();
+    const hm = (min: number) => { const d = new Date(now.getTime() - min * 60000); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    res.json({
+      code: 0,
+      data: {
+        list: [
+          { name: '方*乔', project: '知乎', quantity: '4 单', at: hm(1) },
+          { name: '孟*宁', project: '网盘', quantity: '2 人', at: hm(1) },
+          { name: '袁*宁', project: '知乎', quantity: '8 单', at: hm(2) },
+          { name: '林*满', project: '知乎', quantity: '3 单', at: hm(3) },
+          { name: '许*乔', project: '红果', quantity: '5 次', at: hm(6) },
+          { name: '宋*九', project: '知乎', quantity: '2 单', at: hm(9) },
         ],
       },
     });
