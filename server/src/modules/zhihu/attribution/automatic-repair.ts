@@ -17,7 +17,7 @@ export async function refreshUnconfirmedKeyword(c:PoolConnection,scope:Scope,key
 }
 
 // Exact identities repaired in settings also resume previous report rows.
-export async function processResolvedNames(c:PoolConnection,user:AuthUser,scope:Scope,filter?:{from:string;to:string;keywordIds:string[]}){
+export async function processResolvedNames(c:PoolConnection,user:AuthUser,scope:Scope,filter?:{from?:string;to?:string;keywordIds:string[]}){
  const words=filter?await select(c,'SELECT id,keyword FROM zh_keywords WHERE account_id=? AND project_id=? AND id IN (?)',[scope.accountId,scope.projectId,filter.keywordIds.length?filter.keywordIds:['0']]):[];
  if(filter&&!words.length)return 0;
  const [route]=await select(c,"SELECT mode,DATE_FORMAT(exclusive_from,'%Y-%m-%d') start FROM zh_engine_routes WHERE account_id=? AND project_id=?",[scope.accountId,scope.projectId]);
@@ -30,10 +30,10 @@ export async function processResolvedNames(c:PoolConnection,user:AuthUser,scope:
    FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id WHERE b.account_id=? AND b.project_id=? AND r.id>?
    AND b.status IN ('processed','committed') AND r.fact_id IS NULL AND r.processing_status='exception'
    AND r.error_text IN ('CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH','KEYWORD_UNKNOWN')
-   ${filter?"AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?":''}
+   ${filter?.from?"AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?":''}
    ${filter?`AND (EXISTS(SELECT 1 FROM zh_import_row_matches m WHERE m.source_row_id=r.id AND m.keyword_id IN (?)) OR
      REGEXP_REPLACE(JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.keyword')),'[[:space:]　]+','') COLLATE utf8mb4_unicode_ci IN (?))`:''}
-   ORDER BY r.id LIMIT 256`,[scope.accountId,scope.projectId,after,...(filter?[filter.from,filter.to,words.map(w=>String(w.id)),words.map(w=>normalizedName(String(w.keyword)))]:[])]);
+   ORDER BY r.id LIMIT 256`,[scope.accountId,scope.projectId,after,...(filter?.from?[filter.from,filter.to]:[]),...(filter?[words.map(w=>String(w.id)),words.map(w=>normalizedName(String(w.keyword)))]:[])]);
  if(!rows.length)break;
  after=String(rows[rows.length-1].id);
  for(const row of rows){

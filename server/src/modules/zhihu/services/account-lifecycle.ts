@@ -224,7 +224,14 @@ async function memberHistoryChanged(c: PoolConnection, auth: AuthUser, change: M
     for (const fact of facts) { await attribute(c, scope, fact); recalculated++; }
     if (selectedKeyword) {
       const { processResolvedNames } = await import('../attribution/automatic-repair');
-      resumed += await processResolvedNames(c, user, scope, { from, to, keywordIds: [selectedKeyword] });
+      // A successful original registration/adoption/assignment establishes the
+      // task identity just as its normal entry does. Resume all matching source
+      // rows for that task, not only the day of the evidence that unblocked it
+      // (which may even be the old plan creator's earlier date). Pure history
+      // refresh remains limited to the changed evidence interval.
+      resumed += await processResolvedNames(c, user, scope, {
+        keywordIds: [selectedKeyword], ...(context && context.operation !== 'refresh_unconfirmed' ? {} : { from, to }),
+      });
     }
   }
   return { status: resumed || recalculated ? 'refreshed' as const : 'unchanged' as const, resumed, recalculated,

@@ -316,12 +316,13 @@ it('已有任务指定历史执行人通过真实补依据接口自动继续，�
 
 it('同一文件日期乱序时冻结名称分组最早日，补该日依据自动恢复原选择',async()=>{
  const memberId=await unknownMember(),word='乱序分组历史'+ ++serial;
- const batchId=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n2026-09-25,分析渠道,${word},2\n2026-09-15,分析渠道,${word},3`))).id;
+ const batchId=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n2026-09-25,分析渠道,${word},2\n2026-09-15,分析渠道,${word},3\n2026-09-18,分析渠道,${word},4`))).id;
  const ask=await question(batchId),blocked=await answer(batchId,ask.id,'other-keyword',ops,{taskId:'1',executorId:memberId});
  expect(blocked.status,blocked.text).toBe(409);expect(blocked.body.nextAction.context.selection.fromDate).toBe('2026-09-15');
  const saved=await saveHistory(memberId,historyBody({batchId,word,memberId,day:'2026-09-15',body:blocked.body}));
  expect(saved.status,saved.text).toBe(200);
- expect(await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=? ORDER BY id',[batchId])).toEqual([{processing_status:'processed'},{processing_status:'processed'}]);
+ expect(saved.body.data.refreshStatus.resumed).toBe(3);
+ expect(await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=? ORDER BY id',[batchId])).toEqual([{processing_status:'processed'},{processing_status:'processed'},{processing_status:'processed'}]);
  const [binding]=await q("SELECT DATE_FORMAT(b.activated_on,'%Y-%m-%d') start_day FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword=?",[word]);
  expect(binding.start_day).toBe('2026-09-15');
 });
@@ -384,7 +385,8 @@ it('旧记录同秒修改作品内容或状态使续办来源过期，旧context
 it('原管理员创建的旧计划按原创建日期补角色，再由响应继续补执行人，任意创建人代入仍拒绝',async()=>{
  const memberId=await unknownMember(),unrelated=await unknownMember(),word='管理员原创建'+ ++serial;
  const [plan]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status,zhihu_plan_id,created_at) VALUES(1,'analysis-task','analysis-channel',?,'https://example.com/old-owner',1,1,1,'active','synced',?,'2026-09-02 12:34:56')",[word,'owner-plan-'+serial]);
- const batchId=await upload(word),blocked=await answer(batchId,(await question(batchId)).id,'other-keyword',admin,{taskId:'1',executorId:memberId});
+ const batchId=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n2026-09-14,分析渠道,${word},2\n2026-09-16,分析渠道,${word},3\n2026-09-17,分析渠道,${word},4`))).id;
+ const blocked=await answer(batchId,(await question(batchId)).id,'other-keyword',admin,{taskId:'1',executorId:memberId});
  expect(blocked.status,blocked.text).toBe(409);expect(blocked.body.nextAction.memberId).toBe('1');expect(blocked.body.nextAction.at).toContain('2026-09-02T12:34:56');
  const first=historyBody({memberId:'1',word,batchId,day:'2026-09-02',body:blocked.body},{participation:undefined,leaderId:undefined,historicalRole:'admin'});
  const rejected=await saveHistory(unrelated,{...first,historicalRole:'creator'},admin);expect(rejected.status,rejected.text).toBe(403);
@@ -396,7 +398,8 @@ it('原管理员创建的旧计划按原创建日期补角色，再由响应继�
  expect(resumed.status,resumed.text).toBe(200);expect(resumed.body.data.nextAction).toBeNull();
  const [savedPlan]=await q('SELECT owner_id,zhihu_plan_id FROM plans WHERE id=?',[plan.insertId]);expect(savedPlan.owner_id).toBe(1);
  const [binding]=await q('SELECT b.executor_id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.plan_id=?',[plan.insertId]);expect(binding.executor_id).toBe(Number(memberId));
- expect((await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=?',[batchId]))[0].processing_status).toBe('processed');
+ expect(resumed.body.data.refreshStatus.resumed).toBe(3);
+ expect(await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=?',[batchId])).toEqual([{processing_status:'processed'},{processing_status:'processed'},{processing_status:'processed'}]);
 });
 
 it('同日1001条无关异常不阻断一个目标关键词的补依据恢复，其他行保持待办',async()=>{
