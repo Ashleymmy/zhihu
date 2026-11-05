@@ -174,7 +174,7 @@ onMounted(() => run(load));
             type="search"
             placeholder="输入邀请名称" /></label
         ><button :disabled="busy" @click="run(load)">刷新</button
-        ><router-link to="/team">查看团队与成员</router-link>
+        ><router-link class="btn" to="/team">查看团队与成员</router-link>
       </div>
       <p v-if="busy && !invitations.length" role="status">正在加载…</p>
       <div class="table-wrap">

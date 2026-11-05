@@ -62,7 +62,7 @@ onMounted(load);
       </div>
       <div class="plan-search">
         <router-link class="primary-action" to="/modules/zhihu/operations?create=1">创建关键词</router-link>
-        <router-link to="/modules/zhihu/operations">查看 / 领取关键词</router-link>
+        <router-link class="btn" to="/modules/zhihu/operations">查看 / 领取关键词</router-link>
       </div>
     </header>
     <form

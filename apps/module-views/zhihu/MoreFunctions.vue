@@ -26,7 +26,7 @@ const pages = computed(() =>
         <h1>更多功能</h1>
         <p>查找业务工具，点击卡片进入。</p>
       </div>
-      <router-link to="/dashboard">返回工作台</router-link>
+      <router-link class="btn" to="/dashboard">返回工作台</router-link>
     </header>
     <label class="function-search"
       >查找功能<input v-model="search" type="search" placeholder="输入功能名称"

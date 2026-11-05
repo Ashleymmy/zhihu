@@ -330,7 +330,7 @@ onMounted(() => loadBatches());
 
     <div class="notice">
       报表上传已经合并到“财务做账”，任何日期的报表都可以在那里上传。
-      <router-link to="/modules/zhihu/finance">去财务做账</router-link>
+      <router-link class="btn" to="/modules/zhihu/finance">去财务做账</router-link>
     </div>
 
     <div v-if="error" class="notice error-notice">{{ error }}</div>
