@@ -78,7 +78,28 @@ beforeAll(async () => {
       'INSERT INTO users(id,username,password_hash,role,display_name,admin_duty,parent_id) VALUES(?,?,?,?,?,?,?)',
       [actor.sub, actor.username, 'unused', actor.role, actor.displayName, actor.adminDuty, actor.parentId],
     );
-  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,4)');
+  // These members joined before the reported work; current membership alone is not historical evidence.
+  const joinedBeforeReport = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(
+    new Date(Date.now() - 7 * 86400000),
+  );
+  for (const actor of [leader, creator, independent]) {
+    await c.query('INSERT INTO project_members(project_id,user_id,joined_at) VALUES(1,?,?)', [
+      actor.sub,
+      joinedBeforeReport,
+    ]);
+    await c.query(
+      "INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration',?)",
+      [actor.sub, actor.role, joinedBeforeReport],
+    );
+    await c.query(
+      "INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,?,'registration',?)",
+      [actor.sub, actor.parentId, joinedBeforeReport],
+    );
+    await c.query(
+      "INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(?,1,'member',?,'onboarding',?)",
+      [actor.sub, joinedBeforeReport, 'platform-tasks-fixture-' + actor.sub],
+    );
+  }
   scope.accountId = String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
   await c.query(
     "INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'task-channel',1,'任务渠道'),(2,1,'task-channel2',1,'另一个渠道')",
