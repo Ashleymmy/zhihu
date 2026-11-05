@@ -113,6 +113,55 @@ body {
 }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
+/* ===== 裸控件基线：旧页面未挂 class 的按钮/输入框/选择框统一落到 v2 语言。
+   :where() 零权重——任何类选择器（.btn、.seg button、scoped 样式）都能盖过它，只有完全没样式的控件才吃这套。 ===== */
+button:where(:not([class])) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hover);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.2s var(--ease-out), transform 0.3s var(--spring);
+}
+button:where(:not([class])):hover { background: var(--line-2); }
+button:where(:not([class])):active { transform: scale(0.97); }
+button:where(:not([class])):disabled { opacity: 0.45; cursor: not-allowed; }
+input:where(:not([class]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset])),
+select:where(:not([class])) {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13.5px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+textarea:where(:not([class])) {
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13.5px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:where(:not([class]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset])):focus,
+select:where(:not([class])):focus,
+textarea:where(:not([class])):focus {
+  border-color: var(--clay);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--clay-soft);
+}
 a { color: inherit; text-decoration: none; }
 code, kbd, pre, samp { font-family: var(--font-code); }
 ::selection { color: var(--ink); background: var(--clay-soft); }
@@ -263,6 +312,10 @@ code, kbd, pre, samp { font-family: var(--font-code); }
 .studio-header[data-scrolled="true"] .shell-greet p { max-height: 0; margin-top: 0; opacity: 0; }
 .header-context { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .menu-toggle { display: none; width: 38px; height: 38px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--ink-soft); background: var(--white); }
+/* 二级页返回上级：只在深于导航页的路径出现，样式与 menu-toggle 同族 */
+.shell-back { display: inline-flex; flex: none; align-items: center; gap: 3px; height: 32px; padding: 0 12px 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); background: var(--white); font-size: 12.5px; font-weight: 600; transition: color 0.2s, border-color 0.2s, transform 0.3s var(--spring); }
+.shell-back:hover { color: var(--ink); border-color: var(--line-2); }
+.shell-back:active { transform: scale(0.96); }
 .shell-greet { display: grid; min-width: 0; }
 .shell-greet h1 { margin: 0; overflow: hidden; font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
 .shell-greet p { margin: 2px 0 0; overflow: hidden; color: var(--muted); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
