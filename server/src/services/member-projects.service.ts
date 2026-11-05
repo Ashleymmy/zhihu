@@ -6,6 +6,7 @@ import { AppError } from '../middleware/errors';
 import type { ModuleRuntime } from '../core/module-runtime';
 import { lifecycleProviders } from '../core/account-lifecycle';
 import { writeAudit } from './audit.service';
+import { captureProjectMembership, preserveProjectMembership } from '../core/project-membership-history';
 
 export const canAssignMemberProjects = (actor: AuthUser) =>
   effectiveDuty(actor) !== 'finance' && (isStaffRole(actor.role) || actor.role === 'leader');
@@ -72,7 +73,9 @@ export async function assignMemberProjects(
       const reasons = await provider.accessChangeBlockers?.(c, userId, String(membership.project_id));
       if (reasons?.length) throw new AppError(409, 40900, reasons.join('；'));
     }
-    await c.query('UPDATE project_members SET left_at=NOW(3) WHERE id=?', [membership.id]);
+    await preserveProjectMembership(c,userId,String(membership.project_id));
+    await c.query('UPDATE project_members SET left_at=GREATEST(NOW(3),joined_at) WHERE id=?', [membership.id]);
+    await captureProjectMembership(c,userId,String(membership.project_id),'member_edit',actor.sub);
     await writeAudit(
       {
         userId: actor.sub,
@@ -87,8 +90,9 @@ export async function assignMemberProjects(
   for (const projectId of added) {
     // Existing memberships keep their role; newly granted access is ordinary membership.
     const old = memberships.find((m) => String(m.project_id) === projectId);
+    if(old)await preserveProjectMembership(c,userId,projectId);
     if (old)
-      await c.query("UPDATE project_members SET left_at=NULL,joined_at=NOW(3),member_role='member' WHERE id=?", [
+      await c.query("UPDATE project_members SET joined_at=GREATEST(NOW(3),left_at + INTERVAL 1000 MICROSECOND),left_at=NULL,member_role='member' WHERE id=?", [
         old.id,
       ]);
     else
@@ -96,6 +100,7 @@ export async function assignMemberProjects(
         projectId,
         userId,
       ]);
+    await captureProjectMembership(c,userId,projectId,'member_edit',actor.sub);
     await writeAudit(
       {
         userId: actor.sub,

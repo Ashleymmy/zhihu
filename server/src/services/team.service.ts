@@ -238,6 +238,14 @@ export async function deleteMember(user: AuthUser, id: string, ip?: string) {
     if ([history.teams, history.roles, history.referrals, history.closure].some(value => Number(value) > 0))
       throw new AppError(422,42213,'该账号已有成员关系变更或邀请记录，请改为停用以保留历史');
     if (invitation || use) throw new AppError(422,42213,'该账号存在邀请记录，不可删除；如不再使用请改为停用');
+    const [[projectHistory]]=await connection.query<RowDataPacket[]>(`SELECT
+      EXISTS(SELECT 1 FROM project_membership_history WHERE user_id=? AND (source_kind<>'migration' OR effective_to IS NOT NULL)) changed,
+      EXISTS(SELECT 1 FROM member_history_evidence WHERE user_id=? OR leader_id=?) evidence`,[id,id,id]);
+    if(Number(projectHistory.changed)||Number(projectHistory.evidence))throw new AppError(422,42213,'该账号已有项目参与或历史核实记录，请改为停用以保留历史');
+    // A migration-only current membership has no new business event. Existing
+    // project-owned business foreign keys still prevent deleting a used account.
+    await connection.query("DELETE FROM project_membership_history WHERE user_id=? AND source_kind='migration' AND effective_to IS NULL",[id]);
+    await connection.query('DELETE FROM member_history_versions WHERE user_id=?',[id]);
     // 无业务空账号仍允许删除；仅清除首次注册/整理时的平台直管基线，不删实际关系变更。
     await connection.query('DELETE FROM member_role_history WHERE user_id=?', [id]);
     await connection.query('DELETE FROM team_memberships WHERE user_id=?', [id]);

@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { RowDataPacket } from 'mysql2/promise';
-import { rows } from '../db';
+import { rows, withTransaction } from '../db';
+import { historyEvidenceSchema, historyQuerySchema, listMemberHistoryEvidence, saveMemberHistoryEvidence } from './member-history';
 import type { ModuleRuntime } from './module-runtime';
 import { updateMemberAccess } from '../services/member-access.service';
 import { writeAudit } from '../services/audit.service';
@@ -78,6 +79,15 @@ async function layerCounts(userId: string) {
 
 export function createRelationRouter(runtime: ModuleRuntime) {
   const router = Router();
+
+  router.get('/members/:id/history-evidence', requireDuty('operations'), asyncHandler(async(req,res)=>{
+    const memberId=id.parse(req.params.id),input=historyQuerySchema.parse(req.query);
+    ok(res,await withTransaction(c=>listMemberHistoryEvidence(c,req.user,memberId,input)));
+  }));
+  router.post('/members/:id/history-evidence', requireDuty('operations'), asyncHandler(async(req,res)=>{
+    const memberId=id.parse(req.params.id),input=historyEvidenceSchema.parse(req.body);
+    ok(res,await withTransaction(c=>saveMemberHistoryEvidence(c,req.user,memberId,input,runtime)));
+  }));
 
   router.get(
     '/mine',
@@ -206,7 +216,11 @@ export function createRelationRouter(runtime: ModuleRuntime) {
           operator: str(h.operator_name),
         })),
       ].sort((a, b) => new Date(b.at as string).getTime() - new Date(a.at as string).getTime());
+      const projectHistory=await rows<RowDataPacket>(`SELECT CAST(h.id AS CHAR) id,CAST(h.project_id AS CHAR) projectId,p.name projectName,
+        h.member_role memberRole,h.effective_from effectiveFrom,h.effective_to effectiveTo,h.source_kind sourceKind,h.prior_history_unknown priorHistoryUnknown,h.version
+        FROM project_membership_history h JOIN projects p ON p.id=h.project_id WHERE h.user_id=? ORDER BY h.effective_from DESC,h.id DESC LIMIT ? OFFSET ?`,[userId,paging.pageSize,(paging.page-1)*paging.pageSize]);
       ok(res, {
+        projectHistory,
         user: {
           id: String(user.id),
           name: String(user.display_name),

@@ -279,6 +279,12 @@ it('adds/removes selected projects without replacing unrelated grants and preser
     [m.id, q.insertId],
   );
   expect(original.left_at).toBeNull();
+  const [closedHistory]=await c.query<RowDataPacket[]>('SELECT effective_to,source_kind FROM project_membership_history WHERE user_id=? AND project_id=?',[m.id,p.insertId]);
+  expect(closedHistory).toHaveLength(1);expect(closedHistory[0].effective_to).not.toBeNull();expect(closedHistory[0].source_kind).toBe('member_edit');
+  const rejoin=await preview(a,[m.id],{kind:'projects',mode:'add',projectIds:[String(p.insertId)]});
+  expect((await c.query<RowDataPacket[]>('SELECT id FROM project_membership_history WHERE user_id=? AND project_id=?',[m.id,p.insertId]))[0]).toHaveLength(1);
+  await execute(a,rejoin);await execute(a,rejoin);
+  expect((await c.query<RowDataPacket[]>('SELECT id FROM project_membership_history WHERE user_id=? AND project_id=?',[m.id,p.insertId]))[0]).toHaveLength(2);
 });
 it('resumes bounded chunks, rejects actor permission loss, and never repeats successful rows', async () => {
   const a = await fresh('admin'),
@@ -381,6 +387,7 @@ it('previews and commits the complete single edit atomically, including team, pr
     projectIds: [String(p.insertId)],
   };
   const run = await preview(a, [m.id], operation);
+  expect((await c.query<RowDataPacket[]>('SELECT id FROM project_membership_history WHERE user_id=?',[m.id]))[0]).toHaveLength(0);
   expect(run.items[0].status).toBe('ready');
   expect(run.items[0].preview.after[0]).toMatchObject({
     name: operation.displayName,
@@ -407,6 +414,8 @@ it('previews and commits the complete single edit atomically, including team, pr
   ).toEqual(operation.projectIds);
   expect((await request(app).get('/api/v1/core/auth/me').set(m.headers)).status).toBe(401);
   expect((await execute(a, run)).items).toEqual(done.items);
+  const [recorded]=await c.query<RowDataPacket[]>('SELECT source_kind FROM project_membership_history WHERE user_id=? AND project_id=?',[m.id,p.insertId]);
+  expect(recorded).toEqual([{source_kind:'member_edit'}]);
 });
 
 it('rejects stale phone data and invalid destination without saving any of the accompanying edit', async () => {

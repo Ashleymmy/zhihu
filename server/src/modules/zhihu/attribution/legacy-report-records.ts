@@ -1,12 +1,11 @@
 import type {PoolConnection} from 'mysql2/promise';
 import type {AuthUser} from '../../../types';
-import {isStaffRole} from '../../../auth/roles';
 import {assertDuty} from '../../../core/duties';
 import {fail,type Scope} from './domain';
 import {audit,insert,select} from './store';
 import {normalizedName} from './matching';
 import {lockKeywordSpace} from './resources';
-import {teamLeader} from './relationships';
+import {resolveHistoricalExecutor} from './executor';
 import {reconcileWorkReceipts} from './work-receipts';
 
 // Discover the original record before suggesting a different spelling. No money
@@ -37,15 +36,15 @@ export async function adoptLegacyReportRecord(c:PoolConnection,user:AuthUser,sco
  if(!works.length)fail('原记录还没有作品，请核对实际执行人后登记',409);
  const owners=[...new Set(works.map(work=>String(work.owner_id)))];
  if(owners.length!==1)fail('旧作品由多个人执行，不能合并给一个人，请核对原作品',409);
- const [owner]=await select(c,'SELECT * FROM users WHERE id=? FOR SHARE',[owners[0]]);
- if(!owner||!['developer','admin','operator','leader','creator'].includes(String(owner.role)))fail('原执行人记录无效，请先核对',409);
- const staff=isStaffRole(String(owner.role)),leaderId=staff?null:owner.role==='leader'?owners[0]:await teamLeader(c,scope,owner);
- const path=staff?'staff_self':owner.role==='leader'?'leader_self':leaderId?'team_creator':'direct_creator';
  if(!works[0].release_day)fail('旧作品未登记实际发布日期，请先核对原作品日期',409);
+ // release_time is an actual recorded business timestamp, unlike a report's day.
+ const [[clock]]=await c.query<import('mysql2/promise').RowDataPacket[]>("SELECT DATE_FORMAT(release_time,'%Y-%m-%d %H:%i:%s') at FROM compositions WHERE id=?",[works[0].id]);
+ const owner=await resolveHistoricalExecutor(c,user,scope,owners[0],String(clock.at));
+ const leaderId=owner.leaderId,path=owner.path;
  const id=await insert(c,`INSERT INTO zh_keywords(account_id,project_id,task_id,channel_mapping_id,plan_id,keyword,created_by,upstream_status,legacy_mode,lifecycle_status,used_ever_at)
    VALUES(?,?,?,?,?,?,?,'created','historical_registered','active',NOW(3))`,[scope.accountId,scope.projectId,candidates[0].task_id,mappingId,planId,plan.keyword,plan.created_by]);
  const bindingId=await insert(c,`INSERT INTO zh_keyword_bindings(keyword_id,path_type,leader_id,executor_id,assigned_at,used_at,activated_on,verification_status,relation_snapshot)
-   VALUES(?,?,?,?,?,NOW(3),?,?,?)`,[id,path,leaderId,owners[0],works[0].release_time,works[0].release_day,'pending',JSON.stringify({source:'original-record',planId,ownerId:owners[0],confirmedBy:user.sub})]);
+   VALUES(?,?,?,?,?,NOW(3),?,?,?)`,[id,path,leaderId,owners[0],works[0].release_time,works[0].release_day,'pending',JSON.stringify({source:'original-record',planId,ownerId:owners[0],confirmedBy:user.sub,history:owner.history})]);
  await c.query('UPDATE zh_keywords SET current_binding_id=? WHERE id=?',[bindingId,id]);
  // Repair the old pending flag only when a successful create receipt exists.
  await c.query("UPDATE plans SET status='active' WHERE id=? AND status='pending'",[planId]);

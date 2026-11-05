@@ -11,6 +11,7 @@ import type { ModuleRuntime } from '../core/module-runtime';
 import type { ModuleAccountLifecycle } from '../core/contracts';
 import { lifecycleProviders } from '../core/account-lifecycle';
 import { closeTeamMembership } from '../core/member-relations';
+import { closeProjectMemberships } from '../core/project-membership-history';
 
 const select = async (c: PoolConnection, sql: string, params: unknown[] = []) =>
   (await c.query<RowDataPacket[]>(sql, params))[0];
@@ -102,6 +103,7 @@ export async function closeAccount(auth: AuthUser, password: string, runtime: Mo
       ['closed_' + randomBytes(20).toString('hex'), unusablePassword, auth.sub],
     );
     await closeTeamMembership(c, { userId: auth.sub, reason: '账号注销' });
+    await closeProjectMemberships(c,auth.sub,auth.sub);
     for (const table of ['user_avatars', 'wechat_identities', 'wechat_profiles', 'mini_uploads', 'project_members'])
       await c.query(`DELETE FROM ${table} WHERE user_id=?`, [auth.sub]);
     await c.query('DELETE FROM token_sessions WHERE user_id=?', [auth.sub]);

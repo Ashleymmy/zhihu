@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errors';
 import { AuthUser } from '../types';
 import { writeAudit } from './audit.service';
 import { DEV_DEMO_USER_IDS, demoUsers, isDevDemoAuthUser } from '../core/demo';
+import { captureProjectMembership, preserveProjectMembership } from '../core/project-membership-history';
 
 interface MemberRow extends RowDataPacket {
   id: string;
@@ -143,14 +144,16 @@ export async function addProjectMember(
   const memberRole = input.memberRole ?? 'member';
 
   await withTransaction(async (connection) => {
+    await connection.query('SELECT id FROM users WHERE id=? FOR UPDATE',[input.userId]);
     const [existing] = await connection.query<MemberRow[]>(
       'SELECT * FROM project_members WHERE project_id = ? AND user_id = ? LIMIT 1 FOR UPDATE',
       [projectId, input.userId],
     );
     if (existing[0] && existing[0].left_at === null) throw new AppError(409, 40903, '该用户已是项目成员');
     if (existing[0]) {
+      await preserveProjectMembership(connection,input.userId,projectId);
       await connection.query(
-        'UPDATE project_members SET member_role = ?, joined_at = NOW(3), left_at = NULL WHERE id = ?',
+        'UPDATE project_members SET member_role = ?, joined_at = GREATEST(NOW(3),left_at + INTERVAL 1000 MICROSECOND), left_at = NULL WHERE id = ?',
         [memberRole, existing[0].id],
       );
     } else {
@@ -159,6 +162,7 @@ export async function addProjectMember(
         [projectId, input.userId, memberRole],
       );
     }
+    await captureProjectMembership(connection,input.userId,projectId,'project_management',user.sub);
     await writeAudit(
       {
         userId: user.sub,
@@ -180,11 +184,14 @@ export async function removeProjectMember(user: AuthUser, projectId: string, use
 
   await assertProjectExists(projectId);
   await withTransaction(async (connection) => {
+    await connection.query('SELECT id FROM users WHERE id=? FOR UPDATE',[userId]);
+    await preserveProjectMembership(connection,userId,projectId);
     const [result] = await connection.query<ResultSetHeader>(
-      'UPDATE project_members SET left_at = NOW(3) WHERE project_id = ? AND user_id = ? AND left_at IS NULL',
+      'UPDATE project_members SET left_at = GREATEST(NOW(3),joined_at) WHERE project_id = ? AND user_id = ? AND left_at IS NULL',
       [projectId, userId],
     );
     if (result.affectedRows !== 1) throw new AppError(404, 40403, '该用户不是项目成员');
+    await captureProjectMembership(connection,userId,projectId,'project_management',user.sub);
     await writeAudit(
       {
         userId: user.sub,

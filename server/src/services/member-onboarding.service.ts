@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from 'mysql2/promise';
 import type { Role } from '../types';
 import { writeAudit } from './audit.service';
+import { captureProjectMembership, preserveProjectMembership } from '../core/project-membership-history';
 
 /** Initial access is ordinary membership. Explicit removals and existing roles are preserved. */
 export async function openMemberProjects(
@@ -24,8 +25,9 @@ export async function openMemberProjects(
     const [[existing]] = await c.query<RowDataPacket[]>(
       'SELECT id FROM project_members WHERE project_id=? AND user_id=? FOR UPDATE', [p.id, userId],
     );
-    if (existing) continue;
+    if (existing) { await preserveProjectMembership(c,userId,String(p.id)); continue; }
     await c.query("INSERT INTO project_members(project_id,user_id,member_role) VALUES(?,?,'member')", [p.id, userId]);
+    await captureProjectMembership(c,userId,String(p.id),'onboarding',actorId);
     await writeAudit({ userId: actorId, action: 'project.member_add', resourceType: 'project', resourceId: String(p.id),
       detail: { userId, memberRole: 'member', source: 'member.onboarding', leaderId } }, c);
   }

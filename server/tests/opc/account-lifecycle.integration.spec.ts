@@ -121,6 +121,8 @@ it('closes a core-only account without optional project tables or profile column
     hash,
   ]);
   await conn.query('UPDATE users SET avatar_version=? WHERE id=?', [hash, user.id]);
+  await conn.query("INSERT INTO projects(id,name,slug) VALUES(100,'参与履历项目','history-closure')");
+  await conn.query("INSERT INTO project_members(project_id,user_id,joined_at) VALUES(100,?,'2026-09-01')",[user.id]);
   const status = await request(app).get('/api/v1/core/account-privacy/closure').set(user.headers);
   expect(status.status, JSON.stringify(status.body)).toBe(200);
   expect(status.body.data.canClose).toBe(true);
@@ -131,6 +133,11 @@ it('closes a core-only account without optional project tables or profile column
   expect(row.is_active).toBe(0);
   expect(row.closed_at).toBeTruthy();
   expect(row.avatar_version).toBeNull();
+  const [[projectHistory]]=await conn.query<RowDataPacket[]>('SELECT effective_from,effective_to,closed_by,close_source_kind FROM project_membership_history WHERE user_id=? AND project_id=100',[user.id]);
+  expect(projectHistory.effective_to).not.toBeNull();expect(String(projectHistory.closed_by)).toBe(user.id);expect(projectHistory.close_source_kind).toBe('closure');
+  expect((await conn.query<RowDataPacket[]>('SELECT id FROM project_members WHERE user_id=?',[user.id]))[0]).toHaveLength(0);
+  await conn.query('DELETE FROM audit_logs WHERE user_id=?',[user.id]);
+  expect((await conn.query<RowDataPacket[]>('SELECT id FROM project_membership_history WHERE user_id=?',[user.id]))[0]).toHaveLength(1);
   expect((await conn.query<RowDataPacket[]>('SELECT user_id FROM user_avatars WHERE user_id=?', [user.id]))[0]).toEqual(
     [],
   );

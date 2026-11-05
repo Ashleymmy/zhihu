@@ -71,6 +71,11 @@ beforeAll(async () => {
     ]);
   }
   await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5)');
+  await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(2,1,'member','2026-08-01','onboarding','fixture-2'),(5,1,'member','2026-08-01','onboarding','fixture-5')");
+  for(const actor of [admin,creator,ops,finance,other]){
+    await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration','2026-08-01')",[actor.sub,actor.role]);
+    await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,NULL,'registration','2026-08-01')",[actor.sub]);
+  }
   scope.accountId = String((await query('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
   await c.query(
     "INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'review-channel',1,'默认审核渠道')",

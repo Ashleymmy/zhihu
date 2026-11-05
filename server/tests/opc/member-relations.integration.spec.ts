@@ -253,3 +253,15 @@ it('关系底座不阻止删除空账号，但实际转团或角色变更历史�
   expect(await q('SELECT id FROM users WHERE id IN (21,22)')).toHaveLength(2);
   expect(await q('SELECT id FROM team_memberships WHERE user_id=21')).toHaveLength(3);
 });
+
+it('项目整理基线可随空账号清理，实际参与与补充依据保留并明确拒绝物理删除',async()=>{
+ const team=await import('../../src/services/team.service'),projects=await import('../../src/services/projectMembers.service');
+ await c.query("INSERT INTO projects(id,name,slug) VALUES(100,'履历测试','history-test')");
+ for(const id of [30,31])await c.query("INSERT INTO users(id,username,password_hash,role,display_name) VALUES(?,?,'unused','creator','测试成员')",[id,'user'+id]);
+ await c.query("INSERT INTO project_members(project_id,user_id,joined_at) VALUES(100,30,'2026-09-01')");
+ await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref,prior_history_unknown) VALUES(30,100,'member','2026-09-01','migration','fixture-30',1)");
+ await team.deleteMember(admin,'30');expect(await q('SELECT id FROM users WHERE id=30')).toHaveLength(0);
+ await projects.addProjectMember(admin,'100',{userId:'31'});
+ await expect(team.deleteMember(admin,'31')).rejects.toThrow('保留历史');
+ expect(await q('SELECT id FROM project_membership_history WHERE user_id=31')).toHaveLength(1);
+});

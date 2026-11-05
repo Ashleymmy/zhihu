@@ -26,6 +26,12 @@ beforeAll(async()=>{
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const actor of [admin,creator,ops,finance,leader])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.adminDuty]);
  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5)');
+ // This fixture has documented September participation, independent of today's rows.
+ await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(2,1,'member','2026-08-01','onboarding','fixture-2'),(5,1,'member','2026-08-01','onboarding','fixture-5')");
+ for(const actor of [admin,creator,ops,finance,leader]){
+  await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration','2026-08-01')",[actor.sub,actor.role]);
+  await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,NULL,'registration','2026-08-01')",[actor.sub]);
+ }
  scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'analysis-channel',1,'分析渠道')");
  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'analysis-task','分析活动',NOW())");
@@ -82,11 +88,12 @@ it('重复提交使用同一结果，登记后的新请求不能再次创建；�
 });
 it('团队达人登记保留真实团长，只按既定角色规则产生分成',async()=>{
  await c.query('UPDATE users SET parent_id=5 WHERE id=2');
+ await c.query('UPDATE team_memberships SET leader_id=5 WHERE user_id=2');
  try{
    const id=await upload('团队旧日关键词'),ask=await question(id),response=await answer(id,ask.id,'other-keyword',ops,selection);expect(response.status,response.text).toBe(200);
    const [binding]=await q("SELECT b.path_type,b.leader_id,b.executor_id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword='团队旧日关键词'");
    expect(binding).toEqual({path_type:'team_creator',leader_id:5,executor_id:2});expect((await get(id)).body.data.totals.billableAmount).toBe('34.0000');
- }finally{await c.query('UPDATE users SET parent_id=NULL WHERE id=2');}
+ }finally{await c.query('UPDATE users SET parent_id=NULL WHERE id=2');await c.query('UPDATE team_memberships SET leader_id=NULL WHERE user_id=2');}
 });
 it('已成功创建的旧计划可以登记，保留真实编号、原归属和全部旧计划字段',async()=>{
  const [result]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_plan_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status) VALUES(1,'real-existing','analysis-task','analysis-channel','原来的成功计划','https://example.com/old',1,2,1,'active','synced')");
@@ -123,4 +130,42 @@ it('重复执行历史状态迁移不改变计划、资金、报表原文或已�
  const before=await Promise.all(tables.map(table=>q('SELECT * FROM '+table+' ORDER BY id')));
  const migration=await readFile('schema/zhihu/033_historical_keywords.sql','utf8');await c.query(migration);await c.query(migration);
  expect(await Promise.all(tables.map(table=>q('SELECT * FROM '+table+' ORDER BY id')))).toEqual(before);
+});
+
+it('转团、改任团长和当前退出项目不能覆盖旧日期的达人及原团长归属',async()=>{
+ await c.query("UPDATE team_memberships SET leader_id=5,effective_to='2026-10-01' WHERE user_id=2");
+ await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(2,NULL,'promotion','2026-10-01')");
+ await c.query("INSERT INTO member_role_history(user_id,from_role,to_role,reason,effective_at) VALUES(2,'creator','leader','promotion','2026-10-01')");
+ await c.query("UPDATE users SET role='leader',parent_id=NULL WHERE id=2");
+ await c.query("UPDATE project_members SET left_at='2026-10-15' WHERE user_id=2");
+ await c.query("UPDATE project_membership_history SET effective_to='2026-10-15' WHERE user_id=2");
+ const id=await upload('转团之前的老作品'),ask=await question(id),result=await answer(id,ask.id,'other-keyword',ops,selection);
+ expect(result.status,result.text).toBe(200);
+ const [binding]=await q("SELECT b.path_type,b.leader_id,b.executor_id,b.relation_snapshot FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword='转团之前的老作品'");
+ expect(binding).toMatchObject({path_type:'team_creator',leader_id:5,executor_id:2});
+ expect(binding.relation_snapshot.history.role.value).toBe('creator');expect(binding.relation_snapshot.history.team.value).toBe('5');
+ expect(binding.relation_snapshot.history.sources.length).toBeGreaterThan(0);
+});
+
+it('未知历史与同日变更都有能当场补齐的动作，失败不留下计划或任务',async()=>{
+ for(const [word,businessDate] of [['未知参与期','2026-09-14'],['同日角色变更','2026-10-01']] as const){
+  await c.query('UPDATE project_membership_history SET effective_from=? WHERE user_id=2',[businessDate==='2026-09-14'?'2026-09-20':'2026-08-01']);
+  if(businessDate==='2026-10-01')await c.query("UPDATE member_role_history SET effective_at='2026-10-01 12:00:00' WHERE user_id=2 AND reason='promotion'");
+  const id=await upload(word,'1',businessDate),ask=await question(id),result=await answer(id,ask.id,'other-keyword',ops,selection);
+  expect(result.status,result.text).toBe(409);expect(result.body.nextAction).toMatchObject({method:'POST',path:'/api/v1/core/relations/members/2/history-evidence'});
+  expect(result.body.history.status).toBe(businessDate==='2026-09-14'?'unknown':'conflict');expect(await q('SELECT id FROM plans WHERE keyword=?',[word])).toHaveLength(0);
+ }
+});
+
+it('已经保存的原任务收益路径优先于后来的角色和项目变化',async()=>{
+ const [original]=await q('SELECT b.* FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.id=?',[wordId]);
+ await c.query('UPDATE zh_keyword_bindings SET released_at=NOW(3) WHERE id=?',[original.id]);
+ await c.query("UPDATE zh_keywords SET current_binding_id=NULL,lifecycle_status='available' WHERE id=?",[wordId]);
+ const {assignRetro}=await import('../../src/modules/zhihu/attribution/retro-assignment');
+ await expect(assignRetro(ops,scope,wordId,key(),{executorId:'2',fromDate:'2026-07-01'})).rejects.toMatchObject({httpStatus:409});
+ const restored=await assignRetro(ops,scope,wordId,key(),{executorId:'2',fromDate:date});
+ const [saved]=await q('SELECT path_type,leader_id,executor_id,relation_snapshot FROM zh_keyword_bindings WHERE id=?',[restored.id]);
+ expect(saved).toMatchObject({path_type:original.path_type,leader_id:original.leader_id,executor_id:original.executor_id});
+ expect(saved.relation_snapshot.originalBindingId).toBe(String(original.id));
+ expect((await q('SELECT relation_snapshot FROM zh_keyword_bindings WHERE id=?',[original.id]))[0].relation_snapshot).toEqual(original.relation_snapshot);
 });

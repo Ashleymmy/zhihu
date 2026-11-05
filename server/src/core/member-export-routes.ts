@@ -224,6 +224,14 @@ export function createMemberExportRouter(runtime: ModuleRuntime) {
           ]),
         );
 
+        const [projectHistory]=await c.query<RowDataPacket[]>(`SELECT CAST(h.user_id AS CHAR) user_id,p.name,h.member_role,
+          DATE_FORMAT(h.effective_from,'%Y-%m-%d %H:%i:%s.%f') since,DATE_FORMAT(h.effective_to,'%Y-%m-%d %H:%i:%s.%f') until,
+          h.source_kind,h.prior_history_unknown FROM project_membership_history h JOIN projects p ON p.id=h.project_id
+          WHERE h.user_id IN (?) ${q.projectId?'AND h.project_id=?':''} ORDER BY h.user_id,h.project_id,h.effective_from,h.id LIMIT 30001`,[q.memberIds,...(q.projectId?[q.projectId]:[])]);
+        if(projectHistory.length>30000)throw new AppError(422,42200,'项目参与记录超过 30000 条，请缩小成员范围后导出');
+        sheet(wb,'项目参与历史',['用户ID','项目','项目职责','开始时间（北京时间）','结束时间（北京时间）','时间依据'],projectHistory.map(h=>[
+          uid(h.user_id),str(h.name),({owner:'负责人',admin:'项目管理员',member:'成员',viewer:'查看'} as Record<string,string>)[h.member_role]||'成员',str(h.since),str(h.until),h.prior_history_unknown?'仅能确认此段参与；此前时间未核实':'实际参与记录']));
+
         if (q.includeEarnings) {
           const modules = runtime
             .all()
