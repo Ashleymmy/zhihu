@@ -5,6 +5,7 @@ import type { Role } from '../../types';
 import { zhihuManifest } from './manifest';
 import { businessRole, effectiveDuty, isStaffRole } from '../../auth/roles';
 export function hasPermission(role: Role, permission: string) {
+  if (permission === 'salt.read') return isStaffRole(role);
   if(role==='operator' && /^(callback\.|withdraw\.|finance\.|data\.import|statement\.confirm|engine\.configure)/.test(permission)) return false;
   return hasCorePermission(role, permission) || (zhihuManifest.permissions[role] ?? zhihuManifest.permissions[businessRole(role)] ?? []).includes(permission);
 }
@@ -12,6 +13,7 @@ export const requirePermission =
   (permission: string): RequestHandler =>
   (req, _res, next) => {
     const duty=effectiveDuty(req.user);
+    if (permission === 'salt.read' && duty === 'finance') return next(new AppError(403,40301,'盐选榜单仅向管理员和运营开放'));
     const reading=['GET','HEAD'].includes(req.method);
     if(isStaffRole(req.user.role)&&duty==='finance'&&permission!=='attribution.read'&&(!reading||['callback.secret','callback.config'].includes(permission)))return next(new AppError(403,40301,'此操作需要运营权限'));
     if(isStaffRole(req.user.role)&&duty==='operations'&&/^(withdraw\.|finance\.|data\.import|statement\.confirm)/.test(permission))return next(new AppError(403,40301,'此操作需要财务权限'));
@@ -37,6 +39,7 @@ const LEGACY_PERMISSIONS = [
   'team.review',
   'team.delete',
   'story.read',
+  'salt.read',
   'earning.view_self',
   'earning.view_team',
   'earning.view_all',

@@ -22,6 +22,7 @@ export function businessPages<T extends BusinessPage>(
   if (role === "developer") duty = "all";
   if (role === "operator") duty = "operations";
   return pages.filter((page) => {
+    if(page.path === 'salt' && (!['admin','developer','operator'].includes(role) || duty === 'finance')) return false;
     if(page.path === "risk" && (!["admin","developer"].includes(role) || duty === "finance")) return false;
     if (!includeHidden && hiddenBusinessPages.includes(page.path)) return false;
     if (["keywords", "more", "works/new"].includes(page.path)) return false;

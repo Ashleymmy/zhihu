@@ -68,7 +68,7 @@ export const modulePages: RouteRecordRaw[] = [
   {
     path: 'salt',
     name: 'zhihu-story-salt',
-    component: () => import('./views/StorySaltView.vue'),
+    redirect: '/modules/zhihu/operations',
     meta: { moduleId: 'zhihu', title: '盐选榜单' },
   },
   {

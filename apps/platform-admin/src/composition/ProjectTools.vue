@@ -16,7 +16,7 @@ onMounted(load)
 const tools = [
   { label: '推广活动与渠道', path: '/modules/zhihu/operations', tab: 'channels' },
   { label: '报表中的渠道名称', path: '/modules/zhihu/operations', tab: 'channels' },
-  { label: '盐选榜单', path: '/modules/zhihu/salt' },
+  ...(['admin','developer','operator'].includes(auth.user?.role??'') && (auth.user?.role!=='admin'||auth.user?.adminDuty!=='finance') ? [{ label: '盐选榜单', path: '/modules/zhihu/salt' }] : []),
   { label: '内容标签', path: '/modules/zhihu/tags' },
   { label: '评论截流', path: '/modules/zhihu/comments' },
 ]

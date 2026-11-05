@@ -1,4 +1,5 @@
 import {riskReviewHandlers} from '../tests/attribution-ui/risk-upstream';
+import {saltReviewHandlers} from '../tests/attribution-ui/salt-upstream';
 // Local review environment: starts the full app with a mocked Zhihu upstream and,
 // on a freshly bootstrapped database, writes a small team/keyword/report dataset.
 import 'dotenv/config';
@@ -20,6 +21,7 @@ async function main() {
   const network = setupServer(
     http.post('*/alliance/api/popularize_plan', () => HttpResponse.json({ data: { plan_id: String(++planSeq) } })),
     ...riskReviewHandlers(),
+    ...saltReviewHandlers(),
     http.all('https://open.zhihu.com/*', () => HttpResponse.json({ error: { message: 'mock upstream' } }, { status: 503 })),
   );
   network.listen({ onUnhandledRequest: 'bypass' });

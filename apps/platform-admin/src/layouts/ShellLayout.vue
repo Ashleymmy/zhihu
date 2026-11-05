@@ -28,7 +28,7 @@ async function logout() {
     :groups="navigation"
     :user-name="auth.user?.displayName ?? ''"
     :role-label="auth.user ? (auth.user.role==='admin' && auth.user.adminDuty==='finance'?'财务管理员':ROLE_LABELS[auth.user.role]) : ''"
-    :current-path="route.path"
+    :current-path="typeof route.meta.navigationPath === 'string' ? route.meta.navigationPath : route.path"
     :announcements="announcements"
     @navigate="router.push"
     @logout="logout"

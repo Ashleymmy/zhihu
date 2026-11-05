@@ -1,4 +1,6 @@
 import { authorizeRisk,scopeSchema,requireRiskManager } from '../services/risk-reports';
+import { authorizeSalt, saltScope } from '../services/salt-boards';
+import { saltBoards, saltContents, saltId, saltPaging } from '../zhihu/salt';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../../auth/middleware';
@@ -25,16 +27,21 @@ zhihuContentRouter.use(requirePermission('story.read'));
 /** 盐选榜单列表（§2.7.1） */
 zhihuContentRouter.get(
   '/salt/boards',
-  asyncHandler(async (_req, res) => ok(res, await zhihuGet('/alliance/api/vip/content/rule/labels'))),
+  requirePermission('salt.read'),
+  asyncHandler(async (req, res) => {
+    await authorizeSalt(req.user, saltScope.parse(req.query));
+    ok(res, await saltBoards());
+  }),
 );
 
 /** 榜单内容数据列表（§2.7.2） */
 zhihuContentRouter.get(
   '/salt/boards/:ruleId/contents',
-  validateQuery(paging),
-  asyncHandler(async (req, res) =>
-    ok(res, await zhihuGet('/alliance/api/vip/rule_contents', { rule_id: req.params.ruleId, ...req.query })),
-  ),
+  requirePermission('salt.read'),
+  asyncHandler(async (req, res) => {
+    await authorizeSalt(req.user, saltScope.parse(req.query));
+    ok(res, await saltContents(saltId.parse(req.params.ruleId), saltPaging.parse(req.query)));
+  }),
 );
 
 /** 有声书内容列表（§2.8.1） */
