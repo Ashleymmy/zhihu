@@ -363,6 +363,33 @@ it('actual registration, invitation acceptance, managed creation and promotion e
     ).toHaveLength(1);
 });
 
+it('normal project and role changes do not repair unknown earlier history or invent confirmed evidence', async () => {
+  const [created] = await c.query<mysql.ResultSetHeader>(
+    "INSERT INTO users(username,password_hash,role,display_name) VALUES('history-causality','unused','creator','实际变更成员')",
+  );
+  const memberId = String(created.insertId);
+  const previousDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(
+    new Date(Date.now() - 86400000),
+  );
+  const historical = () => tx((c) => history.resolveMemberHistory(c, memberId, '1', { at: previousDay }));
+  expect((await historical()).status).toBe('unknown');
+  await projects.addProjectMember(admin, '1', { userId: memberId });
+  await projects.removeProjectMember(admin, '1', memberId);
+  await projects.addProjectMember(admin, '1', { userId: memberId });
+  expect((await historical()).projectParticipation.status).toBe('unknown');
+  const changes = await import('../../src/services/member-changes.service');
+  const preview = await changes.previewMemberChanges(ops, [memberId], { kind: 'role', role: 'leader' }, runtime);
+  expect(preview.items[0].status).toBe('ready');
+  const changed = await changes.executeMemberChanges(ops, preview.id, preview.reviewHash, runtime);
+  expect(changed.items[0].status).toBe('succeeded');
+  const after = await historical();
+  expect(after.role.status).toBe('unknown');
+  expect(after.team.status).toBe('unknown');
+  expect(after.projectParticipation.status).toBe('unknown');
+  expect(await q('SELECT id FROM member_history_evidence WHERE user_id=?', [memberId])).toHaveLength(0);
+  expect(await q('SELECT id FROM project_membership_history WHERE user_id=?', [memberId])).toHaveLength(2);
+});
+
 let callbackFails = false,
   seen: MemberHistoryChange[] = [];
 it('module notification validates context and rolls evidence, versions and module writes back together', async () => {
