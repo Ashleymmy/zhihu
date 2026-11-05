@@ -13,7 +13,8 @@ export function riskReviewHandlers(){
   }),
   http.get('https://open.zhihu.com/alliance/api/risk_words',({request})=>{
    const p=new URL(request.url).searchParams,offset=Number(p.get('offset')||0),limit=Number(p.get('limit')||20);
-   const result=records.filter(r=>r.type===Number(p.get('type')||0)&&(!p.get('keyword')||r.keyword.includes(p.get('keyword')!))&&(!p.get('risk_type')||r.risk_type===Number(p.get('risk_type')))&&(!p.get('status')||r.status===Number(p.get('status'))-1));
+   if(p.has('status')&&!['0','1','2'].includes(p.get('status')!))return HttpResponse.json({error:{code:400400,message:'status is invalid'}},{status:400});
+   const result=records.filter(r=>r.type===Number(p.get('type')||0)&&(!p.get('keyword')||r.keyword.includes(p.get('keyword')!))&&(!p.get('risk_type')||r.risk_type===Number(p.get('risk_type')))&&(!p.get('status')||r.status===Number(p.get('status'))));
    return HttpResponse.json({data:result.slice(offset,offset+limit),pagination:{is_first:offset===0,is_end:offset+limit>=result.length,offset,limit,total:result.length}});
   }),
  ];

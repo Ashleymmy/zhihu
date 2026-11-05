@@ -18,6 +18,7 @@ let sequence=0,sendMode='success',listMode='success';
 const upstream=setupServer(
  http.get('https://open.zhihu.com/alliance/api/risk_words',({request})=>{
   const payload=Object.fromEntries(new URL(request.url).searchParams);captures.push({method:'GET',payload});
+  if(payload.status!==undefined && !['0','1','2'].includes(payload.status))return HttpResponse.json({error:{code:400400,message:'status is invalid'}},{status:400});
   if(listMode==='fail')return HttpResponse.json({error:{message:'SECRET upstream failure'}},{status:503});
   return HttpResponse.json({data:[0,1,2,9].map(status=>({keyword:'风险词'+status,type:Number(payload.type),risk_type:1,status,channel:'渠道甲',create_channel:'渠道乙',valided_at:status===1?'2026-11-05 12:00:00':''})),pagination:{is_first:true,is_end:false,offset:Number(payload.offset),limit:Number(payload.limit),total:24}});
  }),
@@ -81,11 +82,14 @@ it('检查项目和来源，不借用默认凭证，只有已成功提交作品�
  expect((await send({...input(image),compositionId:'999'})).status).toBe(422);
  expect((await send(input(image),'1',key(),{projectId:'2',accountId:'2'})).status).toBe(409);
 });
-it('查询筛选按文档送出 1/2/3，响应 0/1/2 转成不同状态，未知值不冒充审核中',async()=>{
+it('查询筛选 1/2/3 转成实测 0/1/2，响应状态分开显示，未知值不冒充审核中',async()=>{
  const r=await get('','1',{type:0,risk_type:2,status:2,offset:20,limit:20});expect(r.status,r.text).toBe(200);
  expect(r.body.data.list.map((x:any)=>x.status)).toEqual(['reviewing','violation','normal','unknown']);expect(r.body.data.hasNext).toBe(true);
- const last=captures.at(-1)!.payload;expect(last).toMatchObject({type:'0',risk_type:'2',status:'2',offset:'20',limit:'20',access_token:'risk_test_token'});
+ const last=captures.at(-1)!.payload;expect(last).toMatchObject({type:'0',risk_type:'2',status:'1',offset:'20',limit:'20',access_token:'risk_test_token'});
  expect(last).not.toHaveProperty('signature');expect(last).not.toHaveProperty('projectId');
+ for(const status of [1,2,3]){expect((await get('','1',{status})).status).toBe(200);expect(captures.at(-1)!.payload.status).toBe(String(status-1));}
+ const legacy=await request(app).get('/api/v1/modules/zhihu/zhihu-content/risk-words').set(headers['1']).query({...scope,status:3});
+ expect(legacy.status,legacy.text).toBe(200);expect(captures.at(-1)!.payload.status).toBe('2');
  expect((await get('','1',{status:0})).status).toBe(422);
  listMode='fail';const bad=await get();listMode='success';expect(bad.status).toBe(502);expect(bad.text).not.toContain('SECRET');expect(bad.body.data).not.toEqual({list:[]});
 });

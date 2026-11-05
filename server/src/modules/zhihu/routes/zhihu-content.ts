@@ -76,7 +76,12 @@ zhihuContentRouter.get(
       status: z.coerce.number().int().min(1).max(3).optional(),
     }),
   ),
-  asyncHandler(async (req, res) => ok(res, await zhihuGet('/alliance/api/risk_words', req.query))),
+  asyncHandler(async (req, res) =>
+    ok(res, await zhihuGet('/alliance/api/risk_words', {
+      ...req.query,
+      ...(req.query.status === undefined ? {} : { status: Number(req.query.status) - 1 }),
+    })),
+  ),
 );
 
 /** 单个内容标签查询（§2.12.1） */

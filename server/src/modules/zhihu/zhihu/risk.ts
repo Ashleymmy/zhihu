@@ -10,7 +10,8 @@ export const riskFilters = z.object({
   type: z.coerce.number().int().min(0).max(1).default(1),
   keyword: z.string().trim().max(128).optional(),
   risk_type: z.coerce.number().int().min(1).max(2).optional(),
-  // Query numbering is 1/2/3; response numbering is 0/1/2 (V1.4.20 pp.58-59).
+  // Keep UI query values 1/2/3. Live GET verification on 2026-11-05 showed
+  // upstream accepts 0/1/2 and rejects 3, contrary to V1.4.20 p.58.
   status: z.coerce.number().int().min(1).max(3).optional(),
   offset: z.coerce.number().int().min(0).max(1000000).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -52,7 +53,11 @@ export async function riskList(input: z.infer<typeof riskFilters>) {
   try {
     const response = await requestAlliance({
       endpoint: endpoint('GET', 'risk_words'),
-      params: { ...input, access_token: config.zhihu.accessToken },
+      params: {
+        ...input,
+        ...(input.status === undefined ? {} : { status: input.status - 1 }),
+        access_token: config.zhihu.accessToken,
+      },
     });
     const data = responseSchema.parse(response.data);
     return {
