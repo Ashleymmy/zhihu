@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref } from 'vue'
 import type { CoreWorkspace } from './core-workspace'
+import type { AccountMonitorItem, MiniMonitor } from '@zhihu-koc/shared-contracts/core'
 import OperationGuide from './OperationGuide.vue'
 import AnimatedNumber from './AnimatedNumber.vue'
 import TrendChart, { type TrendSeries } from './TrendChart.vue'
 import ShareBar, { type ShareItem } from './ShareBar.vue'
+import BarChart from './BarChart.vue'
 const w = inject<CoreWorkspace>('opc')!
 
 interface Todo { kind: string; count: number; label: string; actor: string; actionLabel: string; path: string }
@@ -96,6 +98,26 @@ const devTrend = computed(() => devDaily.value ? {
   labels: devDaily.value.labels,
   series: [{ label: '处理量', color: '#3b7dd8', points: devDaily.value.values.map(Number), area: true }] as TrendSeries[],
 } : null)
+/* 运维监控真实数据（/admin-tools/monitor、/mini-monitor）：读失败时对应卡不显示 */
+const accountMonitor = ref<AccountMonitorItem[] | null>(null), miniMonitor = ref<MiniMonitor | null>(null)
+const monitorTop = computed(() => (accountMonitor.value ?? [])
+  .filter(a => (a.actionCount7d ?? 0) > 0)
+  .sort((a, b) => (b.actionCount7d ?? 0) - (a.actionCount7d ?? 0))
+  .slice(0, 8)
+  .map(a => ({ label: a.displayName || a.username, value: a.actionCount7d ?? 0 })))
+const apiHealth = computed(() => {
+  const t = miniMonitor.value?.technical
+  if (!t) return null
+  return {
+    failurePct: t.failureRate === null ? null : (t.failureRate * 100).toFixed(1),
+    requests: t.requests, serverErrors: t.serverErrors, rejected: t.rejected, averageMs: t.averageMs,
+    lastRequestAt: t.lastRequestAt, failures24h: t.failures.length,
+  }
+})
+const accessSplit = computed(() => {
+  const b = miniMonitor.value?.business
+  return b ? { bound: b.boundAccounts, unbound: b.unboundAccounts, sessions: b.validMiniSessions } : null
+})
 let revision = 0
 
 /* 金额只做整数运算：字符串 → 万分之一元的整数，展示时四舍五入到分 */
@@ -202,17 +224,21 @@ async function loadDevInsights(version: number) {
   const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
   const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
     r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
-  const [sum, daily, workers, activity] = await Promise.allSettled([
+  const [sum, daily, workers, activity, monitor, mini] = await Promise.allSettled([
     get<DevSummary>('/insights/dev-summary'),
     get<DevDaily>('/insights/dev-daily'),
     get<DevWorkers>('/insights/dev-workers'),
     get<DevActivity>('/insights/dev-activity'),
+    get<AccountMonitorItem[]>('/admin-tools/monitor'),
+    get<MiniMonitor>('/mini-monitor'),
   ])
   if (version !== revision) return
   devSummary.value = unwrap(sum)
   devDaily.value = unwrap(daily)
   devWorkers.value = unwrap(workers)
   devActivity.value = unwrap(activity)
+  accountMonitor.value = unwrap(monitor)
+  miniMonitor.value = unwrap(mini)
 }
 onMounted(load)
 
@@ -616,6 +642,38 @@ function untilt(event: PointerEvent) {
           <div class="card-h"><h3>近 24 小时失败</h3></div>
           <div class="big num" style="font-size:30px">{{ devSummary.failures24h }}<small>条</small></div>
           <p class="muted" style="font-size:12.5px;margin-top:4px">{{ devSummary.lastFailure ? `最近一次失败：${devSummary.lastFailure}` : '没有失败记录' }}</p>
+        </article>
+
+        <!-- 接口健康（真实数据：小程序接入监控） -->
+        <article v-if="apiHealth" class="card lift" style="--s:4;--i:6">
+          <div class="card-h"><h3>接口健康</h3><router-link class="chip soft r" to="/system/monitor" style="text-decoration:none">运维监控 →</router-link></div>
+          <div class="big num" style="font-size:30px">{{ apiHealth.failurePct === null ? '暂无观测' : `${100 - Number(apiHealth.failurePct)}` }}<small v-if="apiHealth.failurePct !== null">% 可用</small></div>
+          <div class="growth-rules" style="margin-top:8px">
+            <div>近 24h 请求 <b>{{ apiHealth.requests.toLocaleString('zh-CN') }}</b> 次</div>
+            <div>服务错误 <b>{{ apiHealth.serverErrors }}</b> · 拒绝 <b>{{ apiHealth.rejected }}</b></div>
+            <div>平均处理耗时 <b>{{ apiHealth.averageMs === null ? '暂无观测' : `${apiHealth.averageMs} ms` }}</b></div>
+          </div>
+        </article>
+
+        <!-- 账号接入（真实数据：小程序绑定概况） -->
+        <article v-if="accessSplit" class="card lift" style="--s:4;--i:7">
+          <div class="card-h"><h3>账号接入</h3><span class="chip soft r">小程序</span></div>
+          <div class="big num" style="font-size:30px">{{ accessSplit.bound }}<small>个已绑定微信</small></div>
+          <div class="stack" style="margin-top:10px;height:10px">
+            <i :style="{ flexGrow: Math.max(accessSplit.bound, 0.001), background: '#4e9a4a' }" title="已绑定" />
+            <i :style="{ flexGrow: Math.max(accessSplit.unbound, 0.001), background: 'var(--line-2)' }" title="未绑定" />
+          </div>
+          <div class="legend" style="margin-top:10px">
+            <span><i style="background:#4e9a4a" />已绑定<b>{{ accessSplit.bound }}</b></span>
+            <span><i style="background:var(--line-2)" />未绑定<b>{{ accessSplit.unbound }}</b></span>
+            <span>有效会话<b>{{ accessSplit.sessions }}</b></span>
+          </div>
+        </article>
+
+        <!-- 近 7 日账号操作量（真实数据） -->
+        <article v-if="monitorTop.length" class="card lift" style="--s:8;--i:8">
+          <div class="card-h"><h3>近 7 日操作量</h3><span class="muted" style="font-size:12.5px">按账号 · 前 8 名</span></div>
+          <BarChart :items="monitorTop" color="#3b7dd8" />
         </article>
       </div>
 
