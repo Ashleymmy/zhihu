@@ -8,6 +8,8 @@
 
 需求核对结束后，用户已授权规划推进。第一阶段实施审核规则和权限基础，后续依次交付资料自动核验、团长结算及财务主动付款，业务待办、关联留言和站内提醒随各阶段接入。原 169 项保持审计基线统计，最新实施状态见追加记录。 [阶段计划与联调](#settlement-delivery)
 
+2026-11-05 已进入第二阶段的资料依据、历史补齐与自动核验实施。前端继续全 Mock 探索，状态语义和岗位边界作为衔接基准，精确接口与验证结果随实际交付更新。原 169 项、34 路由和 39 组检查仍对应 2026-11-04 基线。 [第二阶段契约与 Mock 场景](#settlement-evidence-contract)
+
 每项给出当前入口或共享组件、后端依据、差距、实施动作、岗位边界与验收条件。批准范围继续以已确认任务书和开发规范为准。原型中的演示数字、激励档位、自动支付与保留期限单独进入业务决策清单。 [E001] [E002] [E003]
 
 本次证据来自原型、页面路由、包装组件、共享组件、后端服务、岗位校验及已有测试源码。代码存在、测试文件有相应断言、页面实际可用分别记录。已完成的基线检查为后端类型检查、Web 11 项类型检查和生产构建。业务集成测试、多角色浏览器操作及生产版本行为留在逐项验收范围内。
@@ -1722,11 +1724,11 @@
 | 阶段 | 后端交付 | Web 接入与业务验收 | 状态 |
 | --- | --- | --- | --- |
 | 第一阶段，审核规则和权限基础 | 持久化作品默认通过及判定来源，提供普通存量等待处理，保留缺失、报送失败、明确退回和争议原因，补齐审计岗位权限及已发布的本人关键词登记修复。 | 接入服务端统一状态与原因。正常已登记作品参与核算，异常可按现有权限就地处理，作品状态与收益核对结果一致。 | 后端实现与隔离验证完成，待合入及页面联调。 |
-| 第二阶段，资料依据与自动核验 | 按项目、来源、渠道、关键词、日期和类型查询官方资料，复用可信团队、角色、任务及计价历史，补项目参与履历与自动更新。 | 财务上传资料后查看处理结果。核算时直接看到可办理结果、缺失资料或冲突，补齐后自动更新当前范围及待办。零值、未到资料与查询失败分别呈现。 | 依赖第一阶段及资料契约。 |
+| 第二阶段，资料依据与自动核验 | 按项目、来源、渠道、关键词、日期和类型查询官方资料，复用可信团队、角色、任务及计价历史，补项目参与履历与自动更新。 | 财务上传资料后查看处理结果。核算时直接看到可办理结果、缺失资料或冲突，补齐后自动更新当前范围及待办。零值、未到资料与查询失败分别呈现。 | 后端实现已提交 `14fd1a9`，契约和 Mock 样例见[本阶段追加](#settlement-evidence-contract)；整体验证、Web 接入及发布分别记录。 |
 | 第三阶段，团长核对与确认 | 按真实应得人聚合本人收益和团队分成，返回完整明细、就绪项、异常项及确定范围的预览，确认时复核权限、源版本与共源影响。 | 从获准团队上下文或财务入口选择团长、项目和周期，展开来源、处理异常、确认就绪金额。全部筛选与跨页金额一致。 | 依赖第二阶段，确认粒度随契约明确。 |
 | 第四阶段，主动付款办理 | 区分经办人和收款人，建立结算、占用、提现及付款关联，复用实际付款登记与凭证，覆盖取消、失败、重试及并发。 | 财务主动建立付款办理记录，实际转账后登记结果与凭证，查看各自进度并按团长和周期导出。周期已付和跨期余额分别展示。 | 依赖第三阶段及费用、额度、发票、资金开放、期限适用表。 |
 
-第一阶段已覆盖保存后的执行关系审核。旧记录收录仍沿既有路径根据执行人当前团队建立历史执行关系，其历史团长与分成依据需要第二阶段补齐，完整历史归属尚待验收。
+第一阶段交付时，旧记录收录仍根据执行人当前团队建立历史执行关系，此项作为第二阶段断点继续推进。第二阶段已接入可靠历史及就地补依据流程，最新结果见[本阶段契约与验证](#settlement-evidence-contract)。
 
 #### SET-C01 业务内协作
 
@@ -1752,3 +1754,251 @@
 | 综合验收 | 最终 `e0ec8d5` 完整归因 39 文件、500 项通过。以 `9493d38` 为源码的单元 45 文件、323 项，平台集成 15 文件、114 项，小程序兼容 244 项均通过。服务端类型检查与核心构建、Web 类型检查与构建全部退出 0。合计 1181 项通过，平台集成另有 1 项可选浏览器登录分支因未设置 `OPC_PLAYWRIGHT_MODULE` 跳过。 |
 
 正式任务书保存各阶段业务验收、来源范围与实施记录。本清单据交付结果更新接入状态，Web 完整业务链路通过实际页面联调验收。当前交付位于上述隔离分支，合入活跃 Web 树与页面联调待推进。正式发布需先执行审核依据迁移，并对限定范围的存量先预览再应用，生产状态按发布记录验收。 [正式任务书](C:/Users/JT/.codex/worktrees/backend-verification-20261103/zhihu-app/改造/Codex实施任务书_报表归因与拉新拉活_2026-10-08.md#settlement-delivery)
+
+<a id="settlement-evidence-contract"></a>
+## 2026-11-05 第二阶段：资料核验契约与 Mock 场景
+
+本节覆盖 `SET-D01-1、3、4` 和 `SET-C01-1`。后端已在 `codex/settlement-evidence-20261105` 隔离分支提交 `14fd1a9`（核心能力为 `0ac0967`，`233f4b1` 补多日来源恢复，`14fd1a9` 补原作品执行人的可信沿用），以下字段已对照最终核心契约、路由及项目提供器。前端可继续探索页面组织、抽屉、筛选和状态呈现，场景用于保证真实业务分支不遗漏。示例业务数字用于说明数据形状，不是固定设计或验收数字。Mock 可用、后端接口完成、真实联调通过和生产发布分别记录。[权威来源与可信范围](../../改造/Codex实施任务书_报表归因与拉新拉活_2026-10-08.md#settlement-evidence)
+
+#### 来源、结果和岗位
+
+核验以项目、资料来源、渠道、关键词、业务日期、业绩类型六项定位；拉新与拉活各自计量。官方文件原始行及采用版本、持久作品审核、旧任务保存归属、团队/角色/项目履历、计费版本和平台账目分别提供依据。导出文件可以帮助核对历史，正式判断复用其底层记录，并保留资料可信时段和未知范围。
+
+- 默认呈现“结果、原因、下一步”，来源和计算过程按权限展开。有效零业绩显示零；缺资料和失败都不能替换成零。
+- 财务或完整管理员维护官方文件、计费及财务事项；获准运营或完整管理员补成员、项目和历史依据。完整管理员可以连续办理，不创建新角色。运营只接收允许的非金额结果，纯财务不因此获得成员历史维护权限。
+- 补齐后的自动动作仅涵盖资料收录、未确认结果和待办。财务确认及付款仍为独立授权操作；本阶段不提供已经完成的主动结算或付款流程。
+- 隐藏上传记录仍保留有效依据；撤回计账来源才改变核验，撤回一份重复来源须保留其他有效来源。文件日期范围不表示资料齐全，只有搜索资料仍可能缺订单依据。
+- 人工核实 `operator_confirmation` 单独显示为“人工核实”，保留引用、办理人、时段、精度和原值。普通说明保持待核对；与可靠记录矛盾时不能用确认覆盖。旧任务继续使用原保存归属。
+
+#### 已核对的接口与字段含义
+
+下列路径和字段已核对至 `14fd1a9`。接口标识和状态码仅供开发，不直接展示在业务页面。成功响应为 `{ code: 0, data, message: "ok" }`；错误使用 HTTP 状态及中文 `message`，可处理的历史缺口另附 `history/nextAction`。界面只展示中文原因和业务动作。
+
+| 入口 | 输入与结果 | 当前对接边界 |
+| --- | --- | --- |
+| `GET /api/v1/core/evidence` | 必填 `moduleId/projectId/accountId/from/to`；可选 `channelRef/taskRef`（兼容 `keywordRef`）、`metricType/page/pageSize`。默认第 1 页、每页 20 行；单次最多 31 天、每页最多 100 行。 | 返回六维 `key`、`official`、五项 `checks`、`result`；只有获准财务投影含 `finance`。31 天和 100 行是单次读取保护，可分段及继续分页，不是业务容量、结算周期或历史保存上限。 |
+| `GET /api/v1/core/relations/members/:id/history-evidence` | `projectId` 与 `at` 或 `from/to`；`page/pageSize`。返回项目参与、团队、角色分别匹配/未知/冲突、依据和版本。 | 使用当前运营岗位及管理层级；日期为北京时间，日期范围含首尾日，时间戳范围左闭右开，时点按该时点核实。 |
+| `POST /api/v1/core/relations/members/:id/history-evidence` | 所核实时段、精度、项目参与/角色/团长、来源及引用、确认、`expectedVersion/requestKey`，需要恢复原记录时携带服务端给出的 `context`。 | `verified` 才触发自动恢复；普通说明 `pending` 不触发。`effectiveTo` 为排他结束，省略时只确认该日期一天或时间戳 1 毫秒，不补成无限区间。重复同键同内容幂等，冲突和过期版本要求核对。 |
+| 既有上传、来源选择/撤回、分析与待办 | 延续现有真实业务入口和权限。 | 不另建上传储存体系或通用执行接口；同一异常复用待办，修复后更新，正常项可以继续。 |
+
+`taskRef` 是已登记关键词 `zh_keywords.id`，不是上游推广活动或计划编号；`channelRef` 是规范渠道映射标识。省略 `metricType` 时分别查询 `new_user`、`activation`；数量不可跨类型相加。`total` 是过滤后“关键词 × 日期 × 类型”的核验条目数，过滤先于分页。顶层 `status=ready` 仅表示范围内有条目，翻过末页可出现 `list=[]` 且 `total>0`；行内 `result.status=ready` 表示资料与计算就绪，仍不等于结算确认或付款。当前 `lastChangedAt` 返回 `null`，界面不能编造更新时间。尚未登记的报表词继续通过原报表分析及待办处理，不因暂时没有关键词查询条目而消失。
+
+| 字段 | 使用方式 |
+| --- | --- |
+| `official.status/quantity` | 八种状态见下表；数量为整数字符串或 `null`。`"0"` 是有效零值，`null` 是尚无可采用数量。 |
+| `official.coverageBasis/coverageIsExhaustive` | 当前为 `observed_rows` 或 `none`，完整性为 `false`；只能说明实际观察资料，不能把文件日期两端补成连续覆盖。 |
+| `official.sourceRefs` | 未撤回来源；可带 `batchId/line/status`，其中状态为 `adopted/available/pending/superseded`。数字与候选均按实际来源展示。 |
+| `official.withdrawnSourceRefs` | 已撤回来源单列，状态 `withdrawn`，保留追溯；不能合并为当前有效依据。隐藏展示不等于撤回。 |
+| `official.currentRevision/pendingConflict` | 当前采用版本，以及尚待核对候选的版本与来源。前端不取最后上传值代替人工选择。 |
+| `checks` | `work/historicalOwnership/projectParticipation/pricing/existingCalculation` 各自给状态、中文原因、来源、可选版本/动作。保存路径为 `staff_self` 的项目参与检查为 `not_applicable`；不能因当前角色是管理员而豁免普通旧任务。 |
+| `result.nextAction` | 实际动作的 `method/path/parameters/requiredDuty`，可带 `historyContext/expectedHistoryVersion`。当前人无对应岗位时由现有负责岗位待办承接。 |
+| `result.evidenceVersion` | 核验多源摘要，用于识别结果变化，不能替代历史续办的签名或财务确认版本。 |
+| `finance` | 仅获准财务返回，金额为字符串或 `null`；运营响应完全省略此对象，不绘制金额占位或从数量推算。 |
+
+`context` 的来源仅为 `import_row/keyword`，动作和 `selection` 组合见下表。前两个操作的真实 `fromDate` 已由服务端冻结；前端保持原样，不能按上传顺序、今天日期或已确认账日期重新选择。
+
+| `operation` | `sourceKind` | `selection` |
+| --- | --- | --- |
+| `register_historical_keyword` | `import_row` | `{ executorId, taskId, fromDate }` |
+| `assign_retro` | `keyword` | `{ executorId, fromDate }` |
+| `adopt_legacy_record` | `import_row` | `{ planId }` |
+| `refresh_unconfirmed` | `keyword` | `{ memberId }`，可附成对的 `{ from, to }` |
+
+`context.sourceVersion` 是服务端签发的 `v1:<64位 HMAC-SHA256>` 不透明串，覆盖来源真实内容、相关状态和选择；前端原样保存、原样回送。它不是行编号或前端可生成的哈希。来源、选择、相关状态或签名密钥变化后，重新取得当前上下文；拒绝跨项目、跨来源、任意成员和财务动作注入。
+
+历史结果的 `sources[].ref` 是用于引用原历史记录的稳定标识；`sources[].sourceRef` 另存来源事件或人工资料引用。来源类别与记录标识须按服务端给出的配对使用，不能把说明文字当成记录编号。补充依据的替代记录只追加并保留原维度，冲突可展开双方来源。
+
+采用旧资料时，运营可沿用同项目、同来源、成功旧计划中唯一且已核实的原作品执行人，包括原管理人员本人执行。执行人及实际发布时间从原作品取得，前端不能传入任意替代成员或权限放开参数。普通新指派、新登记其他管理员仍拒绝；原角色未知、多执行人或来源不符时继续返回核对原因和获准动作。
+
+核验入口的 `nextAction.historyContext` 对应 POST 请求的 `context`，`expectedHistoryVersion` 对应 `expectedVersion`。原报表/补分配入口因历史不足返回的 `nextAction` 已直接带 `context/expectedVersion`。后续补齐成功响应中，`refreshStatus.nextActions` 是全部剩余项，顶层 `nextAction` 为首项；每项都给出目标 `memberId/projectId/at`、缺少字段、原因、版本和新上下文。沿该响应继续补执行人、原创建人或团长，不重发原动作寻找下一处提示，也不固定为第一次选中的成员。原创建人使用计划创建时点，执行人/团长使用业务日，旧作品使用首次真实发布时间。
+
+<a id="settlement-evidence-examples"></a>
+#### 可复用的请求与响应示例
+
+以下标识、业务数字及摘要均为 Mock 示例，不是生产数据或可用于真实请求的签名。前端可以更换样本；真实接口返回的标识、金额、日期、签名及后续动作始终由后端决定。
+
+财务读取一天、一词、一种业绩：
+
+```http
+GET /api/v1/core/evidence?moduleId=zhihu&projectId=1&accountId=1&from=2026-09-14&to=2026-09-14&channelRef=11&taskRef=101&metricType=new_user&page=1&pageSize=20
+```
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "moduleId": "zhihu", "projectId": "1", "accountId": "1",
+    "from": "2026-09-14", "to": "2026-09-14",
+    "status": "ready", "total": 1, "page": 1, "pageSize": 20,
+    "limits": { "maxDays": 31, "maxPageSize": 100 },
+    "list": [{
+      "key": { "projectId": "1", "accountId": "1", "channelRef": "11", "taskRef": "101", "businessDate": "2026-09-14", "metricType": "new_user" },
+      "title": "示例关键词",
+      "official": {
+        "status": "ready", "quantity": "3", "quantityUnit": "单",
+        "coverageBasis": "observed_rows", "coverageIsExhaustive": false,
+        "sourceRefs": [{ "kind": "official_row", "id": "51", "batchId": "7", "line": 2, "status": "adopted" }],
+        "withdrawnSourceRefs": [], "currentRevision": "71", "pendingConflict": []
+      },
+      "checks": {
+        "work": { "status": "ready", "reason": "作品登记有效，采用平台已保存的核验规则", "sourceRefs": [{ "kind": "work_evidence", "id": "81" }] },
+        "historicalOwnership": { "status": "ready", "reason": "使用任务保存的历史执行关系", "sourceRefs": [{ "kind": "saved_execution", "id": "31" }] },
+        "projectParticipation": { "status": "ready", "reason": "该日项目参与记录已核实", "sourceRefs": [{ "kind": "member_history", "id": "project_membership:41" }], "version": "1" },
+        "pricing": { "status": "ready", "reason": "计价规则已覆盖该日", "sourceRefs": [{ "kind": "pricing_rule", "id": "11" }] },
+        "existingCalculation": { "status": "ready", "reason": "已有未确认核算结果", "sourceRefs": [{ "kind": "calculation", "id": "91" }] }
+      },
+      "result": {
+        "status": "ready", "reason": "资料已齐备，可继续财务核对", "responsibleRole": null, "nextAction": null,
+        "evidenceVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "lastChangedAt": null
+      },
+      "finance": { "amount": "24.0000", "currency": "CNY", "sourceRefs": [{ "kind": "calculation", "id": "91" }] }
+    }]
+  }
+}
+```
+
+有效零值沿用同一完整结构，以下为对应记录的差异片段：`official` 的其余来源字段保留，`result.status` 仍可为 `ready`，金额由后端返回零，不转换成缺资料。运营投影则完全没有 `finance`，即使其业务数量可见。
+
+```json
+{
+  "official": { "status": "valid_zero", "quantity": "0" },
+  "finance": { "amount": "0.0000", "currency": "CNY", "sourceRefs": [{ "kind": "calculation", "id": "91" }] }
+}
+```
+
+```js
+// 仅用于构造运营 Mock：真实接口已在 SQL 和响应层执行岗位过滤。
+const operationsFixture = structuredClone(financeFixture);
+delete operationsFixture.data.list[0].finance;
+// 展示数量、资料状态、来源及获准动作；不生成金额/单价字段或占位。
+```
+
+历史未知示例，运营在关联记录查询 `GET /api/v1/core/relations/members/28/history-evidence?projectId=1&at=2026-09-14`：
+
+```json
+{
+  "code": 0, "message": "ok",
+  "data": {
+    "memberId": "28", "projectId": "1", "version": 0, "status": "unknown",
+    "projectParticipation": { "status": "unknown", "value": null, "knownRange": [], "sources": [] },
+    "team": { "status": "unknown", "value": null, "knownRange": [], "sources": [] },
+    "role": { "status": "unknown", "value": null, "knownRange": [], "sources": [] },
+    "knownRange": { "from": "2026-09-14T00:00:00.000+08:00", "to": "2026-09-15T00:00:00.000+08:00" },
+    "sources": [], "records": [], "page": 1, "pageSize": 50,
+    "nextAction": { "actor": "运营", "label": "补齐历史依据", "method": "POST", "path": "/api/v1/core/relations/members/28/history-evidence", "projectId": "1", "memberId": "28" }
+  }
+}
+```
+
+`team.status=matched, value=null` 表示已核实为独立归属；上例 `unknown, null` 表示不知道，不能混同。历史列表里的记录时间字段当前为 `history_from/history_to`，查询结果的规范区间字段为 `knownRange.from/to`。
+
+假定原报表登记入口已经返回下列 `context`，当前先核实该日项目参与。运营提交 `POST /api/v1/core/relations/members/28/history-evidence`；示例省略结束时间，只确认这一天：
+
+```json
+{
+  "projectId": "1", "effectiveFrom": "2026-09-14", "timePrecision": "date", "participation": true,
+  "sourceKind": "operator_confirmation", "sourceRef": "原始项目名单-示例28", "sourceSummary": "已核对该日原始项目名单", "confirmed": true,
+  "expectedVersion": 0, "requestKey": "mock-history-participation-01",
+  "context": {
+    "moduleId": "zhihu", "accountId": "1", "sourceKind": "import_row", "sourceId": "51",
+    "sourceVersion": "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "operation": "register_historical_keyword",
+    "selection": { "executorId": "28", "taskId": "8", "fromDate": "2026-09-14" }
+  }
+}
+```
+
+本次依据有效，但角色和团队尚未核实，返回 HTTP 200 并保留这次依据；不自动替人填写缺失字段：
+
+```json
+{
+  "code": 0, "message": "ok",
+  "data": {
+    "status": "verified", "evidenceId": "102", "version": 1,
+    "affectedScope": { "memberId": "28", "projectId": "1", "from": "2026-09-14T00:00:00.000+08:00", "to": "2026-09-15T00:00:00.000+08:00" },
+    "refreshStatus": {
+      "status": "unchanged", "recalculated": 0, "resumed": 0,
+      "nextActions": [{
+        "actor": "运营", "label": "补齐历史依据", "method": "POST", "path": "/api/v1/core/relations/members/28/history-evidence",
+        "memberId": "28", "projectId": "1", "at": "2026-09-14",
+        "reason": "历史项目、角色或团长资料尚未核实。下一步：运营：补齐历史依据",
+        "missingFields": ["role", "team"], "expectedVersion": 1,
+        "context": {
+          "moduleId": "zhihu", "accountId": "1", "sourceKind": "import_row", "sourceId": "51",
+          "sourceVersion": "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "operation": "register_historical_keyword", "selection": { "executorId": "28", "taskId": "8", "fromDate": "2026-09-14" }
+        }
+      }]
+    },
+    "nextAction": {
+      "actor": "运营", "label": "补齐历史依据", "method": "POST", "path": "/api/v1/core/relations/members/28/history-evidence",
+      "memberId": "28", "projectId": "1", "at": "2026-09-14",
+      "reason": "历史项目、角色或团长资料尚未核实。下一步：运营：补齐历史依据",
+      "missingFields": ["role", "team"], "expectedVersion": 1,
+      "context": {
+        "moduleId": "zhihu", "accountId": "1", "sourceKind": "import_row", "sourceId": "51",
+        "sourceVersion": "v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation": "register_historical_keyword", "selection": { "executorId": "28", "taskId": "8", "fromDate": "2026-09-14" }
+      }
+    }
+  }
+}
+```
+
+下一次直接使用此响应的目标、`expectedVersion` 和 `context`，补实际核实的 `historicalRole/leaderId`，使用新的 `requestKey`。若还缺团长或原创建人历史，下一响应会给出那个人的路径、时间及版本，不自行替换 `memberId`。全部历史就绪后，响应中 `nextAction=null`，`refreshStatus` 返回真实重核/续办数量；仍需读取原业务结果，其他作品、官方资料或计价问题可能继续存在。普通说明 `sourceKind=description` 返回 `pending`，且不能携带需要恢复业务的上下文；技术失败、越权、过期签名等错误则整笔回滚。
+
+成功续办原登记、采用旧资料或补充分配后，系统继续处理同账号、同项目、该关键词的原动作相关未处理来源，覆盖这些来源的真实日期；即使本次依据只核实一天，或核实的是早于报表日期的原创建人，也不能漏掉后续日期。纯 `refresh_unconfirmed` 则仍只重核本次依据范围。这个边界由服务端决定，前端不扩大日期、批量重发原动作或替其他项目触发恢复。
+
+#### Mock 场景基准
+
+下表中的英文是 fixture 标识，不是界面文案。“下一步”须结合当前岗位；当前人无权办理时显示负责岗位，并由该岗位的既有待办承接。每行至少验证正常显示、来源展开和动作后的变化，不能只画一个成功结果。
+
+| 场景 | 输入/前提 | 应见结果与负责岗位/动作 | 操作后应见变化 |
+| --- | --- | --- | --- |
+| `ready` | 必要官方数量已采用，作品、历史和计费等通过 | “资料齐全”；按权限查看来源及结果 | 保持就绪，后续确认仍需独立授权 |
+| `valid_zero` | 官方必要数量明确为字符串 `"0"` | “本日有效业绩为 0”；可查看原始来源 | 无需补成非零，不能显示为缺资料 |
+| `not_arrived` | 所需渠道/日期/类型资料尚未提供 | “所需资料尚未上传”；财务上传对应资料 | 自动重新核验对应范围 |
+| `record_missing` | 同范围已有资料，目标词缺少必要行 | “缺少对应记录”；财务核对或补资料 | 目标记录补齐后更新，不把原缺失算零 |
+| `sparse_dates` | 文件仅含 1 日、3 日，查询 2 日 | 2 日资料仍不足；可看真实观察日期 | 不能凭文件起止日期改变为齐全 |
+| `search_only` | 有搜索量，缺订单量 | 拉新订单依据待补；财务上传订单资料 | 正确类型补齐后才更新数量及核算 |
+| `processing` | 文件处于预览或处理阶段，尚未形成可用正式结果 | 显示后台处理步骤和当前结论，不混同“未上传” | 完成原上传流程后更新，不要求重新上传同一文件 |
+| `source_conflict` | 当前采用值与候选值冲突 | 显示可比较的来源；获准财务核对选择 | 采用版本、未确认结果及待办同步更新 |
+| `hidden_valid` | 有效文件只被隐藏 | 仍显示有效依据；来源说明展示状态 | 不变为缺失或撤回 |
+| `withdraw_duplicate` | 两份同键有效资料撤回一份 | 有效来源仍在 `sourceRefs`，撤回来源独立留在 `withdrawnSourceRefs`；计量不重复 | 保留依据及正常结果，不误删另一份 |
+| `withdraw_all` | 最后一份必要来源撤回 | “资料已撤回”；财务补资料或按既有更正处理 | 新有效来源到达后自动恢复；已确认/已付原账不改写 |
+| `old_team` | 成员已转团，旧任务保留 | 采用旧任务保存执行人、团长及收益路径 | 新团队不能接收或改写旧任务结果 |
+| `rejoin` | 退出后重新加入同一项目 | 分别展示两段参与区间与中间间隔 | 不合并成连续参加，不伪造更早加入日期 |
+| `history_unknown` | 日期早于可信基线，或变更日无法唯一判断 | “历史依据待补”；获准运营在关联记录补依据 | 核实后自动恢复受影响未确认结果 |
+| `note_pending` | 只补一段普通说明 | “待核实”；运营补可核验引用或显式人工核实 | 保存说明但不自动恢复业务 |
+| `operator_confirmation` | 获准岗位显式核实且与可信历史一致 | 显示“人工核实”及引用、时段、办理人 | 同一待办和相关未确认结果更新，保留办理事件 |
+| `history_conflict` | 新内容与可靠原任务或履历矛盾 | “历史依据冲突”；运营核对双方来源 | 原可信记录保留，不用确认开关覆盖 |
+| `permission_changed` | 打开后岗位、项目或来源权限改变 | 提交时重新校验，显示当前可执行动作 | 被拒操作无副作用，运营不获得金额 |
+| `unavailable` | 提供器或查询失败 | 显示失败与重试，保留筛选和已填内容 | 不伪装为空页或零业绩 |
+| `retry_mixed` | 重复请求且部分记录已就绪 | 同键同内容返回确定结果；异常项各有原因/动作 | 就绪项继续，同一问题不产生重复待办 |
+| `context_rejected` | 注入跨项目来源、旧版本或财务动作 | 明确拒绝并保留可重新核对入口 | 历史、原业务、金额无部分写入 |
+| `staff_self` | 保存的任务路径为管理人员本人执行，缺普通项目成员履历 | 项目参与检查为 `not_applicable`，其他资料仍分别核验 | 普通任务不会因成员后来升为管理员而获豁免，不伪造参与履历 |
+| `channel_ambiguity` | 同名渠道有多个规范候选，或该渠道未匹配到本词范围 | 分别为 `conflict/unknown`；运营在原报表分析入口核对渠道 | 确认正确来源后重核，不当成资料未上传或自动挑一个渠道 |
+| `partial_history` | 本次只补项目参与，仍缺角色、团长或原创建人历史 | 保存已核实部分，按响应 `nextActions` 的真实目标、时间和版本继续 | 不重发原业务找提示；每次保留已核实依据，最后恢复原动作 |
+| `multi_date_resume` | 同一原动作涉及三日报表，补齐的是最早一天或更早原创建人依据 | 同范围该关键词三日来源均继续处理；无关积压不阻塞 | 不漏中间日期；纯历史重核仍遵守依据日期，已确认账不改写 |
+| `unregistered_keyword` | 原文件有尚未登记到任务的词 | 在原报表分析和待办办理；统一核验列表只展开已登记词 | 登记并补齐依据后出现核验条目，不能以原列表为空认定无原始数据 |
+| `filtered_page` | 已按渠道、任务、类型筛选，查询末页之外 | 先筛选后分页，`total` 保持范围内核验条目数；`total>0` 时顶层仍 `ready` | 空页可返回上一页，不显示成资料缺失；31 天/100 行是单次查询限制 |
+| `original_staff_owner` | 成功旧计划在当前项目和来源内，原作品只有一个执行人，其历史管理角色已核实 | 运营可沿原记录采用该执行人，使用真实发布时间和保存路径 | 普通新指派其他管理员仍拒绝；未知历史、多执行人或跨来源继续核对，不出现权限放开开关 |
+
+[响应样例](#settlement-evidence-examples)已覆盖财务就绪、有效零值、历史未知与分次补齐、对应运营投影；金额和数量均按实际字符串类型给出。前端可调整页面组织及交互，不自行推算金额、合并业绩类型、扩大权限或填补未知历史。页面联调时再按受影响角色及 1440px、375px 验证。
+
+#### 当前交付与验证状态
+
+| 内容 | 当前证据 | 仍待完成 |
+| --- | --- | --- |
+| 后端已发布差异对齐 | 隔离分支提交 `1856aed`；69 项归因和 16 项联盟聚焦通过，服务端类型检查与核心构建通过；来源 `53137d9`；两份 `041` 迁移保留完整文件名共存 | 随本阶段一起走后续发布核对 |
+| 历史依据 | `61be71d/ed07ae9` 交付契约和履历，`5c9837f` 补授权顺序，`a3dd183` 验证普通关系变更不填补历史未知；实际补依据与原业务续办已接通 | Web 使用返回的成员、时点、版本和动作接入，保留人工来源说明与未知范围 |
+| 统一查询与恢复 | `0ac0967` 交付正式 DTO、来源状态及自动恢复；`233f4b1` 补多日来源续办。真实查询 18/18、最终自动恢复 23/23，兼容聚焦 56 项单列；请求/响应样例已核源码 | 按上述契约逐页替换 Mock，保持数据就绪与结算确认/付款分离 |
+| 独立审阅 | 最终 `14fd1a9` 结论 `approved_after_fixes`，原 7 项全部修复；全量另发现的 `FULL-REG-01` 也经独立复核关闭。先前 4/4 探针通过，新增来源授权探针另跑 1/1；其余 4 项按名称过滤，不计作环境跳过或重跑通过 | Web 实际页面联调和生产样本验收继续独立执行 |
+| 后端单元、平台与构建 | 最终 `14fd1a9` 上单元 45 文件 323/323，服务端类型检查与核心构建通过。平台 OPC 已跑 17 文件、132 通过、1 项可选浏览器用例跳过；回调调整后另有 20 项核心聚焦通过 | 保留执行范围；可选浏览器用例因未配置 `OPC_PLAYWRIGHT_MODULE` 跳过，不能替代页面截图验收 |
+| 归因全量与定向复测 | 首次 42 文件 548 项：543 通过、5 失败。修复测试历史资料及原执行人沿用权限后，最终 `14fd1a9` 上 8 文件 109/109，0 失败、0 跳过，全部初始 3 个失败文件及关键消费者已复测，初始失败全部关闭 | 新增 2 项边界用例，前后覆盖 550 个不同归因用例；未重跑未受影响全量，不把 548 与 109 相加，也不宣称第二次完整全量通过 |
+| Web/小程序兼容 | C 盘隔离工作树 `pnpm typecheck` 11 任务、`pnpm build` 1 任务通过，均有效缓存；最终 `14fd1a9` 上小程序 244 项通过、0 跳过 | D 盘活跃前端真实页面联调与截图；不能以隔离兼容代替 |
+| 官方风险接口 | 正式记录仅观察到两类空列表的连通、参数和封套；本地契约用例单列 | 非空字段/筛选语义、真实上传/举报/重试及官方后续状态 |
+| 第二阶段整体 | 资料查询、历史补齐、自动核验和现有待办更新已在隔离分支实现；28 个 Mock 场景、样例及实际契约已核对，后端验证按上述范围完成 | 页面联调与生产发布分别验收；第三/四阶段按原计划继续 |
+
+本表采用本轮执行与审阅工件的真实结果，完整日志索引见[任务书本阶段记录](../../改造/Codex实施任务书_报表归因与拉新拉活_2026-10-08.md#settlement-evidence)。不复用第一阶段 1181 项作为本轮总数，也不将聚焦测试重复累加为聚合通过数。既有全 Mock 原型与上述接口契约之间的接入状态按实际页面逐步更新。
