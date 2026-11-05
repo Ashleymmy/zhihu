@@ -251,8 +251,8 @@ attributionRouter.post(
 attributionRouter.get(
   '/imports',
   asyncHandler(async (req, res) => {
-    const q = scopeSchema.merge(pagingSchema).extend({archived:z.enum(['true','false']).default('false')}).parse(req.query);
-    ok(res, await facts.listImports(req.user, q, q.page, q.pageSize,q.archived==='true'));
+    const q = scopeSchema.merge(pagingSchema).extend({archived:z.enum(['true','false']).default('false'),period:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional()}).parse(req.query);
+    ok(res, await facts.listImports(req.user, q, q.page, q.pageSize,q.archived==='true',q.period));
   }),
 );
 attributionRouter.get('/imports/:id/withdrawal',asyncHandler(async(req,res)=>{

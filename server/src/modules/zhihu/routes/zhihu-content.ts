@@ -1,3 +1,4 @@
+import { authorizeRisk,scopeSchema,requireRiskManager } from '../services/risk-reports';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../../auth/middleware';
@@ -66,6 +67,7 @@ zhihuContentRouter.get(
 /** 风险词列表（§2.13.2） */
 zhihuContentRouter.get(
   '/risk-words',
+  asyncHandler(async(req,_res,next)=>{requireRiskManager(req.user);await authorizeRisk(req.user,scopeSchema.parse(req.query));next();}),
   validateQuery(
     paging.extend({
       type: z.coerce.number().int().min(0).max(1).optional(),
@@ -74,7 +76,12 @@ zhihuContentRouter.get(
       status: z.coerce.number().int().min(1).max(3).optional(),
     }),
   ),
-  asyncHandler(async (req, res) => ok(res, await zhihuGet('/alliance/api/risk_words', req.query))),
+  asyncHandler(async (req, res) =>
+    ok(res, await zhihuGet('/alliance/api/risk_words', {
+      ...req.query,
+      ...(req.query.status === undefined ? {} : { status: Number(req.query.status) - 1 }),
+    })),
+  ),
 );
 
 /** 单个内容标签查询（§2.12.1） */

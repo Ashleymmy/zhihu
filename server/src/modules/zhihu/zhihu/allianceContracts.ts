@@ -285,7 +285,7 @@ export const ALLIANCE_SIGNATURE_PROFILES: Record<AllianceOperationKey, AllianceS
   'GET /vip/audio/contents': signedProfile('offset', 'limit'),
   'GET /comic_dramas': signedProfile('offset', 'limit'),
   'GET /intercept_words': signedProfile('offset', 'limit'),
-  'GET /risk_words': signedProfile('offset', 'limit'),
+  'GET /risk_words': tokenOnlyProfile,
   'GET /content_tag': signedProfile(),
   'GET /popularize_tasks': signedProfile('offset', 'limit'),
   'GET /get_agent_channels': signedProfile('offset', 'limit'),
