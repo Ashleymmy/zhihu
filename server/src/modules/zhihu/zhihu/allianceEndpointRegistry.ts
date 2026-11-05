@@ -106,6 +106,8 @@ export const ALLIANCE_ENDPOINTS = ALLIANCE_ENDPOINT_DEFINITIONS;
 // 仅供内部 Job（如 syncMetrics 的 D+1 日批）使用的端点：
 // 不生成公共代理路由，也不进入公共版本策略，只能通过 resolveClientEndpoint 命中。
 const clientOnlyDefinitions: ReadonlyArray<AllianceEndpointDefinition> = [
+  { definitionKey: 'POST /risk_words', method: 'POST', publicPath: '/risk_words', clientPath: '/alliance/api/risk_words', upstreamPath: '/risk_words', requestKind: 'json', requiredPermission: 'project.manage' },
+  { definitionKey: 'POST /basic/file_upload', method: 'POST', publicPath: '/basic/file_upload', clientPath: '/alliance/api/basic/file_upload', upstreamPath: '/basic/file_upload', requestKind: 'multipart', requiredPermission: 'project.manage' },
   {
     definitionKey: 'GET /data_report/daily_data',
     method: 'GET',

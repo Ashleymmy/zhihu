@@ -1,3 +1,4 @@
+import { riskReportsRouter } from './routes/risk-reports';
 import { financeHistoryRouter } from './routes/finance-history';
 import { projectsRouter } from './routes/projects';
 import { miniBusinessRouter } from '../../wechat/business';
@@ -38,6 +39,7 @@ export function createZhihuModule(): BusinessModule {
   router.use(miniBusinessRouter);
   router.use(attributionRouter);
   const routes: Array<[string, Router]> = [
+    ['risk-reports', riskReportsRouter],
     ['projects', projectsRouter],
     ['plans', plansRouter],
     ['channels', channelsRouter],

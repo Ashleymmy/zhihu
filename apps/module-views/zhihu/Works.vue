@@ -4,6 +4,8 @@ import {WorkRegistrationReport} from '@zhihu-koc/shared-components'
 import {errorText,type EngineContext} from './context'
 import WorkDetail from './WorkDetail.vue'
 import HistoricalWorks from './HistoricalWorks.vue'
+import RiskReports from './RiskReports.vue'
+const riskOpen=ref(false)
 import {upstreamReview,evidenceReview,type WorkStatus} from './work-status'
 const props=defineProps<{context:EngineContext;filters?:Record<string,string>;heading?:string}>()
 interface Work extends WorkStatus{id:string;bindingId:string|null;planId:string;keyword:string;workUrl:string;description:string;verificationStatus:string;executorId:string;executorName:string;reason:string;compositionId:string|null;canEdit?:boolean;createdAt:string}
@@ -33,9 +35,10 @@ onMounted(()=>{void refresh();poll=setInterval(()=>{if(!document.hidden)void ref
 onUnmounted(()=>{generation++;if(poll)clearInterval(poll)})
 </script>
 <template>
-  <section class="work-card">
+  <RiskReports v-if="riskOpen" :context="context" @back="riskOpen=false" />
+  <section v-else class="work-card">
     <HistoricalWorks v-if="canOperate()" :context="context" @changed="refresh" />
-    <div class="section-heading"><div><h2>{{heading || '作品记录'}}</h2><p>查看已提交的作品及核验结果。</p></div><div class="engine-actions"><router-link v-if="canOperate()" class="engine-action-link" to="/modules/zhihu/works">登记推广作品</router-link><button :disabled="busy" @click="refresh">刷新</button></div></div>
+    <div class="section-heading"><div><h2>{{heading || '作品记录'}}</h2><p>查看已提交的作品及核验结果。</p></div><div class="engine-actions"><router-link v-if="canOperate()" class="engine-action-link" to="/modules/zhihu/works">登记推广作品</router-link><button v-if="showStats && canOperate()" @click="riskOpen=true">风险举报</button><button :disabled="busy" @click="refresh">刷新</button></div></div>
     <form class="work-search" role="search" aria-label="搜索作品" @submit.prevent="findWorks"><label class="search-field">搜索作品<input v-model="search" type="search" maxlength="200" placeholder="关键词、作品名称、提交人或链接" /></label><label>回传开始日期<input v-model="from" type="date" /></label><label>回传结束日期<input v-model="to" type="date" /></label><label class="success-filter"><input v-model="successfulOnly" type="checkbox" />仅成功登记（排除失败、退回及无效记录）</label><div class="engine-actions"><button type="submit" :disabled="busy">搜索</button><button type="button" :disabled="busy" @click="period('day')">今天</button><button type="button" :disabled="busy" @click="period('week')">本周至今</button><button type="button" :disabled="busy" @click="period('month')">本月至今</button><button type="button" :disabled="busy" @click="clearSearch">清空筛选</button></div></form>
     <p class="cell-note">按首次回传到平台的日期筛选（北京时间），重试不改变日期。默认保留成功、失败及待提交记录。</p>
     <WorkRegistrationReport v-if="showStats" :http="context.coreHttp" :query="reportQuery" />
