@@ -136,4 +136,52 @@ export function mountDemoInsights(app: Express) {
     if (noAmount(authed(req))) return res.status(403).json({ code: 40300, message: '无权查看提现' });
     res.json({ code: 0, data: { totalAmount: '3286.00', count: 4, earliest: '今天 09:12', todayPaid: '1710.60', monthPaid: '42380.00', failedCount: 1 } });
   });
+
+  /** 开发者首页：今日处理概览（系统视角，无金额） */
+  app.get('/api/v1/core/insights/dev-summary', ...guard, (_req, res) => {
+    res.json({
+      code: 0,
+      data: {
+        processedToday: 12406, queueBacklog: 0, syncTasks: 2, patrols: 6, failures24h: 0,
+        lastFailure: '10-12 红果接口超时（已自动重试成功）',
+        weekImports: 6, weekPatrols: 24, weekFixes: 2,
+      },
+    });
+  });
+
+  /** 开发者首页：处理量日序列（业绩条数，按日） */
+  app.get('/api/v1/core/insights/dev-daily', ...guard, (req, res) => {
+    const days = Math.min(90, Math.max(7, Number(req.query.days) || 30));
+    res.json({ code: 0, data: { labels: dailySeries(days, 0, 0).map(d => d.date), values: dailySeries(days, 9000, 2400, 0.3).map(d => d.value) } });
+  });
+
+  /** 开发者首页：Worker 状态 */
+  app.get('/api/v1/core/insights/dev-workers', ...guard, (_req, res) => {
+    res.json({
+      code: 0,
+      data: {
+        list: [
+          { name: '知乎同步', note: '3 分钟前', ok: true },
+          { name: '红果同步', note: '11 分钟前', ok: true },
+          { name: '收益计算队列', note: '0 条积压', ok: true },
+          { name: '归属一致性巡检', note: '0 条差异', ok: true },
+        ],
+      },
+    });
+  });
+
+  /** 开发者首页：任务动态 */
+  app.get('/api/v1/core/insights/dev-activity', ...guard, (_req, res) => {
+    res.json({
+      code: 0,
+      data: {
+        list: [
+          { title: '知乎同步完成', detail: '15:06 · 182 条', tone: 'ok' },
+          { title: '归属巡检通过', detail: '15:00 · 0 差异', tone: 'info' },
+          { title: '报表导入完成', detail: '14:48 · 382 行', tone: 'clay' },
+          { title: '红果同步重试成功', detail: '11:12 · 1 次重试', tone: 'muted' },
+        ],
+      },
+    });
+  });
 }

@@ -82,6 +82,20 @@ const teamTopBars = computed(() => {
   return list.map(t => ({ ...t, pct: Math.round(Number(t.amount ?? t.quantity) / max * 100) }))
 })
 const TEAM_PALETTE = ['#d46b45', '#5b8fe0', '#8e6cc9', '#4e9a4a', '#c9a23f', '#b3557a']
+
+/* ===== 开发者首页可视化（系统视角：处理量/队列/Worker/巡检，无金额） ===== */
+interface DevSummary { processedToday: number; queueBacklog: number; syncTasks: number; patrols: number; failures24h: number; lastFailure: string | null; weekImports: number; weekPatrols: number; weekFixes: number }
+interface DevDaily { labels: string[]; values: string[] }
+interface DevWorkers { list: { name: string; note: string; ok: boolean }[] }
+interface DevActivity { list: { title: string; detail: string; tone: string }[] }
+const devSummary = ref<DevSummary | null>(null), devDaily = ref<DevDaily | null>(null),
+  devWorkers = ref<DevWorkers | null>(null), devActivity = ref<DevActivity | null>(null)
+const isDeveloper = computed(() => w.role.value === 'developer')
+const DEV_TONES: Record<string, string> = { ok: '#4e9a4a', info: '#3b7dd8', clay: '#d46b45', muted: '#b0aea5' }
+const devTrend = computed(() => devDaily.value ? {
+  labels: devDaily.value.labels,
+  series: [{ label: '处理量', color: '#3b7dd8', points: devDaily.value.values.map(Number), area: true }] as TrendSeries[],
+} : null)
 let revision = 0
 
 /* 金额只做整数运算：字符串 → 万分之一元的整数，展示时四舍五入到分 */
@@ -107,6 +121,7 @@ async function load() {
   void loadMoney(version)
   void loadAnnouncements(version)
   void loadStaffInsights(version)
+  void loadDevInsights(version)
   try {
     const result = await w.http.get<Overview>('/dashboard', projectId.value ? { projectId: projectId.value } : {})
     if (version === revision) data.value = result
@@ -159,7 +174,7 @@ async function loadAnnouncements(version: number) {
 }
 /* 员工首页可视化（demo mock 契约，接口 404/失败时对应卡不显示） */
 async function loadStaffInsights(version: number) {
-  if (!isStaff.value) return
+  if (!isStaff.value || isDeveloper.value) return
   const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
   const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
     r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
@@ -180,6 +195,24 @@ async function loadStaffInsights(version: number) {
   todayPayouts.value = unwrap(payouts)
   reconcile.value = unwrap(rec)
   pendingWithdrawals.value = unwrap(pending)
+}
+/* 开发者首页可视化（系统视角，demo mock 契约） */
+async function loadDevInsights(version: number) {
+  if (!isDeveloper.value) return
+  const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
+  const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
+    r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
+  const [sum, daily, workers, activity] = await Promise.allSettled([
+    get<DevSummary>('/insights/dev-summary'),
+    get<DevDaily>('/insights/dev-daily'),
+    get<DevWorkers>('/insights/dev-workers'),
+    get<DevActivity>('/insights/dev-activity'),
+  ])
+  if (version !== revision) return
+  devSummary.value = unwrap(sum)
+  devDaily.value = unwrap(daily)
+  devWorkers.value = unwrap(workers)
+  devActivity.value = unwrap(activity)
 }
 onMounted(load)
 
@@ -520,6 +553,99 @@ function untilt(event: PointerEvent) {
           </div>
         </aside>
       </div>
+    </template>
+
+    <!-- ===== 开发者视图：系统运行视角（处理量/队列/Worker/巡检，不看业务金额） ===== -->
+    <template v-else-if="isDeveloper">
+    <div class="home-v2">
+      <div class="bento enter">
+        <!-- 今日处理主卡 -->
+        <article v-if="devSummary" class="card wallet float lift" style="--s:5;--i:0">
+          <div class="lbl">今日处理业绩</div>
+          <div class="big num"><AnimatedNumber :value="devSummary.processedToday" :decimals="0" :text="devSummary.processedToday.toLocaleString('zh-CN')" /><small style="font-size:16px;margin-left:4px">条</small></div>
+          <div class="pill">{{ devSummary.queueBacklog ? `队列 ${devSummary.queueBacklog} 条积压` : '队列无积压' }} · {{ devSummary.failures24h ? `近 24 小时 ${devSummary.failures24h} 条失败` : '全部按时完成' }}</div>
+          <div class="meta">
+            <div><b>{{ devSummary.syncTasks }}</b>同步任务</div>
+            <div><b>{{ devSummary.patrols }}</b>定时巡检</div>
+            <div><b>{{ devSummary.failures24h }}</b>失败</div>
+          </div>
+          <div class="acts">
+            <router-link class="btn white" to="/system/monitor">查看监控</router-link>
+            <router-link class="btn light" to="/audit-log">审计日志 →</router-link>
+          </div>
+        </article>
+
+        <!-- 待办列表（与员工一致） -->
+        <section class="card" :style="{ '--s': devSummary ? 7 : 12, '--i': 1 }" aria-labelledby="home-todos-dev">
+          <div class="card-h"><h3 id="home-todos-dev">待办</h3><span v-if="todos.length" class="chip clay r">{{ todos.length }} 项</span></div>
+          <template v-if="todos.length">
+            <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row" style="text-decoration:none;color:inherit">
+              <span class="home-todo-count">{{ todo.count }}</span>
+              <div class="t"><b>{{ todo.label }}</b><small>{{ todo.projectName }} · {{ todo.actor }}</small></div>
+              <span class="home-todo-action">{{ todo.actionLabel }} →</span>
+            </router-link>
+          </template>
+          <div v-else-if="!loading && !error" class="bento-empty home-empty"><b>都处理完了</b><p>系统任务和业务待办会出现在这里和顶栏铃铛里。</p></div>
+          <p v-else-if="loading && !data" role="status">正在整理待办…</p>
+        </section>
+
+        <!-- 处理量趋势 -->
+        <article v-if="devTrend" class="card lift" style="--s:7;--i:2">
+          <div class="card-h"><h3>处理量趋势</h3><span class="muted" style="font-size:12.5px">业绩条数 · 近 30 天 · 演示数据</span></div>
+          <TrendChart :labels="devTrend.labels" :series="devTrend.series" :height="210" :format="(v: number) => v.toLocaleString('zh-CN')" caption="近 30 天每日处理量" />
+        </article>
+
+        <!-- Worker 状态 -->
+        <article v-if="devWorkers" class="card lift" style="--s:5;--i:3">
+          <div class="card-h"><h3>Worker 状态</h3><span class="r" style="display:flex;align-items:center;gap:6px;color:var(--ok,#4e9a4a);font-size:12.5px"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block"></span>{{ devWorkers.list.every(x => x.ok) ? '全部正常' : '有异常' }}</span></div>
+          <div v-for="x in devWorkers.list" :key="x.name" style="display:flex;font-size:13px;padding:6px 0">
+            <span class="muted">{{ x.name }}</span><b style="margin-left:auto;font-weight:600" :style="{ color: x.ok ? 'inherit' : 'var(--clay-deep)' }">{{ x.note }}</b>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:8px">同步、队列与巡检的实时明细在运维监控页。</p>
+        </article>
+
+        <!-- 队列 -->
+        <article v-if="devSummary" class="card lift" style="--s:4;--i:4">
+          <div class="card-h"><h3>队列</h3><span class="chip r" :class="devSummary.queueBacklog ? 'clay' : 'soft'">{{ devSummary.queueBacklog ? '有积压' : '无积压' }}</span></div>
+          <div class="big num" style="font-size:30px">{{ devSummary.queueBacklog }}<small>条</small></div>
+          <p class="muted" style="font-size:12.5px;margin-top:4px">收益计算 / 回传 / 通知队列</p>
+        </article>
+
+        <!-- 近 24 小时失败 -->
+        <article v-if="devSummary" class="card lift" style="--s:4;--i:5">
+          <div class="card-h"><h3>近 24 小时失败</h3></div>
+          <div class="big num" style="font-size:30px">{{ devSummary.failures24h }}<small>条</small></div>
+          <p class="muted" style="font-size:12.5px;margin-top:4px">{{ devSummary.lastFailure ? `最近一次失败：${devSummary.lastFailure}` : '没有失败记录' }}</p>
+        </article>
+      </div>
+
+      <!-- 右栏：资料 + 任务动态 + 公告 -->
+      <aside class="home-aside">
+        <div class="card profile">
+          <div class="big-av" style="background:linear-gradient(135deg,#3b7dd8,#1d4ed8)">{{ (w.userName?.value ?? '我').slice(0, 1) }}</div>
+          <h4>{{ w.userName?.value ?? '我' }}</h4>
+          <p class="muted" style="font-size:12.5px">开发者 · 数据与队列</p>
+          <div v-if="devSummary" class="profile-stats">
+            <div><b>{{ devSummary.weekImports }}</b><span>本周导入</span></div>
+            <div><b>{{ devSummary.weekPatrols }}</b><span>本周巡检</span></div>
+            <div><b>{{ devSummary.weekFixes }}</b><span>本周修复</span></div>
+          </div>
+        </div>
+        <div v-if="devActivity?.list.length" class="card">
+          <div class="card-h"><h3>任务动态</h3><span class="muted r" style="font-size:12px">演示数据</span></div>
+          <div v-for="(x, i) in devActivity.list" :key="i" class="row">
+            <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: DEV_TONES[x.tone] ?? '#b0aea5', flex: 'none' }"></span>
+            <div class="t"><b>{{ x.title }}</b><small>{{ x.detail }}</small></div>
+          </div>
+        </div>
+        <div v-if="announcements.length" class="card">
+          <div class="card-h"><h3>公告</h3><span class="muted r" style="font-size:12px">{{ announcements.length }} 条</span></div>
+          <div v-for="a in announcements.slice(0, 4)" :key="a.id" class="row">
+            <div class="t"><b>{{ a.title }}</b><small>{{ a.content.slice(0, 48) }}{{ a.content.length > 48 ? '…' : '' }}</small></div>
+          </div>
+        </div>
+      </aside>
+    </div>
     </template>
 
     <!-- ===== 员工视图：v2 三栏（职务主卡用非金额业务量，金额卡等财务账源接入后点亮） ===== -->
