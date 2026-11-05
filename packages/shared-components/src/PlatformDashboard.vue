@@ -23,6 +23,9 @@ interface RelationMine { inviter: { name: string } | null; channel: string | nul
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
 const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([]), teamLines = ref<MineLine[]>([])
 const selfMine = ref<Mine | null>(null), teamSummary = ref<Mine | null>(null), availableTasks = ref<{ projectId: string; total: number | null }[]>([])
+/* 公告（员工右栏）：有效公告 */
+interface Announcement { id: string; title: string; content: string; createdAt: string }
+const announcements = ref<Announcement[]>([])
 /* 入团申请（团长）：待审批列表与审批动作 */
 interface TeamApplication { id: string; creatorId: string; creatorName: string; creatorUsername: string; message: string | null; status: string; createdAt: string }
 const applications = ref<TeamApplication[]>([]), applicationBusy = ref('')
@@ -37,6 +40,11 @@ async function reviewApplication(id: string, action: 'approve' | 'reject') {
   finally { applicationBusy.value = '' }
 }
 const isMember = computed(() => ['creator', 'leader'].includes(w.role.value))
+/* 员工角色工作台入口（空待办时主卡按钮的落点） */
+const staffWorkbenchPath = computed(() => {
+  if (w.role.value === 'admin' && w.duty?.value === 'finance') return '/finance'
+  return '/team'
+})
 let revision = 0
 
 /* 金额只做整数运算：字符串 → 万分之一元的整数，展示时四舍五入到分 */
@@ -60,6 +68,7 @@ async function load() {
   const version = ++revision
   loading.value = true; error.value = ''
   void loadMoney(version)
+  void loadAnnouncements(version)
   try {
     const result = await w.http.get<Overview>('/dashboard', projectId.value ? { projectId: projectId.value } : {})
     if (version === revision) data.value = result
@@ -102,6 +111,13 @@ async function loadMoney(version: number) {
       } catch { /* 申请列表读不到时卡不显示 */ }
     } catch { /* 团队明细读不到时成员贡献卡给空态 */ }
   }
+}
+/* 公告读取（右栏卡片用） */
+async function loadAnnouncements(version: number) {
+  try {
+    const list = await w.http.get<Announcement[]>('/announcements/active')
+    if (version === revision) announcements.value = list ?? []
+  } catch { /* 公告读不到时卡不显示 */ }
 }
 onMounted(load)
 
@@ -457,7 +473,10 @@ function untilt(event: PointerEvent) {
           <div class="lbl">现在要做</div>
           <div class="big num"><AnimatedNumber :value="todoTotal" :decimals="0" /><small style="font-size:16px;margin-left:4px">项待办</small></div>
           <div class="pill">{{ todoByActor.length ? todoByActor.map(a => `${a.actor} ${a.count}`).join(' · ') : '都处理完了' }}</div>
-          <div class="acts"><router-link v-if="todos[0]" class="btn white" :to="todos[0].path">{{ todos[0].actionLabel || '去处理' }}</router-link><router-link v-else class="btn light" to="/dashboard">查看工作台</router-link></div>
+          <div v-if="todoByActor.length" class="stack" style="margin-top:14px;height:10px">
+            <i v-for="(a, i) in todoByActor" :key="a.actor" :style="{ flexGrow: a.count, background: ['#f0b49b', '#8e6cc9', '#5b8fe0', '#4e9a4a'][i % 4] }" :title="`${a.actor} ${a.count} 项`"></i>
+          </div>
+          <div class="acts"><router-link v-if="todos[0]" class="btn white" :to="todos[0].path">{{ todos[0].actionLabel || '去处理' }}</router-link><router-link v-else class="btn light" :to="staffWorkbenchPath">去工作台</router-link></div>
         </article>
 
         <!-- 待办列表 -->
@@ -493,12 +512,18 @@ function untilt(event: PointerEvent) {
         <article v-if="data && !data.projects.length" class="card" style="--s:12"><div class="bento-empty home-empty"><b>还没有参与的项目</b><router-link class="btn ink" to="/projects" style="margin-top:8px">设置项目 →</router-link></div></article>
       </div>
 
-      <!-- 右栏：职务资料 + Worker（管理/开发者） -->
+      <!-- 右栏：职务资料 + 公告 -->
       <aside class="home-aside">
         <div class="card profile">
           <div class="big-av">{{ (w.userName?.value ?? '我').slice(0, 1) }}</div>
           <h4>{{ w.userName?.value ?? '我' }}</h4>
-          <p class="muted" style="font-size:12.5px">{{ w.role.value === 'operator' ? '运营管理' : w.role.value === 'developer' ? '开发者' : '管理员' }}</p>
+          <p class="muted" style="font-size:12.5px">{{ w.role.value === 'operator' ? '运营管理' : w.role.value === 'developer' ? '开发者' : w.duty?.value === 'finance' ? '财务管理' : '管理员' }}</p>
+        </div>
+        <div v-if="announcements.length" class="card">
+          <div class="card-h"><h3>公告</h3><span class="muted r" style="font-size:12px">{{ announcements.length }} 条</span></div>
+          <div v-for="a in announcements.slice(0, 4)" :key="a.id" class="row">
+            <div class="t"><b>{{ a.title }}</b><small>{{ a.content.slice(0, 48) }}{{ a.content.length > 48 ? '…' : '' }}</small></div>
+          </div>
         </div>
       </aside>
     </div>

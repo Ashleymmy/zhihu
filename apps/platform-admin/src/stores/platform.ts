@@ -10,6 +10,7 @@ export const workspace: CoreWorkspace = {
   projectId,
   role: computed(() => useAuthStore().user?.role ?? ''),
   userName: computed(() => useAuthStore().user?.displayName ?? ''),
+  duty: computed(() => useAuthStore().user?.adminDuty ?? ''),
   operationGuide: computed(() => {
     const user = useAuthStore().user
     return user && modules.value.some(m => m.id === 'zhihu' && m.status === 'enabled')
