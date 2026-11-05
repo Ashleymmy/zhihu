@@ -5,7 +5,7 @@ import {fail,type Scope} from './domain';
 import {audit,insert,select} from './store';
 import {normalizedName} from './matching';
 import {lockKeywordSpace} from './resources';
-import {resolveHistoricalExecutor} from './executor';
+import {resolveOriginalPlanExecutor} from './executor';
 import {reconcileWorkReceipts} from './work-receipts';
 
 // Discover the original record before suggesting a different spelling. No money
@@ -37,9 +37,8 @@ export async function adoptLegacyReportRecord(c:PoolConnection,user:AuthUser,sco
  const owners=[...new Set(works.map(work=>String(work.owner_id)))];
  if(owners.length!==1)fail('旧作品由多个人执行，不能合并给一个人，请核对原作品',409);
  if(!works[0].release_day)fail('旧作品未登记实际发布日期，请先核对原作品日期',409);
- // release_time is an actual recorded business timestamp, unlike a report's day.
- const [[clock]]=await c.query<import('mysql2/promise').RowDataPacket[]>("SELECT DATE_FORMAT(release_time,'%Y-%m-%d %H:%i:%s') at FROM compositions WHERE id=?",[works[0].id]);
- const owner=await resolveHistoricalExecutor(c,user,scope,owners[0],String(clock.at));
+ // Reuse the recorded work owner; this is not permission to select another staff account.
+ const owner=await resolveOriginalPlanExecutor(c,user,scope,planId);
  const leaderId=owner.leaderId,path=owner.path;
  const id=await insert(c,`INSERT INTO zh_keywords(account_id,project_id,task_id,channel_mapping_id,plan_id,keyword,created_by,upstream_status,legacy_mode,lifecycle_status,used_ever_at)
    VALUES(?,?,?,?,?,?,?,'created','historical_registered','active',NOW(3))`,[scope.accountId,scope.projectId,candidates[0].task_id,mappingId,planId,plan.keyword,plan.created_by]);

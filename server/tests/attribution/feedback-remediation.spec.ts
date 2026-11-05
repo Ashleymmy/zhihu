@@ -26,6 +26,8 @@ beforeAll(async()=>{
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const actor of [admin,creator,ops,finance,leader])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.adminDuty]);
  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5)');
+ // The original work was performed as an administrator before its September release.
+ await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(1,'admin','registration','2026-08-01')");
  scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'analysis-channel',1,'分析渠道')");
  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'analysis-task','分析活动',NOW())");
@@ -55,6 +57,16 @@ it('同名旧计划优先于相似词，沿用原管理员执行和成功作品�
  expect(JSON.stringify(run)).not.toMatch(/旧词甲二|987654|billableAmount|unitPrice/);
  expect((await answer(id,ask.id,ask.options[0].key,finance)).status).toBe(403);
  expect((await answer(id,ask.id,'legacy:99999')).status).toBe(409);
+ // The saved owner proves identity, not their role before the first known history.
+ await c.query("UPDATE member_role_history SET effective_at='2026-09-02' WHERE user_id=1");
+ try{
+  const unknown=await answer(id,ask.id,ask.options[0].key,ops);
+  expect(unknown.status,unknown.text).toBe(409);
+  expect(unknown.body.history.role.status).toBe('unknown');
+  expect(unknown.body.nextAction).toMatchObject({memberId:'1',at:'2026-09-01 00:00:00'});
+  expect(await q('SELECT id FROM zh_keywords WHERE plan_id=?',[planId])).toHaveLength(0);
+  expect(await q('SELECT id FROM opc_analysis_answers WHERE ask_key=?',[ask.id])).toHaveLength(0);
+ }finally{await c.query("UPDATE member_role_history SET effective_at='2026-08-01' WHERE user_id=1");}
  const nonce=key(),saved=await answer(id,ask.id,ask.options[0].key,ops,undefined,nonce);expect(saved.status,saved.text).toBe(200);
  expect((await answer(id,ask.id,ask.options[0].key,ops,undefined,nonce)).body.data).toEqual(saved.body.data);
  const [word]=await q('SELECT k.id,b.executor_id,b.path_type,b.verification_status FROM zh_keywords k JOIN zh_keyword_bindings b ON b.id=k.current_binding_id WHERE k.plan_id=?',[planId]);
@@ -63,6 +75,42 @@ it('同名旧计划优先于相似词，沿用原管理员执行和成功作品�
  expect(await q('SELECT raw_json,normalized_json FROM zh_import_rows WHERE batch_id=?',[id])).toEqual(raw);
  expect(await q('SELECT owner_id,created_by,zhihu_plan_id FROM plans WHERE id=?',[planId])).toEqual([{owner_id:1,created_by:1,zhihu_plan_id:'old-receipt'}]);
  const next=await upload('2026-09-15','分析渠道','旧词甲一');expect((await get(next)).body.data.steps[2].status).toBe('done');
+});
+it('普通补录和新历史登记不能冒用原记录来源去指定他人管理员',async()=>{
+ const resources=await import('../../src/modules/zhihu/attribution/resources');
+ const word=await resources.createKeyword(ops,scope,key(),{keyword:'普通管理员补录',taskId:'1',mappingId,landingUrl:'https://example.com/new-staff',popularizeType:1});
+ await upload(date,'分析渠道','普通管理员补录');
+ const [original]=await q("SELECT id FROM plans WHERE keyword='旧词甲一'"),income=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ const denied=await request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/assign-retro').set(headers[ops.sub])
+  .send({...scope,executorId:admin.sub,fromDate:date,requestKey:key(),source:'original-record',planId:String(original.id),allowOtherStaff:true});
+ expect(denied.status,denied.text).toBe(403);expect(denied.body.nextAction).toBeUndefined();
+ // A later role change also cannot authorize selecting somebody else's past staff work.
+ await c.query("INSERT INTO users(id,username,password_hash,role,display_name) VALUES(6,'former-staff','unused','creator','原管理人员')");
+ await c.query("INSERT INTO member_role_history(user_id,from_role,to_role,reason,effective_at) VALUES(6,NULL,'admin','registration','2026-08-01'),(6,'admin','creator','demotion','2026-10-01')");
+ const historicalDenied=await request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/assign-retro').set(headers[ops.sub])
+  .send({...scope,executorId:'6',fromDate:date,requestKey:key()});
+ expect(historicalDenied.status,historicalDenied.text).toBe(403);
+ expect(historicalDenied.body.message).toContain('管理员历史执行记录只能由本人核实');
+ expect(historicalDenied.body.nextAction).toBeUndefined();
+ expect(await q('SELECT id FROM zh_keyword_bindings WHERE keyword_id=?',[word.id])).toHaveLength(0);
+ const reportId=await upload(date,'分析渠道','新登记管理员历史词'),ask=(await get(reportId,ops)).body.data.steps[2].asks[0];
+ const registered=await answer(reportId,ask.id,'other-keyword',ops,{taskId:'1',executorId:admin.sub});
+ expect(registered.status,registered.text).toBe(403);expect(registered.body.nextAction).toBeUndefined();
+ expect(await q("SELECT id FROM plans WHERE keyword='新登记管理员历史词'")).toHaveLength(0);
+ expect(await q("SELECT id FROM zh_keywords WHERE keyword='新登记管理员历史词'")).toHaveLength(0);
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
+});
+it('同一旧计划的作品执行人不唯一时不能沿用或合并给任一管理员',async()=>{
+ const [created]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status,zhihu_plan_id) VALUES(1,'analysis-task','analysis-channel','原作品执行冲突','https://example.com/mixed',1,1,1,'active','synced','mixed-original-plan')");
+ const planId=String(created.insertId);
+ for(const owner of [admin,ops])await c.query("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,release_time,sync_status,zhihu_composition_id) VALUES(?,?,'KOC抖音','original',1,1,?,'2026-09-01','synced',?)",[planId,owner.sub,'https://example.com/mixed-'+owner.sub,'mixed-receipt-'+owner.sub]);
+ const originals=await q('SELECT * FROM compositions WHERE plan_id=? ORDER BY id',[planId]);
+ const reportId=await upload(date,'分析渠道','原作品执行冲突'),ask=(await get(reportId,ops)).body.data.steps[2].asks[0];
+ const denied=await answer(reportId,ask.id,'legacy:'+planId,ops);
+ expect(denied.status,denied.text).toBe(409);expect(denied.body.message).toContain('多个人执行');
+ expect(await q('SELECT id FROM zh_keywords WHERE plan_id=?',[planId])).toHaveLength(0);
+ expect(await q('SELECT * FROM compositions WHERE plan_id=? ORDER BY id',[planId])).toEqual(originals);
+ expect(await q('SELECT id FROM opc_analysis_answers WHERE ask_key=?',[ask.id])).toHaveLength(0);
 });
 it('短关键词只相同前缀不会被当作推荐候选',async()=>{
  const {nearestNames}=await import('../../src/modules/zhihu/attribution/matching');

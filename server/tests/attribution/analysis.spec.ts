@@ -25,7 +25,13 @@ beforeAll(async()=>{
  Object.assign(process.env,{DB_HOST:target.host,DB_PORT:String(target.port),DB_NAME:target.database,DB_USER:target.user,DB_PASS:target.password,OPC_MODULES:'zhihu',DEV_DEMO_AUTH:'0'});
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const actor of [admin,creator,ops,finance,leader])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.adminDuty]);
- await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5)');
+ // Both members participated before the report; current rows alone cannot prove that history.
+ for(const actor of [creator,leader]){
+  await c.query("INSERT INTO project_members(project_id,user_id,joined_at) VALUES(1,?,'2026-08-01')",[actor.sub]);
+  await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration','2026-08-01')",[actor.sub,actor.role]);
+  await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,NULL,'registration','2026-08-01')",[actor.sub]);
+  await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(?,1,'member','2026-08-01','onboarding',?)",[actor.sub,'analysis-fixture-'+actor.sub]);
+ }
  scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'analysis-channel',1,'分析渠道')");
  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'analysis-task','分析活动',NOW())");
