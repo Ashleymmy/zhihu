@@ -1,0 +1,24 @@
+.books-page > .title { color: #fff; }
+.books-intro { margin: 14rpx 0 30rpx; color: #d3dfd8; font-size: 25rpx; line-height: 1.7; }
+.board-picker .muted { font-size: 23rpx; }
+.board-name { font-size: 32rpx; font-weight: 600; padding: 16rpx 0; }
+.picker-arrow { color: #6b7d73; font-size: 34rpx; }
+.board-summary { color: #7a8980; font-size: 22rpx; line-height: 1.7; }
+.book-card { padding: 28rpx; }
+.book-heading { display: flex; align-items: flex-start; gap: 18rpx; }
+.book-rank { flex: none; width: 44rpx; text-align: center; line-height: 46rpx; color: #8a978f; font-size: 27rpx; font-weight: 600; }
+.top-rank { color: #b77929; background: #faf1e4; border-radius: 12rpx; }
+.book-title { flex: 1; min-width: 0; font-size: 31rpx; font-weight: 600; line-height: 1.5; overflow-wrap: break-word; }
+.book-arrow { flex: none; font-size: 34rpx; color: #abb7b0; }
+.book-column { margin: 16rpx 0 0 62rpx; color: #63786a; font-size: 24rpx; line-height: 1.6; }
+.book-topics { margin: 14rpx 0 0 62rpx; color: #8a958f; font-size: 23rpx; line-height: 1.7; }
+.book-footer { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding-top: 24rpx; margin-top: 24rpx; border-top: 1rpx solid #edf1ed; }
+.book-footer .muted { font-size: 23rpx; }
+.book-footer button { margin: 0; flex: none; color: #345c48; }
+.book-details { max-height: 54vh; }
+.book-modal > .row button { margin: 0 0 0 auto; flex-shrink: 0; }
+.detail-title { margin: 12rpx 0 28rpx; font-size: 36rpx; line-height: 1.6; font-weight: 600; }
+.detail-line { margin: 22rpx 0; font-size: 27rpx; line-height: 1.7; }
+.detail-line > .muted { display: block; margin-bottom: 6rpx; font-size: 23rpx; }
+.original-url { color: #506d5d; word-break: break-all; font-size: 24rpx; }
+.copy-tip { padding-top: 16rpx; text-align: center; color: #7a8980; font-size: 23rpx; }

@@ -1,0 +1,15 @@
+<view class="guide-page">
+  <image class="project-logo" src="/images/channels/fanqie.png" mode="aspectFit" />
+  <view class="project-name">番茄</view>
+  <view class="guide-card">
+    <view class="guide-title">项目资源逐步分发中</view>
+    <view class="guide-subtitle">请添加助理导师了解详情</view>
+    <view class="qr-frame" bindtap="preview" aria-label="查看助理导师微信二维码">
+      <image class="qr-source" src="{{qrImage}}" show-menu-by-longpress mode="scaleToFill" />
+    </view>
+    <view class="qr-caption">【助理导师-枝枝微信二维码】</view>
+    <button class="primary preview-button" bindtap="preview">查看微信二维码</button>
+    <view class="guide-tip">点击放大后可长按识别或保存二维码</view>
+  </view>
+  <button class="back-button" bindtap="home">返回首页</button>
+</view>

@@ -1,0 +1,41 @@
+<import src="../../templates/shared.wxml" />
+<view class="page books-page">
+  <view class="title">选书榜单</view>
+  <view class="books-intro">从知乎榜单找小说，选好后复制原文链接。</view>
+  <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest}}" />
+  <block wx:if="{{allowed && scopeReady && !loading && !loadFailed}}">
+    <view class="card board-picker" wx:if="{{boards.length}}">
+      <view class="muted">当前榜单</view>
+      <picker range="{{boards}}" range-key="name" value="{{boardIndex}}" disabled="{{loading || busy}}" bindchange="chooseBoard">
+        <view class="row"><text class="board-name">{{boardName}}</text><text class="picker-arrow">⌄</text></view>
+      </picker>
+      <view class="board-summary">共 {{total}} 部小说<text wx:if="{{updatedAt}}"> · {{updatedAt}} 更新</text></view>
+    </view>
+    <view class="card empty" wx:if="{{!loading && !error && !boards.length}}">知乎暂未提供榜单，下拉可重新获取。</view>
+    <view class="card empty" wx:elif="{{!loading && !error && !list.length}}">这个榜单暂时没有小说，可切换其他榜单。</view>
+    <view class="card book-card" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="showBook" hover-class="press">
+      <view class="book-heading"><text class="book-rank {{item.rank <= 3 ? 'top-rank' : ''}}">{{item.rank}}</text><view class="book-title">{{item.title}}</view><text class="book-arrow">›</text></view>
+      <view class="book-column" wx:if="{{item.columnTitle}}">{{item.columnTitle}}</view>
+      <view class="book-topics" wx:if="{{item.topicText}}">{{item.topicText}}</view>
+      <view class="book-footer"><text class="muted">查看小说详情</text><button size="mini" wx:if="{{item.url}}" data-id="{{item.id}}" catchtap="copyOriginal">复制原文链接</button></view>
+    </view>
+    <template is="loadmore" data="{{loadingMore,total,page,pageSize:20}}" />
+  </block>
+</view>
+<view class="modal-mask" wx:if="{{selected && allowed && scopeReady && !loading && !loadFailed && !guest && !denied}}" catchtouchmove="preventScroll">
+  <view class="modal book-modal">
+    <view class="row"><view class="section-title">小说详情</view><button size="mini" bindtap="closeBook">关闭</button></view>
+    <scroll-view scroll-y class="book-details">
+      <view class="detail-title">{{selected.title}}</view>
+      <view class="detail-line" wx:if="{{selected.columnTitle}}"><text class="muted">所属专栏</text><view>{{selected.columnTitle}}</view></view>
+      <view class="detail-line" wx:if="{{selected.topicText}}"><text class="muted">题材与标签</text><view>{{selected.topicText}}</view></view>
+      <view class="detail-line" wx:if="{{selected.firstCategory || selected.category}}"><text class="muted">分类</text><view>{{selected.firstCategory || selected.category}} {{selected.secondCategory}}</view></view>
+      <view class="detail-line" wx:if="{{selected.theme}}"><text class="muted">主题</text><view>{{selected.theme}}</view></view>
+      <view class="detail-line" wx:if="{{selected.consumeValue}}"><text class="muted">推荐信息</text><view>{{selected.consumeValue}}</view></view>
+      <view class="detail-line" wx:if="{{selected.url}}"><text class="muted">原文链接</text><view class="original-url" user-select>{{selected.url}}</view></view>
+      <view class="muted" wx:else>这部小说暂时没有原文链接，可返回选择其他小说。</view>
+    </scroll-view>
+    <button class="primary" wx:if="{{selected.url}}" data-id="{{selected.id}}" bindtap="copyOriginal">复制原文链接</button>
+    <view class="copy-tip" wx:if="{{selected.url}}">复制后可在浏览器打开小说原文</view>
+  </view>
+</view>

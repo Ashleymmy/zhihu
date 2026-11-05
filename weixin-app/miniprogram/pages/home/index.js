@@ -10,7 +10,7 @@ const ICONS = {
   admin: { iconImg: "/images/icons/admin.png", tint: "#fbeeea", fg: "#d05a43" },
   reports: { iconImg: "/images/icons/reports.png", tint: "#e8eff5", fg: "#3a6ea5" },
 };
-// 业务渠道矩阵：知乎已开通，其余渠道占位，接入后改为 open: true 并配置 path
+// A guided project keeps its own stable key when real project access is added.
 // logo 为官方品牌资产（拉取自公开 favicon/维基），仅作渠道标识
 const CHANNELS = [
   {
@@ -25,13 +25,15 @@ const CHANNELS = [
   },
   {
     key: "fanqie",
-    name: "番茄小说",
-    desc: "小说推文 · 暂未开通",
+    name: "番茄",
+    desc: "小说推文 · 了解项目详情",
     icon: "番",
     logo: "/images/channels/fanqie.png",
     tint: "#fdeee6",
     fg: "#e2543a",
-    open: false,
+    open: true,
+    path: "/pages/fanqie/index",
+    badge: "了解项目",
   },
   {
     key: "douyin",
@@ -100,6 +102,10 @@ Page(
       );
       if (!channel || !channel.open) {
         feedback.toast("该渠道暂未开通");
+        return;
+      }
+      if (channel.path) {
+        wx.navigateTo({ url: channel.path });
         return;
       }
       if (this.data.guest || !this._context) {

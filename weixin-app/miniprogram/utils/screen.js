@@ -17,6 +17,7 @@ function define(page, config) {
         denied: false,
         guest: false,
         loading: false,
+        loadFailed: false,
         busy: false,
         error: "",
         notice: "",
@@ -124,7 +125,7 @@ function define(page, config) {
       if (config.infinite && this.data.page !== 1) this.setData({ page: 1 });
       const version = (this._loadVersion = (this._loadVersion || 0) + 1);
       this._context = null;
-      this.setData({ loading: true, error: "" });
+      this.setData({ loading: true, loadFailed: false, error: "" });
       try {
         const user = await auth.ensure();
         if (version !== this._loadVersion) return;
@@ -199,7 +200,7 @@ function define(page, config) {
       } catch (error) {
         if (version === this._loadVersion) {
           this._context = null;
-          this.setData({ error: error.message || "加载失败，请重试" });
+          this.setData({ loadFailed: true, error: error.message || "加载失败，请重试" });
         }
       } finally {
         if (version === this._loadVersion) this.setData({ loading: false });

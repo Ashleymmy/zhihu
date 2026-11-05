@@ -37,6 +37,7 @@ beforeAll(async()=>{
  Object.assign(process.env,{DB_HOST:target.host,DB_PORT:String(target.port),DB_NAME:target.database,DB_USER:target.user,DB_PASS:target.password,OPC_MODULES:'zhihu',ZHIHU_ACCESS_TOKEN:'salt_test_token',ZHIHU_SECRET_KEY:'salt_test_secret',DEV_DEMO_AUTH:'0'});
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const [id,role,duty]of actors)await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[id,'salt'+id,'unused',role,'测试'+id,duty]);
+ await c.query("INSERT INTO project_members(project_id,user_id,member_role) VALUES(1,6,'member'),(1,7,'member')");
  await c.query("INSERT INTO projects(id,name,slug) VALUES(2,'未接通项目','salt-other')");
  await c.query("INSERT INTO integration_accounts(id,module_id,account_key,name) VALUES(2,'zhihu','unconfigured','其他来源')");
  await c.query('INSERT INTO project_integrations(project_id,account_id) VALUES(2,2)');
@@ -88,4 +89,18 @@ it('外链协议和分页边界校验，拒绝危险链接或不合法参数',as
  for(const tail of ['/invalid/contents','/1661766472115556352/contents?offset=-1','/1661766472115556352/contents?limit=101'])expect((await get(tail)).status).toBe(422);
  mode='link';const r=await get('/1661766472115556352/contents');mode='normal';expect(r.body.data.list[0]).toMatchObject({url:'',columnUrl:''});
  expect((await c.query<any[]>("SELECT COUNT(*) n FROM opc_income_entries"))[0][0].n).toBe(0);
+});
+it('小程序选书按项目授权开放给团长与达人，不开放原管理端接口',async()=>{
+ const customer='/api/v1/modules/zhihu/content-tools/boards';
+ for(const actor of ['1','2','3','5','6','7']){
+  const r=await request(app).get(customer).set(headers[actor]).query(scope);expect(r.status,r.text).toBe(200);
+  expect(r.body.data.list[0].id).toBe('1661766472115556352');
+ }
+ expect((await request(app).get(customer).set(headers['4']).query(scope)).status).toBe(403);
+ expect((await request(app).get(customer).set(headers['7']).query({...scope,projectId:'2',accountId:'2'})).status).toBe(403);
+ const contents=await request(app).get(customer+'/1661766472115556352/contents').set(headers['7']).query({...scope,offset:20,limit:20});
+ expect(contents.status,contents.text).toBe(200);expect(contents.body.data.list).toHaveLength(4);
+ expect((await get('','7')).status).toBe(403);
+ await c.query('UPDATE project_members SET left_at=NOW() WHERE project_id=1 AND user_id=7');
+ expect((await request(app).get(customer).set(headers['7']).query(scope)).status).toBe(403);
 });

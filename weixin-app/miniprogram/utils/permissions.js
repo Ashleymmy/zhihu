@@ -16,6 +16,7 @@ function canFinance(user) {
 }
 function allowed(user, page) {
   if (!known(user)) return false;
+  if (["salt-books", "content-report"].includes(page)) return canOperate(user);
   if (
     ["support", "business", "home", "mine", "profile", "password", "college", "tools", "income", "zhihu", "work-data", "work-detail", "works"].includes(
       page,

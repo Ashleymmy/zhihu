@@ -1,0 +1,53 @@
+<import src="../../templates/shared.wxml" />
+<view class="page report-page">
+  <view class="title">内容举报</view>
+  <view class="report-intro">发现违规全文或搬运内容，向知乎提交证据。</view>
+  <template is="status" data="{{error,notice,denied,loading,scopeReady,scopeNotice,allowed,busy,guest}}" />
+  <block wx:if="{{allowed && scopeReady && !loading && !loadFailed}}">
+    <view class="report-tabs"><button class="{{tab === 'new' ? 'active' : ''}}" data-tab="new" disabled="{{busy || loading}}" bindtap="switchTab">发起举报</button><button class="{{tab === 'history' ? 'active' : ''}}" data-tab="history" disabled="{{busy || loading}}" bindtap="switchTab">我的举报</button></view>
+    <block wx:if="{{tab === 'new'}}">
+      <view class="card">
+        <view class="section-title">选择自己的原作品</view>
+        <view class="work-search"><input value="{{search}}" data-name="search" bindinput="input" bindconfirm="searchWorks" placeholder="搜索关键词或作品名" maxlength="128" disabled="{{busy}}" /><button size="mini" disabled="{{busy || loading}}" bindtap="searchWorks">查找</button></view>
+        <picker range="{{works}}" range-key="label" value="{{workIndex}}" bindchange="chooseWork" disabled="{{busy || loading || !works.length}}"><view class="work-picker">{{work ? work.label : '选择已成功提交知乎的作品'}}<text>⌄</text></view></picker>
+        <button size="mini" wx:if="{{work}}" disabled="{{busy || loading}}" bindtap="queryWorkRisk">查看此关键词的风险</button>
+        <view class="risk-result" wx:if="{{work && workRiskLoaded}}">
+          <view class="muted">{{work.keyword}} · 被举报情况</view>
+          <view class="result-row" wx:for="{{workRiskRows}}" wx:key="key"><text>{{item.riskType === 2 ? '搬运内容' : '违规全文'}} · {{item.statusText}}</text><text class="muted">{{item.validedAt}}</text></view>
+          <view class="muted" wx:if="{{!workRiskRows.length}}">暂未查到该关键词被举报的记录。</view>
+          <button size="mini" wx:if="{{workRiskHasNext}}" data-more="true" disabled="{{busy}}" bindtap="queryWorkRisk">继续查询</button>
+        </view>
+        <view class="muted" wx:if="{{!loading && !error && !works.length}}">{{search ? '没有找到作品，可换一个关键词查找。' : '还没有成功提交知乎的作品，先登记作品再发起举报。'}}</view>
+        <button wx:if="{{!loading && !works.length && !search}}" data-path="/pages/keywords/index" bindtap="open">选择关键词并登记作品</button>
+        <view class="row small-pager" wx:if="{{hasNext || page > 1}}"><button size="mini" disabled="{{page <= 1 || busy || loading}}" bindtap="prevPage">上一页作品</button><button size="mini" disabled="{{!hasNext || busy || loading}}" bindtap="nextPage">下一页作品</button></view>
+      </view>
+      <view class="card">
+        <view class="section-title">举报内容</view>
+        <view class="type-choices"><button class="{{riskType === 1 ? 'chosen' : ''}}" data-type="1" disabled="{{busy}}" bindtap="changeType">违规全文</button><button class="{{riskType === 2 ? 'chosen' : ''}}" data-type="2" disabled="{{busy}}" bindtap="changeType">搬运内容</button></view>
+        <view class="field-label">需要举报的风险词</view><input value="{{keyword}}" data-name="keyword" bindinput="input" maxlength="128" placeholder="填写对方使用的关键词" disabled="{{busy}}" />
+        <view class="field-label">{{riskType === 2 ? '搬运内容链接' : '风险内容链接（选填）'}}</view><input value="{{riskUrl}}" data-name="riskUrl" bindinput="input" maxlength="2048" placeholder="粘贴违规内容的完整网页链接" disabled="{{busy}}" />
+        <view class="field-label">证据截图 <text class="muted">{{images.length}} / 3</text></view>
+        <view class="image-grid"><view class="image-item" wx:for="{{images}}" wx:key="id"><image src="{{item.path}}" mode="aspectFill" data-path="{{item.path}}" bindtap="previewImage" /><button class="remove-image" size="mini" data-id="{{item.id}}" disabled="{{busy}}" bindtap="removeImage">移除</button></view><button class="add-image" wx:if="{{images.length < 3}}" disabled="{{busy || loading}}" bindtap="addImage">＋<view>添加截图</view></button></view>
+        <view class="muted screenshot-tip">至少添加一张能说明问题的截图，最多三张。</view>
+      </view>
+      <button class="primary submit-report" loading="{{busy}}" disabled="{{busy || loading || !work || !keyword || !images.length}}" bindtap="submit">提交举报</button>
+    </block>
+    <block wx:else>
+      <view class="card empty" wx:if="{{!loading && !error && !list.length}}">还没有举报记录。发现违规内容时，可从「发起举报」提交。</view>
+      <view class="card report-record" wx:for="{{list}}" wx:key="id">
+        <view class="row"><view class="record-keyword">{{item.keyword}}</view><text class="tag">{{item.typeText}}</text></view>
+        <view class="record-status {{item.status === 'failed' || item.status === 'unknown' ? 'needs-check' : ''}}">{{item.statusText}}</view>
+        <view class="muted record-message">{{item.createdText}}</view>
+        <view class="muted record-message" wx:if="{{item.status === 'failed' || item.status === 'unknown'}}">{{item.message}}</view>
+        <view class="record-actions"><button size="mini" data-id="{{item.id}}" disabled="{{busy || loading}}" bindtap="queryResult">查询风险词结果</button><button size="mini" wx:if="{{item.status === 'failed' || item.status === 'unknown'}}" data-id="{{item.id}}" disabled="{{busy || loading}}" bindtap="retryReport">{{item.status === 'unknown' ? '核实后重试' : '重新提交'}}</button></view>
+        <view class="risk-result" wx:if="{{resultId === item.id && resultLoaded}}">
+          <view class="muted">知乎对该风险词的审核结果</view>
+          <view class="result-row" wx:for="{{resultRows}}" wx:for-item="result" wx:key="key"><text>{{result.statusText}}</text><text class="muted">{{result.validedAt}}</text></view>
+          <view class="muted" wx:if="{{!resultRows.length}}">暂未查到该词的审核结果，可稍后再次查询。</view>
+          <button size="mini" wx:if="{{resultHasNext}}" data-id="{{item.id}}" data-more="true" disabled="{{busy}}" bindtap="queryResult">继续查询</button>
+        </view>
+      </view>
+      <view class="row small-pager" wx:if="{{hasNext || page > 1}}"><button size="mini" disabled="{{page <= 1 || busy || loading}}" bindtap="prevPage">上一页</button><text class="muted">第 {{page}} 页</text><button size="mini" disabled="{{!hasNext || busy || loading}}" bindtap="nextPage">下一页</button></view>
+    </block>
+  </block>
+</view>

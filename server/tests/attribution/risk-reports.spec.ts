@@ -41,7 +41,7 @@ const get=(tail='',actor='1',extra={})=>request(app).get(url(tail)).set(headers[
 const upload=(actor='1',data=png,type='image/png',extra={})=>request(app).post(url('/images')).set(headers[actor]).query({...scope,...extra}).attach('file',data,{filename:'evidence.png',contentType:type});
 const send=(report:object,actor='1',requestKey=key(),extra={})=>request(app).post(url()).set(headers[actor]).send({...scope,requestKey,report,...extra});
 const retry=(r:any,actor='1',checkedNotReceived=false)=>request(app).post(url('/'+r.id+'/retry')).set(headers[actor]).send({...scope,attempt:r.attempt,checkedNotReceived});
-const input=(imageId:string,keyword=key())=>({compositionId:'1',keyword,riskType:1,imageIds:[imageId]});
+const input=(imageId:string,keyword:string=key())=>({compositionId:'1',keyword,riskType:1,imageIds:[imageId]});
 const q=async(sql:string,args:unknown[]=[])=> (await c.query<RowDataPacket[]>(sql,args))[0];
 beforeAll(async()=>{
  container=await new MySqlContainer('mysql:8.0').withDatabase('risk_reports_isolated').withUsername('test').withUserPassword('isolated').start();
@@ -49,6 +49,7 @@ beforeAll(async()=>{
  Object.assign(process.env,{DB_HOST:target.host,DB_PORT:String(target.port),DB_NAME:target.database,DB_USER:target.user,DB_PASS:target.password,OPC_MODULES:'zhihu',ZHIHU_ACCESS_TOKEN:'risk_test_token',ZHIHU_SECRET_KEY:'risk_test_secret',DEV_DEMO_AUTH:'0'});
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const [id,role,duty]of actors)await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[id,'risk'+id,'unused',role,'测试'+id,duty]);
+ await c.query("INSERT INTO project_members(project_id,user_id,member_role) VALUES(1,6,'member'),(1,7,'member')");
  await c.query("INSERT INTO plans(id,project_id,keyword,channel_id,zhihu_task_id,landing_url,popularize_type,owner_id,created_by,sync_status,zhihu_plan_id) VALUES(1,1,'受损作品词','channel','task','https://example.com/story',1,7,1,'synced','9001')");
  await c.query("INSERT INTO compositions(id,plan_id,owner_id,zhihu_composition_id,media_type,media_account,composition_type,composition_sub_type,title,promo_url,sync_status) VALUES(1,1,7,'2071000000000000001',1,'account',1,1,'原作品','https://example.com/work','synced'),(2,1,7,NULL,1,'account',1,1,'失败作品','https://example.com/failed','failed')");
  await c.query("INSERT INTO projects(id,name,slug) VALUES(2,'其他项目','other-risk')");
@@ -156,4 +157,81 @@ it('同一知乎来源的不同项目仍隔离本地作品、截图及提交记�
  const record=(await get('/history')).body.data.list[0];
  const r=await request(app).post(url('/'+record.id+'/retry')).set(headers['1']).send({...scope,projectId:'2',attempt:record.attempt,checkedNotReceived:true});
  expect(r.status).toBe(404);
+});
+
+const personalUrl = (tail='') => '/api/v1/modules/zhihu/content-tools'+tail;
+const personalGet = (tail:string,actor='7',extra={}) => request(app).get(personalUrl(tail)).set(headers[actor]).query({...scope,...extra});
+const personalImage = (actor='7',base64=png.toString('base64')) => request(app).post(personalUrl('/images')).set(headers[actor]).send({...scope,base64});
+const personalSend = (report:object,actor='7',requestKey=key()) => request(app).post(personalUrl('/reports')).set(headers[actor]).send({...scope,requestKey,report});
+it('成员工具限定本人作品，财务和未授权项目被拒绝，管理端入口仍隔离',async()=>{
+ await c.query("INSERT INTO compositions(id,plan_id,owner_id,zhihu_composition_id,media_type,media_account,composition_type,composition_sub_type,title,promo_url,sync_status) VALUES(3,1,6,'2071000000000000003',1,'account',1,1,'团长原作品','https://example.com/leader','synced')");
+ expect((await personalGet('/works')).body.data.list.map((row:any)=>row.id)).toEqual(['1']);
+ expect((await personalGet('/works','6')).body.data.list.map((row:any)=>row.id)).toEqual(['3']);
+ expect((await personalGet('/works','1')).body.data.list).toEqual([]);
+ expect((await personalGet('/works','5')).status).toBe(200);
+ expect((await personalGet('/works/3/risks','7')).status).toBe(404);
+ const ownRisk=await personalGet('/works/1/risks');expect(ownRisk.status,ownRisk.text).toBe(200);
+ expect(captures.at(-1)!.payload).toMatchObject({type:'0',keyword:'受损作品词'});
+ expect(ownRisk.text).not.toMatch(/渠道|createChannel|channel|风险词0/);
+ expect((await personalGet('/works','4')).status).toBe(403);
+ expect((await personalImage('4')).status).toBe(403);
+ expect((await personalGet('/reports','7',{projectId:'2'})).status).toBe(403);
+ expect((await get('','7')).status).toBe(403);
+ expect((await request(app).get(personalUrl('/works')).query(scope)).status).toBe(401);
+});
+it('小程序截图通过现有 JSON 网关大小限制，服务端验证图片与本人作品',async()=>{
+ expect((await personalImage('7','<svg>bad</svg>')).status).toBe(422);
+ expect((await personalImage('7',Buffer.from('not an image').toString('base64'))).status).toBe(422);
+ expect((await personalImage('7',Buffer.alloc(700*1024+1).toString('base64'))).status).toBe(422);
+ const image=await personalImage();expect(image.status,image.text).toBe(200);
+ expect(Object.keys(image.body.data)).toEqual(['id']);
+ expect((await personalSend({...input(image.body.data.id),compositionId:'3'})).status).toBe(422);
+ expect((await personalSend({...input(image.body.data.id),compositionId:'2'})).status).toBe(422);
+ expect((await personalSend(input(image.body.data.id),'6')).status).toBe(422);
+ const report={...input(image.body.data.id),damageKeyword:'客户端伪造的原作品词'},requestKey=key(),before=captures.filter(x=>x.method==='POST').length;
+ const responses=await Promise.all([personalSend(report,'7',requestKey),personalSend(report,'7',requestKey)]);
+ responses.forEach(response=>expect(response.status,response.text).toBe(200));
+ expect(new Set(responses.map(response=>response.body.data.id)).size).toBe(1);
+ expect(captures.filter(x=>x.method==='POST').length-before).toBe(1);
+ expect(captures.filter(x=>x.method==='POST').at(-1)!.payload.damage_keyword).toBe('受损作品词');
+});
+it('我的举报、重试与风险词结果均隔离本人，知乎渠道和其他风险词不会返回',async()=>{
+ const ownImage=(await personalImage()).body.data.id;
+ const own=(await personalSend(input(ownImage,'风险词1'))).body.data;
+ const otherImage=(await personalImage('6')).body.data.id;
+ const other=(await personalSend({...input(otherImage,'团长举报'),compositionId:'3'},'6')).body.data;
+ const history=await personalGet('/reports');expect(history.status).toBe(200);
+ expect(history.body.data.list.some((row:any)=>row.id===own.id)).toBe(true);
+ expect(history.body.data.list.some((row:any)=>row.id===other.id)).toBe(false);
+ expect(history.text).not.toMatch(/payload_json|file_token|upstream_composition_id/);
+ expect((await personalGet('/reports/'+other.id+'/result')).status).toBe(404);
+ expect((await request(app).post(personalUrl('/reports/'+other.id+'/retry')).set(headers['7']).send({...scope,attempt:1,checkedNotReceived:true})).status).toBe(404);
+ const result=await personalGet('/reports/'+own.id+'/result');expect(result.status,result.text).toBe(200);
+ expect(result.body.data.list).toHaveLength(1);expect(result.body.data.list[0]).toMatchObject({keyword:'风险词1',status:'violation'});
+ expect(result.text).not.toMatch(/渠道|createChannel|channel/);
+ const capture=captures.at(-1)!.payload;expect(capture).toMatchObject({type:'1',keyword:'风险词1',risk_type:'1'});
+});
+it('成员重试延续不确定结果保护，作品转移后不能重试或读出别人的重复记录',async()=>{
+ const image=(await personalImage()).body.data.id,report=input(image);sendMode='unknown';
+ const record=(await personalSend(report)).body.data;sendMode='success';
+ const postRetry=(actor:string,checked:boolean)=>request(app).post(personalUrl('/reports/'+record.id+'/retry')).set(headers[actor]).send({...scope,attempt:1,checkedNotReceived:checked});
+ expect((await postRetry('7',false)).status).toBe(409);
+ await c.query('UPDATE compositions SET owner_id=6 WHERE id=1');
+ try {
+  expect((await postRetry('7',true)).status).toBe(422);
+  const otherImage=(await personalImage('6')).body.data.id;
+  const duplicate=await personalSend({...report,imageIds:[otherImage]},'6');
+  expect(duplicate.status,duplicate.text).toBe(409);expect(duplicate.text).not.toContain(record.id);
+ } finally {await c.query('UPDATE compositions SET owner_id=7 WHERE id=1');}
+ expect((await postRetry('7',true)).body.data.status).toBe('submitted');
+ expect((await q('SELECT COUNT(*) n FROM opc_income_entries'))[0].n).toBe(0);
+});
+it('撤销项目授权后，成员不能继续上传、查询或提交举报',async()=>{
+ const before=captures.length;
+ await c.query('UPDATE project_members SET left_at=NOW() WHERE project_id=1 AND user_id=7');
+ expect((await personalGet('/works')).status).toBe(403);
+ expect((await personalGet('/reports')).status).toBe(403);
+ expect((await personalImage()).status).toBe(403);
+ expect((await personalSend(input(key()))).status).toBe(403);
+ expect(captures.length).toBe(before);
 });

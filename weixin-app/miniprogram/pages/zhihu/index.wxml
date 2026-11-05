@@ -18,7 +18,7 @@
         style="background: {{item.tint}};"
         ><image wx:if="{{item.iconImg}}" class="icon-img" src="{{item.iconImg}}" mode="aspectFit" /><text wx:else style="color: {{item.fg}};">{{item.icon}}</text></view
       >
-      <text class="cell-label">{{item.label}}</text>
+      <view class="cell-label"><view>{{item.label}}</view><view wx:if="{{item.desc}}" class="muted hub-desc">{{item.desc}}</view></view>
       <text class="cell-arrow">›</text>
     </view>
   </view>

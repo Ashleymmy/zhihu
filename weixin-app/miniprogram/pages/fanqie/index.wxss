@@ -1,0 +1,14 @@
+.guide-page { min-height: 100vh; box-sizing: border-box; padding: 52rpx 28rpx 40rpx; background: #fbf6f0; text-align: center; color: #253a32; }
+.project-logo { width: 96rpx; height: 96rpx; border-radius: 24rpx; }
+.project-name { margin: 16rpx 0 36rpx; font-size: 34rpx; font-weight: 600; }
+.guide-card { padding: 40rpx 24rpx 32rpx; border-radius: 28rpx; background: #fff; box-shadow: 0 12rpx 38rpx rgba(79, 48, 28, .05); }
+.guide-title { font-size: 36rpx; line-height: 1.5; font-weight: 600; }
+.guide-subtitle { margin-top: 12rpx; font-size: 28rpx; color: #68766f; }
+.qr-frame { position: relative; width: 500rpx; height: 500rpx; max-width: 100%; margin: 28rpx auto 20rpx; overflow: hidden; background: #fff; }
+/* Display the QR portion of the original asset. Preview retains the full image. */
+.qr-source { position: absolute; width: 684rpx; height: 1015.5rpx; left: -92rpx; top: -293rpx; }
+.qr-caption { font-size: 26rpx; line-height: 1.7; }
+.preview-button { margin: 32rpx 0 0; }
+.guide-tip { margin-top: 20rpx; color: #7b8982; font-size: 23rpx; line-height: 1.7; }
+.back-button { margin: 30rpx 0 0; background: transparent; color: #6c786f; font-size: 26rpx; }
+.back-button::after { border: 0; }

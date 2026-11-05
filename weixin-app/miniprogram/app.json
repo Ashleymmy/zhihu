@@ -29,7 +29,10 @@
     "pages/work-data/index",
     "pages/work-detail/index",
     "pages/support/index",
-    "pages/business/index"
+    "pages/business/index",
+    "pages/salt-books/index",
+    "pages/content-report/index",
+    "pages/fanqie/index"
   ],
   "window": {
     "backgroundColor": "#f5f6f5",

@@ -1,2 +1,3 @@
 /* 知乎工作台：标题位于品牌带内，白化处理；单元格列表沿用全局 cell 样式 */
 .page > .title { color: #fff; }
+.hub-desc { margin-top: 8rpx; font-size: 23rpx; font-weight: 400; }

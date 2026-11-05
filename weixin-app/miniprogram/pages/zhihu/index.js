@@ -25,6 +25,22 @@ const ITEMS = [
     tint: "#e8eff5",
     fg: "#3a6ea5",
   },
+  {
+    key: "salt-books",
+    label: "选书榜单",
+    desc: "找小说 · 复制原文链接",
+    path: "/pages/salt-books/index",
+    iconImg: "/images/icons/cover.png",
+    tint: "#faf3e1",
+  },
+  {
+    key: "content-report",
+    label: "内容举报",
+    desc: "举报违规内容 · 查看我的举报",
+    path: "/pages/content-report/index",
+    iconImg: "/images/icons/admin.png",
+    tint: "#e8eff5",
+  },
 ];
 Page(
   screen("zhihu", {
