@@ -40,12 +40,93 @@ export interface ModuleSummary {
 }
 export interface ModuleDataProvider {
   summary(scope: DataScope, user: AuthUser): Promise<ModuleSummary>;
+  evidence?(scope: DataScope, user: AuthUser, filter: EvidenceFilter): Promise<EvidenceResult>;
   activity?(scope: DataScope, user: AuthUser, filter: ActivityFilter): Promise<ActivityResult>;
   // Aggregate upstream amounts only; never expose individual members' income.
   teamTurnover?(connection: PoolConnection, scope: DataScope, user: AuthUser): Promise<TeamTurnover>;
   workRegistrations?(scope: TaskScope, user: AuthUser, filter: WorkRegistrationFilter, includeRows: boolean): Promise<WorkRegistrationReport>;
   keywordBindings?(scope: TaskScope, user: AuthUser, filter: KeywordBindingFilter): Promise<KeywordBindingRow[]>;
   memberActivity?: MemberActivityProvider;
+}
+export interface EvidenceFilter {
+  channelRef?: string;
+  taskRef?: string;
+  metricType?: string;
+  page: number;
+  pageSize: number;
+}
+export interface EvidenceKey {
+  projectId: string;
+  accountId: string;
+  channelRef: string;
+  taskRef: string;
+  businessDate: string;
+  metricType: string;
+}
+export interface EvidenceSourceRef {
+  kind: string;
+  id: string;
+  batchId?: string;
+  line?: number;
+  status?: 'adopted' | 'available' | 'pending' | 'superseded' | 'withdrawn';
+}
+export interface EvidenceAction {
+  key: string;
+  label: string;
+  method: 'GET' | 'POST';
+  path: string;
+  requiredDuty: 'operations' | 'finance';
+  parameters: Record<string, string>;
+  historyContext?: MemberHistoryContext;
+  expectedHistoryVersion?: number;
+}
+export interface EvidenceCheck {
+  status: 'ready' | 'missing' | 'conflict' | 'blocked' | 'unknown' | 'not_applicable';
+  reason: string;
+  sourceRefs: EvidenceSourceRef[];
+  version?: string;
+  nextAction?: EvidenceAction;
+}
+export type OfficialEvidenceStatus = 'ready' | 'valid_zero' | 'not_arrived' | 'record_missing' | 'conflict' | 'withdrawn' | 'processing' | 'unknown';
+export interface EvidenceRow {
+  key: EvidenceKey;
+  title: string;
+  official: {
+    status: OfficialEvidenceStatus;
+    quantity: string | null;
+    quantityUnit: string;
+    coverageBasis: 'observed_rows' | 'none';
+    coverageIsExhaustive: boolean;
+    sourceRefs: EvidenceSourceRef[];
+    withdrawnSourceRefs?: EvidenceSourceRef[];
+    currentRevision: string | null;
+    pendingConflict: { revisionId: string; sourceRefs: EvidenceSourceRef[] }[];
+  };
+  checks: {
+    work: EvidenceCheck;
+    historicalOwnership: EvidenceCheck;
+    projectParticipation: EvidenceCheck;
+    pricing: EvidenceCheck;
+    existingCalculation: EvidenceCheck;
+  };
+  result: {
+    status: 'ready' | 'needs_input' | 'processing' | 'unknown';
+    reason: string;
+    responsibleRole: 'operations' | 'finance' | null;
+    nextAction: EvidenceAction | null;
+    evidenceVersion: string;
+    lastChangedAt: string | null;
+  };
+  finance?: { amount: string | null; currency: 'CNY'; sourceRefs: EvidenceSourceRef[] };
+}
+export interface EvidenceResult extends DataScope {
+  moduleId: string;
+  status: 'ready' | 'empty';
+  list: EvidenceRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  limits: { maxDays: number; maxPageSize: number };
 }
 export interface MemberActivityCounts { tasks: number; currentTasks: number; verifiedTasks: number; works: number }
 export interface MemberActivityFilter {
@@ -252,6 +333,20 @@ export interface MemberHistoryRefresh {
   status: 'refreshed' | 'unchanged';
   recalculated: number;
   resumed: number;
+  nextActions?: MemberHistoryContinuation[];
+}
+export interface MemberHistoryContinuation {
+  actor: '运营';
+  label: string;
+  method: 'POST';
+  path: string;
+  memberId: string;
+  projectId: string;
+  at: string;
+  reason: string;
+  missingFields: ('projectParticipation' | 'role' | 'team')[];
+  expectedVersion: number;
+  context: MemberHistoryContext;
 }
 export interface ModuleAccountLifecycle {
   /** Same transaction as evidence storage. Validate context source, scope, version

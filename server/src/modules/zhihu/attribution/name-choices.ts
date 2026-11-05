@@ -8,6 +8,9 @@ import {processImportRow} from './facts';
 import {registerHistoricalKeyword,type HistoricalSelection} from './historical-keywords';
 import {processResolvedNames} from './automatic-repair';
 import {legacyReportRecords,adoptLegacyReportRecord} from './legacy-report-records';
+import {AppError} from '../../../middleware/errors';
+import {createHistoryImportContext} from '../services/account-lifecycle';
+import type {MemberHistoryContext} from '../../../core/contracts';
 
 type NameSource={date:string;channel:string;keyword:string};
 export type ChannelSelection={channelId:string}|{mappingId:string}|{upstreamId:string;generation:1|2};
@@ -107,14 +110,17 @@ export async function applyNameChoice(c:PoolConnection,user:AuthUser,scope:Scope
      await audit(c,user,'channel.create',alias,{canonicalId:mappingId,from:choice.source.date,name:choice.source.channel,source:'report-analysis'});
    }
  }else if(option.startsWith('legacy:')){
-   keywordId=await adoptLegacyReportRecord(c,user,scope,mappingId!,choice.source.keyword,option.slice(7));
+   const planId=option.slice(7),context=await createHistoryImportContext(c,scope,choice.rows[0],'adopt_legacy_record',{planId});
+   try{keywordId=await adoptLegacyReportRecord(c,user,scope,mappingId!,choice.source.keyword,planId);}catch(error){throw withHistoryContext(error,context);}
  }else if(option==='other-keyword'){
    if(selection&&'keywordId' in selection){
      if(!choice.candidates.some(item=>String(item.id)===selection.keywordId))fail('关键词候选已变化，请重新选择',409);
      keywordId=selection.keywordId;
    }else{
      if(!selection||!('executorId' in selection))fail('请选择执行人和推广活动');
-     keywordId=(await registerHistoricalKeyword(c,user,scope,mappingId!,choice.source,selection)).id;
+     const context=await createHistoryImportContext(c,scope,choice.rows[0],'register_historical_keyword',{
+       taskId:selection.taskId,executorId:selection.executorId,fromDate:selection.fromDate??choice.source.date});
+     try{keywordId=(await registerHistoricalKeyword(c,user,scope,mappingId!,choice.source,selection)).id;}catch(error){throw withHistoryContext(error,context);}
    }
  }else keywordId=option.slice('keyword:'.length);
  for(const rowId of choice.rows){
@@ -125,4 +131,13 @@ export async function applyNameChoice(c:PoolConnection,user:AuthUser,scope:Scope
  }
  await audit(c,user,'report.names-confirm',choice.rows[0],{rowIds:choice.rows,mappingId,keywordId,originalChannel:choice.source.channel,originalKeyword:choice.source.keyword});
  await processResolvedNames(c,user,scope);
+}
+
+function withHistoryContext(error:unknown,context:MemberHistoryContext):unknown{
+ if(!(error instanceof AppError)||!error.extras?.history)return error;
+ const history=error.extras.history as {version:number;knownRange:{from:string}};
+ const action=error.extras.nextAction as Record<string,unknown>;
+ return new AppError(error.httpStatus,error.code,error.message,{...error.extras,nextAction:{
+   ...action,at:action.at??history.knownRange.from,context,expectedVersion:history.version,
+ }});
 }

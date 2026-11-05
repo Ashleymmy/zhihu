@@ -26,6 +26,13 @@ beforeAll(async()=>{
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const actor of [admin,creator,ops,finance,leader])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.adminDuty]);
  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5)');
+ // Historical registration needs recorded historical participation/role/team,
+ // not today's project_members and parent_id values.
+ for(const actor of [creator,leader]){
+  await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(?,1,?,'2026-09-01','registration',?)",[actor.sub,actor.role,'fixture-'+actor.sub]);
+  await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration','2026-09-01')",[actor.sub,actor.role]);
+  await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,NULL,'registration','2026-09-01')",[actor.sub]);
+ }
  scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'analysis-channel',1,'分析渠道')");
  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'analysis-task','分析活动',NOW())");
@@ -197,4 +204,210 @@ it('上游明确退回的作品不被自动或人工绕过，部署修复可预�
  expect((await q('SELECT verification_status FROM zh_keyword_bindings WHERE id=?',[binding.id]))[0].verification_status).toBe('passed');
  expect(await q('SELECT * FROM opc_income_entries')).toEqual(cashBefore);
  const refreshed=await q('SELECT * FROM zh_metric_facts');await reconcileRegisteredWorks(finance,scope,true);expect(await q('SELECT * FROM zh_metric_facts')).toEqual(refreshed);
+});
+
+async function unknownMember(role='creator'){
+ const [row]=await c.query<mysql.ResultSetHeader>("INSERT INTO users(username,password_hash,role,display_name) VALUES(?,'unused',?,'待核历史成员')",['unknown-'+key(),role]);
+ const id=String(row.insertId);await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,?)',[id]);return id;
+}
+async function blockedRegistration(memberId:string,word='补依据恢复'+ ++serial,day=date){
+ const batchId=await upload(word,'3',day),ask=await question(batchId);
+ const blocked=await answer(batchId,ask.id,'other-keyword',ops,{taskId:'1',executorId:memberId});
+ expect(blocked.status,blocked.text).toBe(409);
+ expect(blocked.body.nextAction.context).toMatchObject({moduleId:'zhihu',accountId:scope.accountId,sourceKind:'import_row',operation:'register_historical_keyword',selection:{executorId:memberId,taskId:'1'}});
+ expect(blocked.body.nextAction.context.sourceVersion).toMatch(/^v1:[a-f0-9]{64}$/);
+ expect(await q('SELECT id FROM zh_keywords WHERE keyword=?',[word])).toHaveLength(0);
+ return {batchId,word,body:blocked.body,memberId,day};
+}
+function historyBody(blocked:Awaited<ReturnType<typeof blockedRegistration>>,extra:Record<string,unknown>={}){
+ return {projectId:'1',effectiveFrom:blocked.day,timePrecision:'date',participation:true,historicalRole:'creator',leaderId:null,
+  sourceKind:'operator_confirmation',sourceRef:'原始成员名单-'+blocked.memberId,sourceSummary:'已核对该日原始项目名单、岗位与团队关系',confirmed:true,
+  expectedVersion:blocked.body.history.version,requestKey:key(),context:blocked.body.nextAction.context,...extra};
+}
+const saveHistory=(id:string,body:object,actor=ops)=>request(app).post('/api/v1/core/relations/members/'+id+'/history-evidence').set(headers[actor.sub]).send(body);
+
+it('补齐历史依据后自动恢复原报表登记和同日拉新拉活，不再上传或确认金额',async()=>{
+ const memberId=await unknownMember(),blocked=await blockedRegistration(memberId),body=historyBody(blocked);
+ const activation=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,拉活量,结算金额\n${date},分析渠道,${blocked.word},2,4`),'activation')).id;
+ const ledger=await q('SELECT * FROM opc_income_entries ORDER BY id'),saved=await saveHistory(memberId,body);
+ expect(saved.status,saved.text).toBe(200);expect(saved.body.data).toMatchObject({status:'verified',refreshStatus:{status:'refreshed',resumed:2}});
+ const rows=await q('SELECT r.processing_status,r.fact_id FROM zh_import_rows r WHERE batch_id IN (?,?) ORDER BY id',[blocked.batchId,activation]);
+ expect(rows).toHaveLength(2);expect(rows.every(r=>r.processing_status==='processed'&&r.fact_id)).toBe(true);
+ expect(await q("SELECT id FROM zh_exceptions WHERE source_row_id IN (SELECT id FROM zh_import_rows WHERE batch_id IN (?,?)) AND status='open' AND reason_code='KEYWORD_UNKNOWN'",[blocked.batchId,activation])).toHaveLength(0);
+ const [binding]=await q('SELECT b.* FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword=?',[blocked.word]);
+ expect(binding.executor_id).toBe(Number(memberId));expect(binding.verification_status).toBe('pending');
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);
+ expect((await saveHistory(memberId,body)).body.data).toEqual(saved.body.data);
+ expect(await q('SELECT id FROM member_history_evidence WHERE user_id=?',[memberId])).toHaveLength(1);
+});
+
+it('补依据续办拒绝伪造操作、来源、选择、越权岗位和过期版本并回滚历史',async()=>{
+ const memberId=await unknownMember(),blocked=await blockedRegistration(memberId),body=historyBody(blocked),ctx=body.context;
+ const before=await q('SELECT * FROM member_history_evidence WHERE user_id=?',[memberId]);
+ const changes=[{operation:'confirm_payment'}, {sourceId:'999999'}, {accountId:'999999'}, {sourceKind:'composition'},
+  {sourceVersion:'v1:'+'0'.repeat(64)}, {selection:{...ctx.selection,executorId:'2'}}, {selection:{...ctx.selection,pay:'true'}}];
+ for(const change of changes){const response=await saveHistory(memberId,{...body,requestKey:key(),context:{...ctx,...change}});expect([403,409,422],response.text).toContain(response.status);}
+ for(const actor of [creator,leader,finance])expect((await saveHistory(memberId,body,actor)).status).toBe(403);
+ await c.query("UPDATE zh_import_rows SET normalized_json=JSON_SET(normalized_json,'$.orders','8') WHERE id=?",[ctx.sourceId]);
+ const stale=await saveHistory(memberId,body);expect(stale.status,stale.text).toBe(409);expect(stale.body.message).toContain('关联资料已更新');
+ expect(await q('SELECT * FROM member_history_evidence WHERE user_id=?',[memberId])).toEqual(before);
+ expect(await q('SELECT id FROM zh_keywords WHERE keyword=?',[blocked.word])).toHaveLength(0);
+});
+
+it('只核实部分历史时保留已核实依据和原待办，补齐余下依据后才恢复',async()=>{
+ const memberId=await unknownMember(),blocked=await blockedRegistration(memberId);
+ const partial=await saveHistory(memberId,historyBody(blocked,{historicalRole:undefined,leaderId:undefined}));
+ expect(partial.status,partial.text).toBe(200);expect(partial.body.data).toMatchObject({status:'verified',refreshStatus:{status:'unchanged',resumed:0}});
+ expect(await q('SELECT id FROM zh_keywords WHERE keyword=?',[blocked.word])).toHaveLength(0);
+ expect(await q("SELECT id FROM zh_exceptions WHERE source_row_id=? AND reason_code='KEYWORD_UNKNOWN' AND status='open'",[blocked.body.nextAction.context.sourceId])).toHaveLength(1);
+ const next=partial.body.data.nextAction;
+ expect(next).toMatchObject({memberId,expectedVersion:1,missingFields:['role','team'],context:expect.objectContaining({operation:'register_historical_keyword'})});
+ const complete=await saveHistory(next.memberId,historyBody(blocked,{participation:undefined,expectedVersion:next.expectedVersion,context:next.context}));
+ expect(complete.status,complete.text).toBe(200);expect(complete.body.data.refreshStatus.status).toBe('refreshed');
+ expect(await q('SELECT id FROM member_history_evidence WHERE user_id=?',[memberId])).toHaveLength(2);
+ expect((await q('SELECT processing_status FROM zh_import_rows WHERE id=?',[blocked.body.nextAction.context.sourceId]))[0].processing_status).toBe('processed');
+});
+
+it('补执行人依据后直接给出待核团长及新的版本，按响应续办且拒绝任意成员代入',async()=>{
+ const memberId=await unknownMember(),leaderId=await unknownMember('leader'),unrelatedId=await unknownMember();
+ const blocked=await blockedRegistration(memberId),partial=await saveHistory(memberId,historyBody(blocked,{leaderId}));
+ expect(partial.status,partial.text).toBe(200);
+ const next=partial.body.data.nextAction;
+ expect(next).toMatchObject({memberId:leaderId,expectedVersion:0,missingFields:['projectParticipation','role']});
+ expect(next.path).toBe('/api/v1/core/relations/members/'+leaderId+'/history-evidence');
+ const body=historyBody(blocked,{historicalRole:'leader',expectedVersion:next.expectedVersion,context:next.context,sourceRef:'团长原始名单'});
+ const rejected=await saveHistory(unrelatedId,{...body,historicalRole:'creator'});expect(rejected.status,rejected.text).toBe(403);
+ expect(await q('SELECT id FROM member_history_evidence WHERE user_id=?',[unrelatedId])).toHaveLength(0);
+ const saved=await saveHistory(leaderId,body);expect(saved.status,saved.text).toBe(200);expect(saved.body.data.nextAction).toBeNull();
+ const [binding]=await q('SELECT b.executor_id,b.leader_id,b.path_type FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword=?',[blocked.word]);
+ expect(binding).toMatchObject({executor_id:Number(memberId),leader_id:Number(leaderId),path_type:'team_creator'});
+});
+
+it('自动恢复出错时历史与登记整笔回滚，同一请求重试并发只恢复一次',async()=>{
+ const memberId=await unknownMember(),blocked=await blockedRegistration(memberId),body=historyBody(blocked);
+ const before=await q('SELECT * FROM zh_import_rows WHERE batch_id=?',[blocked.batchId]);
+ const moneyBefore=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ await c.query("CREATE TRIGGER fail_history_repair BEFORE INSERT ON zh_attribution_results FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated history repair rollback'");
+ try{expect((await saveHistory(memberId,body)).status).toBe(500);}finally{await c.query('DROP TRIGGER fail_history_repair');}
+ expect(await q('SELECT * FROM member_history_evidence WHERE user_id=?',[memberId])).toHaveLength(0);
+ expect(await q('SELECT id FROM zh_keywords WHERE keyword=?',[blocked.word])).toHaveLength(0);
+ expect(await q('SELECT * FROM zh_import_rows WHERE batch_id=?',[blocked.batchId])).toEqual(before);
+ const responses=await Promise.all([saveHistory(memberId,body),saveHistory(memberId,body)]);
+ for(const response of responses)expect(response.status,response.text).toBe(200);
+ expect(responses[0].body.data).toEqual(responses[1].body.data);
+ expect(await q('SELECT id FROM member_history_evidence WHERE user_id=?',[memberId])).toHaveLength(1);
+ expect(await q('SELECT id FROM zh_keywords WHERE keyword=?',[blocked.word])).toHaveLength(1);
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(moneyBefore);
+});
+
+it('已有任务指定历史执行人通过真实补依据接口自动继续，保持原数据来源',async()=>{
+ const memberId=await unknownMember(),resources=await import('../../src/modules/zhihu/attribution/resources');
+ const word=await resources.createKeyword(admin,scope,key(),{keyword:'历史续办分配'+ ++serial,taskId:'1',mappingId,landingUrl:'https://example.com/retro',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['retro-source-'+word.id,word.planId]);await resources.synchronizeKeywords(scope);
+ const batchId=await upload('历史续办分配'+serial),requestKey=key();
+ const response=await request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/assign-retro').set(headers[ops.sub]).set('Idempotency-Key',requestKey).send({...scope,executorId:memberId,fromDate:date,requestKey});
+ expect(response.status,response.text).toBe(409);expect(response.body.nextAction.context.operation).toBe('assign_retro');
+ const original=await q('SELECT * FROM zh_import_rows WHERE batch_id=?',[batchId]);
+ const saved=await saveHistory(memberId,historyBody({batchId,word:'',memberId,day:date,body:response.body}));
+ expect(saved.status,saved.text).toBe(200);expect(saved.body.data.refreshStatus.status).toBe('refreshed');
+ expect((await q('SELECT executor_id FROM zh_keyword_bindings WHERE keyword_id=?',[word.id]))[0].executor_id).toBe(Number(memberId));
+ expect(await q('SELECT * FROM zh_import_rows WHERE batch_id=?',[batchId])).toEqual(original);
+});
+
+it('同一文件日期乱序时冻结名称分组最早日，补该日依据自动恢复原选择',async()=>{
+ const memberId=await unknownMember(),word='乱序分组历史'+ ++serial;
+ const batchId=(await workbench.uploadReport(finance,scope,file(`日期,渠道,关键词,订单量\n2026-09-25,分析渠道,${word},2\n2026-09-15,分析渠道,${word},3`))).id;
+ const ask=await question(batchId),blocked=await answer(batchId,ask.id,'other-keyword',ops,{taskId:'1',executorId:memberId});
+ expect(blocked.status,blocked.text).toBe(409);expect(blocked.body.nextAction.context.selection.fromDate).toBe('2026-09-15');
+ const saved=await saveHistory(memberId,historyBody({batchId,word,memberId,day:'2026-09-15',body:blocked.body}));
+ expect(saved.status,saved.text).toBe(200);
+ expect(await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=? ORDER BY id',[batchId])).toEqual([{processing_status:'processed'},{processing_status:'processed'}]);
+ const [binding]=await q("SELECT DATE_FORMAT(b.activated_on,'%Y-%m-%d') start_day FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword=?",[word]);
+ expect(binding.start_day).toBe('2026-09-15');
+});
+
+it('多文件乱序续办选最早未确认日，跳过已确认的更早日且不改确认账',async()=>{
+ const memberId=await unknownMember(),resources=await import('../../src/modules/zhihu/attribution/resources'),name='乱序续办日期'+ ++serial;
+ const word=await resources.createKeyword(admin,scope,key(),{keyword:name,taskId:'1',mappingId,landingUrl:'https://example.com/earliest',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['order-source-'+word.id,word.planId]);await resources.synchronizeKeywords(scope);
+ for(const d of ['2026-10-15','2026-10-01','2026-09-20'])await upload(name,'2',d);
+ const [locked]=await q("SELECT id,current_result_id FROM zh_metric_facts WHERE keyword_id=? AND business_date='2026-09-20'",[word.id]);
+ // Model an imported already-confirmed historical source. Continuation is a
+ // data repair and must ignore it, even though it predates all pending dates.
+ await c.query("INSERT INTO opc_income_sources(module_id,project_id,account_id,source_key,business_date,source_version,snapshot_hash,description) VALUES('zhihu',1,?,?,'2026-09-20',?,?,'已确认历史来源夹具')",[scope.accountId,'fact:'+locked.id,String(locked.current_result_id),'a'.repeat(64)]);
+ const sourceBefore=await q('SELECT * FROM opc_income_sources ORDER BY id'),factBefore=await q('SELECT * FROM zh_metric_facts WHERE id=?',[locked.id]);
+ const requestKey=key(),blocked=await request(app).post('/api/v1/modules/zhihu/keywords/'+word.id+'/assign-retro').set(headers[ops.sub]).set('Idempotency-Key',requestKey).send({...scope,executorId:memberId,requestKey});
+ expect(blocked.status,blocked.text).toBe(409);expect(blocked.body.nextAction.context.selection.fromDate).toBe('2026-10-01');
+ const saved=await saveHistory(memberId,historyBody({batchId:'',word:name,memberId,day:'2026-10-01',body:blocked.body}));
+ expect(saved.status,saved.text).toBe(200);expect(saved.body.data.refreshStatus).toMatchObject({status:'refreshed',recalculated:2});
+ expect(await q('SELECT * FROM opc_income_sources ORDER BY id')).toEqual(sourceBefore);
+ expect(await q('SELECT * FROM zh_metric_facts WHERE id=?',[locked.id])).toEqual(factBefore);
+ const [binding]=await q("SELECT DATE_FORMAT(activated_on,'%Y-%m-%d') start_day FROM zh_keyword_bindings WHERE keyword_id=?",[word.id]);expect(binding.start_day).toBe('2026-10-01');
+});
+
+it('财务资料待办按业务记录去重，补传必需资料后自动消失并按岗位隔离',async()=>{
+ const work=await history('财务资料待办'+ ++serial);
+ const count=async()=>Number((await todos(finance)).find((todo:any)=>todo.kind==='data.finance.resolve')?.count??0);
+ const before=await count();
+ const onlySearch=file(`日期,渠道,关键词,搜索量\n2026-09-16,分析渠道,${work.keyword},12`);
+ await workbench.uploadReport(finance,scope,onlySearch);
+ expect(await count()).toBe(before+1);
+ await workbench.uploadReport(finance,scope,onlySearch);
+ expect(await count()).toBe(before+1);
+ expect((await todos(ops)).some((todo:any)=>todo.kind==='data.finance.resolve')).toBe(false);
+ expect((await todos(creator)).some((todo:any)=>todo.kind==='data.finance.resolve')).toBe(false);
+ await upload(work.keyword,'3','2026-09-16');
+ expect(await count()).toBe(before);
+});
+
+it('旧记录同秒修改作品内容或状态使续办来源过期，旧context拒绝且历史不落库',async()=>{
+ const memberId=await unknownMember(),word='旧记录内容校验'+ ++serial;
+ const [plan]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status,zhihu_plan_id) VALUES(1,'analysis-task','analysis-channel',?,'https://example.com/legacy',1,?,3,'active','synced',?)",[word,memberId,'old-plan-'+serial]);
+ const [composition]=await c.query<mysql.ResultSetHeader>("INSERT INTO compositions(plan_id,owner_id,media_type,media_account,composition_type,composition_sub_type,promo_url,release_time,sync_status,zhihu_composition_id,updated_at) VALUES(?,?,'KOC抖音','test',2,1,'https://example.com/legacy-origin','2026-09-14 12:00:00','synced',?,'2026-09-15 12:00:00')",[plan.insertId,memberId,'legacy-co-'+serial]);
+ const batchId=await upload(word),ask=await question(batchId),blocked=await answer(batchId,ask.id,'legacy:'+plan.insertId,ops);
+ expect(blocked.status,blocked.text).toBe(409);expect(blocked.body.nextAction.context.operation).toBe('adopt_legacy_record');
+ const body=historyBody({batchId,word,memberId,day:date,body:blocked.body});
+ const before=await q('SELECT * FROM member_history_evidence WHERE user_id=?',[memberId]);
+ await c.query("UPDATE compositions SET promo_url='https://example.com/changed',status='rejected',sync_status='failed',reject_reason='真实退回',updated_at='2026-09-15 12:00:00' WHERE id=?",[composition.insertId]);
+ const stale=await saveHistory(memberId,body);expect(stale.status,stale.text).toBe(409);expect(stale.body.message).toContain('关联资料已更新');
+ expect(await q('SELECT * FROM member_history_evidence WHERE user_id=?',[memberId])).toEqual(before);
+ expect(await q('SELECT id FROM zh_keywords WHERE keyword=?',[word])).toHaveLength(0);
+ await c.query("UPDATE compositions SET status='pending',sync_status='synced',reject_reason=NULL,updated_at='2026-09-15 12:00:00' WHERE id=?",[composition.insertId]);
+ const refreshed=await answer(batchId,(await question(batchId)).id,'legacy:'+plan.insertId,ops);expect(refreshed.status,refreshed.text).toBe(409);
+ expect(refreshed.body.nextAction.context.sourceVersion).not.toBe(body.context.sourceVersion);
+ const saved=await saveHistory(memberId,historyBody({batchId,word,memberId,day:date,body:refreshed.body}));
+ expect(saved.status,saved.text).toBe(200);expect(saved.body.data.refreshStatus.status).toBe('refreshed');
+ const [binding]=await q('SELECT b.executor_id,b.verification_status FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.keyword=?',[word]);
+ expect(binding).toMatchObject({executor_id:Number(memberId),verification_status:'passed'});
+});
+
+it('原管理员创建的旧计划按原创建日期补角色，再由响应继续补执行人，任意创建人代入仍拒绝',async()=>{
+ const memberId=await unknownMember(),unrelated=await unknownMember(),word='管理员原创建'+ ++serial;
+ const [plan]=await c.query<mysql.ResultSetHeader>("INSERT INTO plans(project_id,zhihu_task_id,channel_id,keyword,landing_url,popularize_type,owner_id,created_by,status,sync_status,zhihu_plan_id,created_at) VALUES(1,'analysis-task','analysis-channel',?,'https://example.com/old-owner',1,1,1,'active','synced',?,'2026-09-02 12:34:56')",[word,'owner-plan-'+serial]);
+ const batchId=await upload(word),blocked=await answer(batchId,(await question(batchId)).id,'other-keyword',admin,{taskId:'1',executorId:memberId});
+ expect(blocked.status,blocked.text).toBe(409);expect(blocked.body.nextAction.memberId).toBe('1');expect(blocked.body.nextAction.at).toContain('2026-09-02T12:34:56');
+ const first=historyBody({memberId:'1',word,batchId,day:'2026-09-02',body:blocked.body},{participation:undefined,leaderId:undefined,historicalRole:'admin'});
+ const rejected=await saveHistory(unrelated,{...first,historicalRole:'creator'},admin);expect(rejected.status,rejected.text).toBe(403);
+ expect(await q('SELECT id FROM member_history_evidence WHERE user_id=?',[unrelated])).toHaveLength(0);
+ const saved=await saveHistory('1',first,admin);expect(saved.status,saved.text).toBe(200);
+ const next=saved.body.data.nextAction;expect(next).toMatchObject({memberId,expectedVersion:0,missingFields:['projectParticipation','role','team']});
+ expect(next.at).toContain(date);
+ const resumed=await saveHistory(memberId,historyBody({memberId,word,batchId,day:date,body:blocked.body},{expectedVersion:next.expectedVersion,context:next.context}),admin);
+ expect(resumed.status,resumed.text).toBe(200);expect(resumed.body.data.nextAction).toBeNull();
+ const [savedPlan]=await q('SELECT owner_id,zhihu_plan_id FROM plans WHERE id=?',[plan.insertId]);expect(savedPlan.owner_id).toBe(1);
+ const [binding]=await q('SELECT b.executor_id FROM zh_keyword_bindings b JOIN zh_keywords k ON k.id=b.keyword_id WHERE k.plan_id=?',[plan.insertId]);expect(binding.executor_id).toBe(Number(memberId));
+ expect((await q('SELECT processing_status FROM zh_import_rows WHERE batch_id=?',[batchId]))[0].processing_status).toBe('processed');
+});
+
+it('同日1001条无关异常不阻断一个目标关键词的补依据恢复，其他行保持待办',async()=>{
+ const memberId=await unknownMember(),blocked=await blockedRegistration(memberId);
+ // Preserve a realistic already parsed backlog without spending the regression
+ // on 1001 unrelated parser/HTTP calls; the target repair itself is real HTTP.
+ const [batch]=await q('SELECT batch_id FROM zh_import_rows WHERE id=?',[blocked.body.nextAction.context.sourceId]);
+ const values=Array.from({length:1001},(_,i)=>[batch.batch_id,i+100,JSON.stringify({date,channel:'分析渠道',keyword:'无关待核词'+i,orders:'1'}),'{}','KEYWORD_UNKNOWN','exception']);
+ await c.query('INSERT INTO zh_import_rows(batch_id,line_number,normalized_json,raw_json,error_text,processing_status) VALUES ?',[values]);
+ const before=await q('SELECT id,processing_status,error_text,fact_id FROM zh_import_rows WHERE batch_id=? AND line_number>=100 ORDER BY id',[batch.batch_id]);
+ const saved=await saveHistory(memberId,historyBody(blocked));expect(saved.status,saved.text).toBe(200);expect(saved.body.data.refreshStatus.resumed).toBe(1);
+ expect(await q('SELECT id,processing_status,error_text,fact_id FROM zh_import_rows WHERE batch_id=? AND line_number>=100 ORDER BY id',[batch.batch_id])).toEqual(before);
+ expect((await q('SELECT processing_status FROM zh_import_rows WHERE id=?',[blocked.body.nextAction.context.sourceId]))[0].processing_status).toBe('processed');
 });

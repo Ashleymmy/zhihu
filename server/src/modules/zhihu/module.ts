@@ -34,6 +34,7 @@ import { zhihuTaskProvider } from './attribution/task-provider';
 import { workRegistrations } from './attribution/works';
 import { keywordBindings } from './attribution/keyword-exports';
 import { memberActivity } from './attribution/member-activity';
+import { evidence } from './attribution/evidence-provider';
 export function createZhihuModule(): BusinessModule {
   const router = Router();
   router.use(miniBusinessRouter);
@@ -79,7 +80,7 @@ export function createZhihuModule(): BusinessModule {
           child,
         );
     },
-    dataProvider: { ...attributionDataProvider, workRegistrations, keywordBindings, memberActivity },
+    dataProvider: { ...attributionDataProvider, workRegistrations, keywordBindings, memberActivity, evidence },
     accountLifecycle: zhihuAccountLifecycle,
     rateProvider: zhihuRateProvider,
     todoProvider: zhihuTodoProvider,

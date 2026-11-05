@@ -558,6 +558,7 @@ export async function saveMemberHistoryEvidence(
         });
         refresh.recalculated += result.recalculated;
         refresh.resumed += result.resumed;
+        if (result.nextActions?.length) (refresh.nextActions ??= []).push(...result.nextActions);
         if (result.status === 'refreshed') refresh.status = 'refreshed';
       }
     }
@@ -576,7 +577,7 @@ export async function saveMemberHistoryEvidence(
             method: 'POST',
             path: `/api/v1/core/relations/members/${memberId}/history-evidence`,
           }
-        : null,
+        : refresh.nextActions?.[0] ?? null,
   };
   await c.query('UPDATE member_history_evidence SET result_json=? WHERE id=?', [
     JSON.stringify(result),

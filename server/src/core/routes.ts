@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createEvidenceRouter } from './evidence-routes';
 import { createMemberExportRouter } from './member-export-routes';
 import { createMemberActivityRouter } from './member-activity-routes';
 import { createSupportRouter } from './support-routes';
@@ -37,6 +38,7 @@ const date = z
 export function createPlatformRouter(runtime: ModuleRuntime) {
   const r = Router();
   r.use(requireAuth);
+  r.use('/evidence', createEvidenceRouter(runtime));
   r.use('/support', createSupportRouter());
   r.use('/member-exports', createMemberExportRouter(runtime));
   r.use('/member-activity', createMemberActivityRouter(runtime));

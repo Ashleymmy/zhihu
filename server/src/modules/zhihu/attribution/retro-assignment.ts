@@ -7,12 +7,22 @@ import { attribute } from './facts';
 import { unconfirmedFactSql } from './keyword-usability';
 import type {PoolConnection} from 'mysql2/promise';
 import {resolveHistoricalExecutor} from './executor';
+import {AppError} from '../../../middleware/errors';
+import {createHistoryAssignmentContext} from '../services/account-lifecycle';
 
 export async function assignRetro(user:AuthUser,scope:Scope,id:string,key:string,input:{executorId:string;fromDate?:string}) {
   if(!isStaffRole(user.role))fail('指定执行人需要运营权限',403);
   assertDuty(user,'operations');
   scope={projectId:scope.projectId,accountId:scope.accountId};
-  return mutate(user,scope,'binding.assign-retro',key,{id,...input},c=>assignRetroInTransaction(c,user,scope,id,input));
+  return mutate(user,scope,'binding.assign-retro',key,{id,...input},async c=>{
+    const context=await createHistoryAssignmentContext(c,scope,id,{executorId:input.executorId,...(input.fromDate?{fromDate:input.fromDate}:{})});
+    try{return await assignRetroInTransaction(c,user,scope,id,input);}catch(error){
+      if(!(error instanceof AppError)||!error.extras?.history)throw error;
+      throw new AppError(error.httpStatus,error.code,error.message,{...error.extras,nextAction:{
+        ...(error.extras.nextAction as Record<string,unknown>),context,expectedVersion:(error.extras.history as {version:number}).version,
+      }});
+    }
+  });
 }
 // Callers hold the account/project lock and keep registration, assignment and
 // report repair in the same transaction.

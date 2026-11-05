@@ -62,6 +62,16 @@ export const zhihuTodoProvider: ModuleTodoProvider = {
       }
     }
     if (!isStaffRole(user.role) || dutyAllows(user, 'finance')) {
+      if (dutyAllows(user, 'finance')) {
+        // A source can have several uploads and reasons. Follow the affected
+        // business record once; its existing exception closes on source/rate repair.
+        const [issues] = await withTransaction(c => select(c, `SELECT COUNT(DISTINCT
+          CASE WHEN fact_id IS NOT NULL THEN CONCAT('fact:',fact_id) ELSE CONCAT('row:',source_row_id) END) total
+          FROM zh_exceptions WHERE account_id=? AND project_id=? AND status='open'
+            AND reason_code IN ('PRICE_MISSING','PRICE_OVERLAP','PRICE_CONFLICT','REPORT_INCOMPLETE','SOURCE_REVISION_PENDING')`,
+        [scope.accountId, scope.projectId]));
+        push('data.finance.resolve', issues.total, '财务资料待核对', '财务', '补齐或核对资料', link('/data-issues'));
+      }
       const finance = await overview(user, scope, { from: scope.from, to: scope.to });
       if (dutyAllows(user, 'finance')) push('bill.confirm', new Set(finance.entries.filter((entry) => entry.ready).map((entry) => entry.factId)).size,
         '业绩待确认账单', '财务', '核对并确认', link('/finance'));
