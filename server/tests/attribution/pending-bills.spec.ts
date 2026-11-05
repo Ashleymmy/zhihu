@@ -22,6 +22,14 @@ beforeAll(async()=>{
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const actor of [admin,leader,creator,other])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,parent_id) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.parentId]);
  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,4)');
+ // These members participated before the reported days. Today's access rows
+ // alone cannot establish the historical team or role needed by retro intake.
+ const knownFrom=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date(Date.now()-7*86400000));
+ for(const actor of [admin,leader,creator,other]){
+  await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration',?)",[actor.sub,actor.role,knownFrom]);
+  await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,?,'registration',?)",[actor.sub,actor.parentId,knownFrom]);
+  if(actor.role!=='admin')await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(?,1,'member',?,'onboarding',?)",[actor.sub,knownFrom,'fixture-'+actor.sub]);
+ }
  scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'pending-channel',1,'待处理渠道')");
  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'pending-task','待处理活动',NOW())");
@@ -204,3 +212,15 @@ it('修复脚本默认只预览，显式应用只提前日期、恢复未确认�
  expect(await q("SELECT * FROM zh_statement_entries WHERE status='confirmed' ORDER BY id")).toEqual(bills);expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);
  const repeated=JSON.parse((await promisify(execFile)(process.execPath,[...args,'--apply'],{env:process.env,windowsHide:true})).stdout);expect(repeated.changes).toEqual([]);
 },30000);
+
+it('当前已入项目但没有历史依据的成员不能借当前团长补录旧报表',async()=>{
+ const {assignRetro}=await import('../../src/modules/zhihu/attribution/retro-assignment');
+ await c.query("INSERT INTO users(id,username,password_hash,role,display_name,parent_id) VALUES(9,'pending9','unused','creator','仅当前成员',2)");
+ await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,9)');
+ const [mapping]=await q('SELECT id FROM zh_channel_mappings LIMIT 1');
+ const word=await resources.createKeyword(admin,scope,key(),{keyword:'历史资料缺失词',taskId:'1',mappingId:String(mapping.id),landingUrl:'https://example.com/missing-history',popularizeType:1});
+ const before=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ await expect(assignRetro(admin,scope,word.id,key(),{executorId:'9',fromDate:date})).rejects.toMatchObject({httpStatus:409,extras:{nextAction:{path:'/api/v1/core/relations/members/9/history-evidence'}}});
+ expect(await q('SELECT id FROM zh_keyword_bindings WHERE keyword_id=?',[word.id])).toHaveLength(0);
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(before);
+});

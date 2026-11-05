@@ -30,6 +30,12 @@ beforeAll(async()=>{
  await runOpcMigrations(target,['zhihu']);c=await mysql.createConnection(target);
  for(const actor of [admin,creator,ops,finance,leader,other])await c.query('INSERT INTO users(id,username,password_hash,role,display_name,admin_duty) VALUES(?,?,?,?,?,?)',[actor.sub,actor.username,'unused',actor.role,actor.displayName,actor.adminDuty]);
  await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,5),(1,6)');
+ const knownFrom=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date(Date.now()-7*86400000));
+ for(const actor of [admin,creator,ops,finance,leader,other]){
+  await c.query("INSERT INTO member_role_history(user_id,to_role,reason,effective_at) VALUES(?,?,'registration',?)",[actor.sub,actor.role,knownFrom]);
+  await c.query("INSERT INTO team_memberships(user_id,leader_id,source,effective_from) VALUES(?,NULL,'registration',?)",[actor.sub,knownFrom]);
+  if(actor.role!=='admin')await c.query("INSERT INTO project_membership_history(user_id,project_id,member_role,effective_from,source_kind,source_ref) VALUES(?,1,'member',?,'onboarding',?)",[actor.sub,knownFrom,'fixture-'+actor.sub]);
+ }
  scope.accountId=String((await q('SELECT id FROM integration_accounts LIMIT 1'))[0].id);
  await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'staff-channel',1,'本人执行渠道')");
  await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'staff-task','本人执行活动',NOW())");
@@ -112,4 +118,18 @@ it('管理员与团长同时领取也只有一份归属，已执行记录不能�
  expect(results.map(r=>r.status).sort()).toEqual([200,409]);expect(await q('SELECT id FROM zh_keyword_bindings WHERE keyword_id=?',[word.id])).toHaveLength(1);
  expect((await post('/bindings/'+selfBinding+'/request-release',{reason:'试图重新分配'})).status).toBe(409);
  expect((await post('/keywords/'+retroId+'/assign-retro',{executorId:creator.sub})).status).toBe(409);
+});
+
+it('缺失历史不能把选择他人管理员的权限拒绝降为可补齐，也不能让本人绕过历史核对',async()=>{
+ const word=await readyWord('管理员历史权限顺序');
+ const [saved]=await q('SELECT effective_at FROM member_role_history WHERE user_id=3');
+ await c.query("UPDATE member_role_history SET effective_at='2099-01-01' WHERE user_id=3");
+ try{
+  const denied=await post('/keywords/'+word.id+'/assign-retro',{executorId:ops.sub});
+  expect(denied.status,denied.text).toBe(403);expect(denied.body.nextAction).toBeUndefined();
+  const unknown=await post('/keywords/'+word.id+'/assign-retro',{executorId:ops.sub},ops);
+  expect(unknown.status,unknown.text).toBe(409);expect(unknown.body.nextAction).toMatchObject({path:'/api/v1/core/relations/members/3/history-evidence'});
+  expect(await q('SELECT id FROM zh_keyword_bindings WHERE keyword_id=?',[word.id])).toHaveLength(0);
+  expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(income);
+ }finally{await c.query('UPDATE member_role_history SET effective_at=? WHERE user_id=3',[saved.effective_at]);}
 });

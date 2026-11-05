@@ -27,8 +27,11 @@ export const internalPerformance = (relation: string) => relation==='activation:
 /** Current identity authorizes the action; only recorded history determines payees. */
 export async function resolveHistoricalExecutor(c:PoolConnection,user:AuthUser,scope:Scope,id:string,at:string) {
   assertDuty(user,'operations');
-  const [target]=await select(c,'SELECT id,display_name FROM users WHERE id=? FOR SHARE',[id]);
+  const [target]=await select(c,'SELECT id,role current_role,display_name FROM users WHERE id=? FOR SHARE',[id]);
   if(!target)fail('原执行人记录不存在，请重新核对',409);
+  // This is a current-account authorization check, not a historical payee rule.
+  // Deny selecting someone else's staff account before offering evidence repair.
+  if(id!==user.sub&&isStaffRole(String(target.current_role)))fail('管理员只能选择本人执行',403);
   const history=await resolveMemberHistory(c,id,scope.projectId,{at});
   const staff=history.role.status==='matched'&&isStaffRole(history.role.value);
   const needed=[history.role,...(staff?[]:[history.projectParticipation,history.team])];
