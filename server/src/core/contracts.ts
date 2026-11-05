@@ -228,7 +228,35 @@ export interface ModuleRateProvider {
   published(connection: PoolConnection, user: AuthUser, input: RatePublication): Promise<{ recalculated: number }>;
 }
 
+/** Only resumable operations on unconfirmed business records are accepted here. */
+export interface MemberHistoryContext {
+  moduleId: string;
+  accountId: string;
+  sourceKind: string;
+  sourceId: string;
+  sourceVersion: string;
+  operation: 'register_historical_keyword' | 'assign_retro' | 'adopt_legacy_record' | 'refresh_unconfirmed';
+  selection?: Record<string, string>;
+}
+export interface MemberHistoryChange {
+  memberId: string;
+  projectId: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  timePrecision: 'date' | 'timestamp';
+  evidenceId: string;
+  version: number;
+  context?: MemberHistoryContext;
+}
+export interface MemberHistoryRefresh {
+  status: 'refreshed' | 'unchanged';
+  recalculated: number;
+  resumed: number;
+}
 export interface ModuleAccountLifecycle {
+  /** Same transaction as evidence storage. Validate context source, scope, version
+   * and allowed operation before resuming. Never confirm or pay money here. */
+  memberHistoryChanged?(connection: PoolConnection, actor: AuthUser, change: MemberHistoryChange): Promise<MemberHistoryRefresh>;
   accessChangeBlockers?(connection: PoolConnection, userId: string, projectId?: string): Promise<string[]>;
   /** Preserve existing task ownership during a reviewed business-role/team change.
    * All work must be transactional SQL: previews run this inside a rolled-back savepoint. */
