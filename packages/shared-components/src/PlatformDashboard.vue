@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import type { CoreWorkspace } from './core-workspace'
 import type { AccountMonitorItem, MiniMonitor } from '@zhihu-koc/shared-contracts/core'
 import OperationGuide from './OperationGuide.vue'
@@ -77,12 +77,19 @@ const staffTrend = computed(() => {
 })
 const staffTrendFormat = computed(() => staffTrend.value?.unit === '元' ? money : (v: number) => v.toLocaleString('zh-CN'))
 const staffTrendTotal = (points: number[]) => points.reduce((sum, v) => sum + v, 0)
-/** 团队排行条形图（按量或按金额归一） */
-const teamTopBars = computed(() => {
-  const list = teamTop.value?.list ?? []
-  const max = Math.max(1, ...list.map(t => Number(t.amount ?? t.quantity)))
-  return list.map(t => ({ ...t, pct: Math.round(Number(t.amount ?? t.quantity) / max * 100) }))
+/** 团队排行：复用 BarChart（自带入场生长动画与数值格式化） */
+const teamTopItems = computed(() => (teamTop.value?.list ?? []).map(t => ({
+  label: t.name,
+  value: isOperator.value ? t.quantity : Number(t.amount ?? t.quantity),
+})))
+const teamTopFormat = computed(() => isOperator.value ? undefined : (v: number) => '¥' + v.toLocaleString('zh-CN', { maximumFractionDigits: 0 }))
+/** 对账进度环：数据到达后从 0 转到目标值（CSS transition 已带 1.4s 缓动） */
+const ringOn = ref(false)
+watch(reconcile, v => {
+  if (v && !ringOn.value) requestAnimationFrame(() => requestAnimationFrame(() => { ringOn.value = true }))
 })
+const RING_C = 2 * Math.PI * 40
+const ringOffset = computed(() => RING_C * (1 - (ringOn.value ? reconcile.value?.rate ?? 0 : 0)))
 const TEAM_PALETTE = ['#d46b45', '#5b8fe0', '#8e6cc9', '#4e9a4a', '#c9a23f', '#b3557a']
 
 /* ===== 开发者首页可视化（系统视角：处理量/队列/Worker/巡检，无金额） ===== */
@@ -423,7 +430,7 @@ function untilt(event: PointerEvent) {
 
           <!-- 收益趋势 -->
           <article v-if="trend" class="card lift" style="--s:7;--i:1">
-            <div class="card-h"><h3>收益趋势</h3><span class="muted" style="font-size:12.5px">近 30 天 · 含待确认</span></div>
+            <div class="card-h"><h3>收益趋势</h3><span class="muted" style="font-size:12.5px">近 30 天 · 含待确认</span><router-link class="card-go r" to="/income">收益明细 →</router-link></div>
             <template v-if="trend.hasData">
               <div class="legend" style="margin-bottom:10px"><span v-for="s in trend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}<b>¥{{ yuan(s.total) }}</b></span></div>
               <TrendChart :labels="trend.labels" :series="trend.series" :height="210" :format="money" caption="近 30 天每日收益" />
@@ -433,7 +440,7 @@ function untilt(event: PointerEvent) {
 
           <!-- 团长专属：直邀成员 -->
           <article v-if="isLeader && relation" class="card lift" style="--s:4;--i:2">
-            <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">◉</span><h3>直邀成员</h3><span class="chip soft r">显性</span></div>
+            <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">◉</span><h3>直邀成员</h3><span class="r"><span class="chip soft">显性</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
             <div class="big num"><AnimatedNumber :value="relation.counts.direct" :decimals="0" /><small style="margin-left:4px">人</small></div>
             <div v-if="relation.directList.length" class="avs" style="margin-top:10px">
               <span v-for="(p, i) in relation.directList.slice(0, 5)" :key="i" :style="{ background: PROJECT_PALETTES[i % 4]![0], '--k': i }" :title="p.name">{{ p.name.slice(0, 1) }}</span>
@@ -451,14 +458,14 @@ function untilt(event: PointerEvent) {
 
           <!-- 团长专属：近 30 天团队收益（M-L02：与贡献图同口径，不再用累计冒充本月） -->
           <article v-if="isLeader && teamMonthUnits !== null" class="card lift" style="--s:4;--i:4">
-            <div class="card-h"><h3>近 30 天团队收益</h3><span class="chip soft r">团队 {{ summary?.team?.memberCount ?? 0 }} 人</span></div>
+            <div class="card-h"><h3>近 30 天团队收益</h3><span class="r"><span class="chip soft">团队 {{ summary?.team?.memberCount ?? 0 }} 人</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(teamMonthUnits)" :decimals="2" :text="yuan(teamMonthUnits)" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:4px">成员业绩 × 团长单价，按业绩当天归属计算</p>
           </article>
 
           <!-- 任务收益（本人执行的业绩） -->
           <article v-if="selfTaskUnits !== null" class="card lift" style="--s:4;--i:2">
-            <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">☰</span><h3>任务收益</h3><span class="chip soft r">本月</span></div>
+            <div class="card-h"><span class="ic" style="background:var(--clay-soft);color:var(--clay-deep)">☰</span><h3>任务收益</h3><span class="r"><span class="chip soft">本月</span><router-link class="card-go" to="/income">明细 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(selfTaskUnits)" :decimals="2" :text="yuan(selfTaskUnits)" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:4px">{{ taskSplit || '本月还没有任务收益记录' }}</p>
           </article>
@@ -481,7 +488,7 @@ function untilt(event: PointerEvent) {
 
           <!-- 收益构成 -->
           <article class="card lift" style="--s:4;--i:6">
-            <div class="card-h"><h3>收益构成</h3><span class="muted r" style="font-size:12.5px">本月</span></div>
+            <div class="card-h"><h3>收益构成</h3><span class="r"><span class="muted" style="font-size:12.5px">本月</span><router-link class="card-go" to="/income">明细 →</router-link></span></div>
             <ShareBar v-if="composition.length" :items="composition" />
             <p v-else class="muted" style="font-size:12.5px">本月还没有收益记录，完成任务后这里会按业绩类型拆开。</p>
             <template v-if="teamShare.length">
@@ -502,10 +509,10 @@ function untilt(event: PointerEvent) {
 
           <!-- 团长专属：成员贡献（近 30 天团队业绩按业绩人，前 8） -->
           <article v-if="isLeader" class="card lift" style="--s:12;--i:8">
-            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span v-if="contributors.list.length" class="chip soft r">前 8 名</span></div>
+            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span class="r"><span v-if="contributors.list.length" class="chip soft">前 8 名</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
             <svg v-if="contributors.list.length" class="chart contrib-chart" viewBox="0 0 720 190" preserveAspectRatio="none" role="img" aria-label="成员贡献柱状图">
               <g v-for="(item, i) in contributors.list" :key="item.name">
-                <rect class="bar" :style="{ '--i': i }" :x="20 + i * 86" :y="150 - (item.value / contributors.max) * 120" width="44" :height="Math.max(3, (item.value / contributors.max) * 120)" rx="8" fill="var(--c1)" :opacity="0.45 + 0.55 * (item.value / contributors.max)" />
+                <rect class="bar" :style="{ '--i': i }" :x="20 + i * 86" :y="150 - (item.value / contributors.max) * 120" width="44" :height="Math.max(3, (item.value / contributors.max) * 120)" rx="8" fill="var(--c1)" :opacity="0.45 + 0.55 * (item.value / contributors.max)"><title>{{ item.name }}：¥{{ yuan(item.amount) }}</title></rect>
                 <text class="ax" :x="42 + i * 86" y="170" text-anchor="middle">{{ item.name }}</text>
                 <text class="ax" :x="42 + i * 86" :y="140 - (item.value / contributors.max) * 120" text-anchor="middle" style="font-weight:650;fill:var(--ink)">¥{{ Math.round(item.value) }}</text>
               </g>
@@ -617,13 +624,13 @@ function untilt(event: PointerEvent) {
 
         <!-- 处理量趋势 -->
         <article v-if="devTrend" class="card lift" style="--s:7;--i:2">
-          <div class="card-h"><h3>处理量趋势</h3><span class="muted" style="font-size:12.5px">业绩条数 · 近 30 天 · 演示数据</span></div>
+          <div class="card-h"><h3>处理量趋势</h3><span class="muted" style="font-size:12.5px">业绩条数 · 近 30 天 · 演示数据</span><router-link class="card-go r" to="/system/queue">任务队列 →</router-link></div>
           <TrendChart :labels="devTrend.labels" :series="devTrend.series" :height="210" :format="(v: number) => v.toLocaleString('zh-CN')" caption="近 30 天每日处理量" />
         </article>
 
         <!-- Worker 状态 -->
         <article v-if="devWorkers" class="card lift" style="--s:5;--i:3">
-          <div class="card-h"><h3>Worker 状态</h3><span class="r" style="display:flex;align-items:center;gap:6px;color:var(--ok,#4e9a4a);font-size:12.5px"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block"></span>{{ devWorkers.list.every(x => x.ok) ? '全部正常' : '有异常' }}</span></div>
+          <div class="card-h"><h3>Worker 状态</h3><span class="r"><span style="display:flex;align-items:center;gap:6px;color:var(--ok,#4e9a4a);font-size:12.5px"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block"></span>{{ devWorkers.list.every(x => x.ok) ? '全部正常' : '有异常' }}</span><router-link class="card-go" to="/system/monitor">监控 →</router-link></span></div>
           <div v-for="x in devWorkers.list" :key="x.name" style="display:flex;font-size:13px;padding:6px 0">
             <span class="muted">{{ x.name }}</span><b style="margin-left:auto;font-weight:600" :style="{ color: x.ok ? 'inherit' : 'var(--clay-deep)' }">{{ x.note }}</b>
           </div>
@@ -632,22 +639,22 @@ function untilt(event: PointerEvent) {
 
         <!-- 队列 -->
         <article v-if="devSummary" class="card lift" style="--s:4;--i:4">
-          <div class="card-h"><h3>队列</h3><span class="chip r" :class="devSummary.queueBacklog ? 'clay' : 'soft'">{{ devSummary.queueBacklog ? '有积压' : '无积压' }}</span></div>
-          <div class="big num" style="font-size:30px">{{ devSummary.queueBacklog }}<small>条</small></div>
+          <div class="card-h"><h3>队列</h3><span class="r"><span class="chip" :class="devSummary.queueBacklog ? 'clay' : 'soft'">{{ devSummary.queueBacklog ? '有积压' : '无积压' }}</span><router-link class="card-go" to="/system/queue">队列 →</router-link></span></div>
+          <div class="big num" style="font-size:30px"><AnimatedNumber :value="devSummary.queueBacklog" :decimals="0" /><small>条</small></div>
           <p class="muted" style="font-size:12.5px;margin-top:4px">收益计算 / 回传 / 通知队列</p>
         </article>
 
         <!-- 近 24 小时失败 -->
         <article v-if="devSummary" class="card lift" style="--s:4;--i:5">
-          <div class="card-h"><h3>近 24 小时失败</h3></div>
-          <div class="big num" style="font-size:30px">{{ devSummary.failures24h }}<small>条</small></div>
+          <div class="card-h"><h3>近 24 小时失败</h3><router-link class="card-go r" to="/system/queue">队列 →</router-link></div>
+          <div class="big num" style="font-size:30px"><AnimatedNumber :value="devSummary.failures24h" :decimals="0" /><small>条</small></div>
           <p class="muted" style="font-size:12.5px;margin-top:4px">{{ devSummary.lastFailure ? `最近一次失败：${devSummary.lastFailure}` : '没有失败记录' }}</p>
         </article>
 
         <!-- 接口健康（真实数据：小程序接入监控） -->
         <article v-if="apiHealth" class="card lift" style="--s:4;--i:6">
-          <div class="card-h"><h3>接口健康</h3><router-link class="chip soft r" to="/system/monitor" style="text-decoration:none">运维监控 →</router-link></div>
-          <div class="big num" style="font-size:30px">{{ apiHealth.failurePct === null ? '暂无观测' : `${100 - Number(apiHealth.failurePct)}` }}<small v-if="apiHealth.failurePct !== null">% 可用</small></div>
+          <div class="card-h"><h3>接口健康</h3><router-link class="card-go r" to="/system/monitor">运维监控 →</router-link></div>
+          <div class="big num" style="font-size:30px"><template v-if="apiHealth.failurePct !== null"><AnimatedNumber :value="100 - Number(apiHealth.failurePct)" :decimals="1" /><small>% 可用</small></template><template v-else>暂无观测</template></div>
           <div class="growth-rules" style="margin-top:8px">
             <div>近 24h 请求 <b>{{ apiHealth.requests.toLocaleString('zh-CN') }}</b> 次</div>
             <div>服务错误 <b>{{ apiHealth.serverErrors }}</b> · 拒绝 <b>{{ apiHealth.rejected }}</b></div>
@@ -657,8 +664,8 @@ function untilt(event: PointerEvent) {
 
         <!-- 账号接入（真实数据：小程序绑定概况） -->
         <article v-if="accessSplit" class="card lift" style="--s:4;--i:7">
-          <div class="card-h"><h3>账号接入</h3><span class="chip soft r">小程序</span></div>
-          <div class="big num" style="font-size:30px">{{ accessSplit.bound }}<small>个已绑定微信</small></div>
+          <div class="card-h"><h3>账号接入</h3><span class="r"><span class="chip soft">小程序</span><router-link class="card-go" to="/team?mini=bound">成员 →</router-link></span></div>
+          <div class="big num" style="font-size:30px"><AnimatedNumber :value="accessSplit.bound" :decimals="0" /><small>个已绑定微信</small></div>
           <div class="stack" style="margin-top:10px;height:10px">
             <i :style="{ flexGrow: Math.max(accessSplit.bound, 0.001), background: '#4e9a4a' }" title="已绑定" />
             <i :style="{ flexGrow: Math.max(accessSplit.unbound, 0.001), background: 'var(--line-2)' }" title="未绑定" />
@@ -672,7 +679,7 @@ function untilt(event: PointerEvent) {
 
         <!-- 近 7 日账号操作量（真实数据） -->
         <article v-if="monitorTop.length" class="card lift" style="--s:8;--i:8">
-          <div class="card-h"><h3>近 7 日操作量</h3><span class="muted" style="font-size:12.5px">按账号 · 前 8 名</span></div>
+          <div class="card-h"><h3>近 7 日操作量</h3><span class="muted" style="font-size:12.5px">按账号 · 前 8 名</span><router-link class="card-go r" to="/system/monitor">监控 →</router-link></div>
           <BarChart :items="monitorTop" color="#3b7dd8" />
         </article>
       </div>
@@ -690,7 +697,7 @@ function untilt(event: PointerEvent) {
           </div>
         </div>
         <div v-if="devActivity?.list.length" class="card">
-          <div class="card-h"><h3>任务动态</h3><span class="muted r" style="font-size:12px">演示数据</span></div>
+          <div class="card-h"><h3>任务动态</h3><span class="r"><span class="muted" style="font-size:12px">演示数据</span><router-link class="card-go" to="/system/queue">队列 →</router-link></span></div>
           <div v-for="(x, i) in devActivity.list" :key="i" class="row">
             <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: DEV_TONES[x.tone] ?? '#b0aea5', flex: 'none' }"></span>
             <div class="t"><b>{{ x.title }}</b><small>{{ x.detail }}</small></div>
@@ -744,17 +751,17 @@ function untilt(event: PointerEvent) {
         <!-- 财务/管理员：总览四数 -->
         <template v-if="isFinanceStaff && insightsSummary">
           <article class="card lift" style="--s:4;--i:2">
-            <div class="card-h"><h3>上游收入</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="card-h"><h3>上游收入</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.upstream))" :decimals="2" :text="yuan(units(insightsSummary.upstream))" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}</p>
           </article>
           <article class="card lift" style="--s:4;--i:3">
-            <div class="card-h"><h3>成员支出</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="card-h"><h3>成员支出</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.memberPayout))" :decimals="2" :text="yuan(units(insightsSummary.memberPayout))" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">占上游 {{ insightsSummary.payoutRatio }}</p>
           </article>
           <article class="card lift" style="--s:4;--i:4">
-            <div class="card-h"><h3>平台留存</h3><span class="chip clay r">{{ insightsSummary.retentionRate }}</span></div>
+            <div class="card-h"><h3>平台留存</h3><span class="r"><span class="chip clay">{{ insightsSummary.retentionRate }}</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.retention))" :decimals="2" :text="yuan(units(insightsSummary.retention))" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">活跃成员 {{ insightsSummary.activeMembers }} 人</p>
           </article>
@@ -763,17 +770,17 @@ function untilt(event: PointerEvent) {
         <!-- 运营：业务量总览（无金额权限，接口已按岗位收窄） -->
         <template v-if="isOperator && insightsSummary">
           <article class="card lift" style="--s:4;--i:2">
-            <div class="card-h"><h3>活跃成员</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="card-h"><h3>活跃成员</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/team">成员 →</router-link></span></div>
             <div class="big num"><AnimatedNumber :value="insightsSummary.activeMembers" :decimals="0" /><small style="margin-left:4px">人</small></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}，新增 {{ insightsSummary.newMembers }} 人</p>
           </article>
           <article class="card lift" style="--s:4;--i:3">
-            <div class="card-h"><h3>业绩量</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="card-h"><h3>业绩量</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/tasks">任务 →</router-link></span></div>
             <div class="big num"><AnimatedNumber :value="insightsSummary.taskCount ?? 0" :decimals="0" :text="(insightsSummary.taskCount ?? 0).toLocaleString('zh-CN')" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">全部项目合计</p>
           </article>
           <article class="card lift" style="--s:4;--i:4">
-            <div class="card-h"><h3>活跃团队</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="card-h"><h3>活跃团队</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
             <div class="big num"><AnimatedNumber :value="insightsSummary.activeTeams ?? 0" :decimals="0" /><small style="margin-left:4px">个</small></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">有业绩产出的团队</p>
           </article>
@@ -781,19 +788,19 @@ function untilt(event: PointerEvent) {
 
         <!-- 员工共用：趋势图（财务=上游收入 vs 成员支出；运营=分项目业务量） -->
         <article v-if="staffTrend" class="card lift" style="--s:12;--i:5">
-          <div class="card-h"><h3>{{ isOperator ? '业务量趋势' : '上游收入 vs 成员支出' }}</h3><span class="muted" style="font-size:12.5px">近 30 天 · 演示数据</span></div>
+          <div class="card-h"><h3>{{ isOperator ? '业务量趋势' : '上游收入 vs 成员支出' }}</h3><span class="muted" style="font-size:12.5px">近 30 天 · 演示数据</span><router-link class="card-go r" :to="isOperator ? '/tasks' : '/finance'">{{ isOperator ? '任务 →' : '财务 →' }}</router-link></div>
           <div class="legend" style="margin-bottom:10px"><span v-for="s in staffTrend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}<b>{{ staffTrendFormat(staffTrendTotal(s.points)) }}</b></span></div>
           <TrendChart :labels="staffTrend.labels" :series="staffTrend.series" :height="210" :format="staffTrendFormat" caption="近 30 天每日走势" />
         </article>
 
         <!-- 财务/管理员：对账进度环 -->
         <article v-if="isFinanceStaff && reconcile" class="card lift" style="--s:4;--i:6">
-          <div class="card-h"><h3>对账进度</h3><span class="chip soft r">{{ reconcile.checkedDays }}/{{ reconcile.totalDays }} 天</span></div>
+          <div class="card-h"><h3>对账进度</h3><span class="r"><span class="chip soft">{{ reconcile.checkedDays }}/{{ reconcile.totalDays }} 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
           <div class="ring-wrap" style="margin-top:6px">
             <svg class="ring" width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
               <circle cx="46" cy="46" r="40" fill="none" stroke="var(--card-2)" stroke-width="10" />
               <circle class="v" cx="46" cy="46" r="40" fill="none" stroke="#d46b45" stroke-width="10" stroke-linecap="round"
-                :stroke-dasharray="2 * Math.PI * 40" :stroke-dashoffset="2 * Math.PI * 40 * (1 - reconcile.rate)" transform="rotate(-90 46 46)" />
+                :stroke-dasharray="RING_C" :stroke-dashoffset="ringOffset" transform="rotate(-90 46 46)" />
             </svg>
             <div><div class="big num" style="font-size:26px">{{ Math.round(reconcile.rate * 100) }}<small style="font-size:14px">%</small></div><p class="muted" style="font-size:12.5px">已核对</p></div>
           </div>
@@ -804,27 +811,22 @@ function untilt(event: PointerEvent) {
 
         <!-- 财务/管理员：平台留存构成 -->
         <article v-if="isFinanceStaff && retention?.parts" class="card lift" style="--s:4;--i:7">
-          <div class="card-h"><h3>留存构成</h3><span class="chip clay r">{{ Math.round((retention.rate ?? 0) * 1000) / 10 }}%</span></div>
+          <div class="card-h"><h3>留存构成</h3><span class="r"><span class="chip clay">{{ Math.round((retention.rate ?? 0) * 1000) / 10 }}%</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
           <div class="stack" style="margin-top:6px;height:12px">
             <i v-for="(p, i) in retention.parts" :key="p.label" :style="{ flexGrow: Number(p.amount), background: TEAM_PALETTE[i % TEAM_PALETTE.length] }" :title="`${p.label} ¥${p.amount}`"></i>
           </div>
           <div class="legend" style="margin-top:12px"><span v-for="(p, i) in retention.parts" :key="p.label"><i :style="{ background: TEAM_PALETTE[i % TEAM_PALETTE.length] }" />{{ p.label }}<b>¥{{ p.amount }}</b></span></div>
         </article>
 
-        <!-- 员工共用：团队排行 -->
-        <article v-if="teamTopBars.length" class="card lift" :style="{ '--s': isFinanceStaff ? 4 : 12, '--i': 8 }">
-          <div class="card-h"><h3>团队排行</h3><span class="muted" style="font-size:12.5px">{{ isOperator ? '按业绩量' : '按上游贡献' }} · 演示数据</span></div>
-          <div class="growth-rules" style="margin-top:4px;display:grid;gap:10px">
-            <div v-for="(t, i) in teamTopBars" :key="t.name" style="display:grid;gap:4px">
-              <div style="display:flex;justify-content:space-between;font-size:12.5px"><b>{{ i + 1 }}. {{ t.name }}</b><span class="muted">{{ isOperator ? `${t.quantity.toLocaleString('zh-CN')} 单` : `¥${t.amount}` }}</span></div>
-              <div style="height:8px;border-radius:5px;background:var(--card-2);overflow:hidden"><i :style="{ display: 'block', height: '100%', width: t.pct + '%', background: TEAM_PALETTE[i % TEAM_PALETTE.length], borderRadius: '5px' }"></i></div>
-            </div>
-          </div>
+        <!-- 员工共用：团队排行（BarChart 自带入场生长动画） -->
+        <article v-if="teamTopItems.length" class="card lift" :style="{ '--s': isFinanceStaff ? 4 : 12, '--i': 8 }">
+          <div class="card-h"><h3>团队排行</h3><span class="muted" style="font-size:12.5px">{{ isOperator ? '按业绩量' : '按上游贡献' }} · 演示数据</span><router-link class="card-go r" to="/team">全部团队 →</router-link></div>
+          <BarChart :items="teamTopItems" :format="teamTopFormat" :max-items="6" />
         </article>
 
         <!-- 运营：团队形态（非金额） -->
         <article v-if="isOperator && retention?.teamCount !== undefined" class="card lift" style="--s:6;--i:9">
-          <div class="card-h"><h3>团队形态</h3><span class="chip soft r">当前</span></div>
+          <div class="card-h"><h3>团队形态</h3><span class="r"><span class="chip soft">当前</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
           <div class="profile-stats" style="margin-top:6px">
             <div><b>{{ retention.teamCount }}</b><span>团队</span></div>
             <div><b>{{ retention.newTeams }}</b><span>本月新建</span></div>
@@ -873,7 +875,7 @@ function untilt(event: PointerEvent) {
           <p class="muted" style="font-size:12.5px">{{ w.role.value === 'operator' ? '运营管理' : w.role.value === 'developer' ? '开发者' : w.duty?.value === 'finance' ? '财务管理' : '管理员' }}</p>
         </div>
         <div v-if="isFinanceStaff && todayPayouts" class="card">
-          <div class="card-h"><h3>今日打款</h3><span class="muted r" style="font-size:12px">{{ todayPayouts.count }} 笔</span></div>
+          <div class="card-h"><h3>今日打款</h3><span class="r"><span class="muted" style="font-size:12px">{{ todayPayouts.count }} 笔</span><router-link class="card-go" to="/finance">全部 →</router-link></span></div>
           <div v-for="p in todayPayouts.list" :key="p.name" class="row">
             <div class="t"><b>{{ p.name }} · ¥{{ p.amount }}</b><small>{{ p.method }} · {{ p.status }}</small></div>
           </div>
