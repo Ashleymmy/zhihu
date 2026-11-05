@@ -50,9 +50,15 @@ async function main() {
     await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'task-1','知乎故事推广任务',NOW())");
   }
   if (fresh || seeded.length) await c.query('UPDATE users SET must_change_pwd=0 WHERE username IN (?)', [[...DEMO_USERS, 'admin']]);
-  const { createApp } = await import('../src/app');
+  const { createCoreApp } = await import('../src/core/app');
+  const { loadModules } = await import('../src/composition/modules');
+  const { mountStatic } = await import('../src/composition/static');
+  const { mountDemoInsights } = await import('./demo-insights-mock');
+  const runtime = loadModules();
+  // 演示 mock 接口必须挂在 notFound 之前；createApp() 内部已收尾 404，这里展开同样的组合
+  const app = createCoreApp(runtime, (a) => { mountStatic(a); mountDemoInsights(a); });
+  app.locals.moduleRuntime = runtime;
   const { registerJob } = await import('../src/queue');
-  const app = createApp();
   const { pushPlan } = await import('../src/modules/zhihu/jobs/pushPlan');
   registerJob('zhihu.push-plan', pushPlan);
   const port = Number(process.env.PORT ?? 3000);

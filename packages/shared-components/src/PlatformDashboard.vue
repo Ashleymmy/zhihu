@@ -26,6 +26,21 @@ const selfMine = ref<Mine | null>(null), teamSummary = ref<Mine | null>(null), a
 /* 公告（员工右栏）：有效公告 */
 interface Announcement { id: string; title: string; content: string; createdAt: string }
 const announcements = ref<Announcement[]>([])
+
+/* ===== 员工首页可视化数据（demo mock 契约；正式账源上线后同路径替换） ===== */
+interface InsightsSummary { upstream?: string; memberPayout?: string; retention?: string; activeMembers: number; upstreamChange?: string; payoutRatio?: string; retentionRate?: string; taskCount?: number; activeTeams?: number; newMembers?: number }
+interface InsightsDaily { labels: string[]; series: { key: string; label: string; unit: string; values: string[] }[] }
+interface TeamTop { list: { name: string; quantity: number; amount?: string }[] }
+interface Retention { rate?: number; parts?: { label: string; amount: string }[]; teamCount?: number; newTeams?: number; soloCreators?: number }
+interface TodayPayouts { count: number; list: { name: string; amount: string; method: string; status: string }[] }
+interface ReconcileProgress { rate: number; checkedDays: number; totalDays: number; byProject: { name: string; checked: number; total: number }[] }
+interface PendingWithdrawals { totalAmount: string; count: number; earliest: string; todayPaid: string; monthPaid: string; failedCount: number }
+const insightsSummary = ref<InsightsSummary | null>(null), insightsDaily = ref<InsightsDaily | null>(null), teamTop = ref<TeamTop | null>(null),
+  retention = ref<Retention | null>(null), todayPayouts = ref<TodayPayouts | null>(null), reconcile = ref<ReconcileProgress | null>(null),
+  pendingWithdrawals = ref<PendingWithdrawals | null>(null)
+/** 员工（非成员）才需要总览可视化；运营收窄到非金额字段由接口按岗位控制 */
+const isStaff = computed(() => !isMember.value)
+const canSeeAmount = computed(() => w.role.value === 'developer' || (w.role.value === 'admin' && (w.duty?.value ?? 'all') !== 'operations'))
 /* 入团申请（团长）：待审批列表与审批动作 */
 interface TeamApplication { id: string; creatorId: string; creatorName: string; creatorUsername: string; message: string | null; status: string; createdAt: string }
 const applications = ref<TeamApplication[]>([]), applicationBusy = ref('')
@@ -45,6 +60,28 @@ const staffWorkbenchPath = computed(() => {
   if (w.role.value === 'admin' && w.duty?.value === 'finance') return '/finance'
   return '/team'
 })
+
+/* ===== 员工首页可视化（数据来自 demo mock 契约，接口未上线时各卡自动隐藏） ===== */
+const isFinanceStaff = computed(() => isStaff.value && canSeeAmount.value && w.role.value !== 'operator')
+const isOperator = computed(() => w.role.value === 'operator' || (w.role.value === 'admin' && w.duty?.value === 'operations'))
+/** 趋势图：财务/管理员是上游收入 vs 成员支出；运营是各项目业务量 */
+const staffTrend = computed(() => {
+  if (!insightsDaily.value) return null
+  const palette = ['#d46b45', '#8e6cc9', '#5b8fe0', '#4e9a4a']
+  const series: TrendSeries[] = insightsDaily.value.series.map((s, i) => ({
+    label: s.label, color: palette[i % palette.length]!, points: s.values.map(Number), area: i === 0,
+  }))
+  return { labels: insightsDaily.value.labels, series, unit: insightsDaily.value.series[0]?.unit ?? '元' }
+})
+const staffTrendFormat = computed(() => staffTrend.value?.unit === '元' ? money : (v: number) => v.toLocaleString('zh-CN'))
+const staffTrendTotal = (points: number[]) => points.reduce((sum, v) => sum + v, 0)
+/** 团队排行条形图（按量或按金额归一） */
+const teamTopBars = computed(() => {
+  const list = teamTop.value?.list ?? []
+  const max = Math.max(1, ...list.map(t => Number(t.amount ?? t.quantity)))
+  return list.map(t => ({ ...t, pct: Math.round(Number(t.amount ?? t.quantity) / max * 100) }))
+})
+const TEAM_PALETTE = ['#d46b45', '#5b8fe0', '#8e6cc9', '#4e9a4a', '#c9a23f', '#b3557a']
 let revision = 0
 
 /* 金额只做整数运算：字符串 → 万分之一元的整数，展示时四舍五入到分 */
@@ -69,6 +106,7 @@ async function load() {
   loading.value = true; error.value = ''
   void loadMoney(version)
   void loadAnnouncements(version)
+  void loadStaffInsights(version)
   try {
     const result = await w.http.get<Overview>('/dashboard', projectId.value ? { projectId: projectId.value } : {})
     if (version === revision) data.value = result
@@ -118,6 +156,30 @@ async function loadAnnouncements(version: number) {
     const list = await w.http.get<Announcement[]>('/announcements/active')
     if (version === revision) announcements.value = list ?? []
   } catch { /* 公告读不到时卡不显示 */ }
+}
+/* 员工首页可视化（demo mock 契约，接口 404/失败时对应卡不显示） */
+async function loadStaffInsights(version: number) {
+  if (!isStaff.value) return
+  const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
+  const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
+    r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
+  const [sum, daily, top, ret, payouts, rec, pending] = await Promise.allSettled([
+    get<InsightsSummary>('/insights/summary'),
+    get<InsightsDaily>('/insights/daily'),
+    get<TeamTop>('/insights/team-top'),
+    get<Retention>('/insights/retention'),
+    get<TodayPayouts>('/finance/today-payouts'),
+    get<ReconcileProgress>('/finance/reconcile-progress'),
+    get<PendingWithdrawals>('/finance/withdrawals/pending'),
+  ])
+  if (version !== revision) return
+  insightsSummary.value = unwrap(sum)
+  insightsDaily.value = unwrap(daily)
+  teamTop.value = unwrap(top)
+  retention.value = unwrap(ret)
+  todayPayouts.value = unwrap(payouts)
+  reconcile.value = unwrap(rec)
+  pendingWithdrawals.value = unwrap(pending)
 }
 onMounted(load)
 
@@ -479,6 +541,113 @@ function untilt(event: PointerEvent) {
           <div class="acts"><router-link v-if="todos[0]" class="btn white" :to="todos[0].path">{{ todos[0].actionLabel || '去处理' }}</router-link><router-link v-else class="btn light" :to="staffWorkbenchPath">去工作台</router-link></div>
         </article>
 
+        <!-- 财务/管理员：待打款主卡（demo mock 契约） -->
+        <article v-if="isFinanceStaff && pendingWithdrawals" class="card wallet float lift" style="--s:5;--i:1">
+          <div class="lbl">待打款</div>
+          <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(pendingWithdrawals.totalAmount))" :decimals="2" :text="yuan(units(pendingWithdrawals.totalAmount))" /></div>
+          <div class="meta">
+            <div><b>{{ pendingWithdrawals.count }}</b>笔待审批</div>
+            <div><b>¥{{ yuan(units(pendingWithdrawals.todayPaid)) }}</b>今日已发</div>
+            <div><b>¥{{ yuan(units(pendingWithdrawals.monthPaid)) }}</b>本月已发</div>
+          </div>
+          <div class="acts">
+            <router-link class="btn white" to="/finance">去审批提现</router-link>
+            <span v-if="pendingWithdrawals.failedCount" class="chip clay" style="align-self:center">{{ pendingWithdrawals.failedCount }} 笔发放失败</span>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:10px">最早一笔提交于 {{ pendingWithdrawals.earliest }}</p>
+        </article>
+
+        <!-- 财务/管理员：总览四数 -->
+        <template v-if="isFinanceStaff && insightsSummary">
+          <article class="card lift" style="--s:4;--i:2">
+            <div class="card-h"><h3>上游收入</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.upstream))" :decimals="2" :text="yuan(units(insightsSummary.upstream))" /></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}</p>
+          </article>
+          <article class="card lift" style="--s:4;--i:3">
+            <div class="card-h"><h3>成员支出</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.memberPayout))" :decimals="2" :text="yuan(units(insightsSummary.memberPayout))" /></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">占上游 {{ insightsSummary.payoutRatio }}</p>
+          </article>
+          <article class="card lift" style="--s:4;--i:4">
+            <div class="card-h"><h3>平台留存</h3><span class="chip clay r">{{ insightsSummary.retentionRate }}</span></div>
+            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.retention))" :decimals="2" :text="yuan(units(insightsSummary.retention))" /></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">活跃成员 {{ insightsSummary.activeMembers }} 人</p>
+          </article>
+        </template>
+
+        <!-- 运营：业务量总览（无金额权限，接口已按岗位收窄） -->
+        <template v-if="isOperator && insightsSummary">
+          <article class="card lift" style="--s:4;--i:2">
+            <div class="card-h"><h3>活跃成员</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="big num"><AnimatedNumber :value="insightsSummary.activeMembers" :decimals="0" /><small style="margin-left:4px">人</small></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}，新增 {{ insightsSummary.newMembers }} 人</p>
+          </article>
+          <article class="card lift" style="--s:4;--i:3">
+            <div class="card-h"><h3>业绩量</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="big num"><AnimatedNumber :value="insightsSummary.taskCount ?? 0" :decimals="0" :text="(insightsSummary.taskCount ?? 0).toLocaleString('zh-CN')" /></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">全部项目合计</p>
+          </article>
+          <article class="card lift" style="--s:4;--i:4">
+            <div class="card-h"><h3>活跃团队</h3><span class="chip soft r">近 30 天</span></div>
+            <div class="big num"><AnimatedNumber :value="insightsSummary.activeTeams ?? 0" :decimals="0" /><small style="margin-left:4px">个</small></div>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">有业绩产出的团队</p>
+          </article>
+        </template>
+
+        <!-- 员工共用：趋势图（财务=上游收入 vs 成员支出；运营=分项目业务量） -->
+        <article v-if="staffTrend" class="card lift" style="--s:12;--i:5">
+          <div class="card-h"><h3>{{ isOperator ? '业务量趋势' : '上游收入 vs 成员支出' }}</h3><span class="muted" style="font-size:12.5px">近 30 天 · 演示数据</span></div>
+          <div class="legend" style="margin-bottom:10px"><span v-for="s in staffTrend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}<b>{{ staffTrendFormat(staffTrendTotal(s.points)) }}</b></span></div>
+          <TrendChart :labels="staffTrend.labels" :series="staffTrend.series" :height="210" :format="staffTrendFormat" caption="近 30 天每日走势" />
+        </article>
+
+        <!-- 财务/管理员：对账进度环 -->
+        <article v-if="isFinanceStaff && reconcile" class="card lift" style="--s:4;--i:6">
+          <div class="card-h"><h3>对账进度</h3><span class="chip soft r">{{ reconcile.checkedDays }}/{{ reconcile.totalDays }} 天</span></div>
+          <div class="ring-wrap" style="margin-top:6px">
+            <svg class="ring" width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
+              <circle cx="46" cy="46" r="40" fill="none" stroke="var(--card-2)" stroke-width="10" />
+              <circle class="v" cx="46" cy="46" r="40" fill="none" stroke="#d46b45" stroke-width="10" stroke-linecap="round"
+                :stroke-dasharray="2 * Math.PI * 40" :stroke-dashoffset="2 * Math.PI * 40 * (1 - reconcile.rate)" transform="rotate(-90 46 46)" />
+            </svg>
+            <div><div class="big num" style="font-size:26px">{{ Math.round(reconcile.rate * 100) }}<small style="font-size:14px">%</small></div><p class="muted" style="font-size:12.5px">已核对</p></div>
+          </div>
+          <div class="growth-rules" style="margin-top:12px">
+            <div v-for="p in reconcile.byProject" :key="p.name"><b>{{ p.name }}</b> · {{ p.checked }}/{{ p.total }} 天</div>
+          </div>
+        </article>
+
+        <!-- 财务/管理员：平台留存构成 -->
+        <article v-if="isFinanceStaff && retention?.parts" class="card lift" style="--s:4;--i:7">
+          <div class="card-h"><h3>留存构成</h3><span class="chip clay r">{{ Math.round((retention.rate ?? 0) * 1000) / 10 }}%</span></div>
+          <div class="stack" style="margin-top:6px;height:12px">
+            <i v-for="(p, i) in retention.parts" :key="p.label" :style="{ flexGrow: Number(p.amount), background: TEAM_PALETTE[i % TEAM_PALETTE.length] }" :title="`${p.label} ¥${p.amount}`"></i>
+          </div>
+          <div class="legend" style="margin-top:12px"><span v-for="(p, i) in retention.parts" :key="p.label"><i :style="{ background: TEAM_PALETTE[i % TEAM_PALETTE.length] }" />{{ p.label }}<b>¥{{ p.amount }}</b></span></div>
+        </article>
+
+        <!-- 员工共用：团队排行 -->
+        <article v-if="teamTopBars.length" class="card lift" :style="{ '--s': isFinanceStaff ? 4 : 12, '--i': 8 }">
+          <div class="card-h"><h3>团队排行</h3><span class="muted" style="font-size:12.5px">{{ isOperator ? '按业绩量' : '按上游贡献' }} · 演示数据</span></div>
+          <div class="growth-rules" style="margin-top:4px;display:grid;gap:10px">
+            <div v-for="(t, i) in teamTopBars" :key="t.name" style="display:grid;gap:4px">
+              <div style="display:flex;justify-content:space-between;font-size:12.5px"><b>{{ i + 1 }}. {{ t.name }}</b><span class="muted">{{ isOperator ? `${t.quantity.toLocaleString('zh-CN')} 单` : `¥${t.amount}` }}</span></div>
+              <div style="height:8px;border-radius:5px;background:var(--card-2);overflow:hidden"><i :style="{ display: 'block', height: '100%', width: t.pct + '%', background: TEAM_PALETTE[i % TEAM_PALETTE.length], borderRadius: '5px' }"></i></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 运营：团队形态（非金额） -->
+        <article v-if="isOperator && retention?.teamCount !== undefined" class="card lift" style="--s:6;--i:9">
+          <div class="card-h"><h3>团队形态</h3><span class="chip soft r">当前</span></div>
+          <div class="profile-stats" style="margin-top:6px">
+            <div><b>{{ retention.teamCount }}</b><span>团队</span></div>
+            <div><b>{{ retention.newTeams }}</b><span>本月新建</span></div>
+            <div><b>{{ retention.soloCreators }}</b><span>独立达人</span></div>
+          </div>
+        </article>
+
         <!-- 待办列表 -->
         <section class="card" style="--s:7;--i:1" aria-labelledby="home-todos">
           <div class="card-h"><h3 id="home-todos">待办</h3><span v-if="todos.length" class="chip clay r">{{ todos.length }} 项</span></div>
@@ -518,6 +687,12 @@ function untilt(event: PointerEvent) {
           <div class="big-av">{{ (w.userName?.value ?? '我').slice(0, 1) }}</div>
           <h4>{{ w.userName?.value ?? '我' }}</h4>
           <p class="muted" style="font-size:12.5px">{{ w.role.value === 'operator' ? '运营管理' : w.role.value === 'developer' ? '开发者' : w.duty?.value === 'finance' ? '财务管理' : '管理员' }}</p>
+        </div>
+        <div v-if="isFinanceStaff && todayPayouts" class="card">
+          <div class="card-h"><h3>今日打款</h3><span class="muted r" style="font-size:12px">{{ todayPayouts.count }} 笔</span></div>
+          <div v-for="p in todayPayouts.list" :key="p.name" class="row">
+            <div class="t"><b>{{ p.name }} · ¥{{ p.amount }}</b><small>{{ p.method }} · {{ p.status }}</small></div>
+          </div>
         </div>
         <div v-if="announcements.length" class="card">
           <div class="card-h"><h3>公告</h3><span class="muted r" style="font-size:12px">{{ announcements.length }} 条</span></div>
