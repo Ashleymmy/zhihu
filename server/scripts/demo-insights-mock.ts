@@ -184,4 +184,52 @@ export function mountDemoInsights(app: Express) {
       },
     });
   });
+
+  /** 巡检中心：一致性检查卡片 + 巡检记录 */
+  const inspectionRecords = () => {
+    const now = new Date();
+    const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
+    return [
+      { time: hh(now.getHours()), item: '归属一致性', duration: '42s', result: '通过', diffs: '0 条' },
+      { time: hh(now.getHours()), item: '金额完整性', duration: '38s', result: '通过', diffs: '0 条' },
+      { time: hh(now.getHours() - 1), item: '重复业绩', duration: '12s', result: '通过', diffs: '0 条' },
+      { time: hh(now.getHours() - 1), item: '关系环检测', duration: '8s', result: '通过', diffs: '0 个' },
+      { time: hh(now.getHours() - 2), item: '单价覆盖', duration: '6s', result: '通过', diffs: '0 条' },
+    ];
+  };
+  app.get('/api/v1/core/insights/dev-inspections', ...guard, (_req, res) => {
+    res.json({
+      code: 0,
+      data: {
+        cards: [
+          { name: '归属一致性', diffs: 0, unit: '条差异', note: '每小时巡检 · 最近 15:00' },
+          { name: '金额完整性', diffs: 0, unit: '条差异', note: '收益行与打款逐笔勾稽' },
+          { name: '关系环检测', diffs: 0, unit: '个环', note: '邀请链与团队归属无循环' },
+        ],
+        records: inspectionRecords(),
+      },
+    });
+  });
+
+  /** 巡检中心：立即重跑（演示：记录时间刷新为当前整点） */
+  app.post('/api/v1/core/insights/dev-inspections/run', ...guard, (_req, res) => {
+    res.json({ code: 0, data: { records: inspectionRecords(), ranAt: new Date().toISOString() } });
+  });
+
+  /** 任务队列 */
+  app.get('/api/v1/core/insights/dev-queue', ...guard, (_req, res) => {
+    res.json({
+      code: 0,
+      data: {
+        backlog: 0, successRate: '100%',
+        rows: [
+          { task: '知乎同步 · 10-19', type: '同步', at: '15:06', status: '完成', duration: '4.2s' },
+          { task: '归属一致性巡检', type: '巡检', at: '15:00', status: '完成', duration: '42s' },
+          { task: '红果 10-19 回传入库', type: '回传', at: '14:58', status: '完成', duration: '2.8s' },
+          { task: '收益重算 · 唐南乔晋升', type: '重算', at: '14:26', status: '完成', duration: '1.6s' },
+          { task: '红果同步重试', type: '同步', at: '11:12', status: '重试后成功', duration: '12s' },
+        ],
+      },
+    });
+  });
 }

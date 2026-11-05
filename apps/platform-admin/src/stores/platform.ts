@@ -13,6 +13,8 @@ export const workspace: CoreWorkspace = {
   duty: computed(() => useAuthStore().user?.adminDuty ?? ''),
   operationGuide: computed(() => {
     const user = useAuthStore().user
+    // 开发者面向系统与队列，不展示业务操作引导
+    if (user?.role === 'developer') return null
     return user && modules.value.some(m => m.id === 'zhihu' && m.status === 'enabled')
       ? zhihuOperationGuide(user, { projectId: projectId.value }) : null
   }),

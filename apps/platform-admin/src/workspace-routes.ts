@@ -52,6 +52,18 @@ export const workspaceRoutes: RouteRecordRaw[] = [
     meta: { title: '运维监控' },
   },
   {
+    path: 'system/inspect',
+    name: 'system-inspect',
+    component: () => import('./views/SystemInspectView.vue'),
+    meta: { title: '巡检中心' },
+  },
+  {
+    path: 'system/queue',
+    name: 'system-queue',
+    component: () => import('./views/SystemQueueView.vue'),
+    meta: { title: '任务队列' },
+  },
+  {
     path: 'system/db',
     name: 'system-db',
     component: () => import('./views/SysDbView.vue'),
