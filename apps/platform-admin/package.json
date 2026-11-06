@@ -11,18 +11,20 @@
     "lint": "echo \"lint: platform-admin (no linter configured yet)\""
   },
   "dependencies": {
-    "@zhihu-koc/zhihu-module-views": "workspace:*",
     "@zhihu-koc/shared-components": "workspace:*",
     "@zhihu-koc/shared-contracts": "workspace:*",
     "@zhihu-koc/shared-i18n": "workspace:*",
     "@zhihu-koc/shared-services": "workspace:*",
     "@zhihu-koc/shared-tokens": "workspace:*",
     "@zhihu-koc/shared-utils": "workspace:*",
+    "@zhihu-koc/zhihu-module-views": "workspace:*",
     "pinia": "^2.1.7",
+    "three": "^0.187.0",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-vue": "^5.0.4",
     "@zhihu-koc/test-support": "workspace:*",
     "typescript": "^5.4.0",
