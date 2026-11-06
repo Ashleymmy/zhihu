@@ -290,13 +290,14 @@ export function useFinanceApi(context: EngineContext) {
   }
 
   /** GET /workbench?viewVersion=2 账期视图（拉新拉活分开汇总） */
-  function getWorkbench(from: string, to: string, metricType?: 'new_user' | 'activation') {
+  function getWorkbench(from: string, to: string, metricType?: 'new_user' | 'activation', importId?: string) {
     return http.get<WorkbenchView>('/workbench', {
       ...scope,
       from,
       to,
       viewVersion: '2',
       ...(metricType ? { metricType } : {}),
+      ...(importId ? { importId } : {}),
     })
   }
 
@@ -362,7 +363,7 @@ export function useFinanceApi(context: EngineContext) {
 
   // ---------- 确认（一次操作 + jobId 分批轮询） ----------
   /** POST /workbench/confirm 一次提交全部就绪账单，返回 Progress（可能带 jobId） */
-  function confirmBills(from: string, to: string, reviewHash: string, key:string) {
+  function confirmBills(from: string, to: string, reviewHash: string, key:string, importId?:string) {
     return http.post<ConfirmProgress>('/workbench/confirm', {
       ...scope,
       from,
@@ -371,6 +372,7 @@ export function useFinanceApi(context: EngineContext) {
       reviewHash,
       acknowledged: true,
       requestKey:key,
+      ...(importId ? { importId } : {}),
     })
   }
 

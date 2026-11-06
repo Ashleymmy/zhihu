@@ -18,7 +18,7 @@ import {allocations} from './allocations';
 import {reanalyzeImport} from './import-history';
 import {randomUUID} from 'node:crypto';
 import {registeredWorkSql} from './work-receipts';
-export interface Period{from:string;to:string;metricType?:MetricType}
+export interface Period{from:string;to:string;metricType?:MetricType;importId?:string}
 export async function listPeriods(user:AuthUser,scope:Scope,page=1){
  assertDuty(user,'finance');await authorize(user,scope);
  return withTransaction(async c=>{
@@ -64,9 +64,15 @@ export async function uploadReport(user:AuthUser,scope:Scope,file:AllianceUpload
 }
 export async function overview(user:AuthUser,scope:Scope,period:Period,connection?:PoolConnection,factIds?:string[]){
  if(isStaffRole(user.role))assertDuty(user,'finance');
- scope={projectId:scope.projectId,accountId:scope.accountId};period={from:period.from,to:period.to,...(period.metricType?{metricType:period.metricType}:{})};
+ scope={projectId:scope.projectId,accountId:scope.accountId};period={from:period.from,to:period.to,...(period.metricType?{metricType:period.metricType}:{}),...(period.importId?{importId:period.importId}:{})};
  valid(period);if(!connection)await authorize(user,scope);
  const read=async(c:PoolConnection)=>{
+  if(period.importId){
+   if(!isStaffRole(user.role))fail('原始报告仅管理员可见',403);
+   const [batch]=await select(c,'SELECT id,status FROM zh_import_batches WHERE id=? AND account_id=? AND project_id=?',[period.importId,scope.accountId,scope.projectId]);
+   if(!batch)fail('这份报表不存在',404);
+   if(!['committed','processed'].includes(String(batch.status)))fail('这份报表尚未导入或已撤销，请重新选择',409);
+  }
   const rows=await select(c,`SELECT CAST(f.id AS CHAR) id,CAST(f.current_result_id AS CHAR) result_id,CAST(f.current_revision_id AS CHAR) revision_id,
     CAST(f.keyword_id AS CHAR) keyword_id,f.metric_type,r.snapshot_json,r.reason_code,b.verification_status,b.leader_id,b.executor_id,b.id binding_id,
     executor.display_name executor_name,executor.role executor_role,leader.display_name leader_name,k.legacy_mode,
@@ -82,10 +88,10 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     LEFT JOIN zh_keyword_bindings b ON b.id=k.current_binding_id LEFT JOIN zh_attribution_results r ON r.id=f.current_result_id
     LEFT JOIN users executor ON executor.id=b.executor_id LEFT JOIN users leader ON leader.id=b.leader_id
     LEFT JOIN opc_income_sources src ON src.module_id='zhihu' AND src.account_id=f.account_id AND src.source_key=CONCAT('fact:',f.id)
-    WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ? AND (? IS NULL OR f.metric_type=?) AND (? IN ('developer','admin','operator') OR b.leader_id=? OR b.executor_id=?) ${factIds?'AND f.id IN (?)':''} ORDER BY f.id`,
-    [scope.accountId,scope.projectId,period.from,period.to,period.metricType??null,period.metricType??null,user.role,user.sub,user.sub,...(factIds?[factIds]:[])]);
+    WHERE f.account_id=? AND f.project_id=? AND f.business_date BETWEEN ? AND ? AND (? IS NULL OR f.metric_type=?) AND (? IN ('developer','admin','operator') OR b.leader_id=? OR b.executor_id=?) ${period.importId?'AND EXISTS(SELECT 1 FROM zh_import_rows report_row WHERE report_row.batch_id=? AND report_row.fact_id=f.id)':''} ${factIds?'AND f.id IN (?)':''} ORDER BY f.id`,
+    [scope.accountId,scope.projectId,period.from,period.to,period.metricType??null,period.metricType??null,user.role,user.sub,user.sub,...(period.importId?[period.importId]:[]),...(factIds?[factIds]:[])]);
   const users=await select(c,`SELECT CAST(u.id AS CHAR) id,u.display_name,u.role,CAST(u.parent_id AS CHAR) parent_id FROM users u JOIN project_members pm ON pm.user_id=u.id WHERE pm.project_id=? AND pm.left_at IS NULL AND (? IN ('developer','admin','operator') OR u.id=? OR u.parent_id=?)`,[scope.projectId,user.role,user.sub,user.sub]);
-  const prior=await select(c,`SELECT CAST(e.source_id AS CHAR) source_id,CAST(e.user_id AS CHAR) user_id,CAST(SUM(e.amount) AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id WHERE src.module_id='zhihu' AND src.account_id=? AND src.project_id=? AND src.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR e.user_id=?) ${factIds?'AND src.source_key IN (?)':''} GROUP BY e.source_id,e.user_id`,[scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub,...(factIds?[factIds.map(id=>'fact:'+id)]:[])]);
+  const prior=await select(c,`SELECT CAST(e.source_id AS CHAR) source_id,CAST(e.user_id AS CHAR) user_id,CAST(SUM(e.amount) AS CHAR) amount FROM opc_income_entries e JOIN opc_income_sources src ON src.id=e.source_id WHERE src.module_id='zhihu' AND src.account_id=? AND src.project_id=? AND src.business_date BETWEEN ? AND ? AND (? IN ('developer','admin','operator') OR e.user_id=?) ${period.importId?"AND EXISTS(SELECT 1 FROM zh_import_rows report_row WHERE report_row.batch_id=? AND CONCAT('fact:',report_row.fact_id)=src.source_key)":''} ${factIds?'AND src.source_key IN (?)':''} GROUP BY e.source_id,e.user_id`,[scope.accountId,scope.projectId,period.from,period.to,user.role,user.sub,...(period.importId?[period.importId]:[]),...(factIds?[factIds.map(id=>'fact:'+id)]:[])]);
   const [route]=await select(c,'SELECT mode FROM zh_engine_routes WHERE account_id=? AND project_id=?',[scope.accountId,scope.projectId]);
   const entries:{id:string;factId:string;keywordId:string;resultId:string;revisionId:string;calculation?:{quantity:string;unitPrice:string;beforeRiskAmount:string};priceSources?:('agreement'|'role_rate')[];canAssignRetro?:boolean;retroFromDate?:string;bindingId?:string;executorName?:string;legacyMode?:string;metricType:MetricType;quantity:string|null;activations:string|null;settlementMismatch?:AttributionSnapshot['settlementMismatch'];internal?:boolean;keyword:string;date:string;orders:string|null;payeeId:string;payeeName:string;parentId:string|null;role:string;payerName:string;amount:string|null;confirmedAmount:string;pendingAmount:string;kind:string;status:string;ownPayable:boolean;ownReceivable:boolean;blocked:string;reasonCode:string;reason:string;next:string;ready:boolean;confirmationToken?:string}[]=[];
   const team=new Map<string,{executorId:string;name:string;orders:bigint;commission:bigint;activations:bigint;activationCommission:bigint}>();
@@ -146,6 +152,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   const unresolved=isStaffRole(user.role)&&!factIds?await select(c,`SELECT CAST(r.id AS CHAR) id,r.normalized_json,r.error_text,IF(b.report_kind='activation','activation','new_user') metric_type
     FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id
     WHERE b.account_id=? AND b.project_id=? AND r.fact_id IS NULL AND r.processing_status='exception'
+      ${period.importId?'AND r.batch_id=?':''}
       AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?
       AND (? IS NULL OR IF(b.report_kind='activation','activation','new_user')=?)
       AND EXISTS(SELECT 1 FROM zh_exceptions x WHERE x.source_row_id=r.id AND x.status='open')
@@ -155,7 +162,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
           AND JSON_EXTRACT(matched.normalized_json,'$.date')=JSON_EXTRACT(r.normalized_json,'$.date')
           AND JSON_EXTRACT(matched.normalized_json,'$.channel')=JSON_EXTRACT(r.normalized_json,'$.channel')
           AND JSON_EXTRACT(matched.normalized_json,'$.keyword')=JSON_EXTRACT(r.normalized_json,'$.keyword'))
-    ORDER BY r.id`,[scope.accountId,scope.projectId,period.from,period.to,period.metricType??null,period.metricType??null]):[];
+    ORDER BY r.id`,[scope.accountId,scope.projectId,...(period.importId?[period.importId]:[]),period.from,period.to,period.metricType??null,period.metricType??null]):[];
   const missing=new Map<string,{id:string;raw:SourceRow;code:string;metricType:MetricType}>();
   for(const r of unresolved){const raw=json<SourceRow>(r.normalized_json),metricType:MetricType=r.metric_type==='activation'?'activation':'new_user',key=JSON.stringify([raw.date,raw.channel,raw.keyword,metricType]);const previous=missing.get(key);missing.set(key,{id:String(r.id),raw:{...raw,orders:raw.orders??previous?.raw.orders??null},code:String(r.error_text),metricType});}
   let unmatchedOrders=0n;
@@ -179,7 +186,7 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
   }):pricedEntries;
   const groupSum=(predicate:(e:typeof groupEntries[number])=>boolean,field:'amount'|'confirmedAmount'|'pendingAmount'='amount')=>moneyText(groupEntries.filter(predicate).reduce((n,e)=>n+money(e[field]??'0',true),0n));
   const groups=[...new Set(groupEntries.map(e=>e.payeeId))].map(payeeId=>{const list=groupEntries.filter(e=>e.payeeId===payeeId);return{payeeId,name:list[0].payeeName,confirmed:groupSum(e=>e.payeeId===payeeId,'confirmedAmount'),pending:groupSum(e=>e.payeeId===payeeId,'pendingAmount'),total:groupSum(e=>e.payeeId===payeeId),blockers:[...new Set(list.map(e=>e.blocked).filter(Boolean))],ready:list.filter(e=>e.ready).length};});
-  const [issues]=await select(c,`SELECT COUNT(*) total FROM zh_exceptions x LEFT JOIN zh_import_rows r ON r.id=x.source_row_id LEFT JOIN zh_metric_facts f ON f.id=x.fact_id WHERE x.account_id=? AND x.project_id=? AND x.status='open' AND (? IN ('developer','admin','operator')) AND COALESCE(DATE_FORMAT(f.business_date,'%Y-%m-%d'),JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date'))) BETWEEN ? AND ?`,[scope.accountId,scope.projectId,user.role,period.from,period.to]);
+  const [issues]=await select(c,`SELECT COUNT(*) total FROM zh_exceptions x LEFT JOIN zh_import_rows r ON r.id=x.source_row_id LEFT JOIN zh_metric_facts f ON f.id=x.fact_id WHERE x.account_id=? AND x.project_id=? AND x.status='open' AND (? IN ('developer','admin','operator')) AND COALESCE(DATE_FORMAT(f.business_date,'%Y-%m-%d'),JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date'))) BETWEEN ? AND ? ${period.importId?'AND (r.batch_id=? OR EXISTS(SELECT 1 FROM zh_import_rows report_row WHERE report_row.batch_id=? AND report_row.fact_id=x.fact_id))':''}`,[scope.accountId,scope.projectId,user.role,period.from,period.to,...(period.importId?[period.importId,period.importId]:[])]);
   const reported=(type:MetricType)=>{
     if(!isStaffRole(user.role))return {};
     const records=[...new Map(entries.filter(e=>e.metricType===type).map(e=>[e.factId||e.id,e])).values()] as (typeof entries[number]&{reportedSettlement?:string|null})[];
@@ -193,9 +200,10 @@ export async function overview(user:AuthUser,scope:Scope,period:Period,connectio
     IF(j.status='failed','failed','running') status
     FROM zh_import_rows r JOIN zh_import_batches b ON b.id=r.batch_id LEFT JOIN zh_processing_jobs j ON j.batch_id=b.id
     WHERE b.project_id=? AND b.account_id=? AND b.status IN ('committed','processed') AND r.processing_status='pending'
+      ${period.importId?'AND b.id=?':''}
       AND JSON_UNQUOTE(JSON_EXTRACT(r.normalized_json,'$.date')) BETWEEN ? AND ?
       AND (? IS NULL OR IF(b.report_kind='activation','activation','new_user')=?)
-    GROUP BY b.id,b.file_name,j.status ORDER BY b.id`,[scope.projectId,scope.accountId,period.from,period.to,period.metricType??null,period.metricType??null]):[];
+    GROUP BY b.id,b.file_name,j.status ORDER BY b.id`,[scope.projectId,scope.accountId,...(period.importId?[period.importId]:[]),period.from,period.to,period.metricType??null,period.metricType??null]):[];
   if (!canViewUnitPrices(user)) for (const entry of entries) delete entry.calculation;
   return{period,entries,groups,teamPerformance,processingImports:processingImports.map(r=>({id:String(r.id),fileName:String(r.fileName),status:String(r.status),pendingRows:Number(r.pendingRows)})),reviewHash:digest([scope,period,tokens]),needsReview:route?.mode==='trial',summary:{records:stats.new_user.records,totalRecords:rows.filter(r=>r.snapshot_json).length+missing.size,orders:String(orderTotal),totalOrders:String(orderTotal+unmatchedOrders),billableOrders:String(billableOrders),pendingOrders:String(pendingOrders),issues:Number(issues.total),receivable:byType.new_user.receivable,confirmedReceivable:byType.new_user.confirmedReceivable,pendingReceivable:byType.new_user.pendingReceivable,payable:byType.new_user.payable,confirmedPayable:byType.new_user.confirmedPayable,pendingPayable:byType.new_user.pendingPayable,retained:byType.new_user.receivable,byType,staffAmount:isStaffRole(user.role)?moneyText(staffTotal):'0.0000'},withdrawal:{enabled:true,message:'已确认且款项可用后，可在下方申请提现。'}};
  };

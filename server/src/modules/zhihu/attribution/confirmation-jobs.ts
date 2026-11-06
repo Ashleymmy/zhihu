@@ -118,7 +118,7 @@ export async function startConfirmation(
   reviewHash: string,
 ): Promise<Progress> {
   assertDuty(user, 'finance');
-  period = { from: period.from, to: period.to, ...(period.metricType ? { metricType: period.metricType } : {}) };
+  period = { from: period.from, to: period.to, ...(period.metricType ? { metricType: period.metricType } : {}), ...(period.importId ? { importId: period.importId } : {}) };
   return mutate(user, scope, 'workbench.confirm', key, { period, reviewHash }, async (c) => {
     const view = await overview(user, scope, period, c);
     if (view.reviewHash !== reviewHash) fail('数据或审核状态已更新，请刷新后重新核对', 409);
