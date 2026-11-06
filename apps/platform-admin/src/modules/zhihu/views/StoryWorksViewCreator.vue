@@ -156,7 +156,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
 
 <template>
   <div class="page-stack">
-    <router-link to="/modules/zhihu/history" class="back-link">← 返回知乎故事</router-link>
+    <router-link to="/works" class="back-link">← 返回作品记录</router-link>
     <header class="page-header">
       <div>
         <p class="section-index">02 / 作品管理</p>

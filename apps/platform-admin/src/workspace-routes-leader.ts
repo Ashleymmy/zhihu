@@ -5,7 +5,7 @@ import {
   PublicFinance,
 } from '@zhihu-koc/shared-components'
 export const workspaceRoutes: RouteRecordRaw[] = [
-  { path: 'invitations', name: 'invitations', component: () => import('../../platform-admin/src/views/InvitationLinksView.vue'), meta: { title: '邀请链接' } },
+  { path: 'invitations', name: 'invitations', component: () => import('./views/InvitationLinksView.vue'), meta: { title: '邀请链接' } },
   { path: '', redirect: '/dashboard' },
   {
     path: 'dashboard',
@@ -28,13 +28,13 @@ export const workspaceRoutes: RouteRecordRaw[] = [
   {
     path: 'projects',
     name: 'projects',
-    component: () => import('./views/ProjectsView.vue'),
+    component: () => import('./views/LeaderProjectsView.vue'),
     meta: { title: '项目管理' },
   },
   {
     path: 'team',
     name: 'team',
-    component: () => import('../../platform-admin/src/views/TeamView.vue'),
+    component: () => import('./views/TeamView.vue'),
     meta: { title: '达人管理' },
   },
   {

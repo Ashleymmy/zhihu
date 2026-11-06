@@ -27,19 +27,19 @@ export const workspaceRoutes: RouteRecordRaw[] = [
   {
     path: 'projects',
     name: 'projects',
-    component: () => import('./views/ProjectsView.vue'),
+    component: () => import('./views/CreatorProjectsView.vue'),
     meta: { title: '项目管理' },
   },
   {
     path: 'profile',
     name: 'profile',
-    component: () => import('./views/ProfileView.vue'),
+    component: () => import('./views/CreatorProfileView.vue'),
     meta: { title: '个人信息' },
   },
   {
     path: 'join-team',
     name: 'join-team',
-    component: () => import('./views/JoinTeamView.vue'),
+    component: () => import('./views/CreatorJoinTeamView.vue'),
     meta: { title: '申请入团' },
   },
 ]
