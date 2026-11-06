@@ -30,7 +30,7 @@ interface Announcement { id: string; title: string; content: string; createdAt: 
 const announcements = ref<Announcement[]>([])
 
 /* ===== 员工首页可视化数据（demo mock 契约；正式账源上线后同路径替换） ===== */
-interface InsightsSummary { upstream?: string; memberPayout?: string; retention?: string; activeMembers: number; upstreamChange?: string; payoutRatio?: string; retentionRate?: string; taskCount?: number; activeTeams?: number; newMembers?: number }
+interface InsightsSummary { upstream?: string; memberPayout?: string; retention?: string; activeMembers: number; upstreamChange?: string; payoutRatio?: string; retentionRate?: string; taskCount?: number; activeTeams?: number; newMembers?: number; weekStats?: { label: string; value: string }[] }
 interface InsightsDaily { labels: string[]; series: { key: string; label: string; unit: string; values: string[] }[] }
 interface TeamTop { list: { name: string; quantity: number; amount?: string }[] }
 interface Retention { rate?: number; parts?: { label: string; amount: string }[]; teamCount?: number; newTeams?: number; soloCreators?: number; activeRate?: number }
@@ -40,7 +40,7 @@ interface ReconcileProgress { rate: number; checkedDays: number; totalDays: numb
 interface ForestNode { name: string; via?: 'team' | 'invite'; children?: ForestNode[] }
 interface RelationForest { roots: ForestNode[] }
 interface LiveFeed { list: { name: string; project: string; quantity: string; at: string }[] }
-interface PendingWithdrawals { totalAmount: string; count: number; earliest: string; todayPaid: string; monthPaid: string; failedCount: number }
+interface PendingWithdrawals { totalAmount: string; count: number; earliest: string; todayPaid: string; monthPaid: string; failedCount: number; oldest?: { name: string; amount: string; waiting: string }[] }
 const insightsSummary = ref<InsightsSummary | null>(null), insightsDaily = ref<InsightsDaily | null>(null), teamTop = ref<TeamTop | null>(null),
   retention = ref<Retention | null>(null), todayPayouts = ref<TodayPayouts | null>(null), reconcile = ref<ReconcileProgress | null>(null),
   pendingWithdrawals = ref<PendingWithdrawals | null>(null), relationForest = ref<RelationForest | null>(null), liveFeed = ref<LiveFeed | null>(null)
@@ -103,6 +103,17 @@ watch(retention, v => {
 })
 const ringOffsetRet = computed(() => RING_C * (1 - (ringOnRet.value ? retention.value?.activeRate ?? 0 : 0)))
 const TEAM_PALETTE = ['#d46b45', '#5b8fe0', '#8e6cc9', '#4e9a4a', '#c9a23f', '#b3557a']
+
+/* 关系森林交互：悬停/聚焦高亮一整条血脉（祖先 + 后代），其余变暗；点击进关系图 */
+const forestHover = ref('')
+const forestNodeState = (id: string) => {
+  const hov = forestHover.value
+  if (!hov) return ''
+  if (id === hov || hov.startsWith(id + '.') || id.startsWith(hov + '.')) return 'on'
+  return 'dim'
+}
+const forestColor = (name: string) => TEAM_PALETTE[[...name].reduce((s, c) => s + c.charCodeAt(0), 0) % TEAM_PALETTE.length]
+const latestFeed = computed(() => liveFeed.value?.list?.[0] ?? null)
 
 /* ===== 开发者首页可视化（系统视角：处理量/队列/Worker/巡检，无金额） ===== */
 interface DevSummary { processedToday: number; queueBacklog: number; syncTasks: number; patrols: number; failures24h: number; lastFailure: string | null; weekImports: number; weekPatrols: number; weekFixes: number }
@@ -439,7 +450,7 @@ function untilt(event: PointerEvent) {
         <button class="btn" @click="load" :disabled="loading">{{ loading ? '刷新中…' : '刷新' }}</button>
       </div>
       <div class="home-v2">
-        <div class="bento enter">
+        <div class="bento enter member">
           <!-- 钱包卡 -->
           <article v-if="wallet || month" class="card wallet float lift" style="--s:5;--i:0" @pointermove="tilt" @pointerleave="untilt">
             <svg v-if="spark" class="spark" width="110" height="22" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true"><path :d="spark" pathLength="1" fill="none" stroke="#f0b49b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -743,24 +754,34 @@ function untilt(event: PointerEvent) {
     <div class="home-v2">
       <div class="bento enter">
         <!-- 职务主卡：待办与业务概览（非金额，金额卡待 BE-08 账源） -->
-        <article class="card wallet float lift" style="--s:5;--i:0">
+        <article class="card wallet float lift" :style="{ '--s': 4, '--i': 0 }">
           <div class="lbl">现在要做</div>
           <div class="big num"><AnimatedNumber :value="todoTotal" :decimals="0" /><small style="font-size:16px;margin-left:4px">项待办</small></div>
           <div class="pill">{{ todoByActor.length ? todoByActor.map(a => `${a.actor} ${a.count}`).join(' · ') : '都处理完了' }}</div>
           <div v-if="todoByActor.length" class="stack" style="margin-top:14px;height:10px">
             <i v-for="(a, i) in todoByActor" :key="a.actor" :style="{ flexGrow: a.count, background: ['#f0b49b', '#8e6cc9', '#5b8fe0', '#4e9a4a'][i % 4] }" :title="`${a.actor} ${a.count} 项`"></i>
           </div>
+          <div v-else class="hero-calm">
+            <p>喝杯茶，新事项一出现就会来找你。</p>
+            <p v-if="latestFeed" class="hero-calm-feed">最新业绩 · {{ latestFeed.at }} · {{ latestFeed.name }} {{ latestFeed.project }} {{ latestFeed.quantity }}</p>
+          </div>
           <div class="acts"><router-link v-if="todos[0]" class="btn white" :to="todos[0].path">{{ todos[0].actionLabel || '去处理' }}</router-link><router-link v-else class="btn light" :to="staffWorkbenchPath">去工作台</router-link></div>
         </article>
 
         <!-- 财务/管理员：待打款主卡（demo mock 契约） -->
-        <article v-if="isFinanceStaff && pendingWithdrawals" class="card wallet float lift" style="--s:5;--i:1">
+        <article v-if="isFinanceStaff && pendingWithdrawals" class="card wallet float lift" style="--s:4;--i:1">
           <div class="lbl">待打款</div>
           <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(pendingWithdrawals.totalAmount))" :decimals="2" :text="yuan(units(pendingWithdrawals.totalAmount))" /></div>
           <div class="meta">
             <div><b>{{ pendingWithdrawals.count }}</b>笔待审批</div>
             <div><b>¥{{ yuan(units(pendingWithdrawals.todayPaid)) }}</b>今日已发</div>
             <div><b>¥{{ yuan(units(pendingWithdrawals.monthPaid)) }}</b>本月已发</div>
+          </div>
+          <div v-if="pendingWithdrawals.oldest?.length" class="wallet-oldest">
+            <p class="muted" style="font-size:12px;margin:0">等待最久的三笔</p>
+            <div v-for="o in pendingWithdrawals.oldest" :key="o.name" class="wallet-oldest-row">
+              <b>{{ o.name }}</b><span>¥{{ yuan(units(o.amount)) }}</span><em>{{ o.waiting }}</em>
+            </div>
           </div>
           <div class="acts">
             <router-link class="btn white" to="/finance">去审批提现</router-link>
@@ -769,19 +790,29 @@ function untilt(event: PointerEvent) {
           <p class="muted" style="font-size:12px;margin-top:10px">最早一笔提交于 {{ pendingWithdrawals.earliest }}</p>
         </article>
 
+        <!-- 员工共享：实时动态（30s 自动刷新）——顶行第三张，业绩产生即出现在这里 -->
+        <article v-if="liveFeed" class="card lift" :style="{ '--s': isOperator ? 8 : 4, '--i': isOperator ? 1 : 2 }">
+          <div class="card-h"><h3>实时动态</h3><span class="r"><button type="button" class="live-toggle" :aria-pressed="liveOn" @click="liveOn = !liveOn"><i :class="{ on: liveOn }" />自动刷新</button></span></div>
+          <div v-for="(x, i) in liveFeed.list" :key="i" class="row">
+            <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: TEAM_PALETTE[i % TEAM_PALETTE.length], flex: 'none' }"></span>
+            <div class="t"><b>{{ x.name }} · {{ x.project }} {{ x.quantity }}</b><small>{{ x.at }}</small></div>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:8px">业绩产生即出现在这里，名字已脱敏 · 演示数据</p>
+        </article>
+
         <!-- 财务/管理员：总览四数 -->
         <template v-if="isFinanceStaff && insightsSummary">
-          <article class="card lift" style="--s:4;--i:2">
+          <article class="card lift" style="--s:4;--i:3">
             <div class="card-h"><h3>上游收入</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.upstream))" :decimals="2" :text="yuan(units(insightsSummary.upstream))" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}</p>
           </article>
-          <article class="card lift" style="--s:4;--i:3">
+          <article class="card lift" style="--s:4;--i:4">
             <div class="card-h"><h3>成员支出</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.memberPayout))" :decimals="2" :text="yuan(units(insightsSummary.memberPayout))" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">占上游 {{ insightsSummary.payoutRatio }}</p>
           </article>
-          <article class="card lift" style="--s:4;--i:4">
+          <article class="card lift" style="--s:4;--i:5">
             <div class="card-h"><h3>平台留存</h3><span class="r"><span class="chip clay">{{ insightsSummary.retentionRate }}</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
             <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.retention))" :decimals="2" :text="yuan(units(insightsSummary.retention))" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">活跃成员 {{ insightsSummary.activeMembers }} 人</p>
@@ -808,14 +839,14 @@ function untilt(event: PointerEvent) {
         </template>
 
         <!-- 员工共用：趋势图（财务=上游收入 vs 成员支出；运营=分项目业务量） -->
-        <article v-if="staffTrend" class="card lift" style="--s:12;--i:5">
+        <article v-if="staffTrend" class="card lift" :style="{ '--s': isOperator ? 8 : 12, '--i': 6 }">
           <div class="card-h"><h3>{{ isOperator ? '业务量趋势' : '上游收入 vs 成员支出' }}</h3><span class="muted" style="font-size:12.5px">近 30 天 · 演示数据</span><router-link class="card-go r" :to="isOperator ? '/tasks' : '/finance'">{{ isOperator ? '任务 →' : '财务 →' }}</router-link></div>
           <div class="legend" style="margin-bottom:10px"><span v-for="s in staffTrend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}<b>{{ staffTrendFormat(staffTrendTotal(s.points)) }}</b></span></div>
           <TrendChart :labels="staffTrend.labels" :series="staffTrend.series" :height="210" :format="staffTrendFormat" caption="近 30 天每日走势" />
         </article>
 
         <!-- 财务/管理员：对账进度环 -->
-        <article v-if="isFinanceStaff && reconcile" class="card lift" style="--s:4;--i:6">
+        <article v-if="isFinanceStaff && reconcile" class="card lift" style="--s:4;--i:7">
           <div class="card-h"><h3>对账进度</h3><span class="r"><span class="chip soft">{{ reconcile.checkedDays }}/{{ reconcile.totalDays }} 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
           <div class="ring-wrap" style="margin-top:6px">
             <svg class="ring" width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
@@ -831,7 +862,7 @@ function untilt(event: PointerEvent) {
         </article>
 
         <!-- 财务/管理员：平台留存构成 -->
-        <article v-if="isFinanceStaff && retention?.parts" class="card lift" style="--s:4;--i:7">
+        <article v-if="isFinanceStaff && retention?.parts" class="card lift" style="--s:4;--i:8">
           <div class="card-h"><h3>留存构成</h3><span class="r"><span class="chip clay">{{ Math.round((retention.rate ?? 0) * 1000) / 10 }}%</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
           <div class="stack" style="margin-top:6px;height:12px">
             <i v-for="(p, i) in retention.parts" :key="p.label" :style="{ flexGrow: Number(p.amount), background: TEAM_PALETTE[i % TEAM_PALETTE.length] }" :title="`${p.label} ¥${p.amount}`"></i>
@@ -840,7 +871,7 @@ function untilt(event: PointerEvent) {
         </article>
 
         <!-- 员工共用：团队排行（BarChart 自带入场生长动画） -->
-        <article v-if="teamTopItems.length" class="card lift" :style="{ '--s': isFinanceStaff ? 4 : 12, '--i': 8 }">
+        <article v-if="teamTopItems.length" class="card lift" :style="{ '--s': isFinanceStaff ? 4 : 12, '--i': 9 }">
           <div class="card-h"><h3>团队排行</h3><span class="muted" style="font-size:12.5px">{{ isOperator ? '按业绩量' : '按上游贡献' }} · 演示数据</span><router-link class="card-go r" to="/team">全部团队 →</router-link></div>
           <BarChart :items="teamTopItems" :format="teamTopFormat" :max-items="6" />
         </article>
@@ -864,16 +895,59 @@ function untilt(event: PointerEvent) {
         </article>
 
         <!-- 员工共享：关系森林（实线=当前团队，虚线=原始邀请；隐性层只在员工端可见） -->
-        <article v-if="relationForest" class="card lift" style="--s:7;--i:10">
+        <article v-if="relationForest" class="card lift forest-card" :style="{ '--s': 12, '--i': 10 }">
           <div class="card-h"><h3>关系森林</h3><span class="muted" style="font-size:12.5px">演示数据</span><router-link class="card-go r" to="/team/relations">关系图 →</router-link></div>
-          <div class="forest">
-            <div v-for="root in relationForest.roots" :key="root.name" class="forest-tree">
-              <span class="f-node f-root">{{ root.name }}</span>
+          <div class="forest" @mouseleave="forestHover = ''">
+            <div v-for="(root, ri) in relationForest.roots" :key="root.name" class="forest-tree">
+              <router-link v-slot="{ navigate }" to="/team/relations" custom>
+                <button
+                  type="button"
+                  class="f-node f-root"
+                  :class="forestNodeState(`${ri}`)"
+                  :style="{ '--d': `${ri * 120}ms` }"
+                  :title="`${root.name}的团队，点击查看关系图`"
+                  @mouseenter="forestHover = `${ri}`"
+                  @focus="forestHover = `${ri}`"
+                  @click="navigate"
+                >
+                  <i class="f-dot" :style="{ background: forestColor(root.name) }">{{ root.name.slice(0, 1) }}</i>{{ root.name }}<em v-if="root.children?.length" class="f-count">{{ root.children.length }}</em>
+                </button>
+              </router-link>
               <div class="f-col">
-                <div v-for="ch in root.children" :key="ch.name" class="f-item">
-                  <span class="f-node" :data-via="ch.via">{{ ch.name }}</span>
+                <div v-for="(ch, ci) in root.children" :key="ch.name" class="f-item">
+                  <router-link v-slot="{ navigate }" to="/team/relations" custom>
+                    <button
+                      type="button"
+                      class="f-node"
+                      :class="forestNodeState(`${ri}.${ci}`)"
+                      :style="{ '--d': `${ri * 120 + (ci + 1) * 70}ms` }"
+                      :data-via="ch.via"
+                      :title="`${ch.name}，点击查看关系图`"
+                      @mouseenter="forestHover = `${ri}.${ci}`"
+                      @focus="forestHover = `${ri}.${ci}`"
+                      @click="navigate"
+                    >
+                      <i class="f-dot" :style="{ background: forestColor(ch.name) }">{{ ch.name.slice(0, 1) }}</i>{{ ch.name }}<em v-if="ch.children?.length" class="f-count">{{ ch.children.length }}</em>
+                    </button>
+                  </router-link>
                   <div v-if="ch.children?.length" class="f-col">
-                    <span v-for="gc in ch.children" :key="gc.name" class="f-node" :data-via="gc.via">{{ gc.name }}</span>
+                    <template v-for="(gc, gi) in ch.children" :key="gc.name">
+                      <router-link v-slot="{ navigate }" to="/team/relations" custom>
+                        <button
+                          type="button"
+                          class="f-node"
+                          :class="forestNodeState(`${ri}.${ci}.${gi}`)"
+                          :style="{ '--d': `${ri * 120 + (ci + 1) * 70 + (gi + 1) * 45}ms` }"
+                          :data-via="gc.via"
+                          :title="`${gc.name}，点击查看关系图`"
+                          @mouseenter="forestHover = `${ri}.${ci}.${gi}`"
+                          @focus="forestHover = `${ri}.${ci}.${gi}`"
+                          @click="navigate"
+                        >
+                          <i class="f-dot" :style="{ background: forestColor(gc.name) }">{{ gc.name.slice(0, 1) }}</i>{{ gc.name }}
+                        </button>
+                      </router-link>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -882,28 +956,14 @@ function untilt(event: PointerEvent) {
           <p class="muted" style="font-size:12px;margin-top:12px">实线 = 当前团队 · 虚线 = 原始邀请（隐性，仅员工可见）</p>
         </article>
 
-        <!-- 员工共享：实时动态（30s 自动刷新） -->
-        <article v-if="liveFeed" class="card lift" style="--s:5;--i:11">
-          <div class="card-h"><h3>实时动态</h3><span class="r"><button type="button" class="live-toggle" :aria-pressed="liveOn" @click="liveOn = !liveOn"><i :class="{ on: liveOn }" />自动刷新</button></span></div>
-          <div v-for="(x, i) in liveFeed.list" :key="i" class="row">
-            <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: TEAM_PALETTE[i % TEAM_PALETTE.length], flex: 'none' }"></span>
-            <div class="t"><b>{{ x.name }} · {{ x.project }} {{ x.quantity }}</b><small>{{ x.at }}</small></div>
-          </div>
-          <p class="muted" style="font-size:12px;margin-top:8px">业绩产生即出现在这里，名字已脱敏 · 演示数据</p>
-        </article>
-
-        <!-- 待办列表 -->
-        <section class="card" style="--s:7;--i:1" aria-labelledby="home-todos">
-          <div class="card-h"><h3 id="home-todos">待办</h3><span v-if="todos.length" class="chip clay r">{{ todos.length }} 项</span></div>
-          <template v-if="todos.length">
-            <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row" style="text-decoration:none;color:inherit">
-              <span class="home-todo-count">{{ todo.count }}</span>
-              <div class="t"><b>{{ todo.label }}</b><small>{{ todo.projectName }} · {{ todo.actor }}</small></div>
-              <span class="home-todo-action">{{ todo.actionLabel }} →</span>
-            </router-link>
-          </template>
-          <div v-else-if="!loading && !error && !unavailable" class="bento-empty home-empty"><b>都处理完了</b><p>新的待办会实时出现在这里和顶栏铃铛里。</p></div>
-          <p v-else-if="loading && !data" role="status">正在整理你的待办…</p>
+        <!-- 待办列表（有待办才显示；空时主卡 pill 已说明“都处理完了”） -->
+        <section v-if="todos.length" class="card" :style="{ '--s': isOperator ? 7 : 12, '--i': 12 }" aria-labelledby="home-todos-staff">
+          <div class="card-h"><h3 id="home-todos-staff">待办</h3><span class="chip clay r">{{ todos.length }} 项</span></div>
+          <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row" style="text-decoration:none;color:inherit">
+            <span class="home-todo-count">{{ todo.count }}</span>
+            <div class="t"><b>{{ todo.label }}</b><small>{{ todo.projectName }} · {{ todo.actor }}</small></div>
+            <span class="home-todo-action">{{ todo.actionLabel }} →</span>
+          </router-link>
         </section>
 
         <!-- 项目业务量 -->
@@ -931,6 +991,9 @@ function untilt(event: PointerEvent) {
           <div class="big-av">{{ (w.userName?.value ?? '我').slice(0, 1) }}</div>
           <h4>{{ w.userName?.value ?? '我' }}</h4>
           <p class="muted" style="font-size:12.5px">{{ w.role.value === 'operator' ? '运营管理' : w.role.value === 'developer' ? '开发者' : w.duty?.value === 'finance' ? '财务管理' : '管理员' }}</p>
+          <div v-if="insightsSummary?.weekStats?.length" class="profile-stats">
+            <div v-for="s in insightsSummary.weekStats" :key="s.label"><b>{{ s.value }}</b><span>{{ s.label }}</span></div>
+          </div>
         </div>
         <div v-if="isFinanceStaff && todayPayouts" class="card">
           <div class="card-h"><h3>今日打款</h3><span class="r"><span class="muted" style="font-size:12px">{{ todayPayouts.count }} 笔</span><router-link class="card-go" to="/finance">全部 →</router-link></span></div>
@@ -986,18 +1049,46 @@ function untilt(event: PointerEvent) {
 .cb-name { max-width: 100%; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes contrib-grow { from { transform: scaleY(0); } }
 @media (prefers-reduced-motion: reduce) { .cb-bar { animation: none; } }
-/* 关系森林：横向树，实线=当前团队，虚线=原始邀请 */
-.forest { display: grid; gap: 14px; }
+/* 待打款：等待最久明细；现在要做：零待办时的从容态（margin-top:auto 让两段内容把卡片撑匀） */
+.wallet-oldest { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.wallet-oldest .muted { color: rgba(255, 255, 255, 0.55); }
+.wallet-oldest-row { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; color: rgba(255, 255, 255, 0.88); font-size: 12.5px; }
+.wallet-oldest-row b { font-weight: 650; }
+.wallet-oldest-row em { margin-left: auto; color: rgba(255, 255, 255, 0.55); font-size: 12px; font-style: normal; }
+.hero-calm { display: grid; gap: 6px; margin-top: auto; padding: 14px 0 4px; }
+.hero-calm p { margin: 0; color: rgba(255, 255, 255, 0.75); font-size: 13px; }
+.hero-calm .hero-calm-feed { color: rgba(255, 255, 255, 0.5); font-size: 12px; }
+
+/* 关系森林：横向树，实线=当前团队，虚线=原始邀请；悬停高亮整条血脉，逐层入场 */
+/* 多棵树横向铺开填满卡宽，内容垂直居中吃掉 bento 行高拉伸出的空白 */
+.forest-card { display: flex; flex-direction: column; }
+.forest-card .forest { flex: 1; align-content: center; }
+.forest-card .card-h + .forest { margin-top: 4px; }
+.forest { display: flex; flex-wrap: wrap; gap: 18px 44px; align-items: flex-start; justify-content: space-evenly; }
 .forest-tree { display: flex; align-items: flex-start; }
-.f-col { position: relative; display: grid; gap: 8px; padding-left: 30px; }
-.f-col::before { position: absolute; top: 14px; bottom: 14px; left: 10px; border-left: 1.5px solid var(--line-2); content: ""; }
+.f-col { position: relative; display: grid; gap: 8px; padding-left: 30px; justify-items: start; }
+.f-col::before { position: absolute; top: 14px; bottom: 14px; left: 10px; border-left: 1.5px solid var(--line-2); content: ""; transform-origin: top; animation: forest-line 0.45s var(--ease-out) both; }
 .f-item { display: flex; align-items: flex-start; }
-.f-node { position: relative; display: inline-block; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
-.f-node::before { position: absolute; top: 50%; left: -20px; width: 20px; border-top: 1.5px solid var(--line-2); content: ""; }
-.f-root { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.f-node { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: transform 0.3s var(--spring), box-shadow 0.2s, opacity 0.25s, border-color 0.2s; animation: forest-in 0.45s var(--spring) both; animation-delay: var(--d, 0ms); }
+.f-node::before { position: absolute; top: 50%; left: -20px; width: 20px; border-top: 1.5px solid var(--line-2); content: ""; transition: border-color 0.2s; }
+.f-dot { display: grid; width: 20px; height: 20px; flex: none; place-items: center; border-radius: 50%; color: #fff; font-size: 10.5px; font-style: normal; font-weight: 700; }
+.f-count { min-width: 17px; padding: 1px 5px; border-radius: 999px; background: var(--card-2); color: var(--ink-soft); font-size: 10.5px; font-style: normal; font-weight: 700; text-align: center; }
+.f-root { padding: 5px 14px 5px 6px; border-color: var(--ink); background: var(--ink); color: var(--bg); }
 .f-root::before { display: none; }
+.f-root .f-dot { background: rgba(255, 255, 255, 0.28) !important; }
+.f-root .f-count { background: rgba(255, 255, 255, 0.18); color: var(--bg); }
 .f-node[data-via="invite"] { border-style: dashed; color: var(--ink-soft); }
 .f-node[data-via="invite"]::before { border-top-style: dashed; }
+.f-node:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(20, 20, 19, 0.1); }
+.f-node:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.f-node.dim { opacity: 0.32; }
+.f-node.on { border-color: var(--clay-deep); box-shadow: 0 0 0 3px var(--clay-soft); }
+.f-node.on::before { border-top-color: var(--clay-deep); }
+.f-col:has(.f-node.on)::before { border-left-color: color-mix(in srgb, var(--clay) 45%, var(--line-2)); }
+@keyframes forest-in { from { opacity: 0; transform: translateY(8px) scale(0.92); } }
+@keyframes forest-line { from { transform: scaleY(0); } }
+@media (prefers-reduced-motion: reduce) { .f-node, .f-col::before { animation: none; } }
+@media (max-width: 700px) { .f-col { padding-left: 22px; } .f-node::before { left: -14px; width: 14px; } }
 /* 实时动态开关 */
 .live-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; }
 .live-toggle i { position: relative; width: 26px; height: 15px; border-radius: 999px; background: var(--line-2); transition: background 0.2s; }
@@ -1010,9 +1101,9 @@ function untilt(event: PointerEvent) {
   .home-v2 { grid-template-columns: 1fr; }
   .home-aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
-/* 大屏加密：1900px 以上小卡一行 4 张（内联 --s:4 用 !important 覆盖） */
+/* 大屏加密：1900px 以上成员视图小卡一行 4 张（内联 --s:4 用 !important 覆盖；员工/开发者视图保持 12 格凑满） */
 @media (min-width: 1900px) {
-  .home-v2 .bento .card[style*="--s:4"] { grid-column: span 3 !important; }
+  .home-v2 .bento.member .card[style*="--s:4"] { grid-column: span 3 !important; }
 }
 @media (max-width: 720px) {
   .home-aside { grid-template-columns: 1fr; }

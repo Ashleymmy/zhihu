@@ -33,16 +33,31 @@ function dailySeries(days: number, base: number, amp: number, seed = 0): { date:
 export function mountDemoInsights(app: Express) {
   const authed = (req: Request): AuthUser | undefined => (req as Request & { user?: AuthUser }).user;
 
-  /** 员工总览四数卡：上游收入、成员支出、平台留存、活跃成员 */
+  /** 员工总览四数卡：上游收入、成员支出、平台留存、活跃成员 + 资料卡本周统计 */
   app.get('/api/v1/core/insights/summary', ...guard, (req, res) => {
     if (noAmount(authed(req))) {
-      return res.json({ code: 0, data: { activeMembers: 108, upstreamChange: '+32.9%', taskCount: 12406, activeTeams: 12, newMembers: 14 } });
+      return res.json({
+        code: 0,
+        data: {
+          activeMembers: 108, upstreamChange: '+32.9%', taskCount: 12406, activeTeams: 12, newMembers: 14,
+          weekStats: [
+            { label: '本周处理', value: '26' },
+            { label: '本周提名', value: '5' },
+            { label: '本周审核', value: '38' },
+          ],
+        },
+      });
     }
     res.json({
       code: 0,
       data: {
         upstream: '62480.00', memberPayout: '48360.00', retention: '14120.00', activeMembers: 108,
         upstreamChange: '+32.9%', payoutRatio: '77.4%', retentionRate: '22.6%',
+        weekStats: [
+          { label: '本周打款', value: '42 笔' },
+          { label: '本周对账', value: '19 天' },
+          { label: '本周导出', value: '6 次' },
+        ],
       },
     });
   });
@@ -134,7 +149,12 @@ export function mountDemoInsights(app: Express) {
   /** 待审批提现汇总（财务主卡） */
   app.get('/api/v1/core/finance/withdrawals/pending', ...guard, (req, res) => {
     if (noAmount(authed(req))) return res.status(403).json({ code: 40300, message: '无权查看提现' });
-    res.json({ code: 0, data: { totalAmount: '3286.00', count: 4, earliest: '今天 09:12', todayPaid: '1710.60', monthPaid: '42380.00', failedCount: 1 } });
+    res.json({ code: 0, data: { totalAmount: '3286.00', count: 4, earliest: '今天 09:12', todayPaid: '1710.60', monthPaid: '42380.00', failedCount: 1,
+      oldest: [
+        { name: '林*满', amount: '820.00', waiting: '等了 7 小时' },
+        { name: '韩*宁', amount: '460.00', waiting: '等了 5 小时' },
+        { name: '许*乔', amount: '310.00', waiting: '等了 3 小时' },
+      ] } });
   });
 
   /** 开发者首页：今日处理概览（系统视角，无金额） */
