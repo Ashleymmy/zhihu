@@ -203,7 +203,7 @@ async function main() {
       if (!crossView.processingImports.length) break;
       await new Promise(resolve => setTimeout(resolve, 250));
     }
-    assert.equal(crossView.summary.orders, '2');
+    assert.equal(crossView.summary.byType.newUser.quantity, '2');
     for (const session of Object.values(sessions)) assert.deepEqual(session.errors, []);
     const result = { passed: true, widths: [1440, 375], roles: ['finance', 'admin', 'developer'], currentOrders: 5, currentPayable: '42.50', monthOrders: 12, monthPayable: '101.50', historyScoped: true, confirmationScoped: true, sameDayOtherReportUnconfirmed: true, crossMonthRange: true, oldLedgerUnchanged: true };
     fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify(result, null, 2));
