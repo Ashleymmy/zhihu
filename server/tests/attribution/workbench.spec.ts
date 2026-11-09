@@ -394,3 +394,40 @@ it('报表范围保留未识别行，空报表不能退回整月，报表和财�
  expect((await get(fin,path('/workbench'),{...scope,...period})).status).toBe(409);
  expect((await post(fin,path('/workbench/confirm'),{...scope,...period,reviewHash:view.reviewHash,acknowledged:true,requestKey:key()})).status).toBe(409);
 });
+
+it('同一关键词连续三日出单分别累计，重复导出同一天不会再增加收入',async()=>{
+ const keyword='连续出单核对词';
+ const dates=[2,1,0].map(offset=>new Date(Date.parse(day)-offset*86400000).toISOString().slice(0,10));
+ await resource.createMapping(admin,scope,key(),{channelId:'1',name:'连续日渠道',from:dates[0],canonicalId:mapping});
+ const word=await resource.createKeyword(admin,scope,key(),{keyword,taskId:'1',mappingId:mapping,landingUrl:'https://example.com/daily-orders',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['daily-'+word.id,word.planId]);
+ const bind=await resource.distribute(admin,scope,word.id,key(),a.sub);
+ await resource.changeBinding(a,scope,bind.id,key(),{action:'activate'});
+ // This disposable fixture predates the three report dates.
+ await c.query('UPDATE zh_keyword_bindings SET activated_on=?,assigned_at=?,used_at=? WHERE id=?',[dates[0],dates[0],dates[0],bind.id]);
+ const evidence=await statements.submitEvidence(a,scope,key(),{bindingId:bind.id,url:'https://example.com/daily-work',description:'连续日期隔离核验'});
+ await statements.reviewEvidence(ops,scope,evidence.id,key(),true,'隔离核验');
+ for(const [index,date] of dates.entries()){
+  const orders=index===1?1:2;
+  const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${date},连续日渠道,${keyword},${orders}`);
+  const imported=await workbench.uploadReport(fin,scope,{buffer,size:buffer.length,originalname:'连续出单.csv',mimetype:'text/csv'});
+  const period={from:dates[0],to:day,importId:imported.id};
+  const view=await workbench.overview(fin,scope,period);
+  expect(view.summary.orders).toBe(String(orders));
+  expect(view.entries.every(entry=>entry.date===date)).toBe(true);
+  await workbench.confirmBills(fin,scope,period,key(),view.reviewHash);
+ }
+ const whole=await workbench.overview(fin,scope,{from:dates[0],to:day});
+ const entries=whole.entries.filter(entry=>entry.keyword===keyword);
+ const quantities=[...new Map(entries.map(entry=>[entry.factId,entry.quantity])).values()];
+ expect(quantities).toHaveLength(3);expect(quantities.reduce((sum,value)=>sum+BigInt(value!),0n)).toBe(5n);
+ expect(entries.reduce((sum,entry)=>sum+BigInt(entry.confirmedAmount.replace('.','')),0n)).toBe(425000n);
+ const ledger=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${day},连续日渠道,${keyword},2\n`);
+ const repeated=await workbench.uploadReport(fin,scope,{buffer,size:buffer.length,originalname:'重新导出的同日数据.csv',mimetype:'text/csv'});
+ const period={from:dates[0],to:day,importId:repeated.id};
+ const duplicate=await workbench.overview(fin,scope,period);
+ expect(duplicate.summary).toMatchObject({orders:'2',payable:'17.0000',confirmedPayable:'17.0000',pendingPayable:'0.0000'});
+ expect(await workbench.confirmBills(fin,scope,period,key(),duplicate.reviewHash)).toMatchObject({confirmed:0,total:0});
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);
+});
