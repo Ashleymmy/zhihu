@@ -9,8 +9,8 @@ import type { ModuleRuntime } from './module-runtime';
 import { recordRoleChange, setTeamLeader } from './member-relations';
 
 /**
- * 晋升（P1b）：运营提名 → 另一位运营或完整管理员审核。
- * 审核通过时在同一事务里：达人改为团长并转为平台直管；其直接邀请的成员按审核时的选择跟随或留下；
+ * 晋升由同一位有运营权限的人员登记并确认，无需另一人审核。
+ * 确认时在同一事务里：达人改为团长并转为平台直管；其直接邀请的成员按办理人的选择跟随或留下；
  * 写角色历史、团队归属历史，改写邀请链接的所属团队，并让相关账号重新登录以拿到新角色。
  * 原团长此后不再从晋升者及跟随成员获得团队收益（决策 3）。本阶段不改动任何金额计算。
  */
@@ -130,7 +130,7 @@ export async function nominate(auth: AuthUser, input: { userId: string; note: st
       );
       return { id: String(r.insertId) };
     } catch (e) {
-      if ((e as { code?: string }).code === 'ER_DUP_ENTRY') throw new AppError(409, 40900, '该成员已有一张审核中的晋升提名');
+      if ((e as { code?: string }).code === 'ER_DUP_ENTRY') throw new AppError(409, 40900, '该成员已有待确认的晋升，请在晋升工作台继续办理');
       throw e;
     }
   });
@@ -142,14 +142,9 @@ async function lockedPromotion(c: PoolConnection, id: string) {
   if (!OPEN.includes(String(p.status))) throw new AppError(409, 40900, '这张提名已经处理过了');
   return p;
 }
-function assertReviewer(auth: AuthUser, p: RowDataPacket) {
-  if (idText(p.proposed_by) === auth.sub) throw new AppError(403, 40301, '提名人不能审核自己的提名，请让另一位同事审核');
-}
-
 export async function approve(auth: AuthUser, id: string, input: { follow: string[]; note?: string }, runtime: ModuleRuntime) {
   return withTransaction(async (c) => {
     const p = await lockedPromotion(c, id);
-    assertReviewer(auth, p);
     const userId = String(p.user_id);
     const user = await lockedUser(c, userId);
     if (!nominable(user)) throw new AppError(409, 40900, '该成员的账号状态已经变化，请退回这张提名');
@@ -218,7 +213,6 @@ export async function approve(auth: AuthUser, id: string, input: { follow: strin
 export async function decline(auth: AuthUser, id: string, status: 'rejected' | 'cancelled', reason: string) {
   return withTransaction(async (c) => {
     const p = await lockedPromotion(c, id);
-    if (status === 'rejected') assertReviewer(auth, p);
     await c.query('UPDATE member_promotions SET status=?,reviewed_by=?,decided_at=NOW(3),review_note=? WHERE id=?', [
       status, auth.sub, reason, id,
     ]);
@@ -234,7 +228,7 @@ const LIST_SQL = `SELECT p.*,u.display_name user_name,u.role user_role,l.display
   FROM member_promotions p JOIN users u ON u.id=p.user_id LEFT JOIN users l ON l.id=p.from_leader_id
   LEFT JOIN users pb ON pb.id=p.proposed_by LEFT JOIN users rb ON rb.id=p.reviewed_by`;
 const json = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v);
-function shape(p: RowDataPacket, viewer: AuthUser) {
+function shape(p: RowDataPacket) {
   const plan = json(p.member_plan) as { action: string }[] | null;
   return {
     id: String(p.id),
@@ -250,7 +244,8 @@ function shape(p: RowDataPacket, viewer: AuthUser) {
     decidedAt: p.decided_at,
     reviewNote: p.review_note == null ? null : String(p.review_note),
     followed: plan ? plan.filter((m) => m.action === 'follow').length : null,
-    canReview: OPEN.includes(String(p.status)) && idText(p.proposed_by) !== viewer.sub,
+    // 保留原契约字段名；待确认记录可由发起人本人继续办理。
+    canReview: OPEN.includes(String(p.status)),
   };
 }
 
@@ -260,13 +255,13 @@ export async function listPromotions(viewer: AuthUser, view: 'open' | 'done') {
       ? `${LIST_SQL} WHERE p.status IN ('candidate','proposed') ORDER BY p.proposed_at,p.id LIMIT 200`
       : `${LIST_SQL} WHERE p.status IN ('approved','rejected','cancelled') ORDER BY p.decided_at DESC,p.id DESC LIMIT 100`,
   );
-  return list.map((p) => shape(p, viewer));
+  return list.map((p) => shape(p));
 }
 
 export async function promotionDetail(viewer: AuthUser, id: string) {
   const [p] = await rows<RowDataPacket>(`${LIST_SQL} WHERE p.id=?`, [id]);
   if (!p) throw new AppError(404, 40400, '晋升提名不存在');
-  const item = shape(p, viewer);
+  const item = shape(p);
   const plan = json(p.member_plan) as { userId: string; name: string; action: 'follow' | 'stay'; fromLeaderId: string | null }[] | null;
   // 已处理的提名展示当时的去向；审核中的提名展示此刻的直接邀请成员和默认去向
   const members = plan

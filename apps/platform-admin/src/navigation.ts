@@ -39,7 +39,7 @@ export function workspaceNavigation(user: AuthUser | null, hasBusiness: boolean)
   }
   if (user.role === 'leader' || staff && duty !== 'finance') items.push({ key: 'team', label: staff ? '成员与团队' : '我的团队', path: '/team' })
   // 关系与晋升（含隐性荐邀层）只归员工管控，成员端不出现
-  if (staff && duty !== 'finance') items.push({ key: 'relations', label: '关系图', path: '/team/relations' }, { key: 'promotions', label: '晋升审核', path: '/team/promotions' })
+  if (staff && duty !== 'finance') items.push({ key: 'relations', label: '关系图', path: '/team/relations' }, { key: 'promotions', label: '晋升办理', path: '/team/promotions' })
   if (hasBusiness && (!staff || duty !== 'operations')) items.push({ key: 'finance', label: staff ? '财务' : '我的收益', path: staff ? '/finance' : '/income' })
   if (staff && duty !== 'operations') items.push({ key: 'rates', label: '计费规则', path: '/rates' })
   if (staff && duty !== 'finance') items.push({ key: 'projects', label: '项目设置', path: '/projects' })

@@ -73,7 +73,7 @@ header {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 22px 14px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--white, #fff);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }

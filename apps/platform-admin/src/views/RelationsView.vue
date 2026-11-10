@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { http } from '../stores/auth'
 import { ActionDialog, AnimatedNumber, notify } from '@zhihu-koc/shared-components'
+const router = useRouter()
 
 /** 成员关系图：左侧逐层加载的成员树（按团队 / 按邀请），右侧是选中成员的三种关系与变更时间线 */
 interface TreeNode { id: string; name: string; role: string; active: boolean; children: number }
@@ -177,12 +179,11 @@ async function submitNominate() {
   nominateBusy.value = true
   nominateError.value = ''
   try {
-    await http.post('/promotions', { userId: nominee.value.user.id, note: nominateNote.value.trim() })
+    const result = await http.post<{ id: string }>('/promotions', { userId: nominee.value.user.id, note: nominateNote.value.trim() })
     nominateOpen.value = false
-    notify(`已提名 ${nominee.value.user.name}，等待另一位同事审核`)
-    await loadNominee(nominee.value.user.id)
+    await router.push({ path: '/team/promotions', query: { id: result.id } })
   } catch (e) {
-    nominateError.value = (e instanceof Error && e.message) || '提名没有提交成功，请重试'
+    nominateError.value = (e instanceof Error && e.message) || '晋升办理没有打开，请重试'
   } finally {
     nominateBusy.value = false
   }
@@ -291,8 +292,8 @@ onMounted(() => { void loadChildren(''); void loadSettings() })
               <span v-if="!detail.user.active" class="chip down" style="margin-left:6px">已停用</span>
             </div>
             <div v-if="nominee" class="person-actions">
-              <router-link v-if="nominee.openPromotionId" :to="`/team/promotions?id=${nominee.openPromotionId}`" class="chip clay">晋升审核中 →</router-link>
-              <button v-else-if="nominee.nominable" type="button" class="ghost-aurora" @click="openNominate">提名晋升</button>
+              <router-link v-if="nominee.openPromotionId" :to="`/team/promotions?id=${nominee.openPromotionId}`" class="chip clay">继续办理晋升 →</router-link>
+              <button v-else-if="nominee.nominable" type="button" class="ghost-aurora" @click="openNominate">办理晋升</button>
             </div>
             <div v-if="detail.user.active" class="person-actions" :class="{ solo: !nominee }">
               <button v-if="detail.user.role === 'creator'" type="button" class="ghost-aurora" @click="openMove('transfer')">调整团队</button>
@@ -343,7 +344,7 @@ onMounted(() => { void loadChildren(''); void loadSettings() })
       </form>
     </ActionDialog>
 
-    <ActionDialog :open="nominateOpen" :title="`提名 ${nominee?.user.name ?? ''} 晋升团长`" :busy="nominateBusy" @close="nominateOpen = false">
+    <ActionDialog :open="nominateOpen" :title="`办理 ${nominee?.user.name ?? ''} 晋升团长`" :busy="nominateBusy" @close="nominateOpen = false">
       <form v-if="nominee" @submit.prevent="submitNominate">
         <p v-if="nominateError" role="alert" class="relations-error">{{ nominateError }}</p>
         <div class="nominee-stats">
@@ -352,12 +353,12 @@ onMounted(() => { void loadChildren(''); void loadSettings() })
           <div v-for="q in nominee.metrics.quantities" :key="q.label"><small>{{ q.label }}</small><b>{{ Number(q.quantity).toLocaleString('zh-CN') }}</b><em>{{ q.unit }}</em></div>
         </div>
         <p class="nominee-note">
-          <template v-if="nominee.members.length">{{ nominee.user.name }} 直接邀请的 {{ nominee.members.length }} 位在用达人中，{{ followCount }} 位和 {{ nominee.user.name }} 同在一个团队，默认跟随；审核时可以逐人调整。</template>
+          <template v-if="nominee.members.length">{{ nominee.user.name }} 直接邀请的 {{ nominee.members.length }} 位在用达人中，{{ followCount }} 位和 {{ nominee.user.name }} 同在一个团队，默认跟随；下一步可逐人调整。</template>
           <template v-else>{{ nominee.user.name }} 还没有直接邀请的在用达人。</template>
         </p>
-        <label>提名理由<textarea v-model="nominateNote" rows="3" minlength="2" maxlength="500" required placeholder="例如：近一个月稳定产出，作品合格率高" /></label>
-        <p class="nominee-note">提名后需要另一位同事在晋升工作台审核，通过后才生效。</p>
-        <div class="dialog-actions"><button type="button" @click="nominateOpen = false">取消</button><button class="primary" :disabled="nominateBusy">提交提名</button></div>
+        <label>晋升说明<textarea v-model="nominateNote" rows="3" minlength="2" maxlength="500" required placeholder="例如：近一个月稳定产出" /></label>
+        <p class="nominee-note">下一步核对成员去向，由你确认后生效。</p>
+        <div class="dialog-actions"><button type="button" @click="nominateOpen = false">取消</button><button class="primary" :disabled="nominateBusy">下一步</button></div>
       </form>
     </ActionDialog>
   </section>
@@ -391,7 +392,7 @@ button.tree-toggle:hover { background: var(--line); }
 .setting-line { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); font-size: 14px; cursor: pointer; }
 .setting-line input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--clay); }
 .setting-line small { display: block; color: var(--muted); font-size: 12.5px; }
-select { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; }
+select { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); font: inherit; }
 @media (max-width: 700px) { .person { flex-wrap: wrap; } .person-actions { margin-left: 0; } }
 .serif-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 24px; font-weight: 600; }
 .layer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
@@ -421,7 +422,7 @@ select { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); borde
 .nominee-stats b { font-family: var(--font-display); font-size: 24px; font-weight: 600; }
 .nominee-stats em { margin-left: 3px; color: var(--muted); font-size: 12px; font-style: normal; }
 .nominee-note { margin: 0; color: var(--muted); font-size: 13px; }
-textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; resize: vertical; }
+textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); font: inherit; resize: vertical; }
 textarea:focus-visible { outline: none; border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
 .relations-error button { margin-left: 8px; }
 @media (max-width: 960px) {

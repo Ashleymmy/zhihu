@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { http } from '../stores/auth'
 import { ActionDialog, DetailDrawer, notify } from '@zhihu-koc/shared-components'
 
-/** 晋升工作台：审核中的提名与已处理记录；审核通过时逐人决定直接邀请成员跟随还是留下 */
+/** 晋升工作台：由办理人核对并确认，逐人决定直接邀请成员跟随还是留下。 */
 interface Person { id: string; name: string }
 interface Metrics { from: string; to: string; activeDays: number; records: number; quantities: { label: string; unit: string; quantity: string }[]; memberDays: number }
 interface Promotion {
@@ -27,10 +27,10 @@ type Detail = Promotion & { members: Member[] }
 
 const STATUS: Record<Promotion['status'], { text: string; tone: string }> = {
   candidate: { text: '系统候选', tone: 'soft' },
-  proposed: { text: '待审核', tone: 'clay' },
-  approved: { text: '已通过', tone: 'up' },
-  rejected: { text: '已退回', tone: 'down' },
-  cancelled: { text: '已撤回', tone: 'soft' },
+  proposed: { text: '待确认', tone: 'clay' },
+  approved: { text: '已晋升', tone: 'up' },
+  rejected: { text: '未晋升', tone: 'down' },
+  cancelled: { text: '已取消', tone: 'soft' },
 }
 const route = useRoute()
 const router = useRouter()
@@ -78,9 +78,8 @@ function close() {
   void router.replace({ query: rest })
 }
 const isOpen = computed(() => !!detail.value && ['candidate', 'proposed'].includes(detail.value.status))
-const isProposer = computed(() => !!detail.value && isOpen.value && !detail.value.canReview)
 
-/* 审核通过后的变化预览：按原团队分组统计跟随人数 */
+/* 确认晋升后的变化预览：按原团队分组统计跟随人数 */
 const preview = computed(() => {
   const d = detail.value
   if (!d) return null
@@ -122,7 +121,7 @@ async function submitDecline() {
   declineError.value = ''
   try {
     await http.post(`/promotions/${detail.value.id}/${decline.value}`, { reason: declineReason.value.trim() })
-    notify(decline.value === 'reject' ? '已退回这张提名' : '已撤回提名')
+    notify(decline.value === 'reject' ? '已记录暂不晋升' : '已取消本次晋升')
     decline.value = null
     declineReason.value = ''
     close()
@@ -151,20 +150,20 @@ onMounted(async () => {
       <div>
         <router-link to="/team/relations" class="back-link">← 成员关系图</router-link>
         <h1>晋升工作台</h1>
-        <p>在成员关系图里提名达人，再由另一位同事审核。评估只看业务数据，不看邀请人数；通过后原团长不再从晋升者和跟随成员获得团队收益。</p>
+        <p>核对成员去向后确认晋升，由当前办理人完成。</p>
       </div>
     </header>
 
     <div class="seg" role="group" aria-label="查看">
-      <button type="button" :aria-pressed="view === 'open'" @click="view = 'open'">待审核<span v-if="lists.open?.length" class="seg-count">{{ lists.open.length }}</span></button>
+      <button type="button" :aria-pressed="view === 'open'" @click="view = 'open'">待确认<span v-if="lists.open?.length" class="seg-count">{{ lists.open.length }}</span></button>
       <button type="button" :aria-pressed="view === 'done'" @click="view = 'done'">已处理</button>
     </div>
 
     <p v-if="listError" class="promo-error" role="alert">{{ listError }} <button type="button" @click="load()">重试</button></p>
     <p v-else-if="!items" role="status" class="bento-note">正在加载…</p>
     <div v-else-if="!items.length" class="bento-card bento-empty promo-empty">
-      <b>{{ view === 'open' ? '没有待审核的提名' : '还没有处理过的提名' }}</b>
-      <p>{{ view === 'open' ? '在成员关系图里选中一位达人，点「提名晋升」。' : '审核通过、退回或撤回的提名会留在这里。' }}</p>
+      <b>{{ view === 'open' ? '没有待确认的晋升' : '还没有晋升办理记录' }}</b>
+      <p>{{ view === 'open' ? '在成员关系图里选中一位达人，点「办理晋升」。' : '已晋升、暂不晋升和取消的记录会留在这里。' }}</p>
       <router-link v-if="view === 'open'" to="/team/relations" class="primary-action">去成员关系图</router-link>
     </div>
     <div v-else class="bento promo-grid">
@@ -181,14 +180,14 @@ onMounted(async () => {
         </div>
         <p class="promo-note">{{ p.note }}</p>
         <small class="promo-meta">
-          {{ p.proposer?.name ?? '系统' }} 提名 · {{ when(p.proposedAt) }}
-          <template v-if="p.decidedAt"> · {{ p.reviewer?.name }} {{ STATUS[p.status].text.slice(1) }}</template>
+          {{ p.proposer?.name ?? '系统' }} 发起 · {{ when(p.proposedAt) }}
+          <template v-if="p.decidedAt"> · {{ p.reviewer?.name }} 办理</template>
           <template v-if="p.status === 'approved' && p.followed !== null"> · {{ p.followed }} 人跟随</template>
         </small>
       </button>
     </div>
 
-    <DetailDrawer :open="!!detail || !!detailError" :title="detail ? `${detail.user.name} 晋升团长` : '晋升提名'" @close="close">
+    <DetailDrawer :open="!!detail || !!detailError" :title="detail ? `${detail.user.name} 晋升团长` : '晋升办理'" @close="close">
       <p v-if="detailError" class="promo-error" role="alert">{{ detailError }}</p>
       <template v-if="detail">
         <div class="promo-status">
@@ -197,13 +196,13 @@ onMounted(async () => {
         </div>
 
         <section class="promo-sec">
-          <h3>提名理由</h3>
+          <h3>晋升说明</h3>
           <p class="promo-quote">{{ detail.note }}</p>
           <small>{{ detail.proposer?.name ?? '系统' }} · {{ when(detail.proposedAt) }}</small>
         </section>
 
         <section class="promo-sec">
-          <h3>近 30 天业绩<small>{{ day(detail.metrics.from) }} – {{ day(detail.metrics.to) }}，提名时统计</small></h3>
+          <h3>近 30 天业绩<small>{{ day(detail.metrics.from) }} – {{ day(detail.metrics.to) }}，发起时统计</small></h3>
           <div class="promo-stats">
             <div><small>有业绩的天数</small><b>{{ detail.metrics.activeDays }}</b></div>
             <div><small>业绩条数</small><b>{{ detail.metrics.records }}</b></div>
@@ -213,7 +212,7 @@ onMounted(async () => {
         </section>
 
         <section class="promo-sec">
-          <h3>直接邀请的成员<small>{{ isOpen ? '审核时逐人决定跟随还是留下' : '审核时的去向' }}</small></h3>
+          <h3>直接邀请的成员<small>{{ isOpen ? '逐人选择跟随还是留下' : '办理时的去向' }}</small></h3>
           <p v-if="!detail.members.length" class="promo-muted">没有直接邀请的在用达人。</p>
           <ul v-else class="promo-members">
             <li v-for="m in detail.members" :key="m.id">
@@ -230,7 +229,7 @@ onMounted(async () => {
 
         <template v-if="isOpen && detail.canReview && preview">
           <section class="promo-preview" aria-live="polite">
-            <h3>审核通过后</h3>
+            <h3>确认晋升后</h3>
             <ul>
               <li><b>{{ detail.user.name }}</b> 成为团长，转为平台直管{{ detail.fromLeader ? `，离开 ${detail.fromLeader.name} 的团队` : '' }}</li>
               <li v-if="preview.moving">{{ preview.moving }} 位成员加入 {{ detail.user.name }} 的团队<template v-if="preview.fromTeams.length">（{{ preview.fromTeams.map(([team, n]) => `${team} ${n} 人`).join('、') }}）</template></li>
@@ -239,15 +238,11 @@ onMounted(async () => {
               <li>邀请关系保持不变；涉及的账号需要重新登录</li>
             </ul>
           </section>
-          <label class="promo-field">审核备注（选填）<textarea v-model="approveNote" rows="2" maxlength="500" placeholder="例如：业绩稳定，同意晋升" /></label>
+          <label class="promo-field">办理备注（选填）<textarea v-model="approveNote" rows="2" maxlength="500" placeholder="例如：已核对成员去向" /></label>
           <div class="promo-actions">
-            <button type="button" class="primary-action" :disabled="busy" @click="approve">{{ busy ? '正在处理…' : '通过' }}</button>
-            <button type="button" class="ghost-aurora" :disabled="busy" @click="decline = 'reject'; declineReason = ''; declineError = ''">退回</button>
+            <button type="button" class="primary-action" :disabled="busy" @click="approve">{{ busy ? '正在处理…' : '确认晋升' }}</button>
+            <button type="button" class="ghost-aurora" :disabled="busy" @click="decline = 'cancel'; declineReason = ''; declineError = ''">取消办理</button>
           </div>
-        </template>
-        <template v-else-if="isProposer">
-          <p class="promo-muted">你是提名人，需要另一位同事审核。</p>
-          <div class="promo-actions"><button type="button" class="ghost-aurora" @click="decline = 'cancel'; declineReason = ''; declineError = ''">撤回提名</button></div>
         </template>
         <section v-else-if="detail.decidedAt" class="promo-sec">
           <h3>处理结果</h3>
@@ -257,12 +252,12 @@ onMounted(async () => {
       </template>
     </DetailDrawer>
 
-    <ActionDialog :open="!!decline" :title="decline === 'reject' ? '退回这张提名' : '撤回提名'" :busy="busy" @close="decline = null">
+    <ActionDialog :open="!!decline" :title="decline === 'reject' ? '暂不晋升' : '取消本次晋升'" :busy="busy" @close="decline = null">
       <form @submit.prevent="submitDecline">
         <p v-if="declineError" role="alert" class="promo-error">{{ declineError }}</p>
-        <label>{{ decline === 'reject' ? '退回原因' : '撤回原因' }}<textarea v-model="declineReason" rows="3" maxlength="500" required :placeholder="decline === 'reject' ? '例如：再观察一个月的业绩' : '例如：信息有误，重新提名'" /></label>
-        <p class="promo-muted">{{ decline === 'reject' ? '退回后成员的角色和团队不变，之后可以重新提名。' : '撤回后可以重新提名。' }}</p>
-        <div class="dialog-actions"><button type="button" @click="decline = null">取消</button><button class="primary" :disabled="busy">{{ decline === 'reject' ? '确认退回' : '确认撤回' }}</button></div>
+        <label>原因<textarea v-model="declineReason" rows="3" maxlength="500" required placeholder="例如：成员去向需要重新核对" /></label>
+        <p class="promo-muted">成员的角色和团队保持原状，之后可以重新办理。</p>
+        <div class="dialog-actions"><button type="button" @click="decline = null">返回</button><button class="primary" :disabled="busy">{{ decline === 'reject' ? '确认暂不晋升' : '确认取消' }}</button></div>
       </form>
     </ActionDialog>
   </section>
@@ -305,7 +300,7 @@ onMounted(async () => {
 .promo-preview { margin-bottom: 18px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--clay) 30%, transparent); border-radius: 16px; background: var(--clay-soft); }
 .promo-preview ul { display: grid; gap: 6px; margin: 0; padding-left: 18px; line-height: 1.6; }
 .promo-field { display: grid; gap: 8px; margin-bottom: 16px; font-size: 14px; }
-textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; resize: vertical; }
+textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); font: inherit; resize: vertical; }
 textarea:focus-visible { outline: none; border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
 .promo-actions { display: flex; gap: 10px; }
 /* 空态：居中、限宽、正文可换行，避免文字贴边被裁 */

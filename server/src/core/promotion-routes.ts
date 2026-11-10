@@ -6,7 +6,7 @@ import { requireDuty } from './duties';
 import type { ModuleRuntime } from './module-runtime';
 import { approve, decline, listPromotions, nominate, nomineePreview, promotionDetail } from './member-promotions';
 
-/** 晋升工作台：只有运营岗位（含完整管理员）可以提名、查看和审核 */
+/** 晋升工作台：有运营权限的现有人员可单人登记、查看和确认，保留原接口地址兼容旧记录。 */
 const id = z.string().regex(/^[1-9]\d*$/);
 const reason = z.string().trim().min(2, '请写明原因').max(500);
 const none = z.object({}).strict();

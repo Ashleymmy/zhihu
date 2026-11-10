@@ -142,6 +142,18 @@ afterAll(async () => {
   await container?.stop();
 }, 30000);
 
+it('从旧双人约束升级时保留已处理记录，且不再拒绝同人确认', async () => {
+  await c.query("ALTER TABLE member_promotions ADD CONSTRAINT chk_promotion_reviewer CHECK (status <> 'approved' OR reviewed_by IS NULL OR proposed_by IS NULL OR reviewed_by <> proposed_by)");
+  const metrics = { from: '2026-10-01', to: '2026-10-30', activeDays: 1, records: 1, quantities: [], memberDays: 30 };
+  await c.query("INSERT INTO member_promotions(user_id,status,trigger_type,metrics_snapshot,note,proposed_by,reviewed_by,decided_at) VALUES(2,'approved','manual',?,'历史办理记录',7,1,NOW(3))", [JSON.stringify(metrics)]);
+  const before = await q('SELECT * FROM member_promotions ORDER BY id');
+  const { readFile } = await import('node:fs/promises');
+  const migration = await readFile('schema/extensions/030_single_operator_promotions.sql', 'utf8');
+  for (const statement of migration.split(';').filter((text) => text.trim())) await c.query(statement);
+  expect(await q('SELECT * FROM member_promotions ORDER BY id')).toEqual(before);
+  expect((await q("SELECT COUNT(*) n FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='member_promotions' AND CONSTRAINT_NAME='chk_promotion_reviewer'"))[0]?.n).toBe(0);
+});
+
 it('提名前可看近 30 天业绩指标和直接邀请成员的默认去向；只有运营岗位可以使用', async () => {
   const preview = await api('7', 'get', '/promotions/nominee/3');
   expect(preview.status, preview.text).toBe(200);
@@ -163,15 +175,19 @@ it('提名前可看近 30 天业绩指标和直接邀请成员的默认去向；
   expect((await api('7', 'get', '/promotions').query({ view: 'all' })).status).toBe(422);
 });
 
-it('达人不能在账号编辑里直接改成团长，需要走提名', async () => {
-  const res = await api('1', 'patch', '/team/members/9/access').send({ role: 'leader' });
-  expect(res.status, res.text).toBe(409);
-  expect((await q('SELECT role FROM users WHERE id=9'))[0]?.role).toBe('creator');
+it('有权限的同一人可在账号编辑里将达人改为团长，不要求另一人审核', async () => {
   const list = await api('1', 'get', '/team/members');
-  expect(list.body.data.find((m: { id: string }) => m.id === '9').editableRoles).not.toContain('leader');
+  expect(list.body.data.find((m: { id: string }) => m.id === '9').editableRoles).toContain('leader');
+  expect((await api('8', 'patch', '/team/members/9/access').send({ role: 'leader' })).status).toBe(403);
+  expect((await q('SELECT role FROM users WHERE id=9'))[0]?.role).toBe('creator');
+  const res = await api('1', 'patch', '/team/members/9/access').send({ role: 'leader' });
+  expect(res.status, res.text).toBe(200);
+  expect((await q('SELECT role,parent_id FROM users WHERE id=9'))[0]).toMatchObject({ role: 'leader', parent_id: null });
+  expect((await q("SELECT COUNT(*) n FROM member_role_history WHERE user_id=9 AND from_role='creator' AND to_role='leader'"))[0]?.n).toBe(1);
+  expect((await api('1', 'patch', '/team/members/9/access').send({ role: 'creator' })).status).toBe(200);
 });
 
-it('提名需要理由；同一人只能有一张审核中的提名；只能提名在用的达人；提名人不能自己审核', async () => {
+it('登记保留唯一待确认记录；发起人可以继续办理，其他无权限角色仍被拒绝', async () => {
   expect((await api('7', 'post', '/promotions').send({ userId: '3', note: '' })).status).toBe(422);
   expect((await api('7', 'post', '/promotions').send({ userId: '2', note: '已经是团长' })).status).toBe(409);
   const created = await api('7', 'post', '/promotions').send({ userId: '3', note: '近一个月稳定产出，带新人积极' });
@@ -179,9 +195,14 @@ it('提名需要理由；同一人只能有一张审核中的提名；只能提�
   const id = created.body.data.id;
   expect((await api('1', 'post', '/promotions').send({ userId: '3', note: '重复提名' })).status).toBe(409);
   const mine = await api('7', 'get', '/promotions/' + id);
-  expect(mine.body.data).toMatchObject({ status: 'proposed', canReview: false, fromLeader: { id: '2' }, user: { id: '3' } });
-  expect((await api('7', 'post', `/promotions/${id}/approve`).send({ follow: [] })).status).toBe(403);
-  expect((await api('7', 'post', `/promotions/${id}/reject`).send({ reason: '自己退回' })).status).toBe(403);
+  expect(mine.body.data).toMatchObject({ status: 'proposed', canReview: true, fromLeader: { id: '2' }, user: { id: '3' } });
+  expect((await api('7', 'get', '/promotions')).body.data.find((p: { id: string }) => p.id === id)?.canReview).toBe(true);
+  for (const who of ['2', '3', '8']) {
+    expect((await api(who, 'get', '/promotions/' + id)).status).toBe(403);
+    expect((await api(who, 'post', `/promotions/${id}/approve`).send({ follow: [] })).status).toBe(403);
+    expect((await api(who, 'post', `/promotions/${id}/reject`).send({ reason: '无权退回' })).status).toBe(403);
+    expect((await api(who, 'post', `/promotions/${id}/cancel`).send({ reason: '无权取消' })).status).toBe(403);
+  }
   expect((await api('1', 'get', '/promotions/' + id)).body.data.canReview).toBe(true);
   // 提名人可以撤回，撤回后可以重新提名
   expect((await api('7', 'post', `/promotions/${id}/cancel`).send({ reason: '信息有误，重新提名' })).status).toBe(200);
@@ -189,7 +210,7 @@ it('提名需要理由；同一人只能有一张审核中的提名；只能提�
   expect((await api('7', 'post', '/promotions').send({ userId: '9', note: '独立达人，业绩稳定' })).status).toBe(201);
 });
 
-it('审核通过：B 成为平台直管的团长，选中的成员跟随，留下的不变；邀请关系不变；历史、链接和登录状态同步更新', async () => {
+it('发起人本人确认晋升：成员去向、历史、链接和登录状态同步更新，业务阻塞及重复确认仍被拒绝', async () => {
   const created = await api('7', 'post', '/promotions').send({ userId: '3', note: '近一个月稳定产出' });
   const id = created.body.data.id;
   expect((await api('1', 'post', `/promotions/${id}/approve`).send({ follow: ['4', '9'] })).status).toBe(422);
@@ -197,7 +218,7 @@ it('审核通过：B 成为平台直管的团长，选中的成员跟随，留�
   expect(blocked.status).toBe(409);
   expect(blocked.body.message).toContain('人员5：仍有进行中的任务');
   expect((await q('SELECT role FROM users WHERE id=3'))[0]?.role).toBe('creator');
-  const res = await api('1', 'post', `/promotions/${id}/approve`).send({ follow: ['4'], note: '同意' });
+  const res = await api('7', 'post', `/promotions/${id}/approve`).send({ follow: ['4'], note: '确认晋升' });
   expect(res.status, res.text).toBe(200);
   expect(res.body.data).toEqual({ followed: 1, stayed: 2 });
   const users = await q('SELECT id,role,CAST(parent_id AS CHAR) parent FROM users WHERE id IN (3,4,5,6) ORDER BY id');
@@ -224,7 +245,7 @@ it('审核通过：B 成为平台直管的团长，选中的成员跟随，留�
   expect((await q('SELECT COUNT(*) n FROM token_sessions WHERE user_id=5 AND revoked_at IS NULL'))[0]?.n).toBe(1);
   const done = await api('7', 'get', '/promotions').query({ view: 'done' });
   const item = done.body.data.find((p: { id: string }) => p.id === String(id));
-  expect(item).toMatchObject({ status: 'approved', followed: 1, reviewer: { id: '1' }, canReview: false });
+  expect(item).toMatchObject({ status: 'approved', followed: 1, proposer: { id: '7' }, reviewer: { id: '7' }, canReview: false });
   const detail = await api('7', 'get', '/promotions/' + id);
   expect(detail.body.data.members.map((m: { id: string; defaultAction: string }) => [m.id, m.defaultAction])).toEqual([
     ['4', 'follow'], ['5', 'stay'], ['6', 'stay'],
@@ -242,8 +263,20 @@ it('退回需要写明原因，退回后记录保留', async () => {
   expect(todos.body.data.todos).toEqual([expect.objectContaining({ kind: 'promotion.review', count: 1, path: '/team/promotions' })]);
   expect((await api('8', 'get', '/dashboard')).body.data.todos).toEqual([]);
   expect((await api('1', 'post', `/promotions/${open.id}/reject`).send({})).status).toBe(422);
-  expect((await api('1', 'post', `/promotions/${open.id}/reject`).send({ reason: '再观察一个月' })).status).toBe(200);
+  expect((await api('7', 'post', `/promotions/${open.id}/reject`).send({ reason: '再观察一个月' })).status).toBe(200);
   const done = (await api('7', 'get', '/promotions').query({ view: 'done' })).body.data;
   expect(done.find((p: { id: string }) => p.id === open.id)).toMatchObject({ status: 'rejected', reviewNote: '再观察一个月' });
   expect((await q('SELECT role FROM users WHERE id=9'))[0]?.role).toBe('creator');
+});
+
+it('单人办理迁移可重复执行，历史晋升及角色、团队、业绩记录保持不变', async () => {
+  const tables = ['member_promotions', 'users', 'member_role_history', 'team_memberships', 'opc_earning_sources', 'opc_earning_lines'];
+  const snapshot = () => Promise.all(tables.map((table) => q('SELECT * FROM ' + table + ' ORDER BY 1')));
+  const before = await snapshot();
+  const { readFile } = await import('node:fs/promises');
+  const migration = await readFile('schema/extensions/030_single_operator_promotions.sql', 'utf8');
+  for (let repeat = 0; repeat < 2; repeat++)
+    for (const statement of migration.split(';').filter((text) => text.trim())) await c.query(statement);
+  expect(await snapshot()).toEqual(before);
+  expect((await q("SELECT COUNT(*) n FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='member_promotions' AND CONSTRAINT_NAME='chk_promotion_reviewer'"))[0]?.n).toBe(0);
 });

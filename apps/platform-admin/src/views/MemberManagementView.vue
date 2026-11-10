@@ -1117,7 +1117,7 @@ onMounted(() => run(load));
               >
                 {{ ROLE_LABELS[role] }}
               </option>
-            </select><small v-if="selected.role === 'creator' && isStaffRole(auth.user?.role)" class="role-hint">升为团长请在<router-link to="/team/relations">成员关系图</router-link>里提名晋升</small></label
+            </select></label
           ><label
             >状态<select v-model="edit.isActive">
               <option :value="true">启用</option>

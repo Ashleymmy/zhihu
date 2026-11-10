@@ -673,7 +673,8 @@ onMounted(async () => {
 }
 .change-note {
   padding: 12px 16px;
-  background: #edf4f3;
+  background: var(--paper);
+  color: var(--ink);
   border-radius: 6px;
 }
 .change-error {
