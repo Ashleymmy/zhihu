@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createEvidenceRouter } from './evidence-routes';
 import { createSettlementRouter } from './settlement-routes';
 import { createRecordCommentRouter } from './record-comments';
+import { createReminderRouter } from './reminder-routes';
 import { createInsightsRouter } from './insights-routes';
 import { createFinanceOverviewRouter } from './finance-overview';
 import { createMemberExportRouter } from './member-export-routes';
@@ -42,6 +43,7 @@ const date = z
 export function createPlatformRouter(runtime: ModuleRuntime) {
   const r = Router();
   r.use(requireAuth);
+  r.use('/reminders', createReminderRouter(runtime));
   r.use('/insights', createInsightsRouter(runtime));
   r.use('/finance', createFinanceOverviewRouter(runtime));
   r.use('/evidence', createEvidenceRouter(runtime));

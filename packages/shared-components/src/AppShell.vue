@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ToastHost from './ToastHost.vue'
+import type { ReminderItem } from '@zhihu-koc/shared-contracts/core'
 
 export interface NavItem {
   key: string
@@ -41,6 +42,12 @@ const props = defineProps<{
   /** 不传则不显示待办铃铛（未接通的功能不出现） */
   todos?: ShellTodo[]
   todosError?: string
+  reminders?: ReminderItem[]
+  remindersUnread?: number
+  remindersError?: string
+  remindersLoading?: boolean
+  remindersHasMore?: boolean
+  remindersState?: 'unread' | 'all'
   /** 手机底部标签栏；不传则手机端只用侧栏抽屉 */
   mobileTabs?: NavItem[]
 }>()
@@ -49,6 +56,11 @@ const emit = defineEmits<{
   navigate: [path: string]
   logout: []
   'refresh-todos': []
+  'refresh-reminders': []
+  'more-reminders': []
+  'reminder-state': [state: 'unread' | 'all']
+  'open-reminder': [item: ReminderItem]
+  'read-reminder': [item: ReminderItem, read: boolean]
 }>()
 
 /* ---------- 图标：线性 24 栅格，按导航 key 取 ---------- */
@@ -152,6 +164,8 @@ const today = computed(() => {
 })
 const initials = computed(() => props.userName.slice(0, 1) || '我')
 const todoTotal = computed(() => (props.todos ?? []).reduce((sum, todo) => sum + todo.count, 0))
+const bellLabel = computed(() => `待办 ${todoTotal.value} 项` + (props.remindersUnread === undefined ? (props.remindersError ? '，提醒待更新' : '') : `，未读提醒 ${props.remindersUnread} 条`))
+function openReminder(item: ReminderItem) { popover.value = null; emit('open-reminder', item) }
 function togglePopover(name: 'todos' | 'account') { popover.value = popover.value === name ? null : name }
 function onDocClick(event: MouseEvent) {
   if (popover.value && !(event.target as HTMLElement).closest('.shell-popover, [data-popover-trigger]')) popover.value = null
@@ -295,12 +309,24 @@ onBeforeUnmount(() => {
             <span>搜索页面</span>
             <kbd>Ctrl K</kbd>
           </button>
-          <div v-if="todos || todosError" class="shell-pop-anchor">
-            <button type="button" class="shell-icon-btn" data-popover-trigger :aria-expanded="popover === 'todos'" :aria-label="todoTotal ? `待办 ${todoTotal} 项` : '待办'" @click="togglePopover('todos')">
+          <div v-if="todos || todosError || reminders || remindersError" class="shell-pop-anchor">
+            <button type="button" class="shell-icon-btn" data-popover-trigger :aria-expanded="popover === 'todos'" :aria-label="bellLabel" @click="togglePopover('todos')">
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-              <span v-if="todosError" class="shell-badge">!</span><span v-else-if="todoTotal" class="shell-badge">{{ todoTotal > 99 ? '99+' : todoTotal }}</span>
+              <span v-if="todosError || remindersError" class="shell-badge">!</span><span v-else-if="remindersUnread || todoTotal" class="shell-badge">{{ (remindersUnread || todoTotal) > 99 ? '99+' : (remindersUnread || todoTotal) }}</span>
             </button>
             <div v-if="popover === 'todos'" class="shell-popover shell-todos" role="dialog" aria-label="待办">
+              <section v-if="reminders || remindersError" class="shell-reminders" aria-label="业务提醒">
+                <p class="shell-pop-title">业务提醒<span>{{ remindersUnread === undefined ? '待更新' : remindersUnread + ' 条未读' }}</span></p>
+                <div class="reminder-controls"><button type="button" :aria-pressed="remindersState !== 'all'" @click="emit('reminder-state','unread')">未读</button><button type="button" :aria-pressed="remindersState === 'all'" @click="emit('reminder-state','all')">全部</button><button type="button" :disabled="remindersLoading" @click="emit('refresh-reminders')">刷新</button></div>
+                <div v-if="remindersError" class="shell-pop-empty" role="alert"><span>{{ remindersError }}</span><button type="button" @click="emit('refresh-reminders')">重新读取提醒</button></div>
+                <article v-for="item in reminders" :key="item.id" class="shell-reminder" :data-unread="!item.readAt">
+                  <button type="button" class="reminder-open" @click="openReminder(item)"><b>{{ item.title }}</b><span>{{ item.body }}</span><small>{{ item.createdAt }} · {{ item.readAt ? '已读' : '未读' }}{{ item.handled ? ' · 对应事项已办理' : '' }}</small><strong>{{ item.next }} →</strong></button>
+                  <button type="button" class="reminder-read" :disabled="remindersLoading" @click="emit('read-reminder',item,!item.readAt)">{{ item.readAt ? '标为未读' : '标为已读' }}</button>
+                </article>
+                <p v-if="remindersLoading" class="shell-pop-empty" role="status">正在读取提醒…</p>
+                <div v-else-if="!reminders?.length && !remindersError" class="shell-pop-empty"><span>{{ remindersState === 'all' ? '还没有业务提醒。新的留言和付款进度会出现在这里。' : '当前提醒都已读。待办仍按实际办理进度保留。' }}</span><button v-if="remindersState !== 'all'" type="button" @click="emit('reminder-state','all')">查看全部提醒</button></div>
+                <button v-if="remindersHasMore" type="button" class="reminder-more" :disabled="remindersLoading" @click="emit('more-reminders')">继续查看</button>
+              </section>
               <p class="shell-pop-title">现在要做<span v-if="todos?.length">{{ todos.length }} 项</span></p>
               <div v-if="todosError" class="shell-pop-empty" role="alert"><span>{{todosError}}</span><button type="button" class="btn" @click="emit('refresh-todos')">重新读取待办</button></div>
               <button v-for="todo in todos" :key="todo.key" type="button" class="shell-todo" @click="handleNav(todo.path)">
@@ -388,3 +414,6 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+<style scoped>
+.shell-reminders{border-bottom:1px solid var(--line,#ddd);padding-bottom:12px;margin-bottom:12px;min-width:0}.reminder-controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.reminder-controls button,.reminder-read,.reminder-more{min-height:36px;padding:6px 10px;border:1px solid var(--line,#ddd);border-radius:7px;color:inherit;background:var(--paper,#fff);font:inherit;cursor:pointer}.reminder-controls button[aria-pressed=true]{background:var(--ink,#222);color:var(--paper,#fff)}.shell-reminder{display:grid;gap:5px;border-top:1px solid var(--line,#ddd);padding:10px 0;min-width:0}.reminder-open{display:grid;gap:6px;text-align:left;background:transparent;border:0;color:inherit;padding:4px;cursor:pointer;font:inherit;overflow-wrap:anywhere;min-width:0}.reminder-open small{color:var(--ink-soft,#666);font-size:11px}.reminder-open strong{font-size:12px}.shell-reminder[data-unread=true] b:before{content:'●';margin-right:5px;color:var(--accent,#176166);font-size:9px}.reminder-read{justify-self:start;font-size:12px}.reminder-more{width:100%}.shell-todos{max-height:min(75vh,640px);overflow-y:auto;max-width:calc(100vw - 24px)}@media(max-width:500px){.reminder-controls button,.reminder-read,.reminder-more{min-height:44px}.shell-todos{width:min(340px,calc(100vw - 24px))}}
+</style>
