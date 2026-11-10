@@ -18,7 +18,7 @@ async function send() {
   attempt.value ??= { body: body.value.trim(), requestKey: createRequestKey() }
   saving.value = true; sendError.value = ''; notice.value = ''
   try { await props.api.add(attempt.value); attempt.value = null; body.value = ''; notice.value = '留言已保存。'; page.value = 1; await load() }
-  catch (e) { sendError.value = apiMessage(e, '未确认留言是否保存，请用原内容重试。'); const status = Number((e as { status?: number })?.status); if (status >= 400 && status < 500 && status !== 408) attempt.value = null }
+  catch (e) { sendError.value = apiMessage(e, '连接暂时中断，内容已保留，请用原内容重试。'); const status = Number((e as { status?: number })?.status); if (status >= 400 && status < 500 && status !== 408) attempt.value = null }
   finally { saving.value = false }
 }
 watch(() => props.api, () => { page.value = 1; body.value = ''; attempt.value = null; notice.value = ''; sendError.value = ''; void load() }, { immediate: true })

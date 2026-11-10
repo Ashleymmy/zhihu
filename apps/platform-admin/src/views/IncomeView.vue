@@ -14,6 +14,7 @@ const route = useRoute(),
     :initial-to="String(route.query.to || '')"
     :initial-group="String(route.query.group || '')"
     :initial-performer-id="String(route.query.performerId || '')"
+    :initial-withdrawal-id="String(route.query.withdrawalId || '')"
     @navigate="router.push"
   />
 </template>

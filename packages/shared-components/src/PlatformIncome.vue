@@ -11,7 +11,7 @@ import {
   type EarningView,
 } from "./platform-earnings";
 import type { DataGridRow } from "./data-grid";
-const props = defineProps<{ initialProjectId?: string; initialAccountId?: string; initialModuleId?: string; initialFrom?: string; initialTo?: string; initialGroup?: string; initialPerformerId?: string }>(),
+const props = defineProps<{ initialProjectId?: string; initialAccountId?: string; initialModuleId?: string; initialFrom?: string; initialTo?: string; initialGroup?: string; initialPerformerId?: string; initialWithdrawalId?: string }>(),
   emit = defineEmits<{ navigate: [path: string] }>();
 const w = inject<CoreWorkspace>("opc")!;
 const earningPanels = inject<Record<string,Component>>("opc-earning-panels", {});
@@ -384,6 +384,7 @@ function close() {
           :key="walletKey"
           :http="w.http"
           :scope="wallet"
+          :initial-withdrawal-id="initialWithdrawalId"
         />
       </section>
       <div v-else class="income-empty">

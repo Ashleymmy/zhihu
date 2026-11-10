@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { createEvidenceApi, createSettlementApi, createEvidenceCommentApi } from '@zhihu-koc/shared-services/core'
+import { createEvidenceApi, createSettlementApi, createSettlementPaymentApi, createEvidenceCommentApi } from '@zhihu-koc/shared-services/core'
 import type { CoreWorkspace } from '@zhihu-koc/shared-components'
 import { http, useAuthStore } from './auth'
 import { zhihuOperationGuide } from '@zhihu-koc/zhihu-module-views/operation-guide'
@@ -9,6 +9,7 @@ export const workspace: CoreWorkspace = {
   http,
   evidenceApi: createEvidenceApi(http),
   settlementApi: createSettlementApi(http),
+  settlementPaymentApi: createSettlementPaymentApi(http),
   evidenceComments: key => createEvidenceCommentApi(http, key),
   modules,
   projectId,

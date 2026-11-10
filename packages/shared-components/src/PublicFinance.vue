@@ -45,9 +45,14 @@ const props = defineProps<{
   initialTo?: string;
   initialLeaderId?: string;
   initialImportId?: string;
+  initialModuleId?: string;
+  initialSettlementId?: string;
+  initialWithdrawalId?: string;
+  initialSourceId?: string;
+  initialMetricType?: string;
 }>();
 const emit = defineEmits<{ context: [value: SettlementScope]; navigate: [path: string] }>();
-const section = ref(props.initialLeaderId ? 'settlement' : 'reports'), ratesOpen = ref(false), rateMetric = ref('new_user'), reportId = ref(props.initialImportId || ''), actionNotice = ref(''), settlementLocked = ref(false);
+const section = ref(props.initialLeaderId || props.initialSettlementId || props.initialSourceId ? 'settlement' : 'reports'), ratesOpen = ref(false), rateMetric = ref('new_user'), reportId = ref(props.initialImportId || ''), actionNotice = ref(''), settlementLocked = ref(false);
 const w = inject<CoreWorkspace>("opc")!,
   panels = inject<Record<string, Component>>("opc-finance-panels", {});
 const scopes = ref<Scope[]>([]),
@@ -99,8 +104,9 @@ async function load() {
         scopes.value.find(
           (s) =>
             s.projectId === props.initialProjectId &&
-            (!props.initialAccountId || s.accountId === props.initialAccountId),
-        ) ?? scopes.value[0];
+            (!props.initialAccountId || s.accountId === props.initialAccountId) &&
+            (!props.initialModuleId || s.moduleId === props.initialModuleId),
+        ) ?? (props.initialProjectId ? undefined : scopes.value[0]);
       key.value = props.initialLeaderId && !props.initialAccountId && scopes.value.length > 1 ? '' : initial ? initial.projectId + ":" + initial.accountId : "";
     }
     revision.value++;
@@ -144,6 +150,12 @@ async function loadEntries() {
 watch([key, revision], () => {
   page.value = 1;
   void loadEntries();
+});
+watch(() => [props.initialProjectId, props.initialAccountId, props.initialModuleId, props.initialSettlementId, props.initialSourceId], () => {
+  if (settlementLocked.value) return;
+  const target = scopes.value.find(s => s.projectId === props.initialProjectId && (!props.initialAccountId || s.accountId === props.initialAccountId) && (!props.initialModuleId || s.moduleId === props.initialModuleId));
+  if (target) key.value = target.projectId + ':' + target.accountId;
+  if (props.initialSettlementId || props.initialSourceId) section.value = 'settlement';
 });
 onMounted(load);
 function totals(filtered: DataGridRow[]) {
@@ -236,7 +248,7 @@ const rows = computed<DataGridRow[]>(
         <p>这个项目暂时未加载，其他项目仍可处理。</p>
         <button @click="load">重新加载</button>
       </div>
-      <SettlementWorkbench v-else-if="section==='settlement' && w.settlementApi" :key="key" :scope="current" :leader-id="initialLeaderId" :from="period.from" :to="period.to" @context="Object.assign(period,{from:$event.from,to:$event.to});emit('context',$event)" @action="action" @lock="settlementLocked=$event" />
+      <SettlementWorkbench v-else-if="section==='settlement' && w.settlementApi" :key="key" :scope="current" :leader-id="initialLeaderId" :from="period.from" :to="period.to" :metric-type="initialMetricType" :settlement-id="initialSettlementId" :withdrawal-id="initialWithdrawalId" :source-id="initialSourceId" @context="Object.assign(period,{from:$event.from,to:$event.to});emit('context',$event)" @action="action" @lock="settlementLocked=$event" />
       <component
         v-else-if="panel"
         :is="panel"

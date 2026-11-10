@@ -5,7 +5,7 @@ export function isDefinitiveRejection(error: unknown): boolean {
 }
 export function isStaleSettlement(error: unknown): boolean { return Number((error as { status?: number })?.status) === 409 }
 export function canPreviewSettlement(summary: { ready: number }): boolean { return summary.ready > 0 }
-export function apiMessage(error: unknown, fallback: string): string { return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : fallback }
+export function apiMessage(error: unknown, fallback: string): string { return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' && /[\u3400-\u9fff]/.test(error.message) ? error.message : fallback }
 export function createMutationAttempt<T extends object>(key: () => string) {
   let payload: (T & { requestKey: string }) | null = null
   return {

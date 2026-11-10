@@ -9,7 +9,7 @@ interface Withdrawal{id:string;userId:string;displayName:string;amount:string;st
 interface Policy{enabled:boolean;version:string;lines:string[];details:string[];dailyAmountLimit?:string;todayAmount?:string;remainingAmount?:string;appliedDay?:string}
 interface Quote{amount:string;feeAmount:string;netAmount:string;policyVersion:string;quoteToken:string;tier:string;reviewDeadline:string;settlementDeadline:string;settlementMonth:string|null;invoiceRequired:boolean}
 interface View{balance:{confirmed:string;held:string;available:string;offset:string;paid:string;processing:string}|null;withdrawals:Withdrawal[];total:number;funding:{amount:string;hash:string};canManage:boolean;withdrawalPolicy?:Policy}
-const props=defineProps<{http:Http;scope:Scope}>()
+const props=defineProps<{http:Http;scope:Scope;initialWithdrawalId?:string}>()
 const emit=defineEmits<{updated:[]}>()
 const view=ref<View|null>(null),page=ref(1),busy=ref(false),error=ref(''),notice=ref(''),applyOpen=ref(false),fundOpen=ref(false),reference=ref(''),request=ref(createRequestKey())
 const applicant=reactive({amount:'',receiverName:'',payMethod:'wechat',payAccount:''})
@@ -64,7 +64,17 @@ async function saveInvoiceInstructions(){if(!selected.value)return;await props.h
 async function uploadInvoice(){if(!selected.value||!invoiceFile.value)throw new Error('请选择发票文件');const form=new FormData();for(const [k,v] of Object.entries(props.scope))form.append(k,v);form.append('expectedVersion',String(selected.value.invoiceVersion||0));form.append('proof',invoiceFile.value);await props.http.postForm('/finance/withdrawals/'+selected.value.id+'/invoice',form);selected.value=null;await load()}
 async function reviewInvoice(decision:string){if(!selected.value)return;await props.http.post('/finance/withdrawals/'+selected.value.id+'/invoice-review',{...props.scope,expectedVersion:selected.value.invoiceVersion,action:decision,reason:reason.value});selected.value=null;await load()}
 async function downloadInvoice(w:Withdrawal){const blob=await props.http.getBlob('/finance/withdrawals/'+w.id+'/invoice?'+new URLSearchParams({...props.scope}));const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=w.invoiceName||'发票';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-onMounted(()=>run(load))
+async function openWithdrawal(id:string){
+ if(!id)return
+ for(let targetPage=1;;targetPage++){
+  const data=await props.http.get<View>('/finance',{...props.scope,page:targetPage,attention:'all'})
+  const row=data.withdrawals.find(w=>w.id===id)
+  if(row){view.value=data;page.value=targetPage;attention.value='all';choose(row,'detail');return}
+  if(targetPage*25>=data.total)throw new Error('这笔付款不在当前项目或已无权查看。请核对提醒中的项目后重试。')
+ }
+}
+watch(()=>props.initialWithdrawalId,id=>{if(id)void run(()=>openWithdrawal(id))})
+onMounted(()=>run(async()=>{await load();if(props.initialWithdrawalId)await openWithdrawal(props.initialWithdrawalId)}))
 </script>
 <template>
   <section class="cash-box">
@@ -104,6 +114,7 @@ onMounted(()=>run(load))
       </tbody></table></div><p v-if="!view.withdrawals.length" class="cash-empty">还没有提现申请。</p>
       <div v-if="view.total>25" class="cash-actions"><button :disabled="page===1||busy" @click="page--;run(load)">上一页</button><span>第 {{page}} 页</span><button :disabled="page*25>=view.total||busy" @click="page++;run(load)">下一页</button></div>
       <Sheet :open="modalOpen" :title="modalTitle" @close="closeDialog"><p v-if="error" class="cash-error" role="alert">{{error}}</p>
+        <section v-if="selected&&action==='detail'" class="cash-dialog"><h3>{{labels[selected.status]||'处理中'}}</h3><p>本次扣减 ¥{{amount(selected.amount)}} · 费用 ¥{{amount(selected.feeAmount||'0')}}</p><strong>{{selected.status==='paid'?'实际打款':'预计到账'}} ¥{{amount(selected.netAmount??selected.amount)}}</strong><p>{{selected.receiverName||selected.displayName}} · {{methods[selected.payMethod||'']||selected.bankName}} · {{selected.payAccount||selected.bankAccount}}</p><p v-if="selected.reviewDeadline">审核截止：{{selected.reviewDeadline}} · 最迟结算：{{selected.settlementDeadline}}</p><p v-if="selected.paidOn">实际付款日期：{{selected.paidOn}}</p><p v-if="selected.remark">{{selected.remark}}</p><div class="cash-actions"><button v-if="selected.proofName" :disabled="busy" @click="run(()=>download(selected!))">查看付款凭证</button><button v-if="selected.invoiceRequired" :disabled="busy" @click="action='invoice'">查看发票要求与进度</button><button v-if="!view.canManage&&selected.status==='pending'" :disabled="busy" @click="action='cancel'">撤回申请</button><button v-if="selected.paymentVersion>0" :disabled="busy" @click="run(()=>inspectHistory(selected!))">查看登记与更正记录</button><button :disabled="busy" @click="closeDialog">关闭详情</button></div></section>
         <form v-if="fundOpen" class="cash-dialog" @submit.prevent="run(release)"><p>资金备妥后，本次开放 ¥{{amount(view.funding.amount)}} 供成员申请提现。</p><label>单号或说明（选填）<input v-model="reference" maxlength="255" /></label><button class="cash-primary primary" :disabled="busy">确认款项可用</button><button type="button" :disabled="busy" @click="fundOpen=false">取消</button></form>
         <form v-if="applyOpen" class="cash-dialog" @submit.prevent="run(apply)">
           <div v-if="policy?.enabled" class="cash-rules"><p v-for="line in policy.lines" :key="line">{{line}}</p></div>
