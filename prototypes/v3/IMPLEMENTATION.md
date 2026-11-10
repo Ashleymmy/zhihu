@@ -12,6 +12,8 @@
 
 2026-11-10 已合并完成的统一 Web 并接入实际 API，交付第三阶段团长核对、精确预览/确认、持久结果及记录关联留言。新增查询基于真实平台数据，无法可靠提供的指标显式不可用。最新接入按 33 类业务入口单列，不改写原 169 项审计统计；本地验证、生产发布和第四阶段付款分别记载。 [本轮接入与阶段三契约](#web-api-settlement-contract)
 
+2026-11-10 第四阶段已在本地接通财务主动付款、实际付款登记与凭证、旧付款对应收益、完整定向导出、付款留言及站内提醒。最新字段和入口见[第四阶段契约](#settlement-payment-contract)；第三阶段的固定未付款状态保留为历史交付说明，当前状态由付款实时查询返回。最终整体验收和生产发布另记，不以本地通过代替上线。
+
 每项给出当前入口或共享组件、后端依据、差距、实施动作、岗位边界与验收条件。批准范围继续以已确认任务书和开发规范为准。原型中的演示数字、激励档位、自动支付与保留期限单独进入业务决策清单。 [E001] [E002] [E003]
 
 本次证据来自原型、页面路由、包装组件、共享组件、后端服务、岗位校验及已有测试源码。代码存在、测试文件有相应断言、页面实际可用分别记录。已完成的基线检查为后端类型检查、Web 11 项类型检查和生产构建。业务集成测试、多角色浏览器操作及生产版本行为留在逐项验收范围内。
@@ -1704,7 +1706,7 @@
 
 结算金额依据实际业绩、计价规则和账目形成。团长应得分成与团队成员个人应得金额分别归属。财务主动办理的费用、额度、发票、资金开放及期限适用方式列入方案评审，首版建议承接现有线下实际付款登记能力。
 
-当前 `financeOverview` 以项目与来源查询既有提现，申请入口仅接受团长/达人本人，账单确认调用按项目及日期范围提交。按所选团长主动建立结算及付款办理记录需要补齐服务契约和流程。 [财务查询与申请](D:/ITEM/zhihu-app/web-redesign/server/src/core/finance.ts:85) [现有账单确认](D:/ITEM/zhihu-app/web-redesign/apps/module-views/zhihu/Finance/composables/useFinanceApi.ts:359) [跨期付款说明](D:/ITEM/zhihu-app/web-redesign/apps/module-views/zhihu/Finance/components/StepPayout.vue:11)
+立项时 `financeOverview` 以项目与来源查询既有提现，申请入口仅接受团长/达人本人，账单确认按项目及日期提交。2026-11-10 已补所选团长的结算及主动付款契约，详见[第四阶段](#settlement-payment-contract)；旧提现路径仍保留。 [原财务查询与申请](D:/ITEM/zhihu-app/web-redesign/server/src/core/finance.ts:85) [原账单确认](D:/ITEM/zhihu-app/web-redesign/apps/module-views/zhihu/Finance/composables/useFinanceApi.ts:359)
 
 用户确认内容、六项任务与验收条件已写入正式任务书。 [SET-L01 任务记录](D:/ITEM/zhihu-app/web-redesign/改造/Codex实施任务书_报表归因与拉新拉活_2026-10-08.md:1335)
 
@@ -1729,7 +1731,7 @@
 | 第一阶段，审核规则和权限基础 | 持久化作品默认通过及判定来源，提供普通存量等待处理，保留缺失、报送失败、明确退回和争议原因，补齐审计岗位权限及已发布的本人关键词登记修复。 | 接入服务端统一状态与原因。正常已登记作品参与核算，异常可按现有权限就地处理，作品状态与收益核对结果一致。 | 后端历史交付保留，2026-11-10 已随统一 Web 合入并接线，页面验收见[最新记录](#web-api-settlement-contract)。 |
 | 第二阶段，资料依据与自动核验 | 按项目、来源、渠道、关键词、日期和类型查询官方资料，复用可信团队、角色、任务及计价历史，补项目参与履历与自动更新。 | 财务上传资料后查看处理结果。核算时直接看到可办理结果、缺失资料或冲突，补齐后自动更新当前范围及待办。零值、未到资料与查询失败分别呈现。 | 后端 `14fd1a9` 能力保留；2026-11-10 资料抽屉、原任务/报表的历史补齐及连续动作已接真实 API，发布另验。 |
 | 第三阶段，团长核对与确认 | 按真实应得人聚合本人收益和团队分成，返回完整明细、就绪项、异常项及确定范围的预览，确认时复核权限、源版本与共源影响。 | 从获准团队上下文或财务入口选择团长、项目和周期，展开来源、处理异常、确认就绪金额。全部筛选与跨页金额一致。 | `3095ce2/6e2b0dd` 后端与 `1b6e075` Web 已实现，SET-L01-1..4、第 6 项结果查询及 SET-C01-2 已接通；浏览器最终范围与测试见最新记录。 |
-| 第四阶段，主动付款办理 | 区分经办人和收款人，建立结算、占用、提现及付款关联，复用实际付款登记与凭证，覆盖取消、失败、重试及并发。 | 财务主动建立付款办理记录，实际转账后登记结果与凭证，查看各自进度并按团长和周期导出。周期已付和跨期余额分别展示。 | 尚未实施。现有提现和实际付款登记继续使用原流程；主动付款仍依赖费用、额度、发票、资金开放及期限适用表，阶段三确认不代表付款。 |
+| 第四阶段，主动付款办理 | 区分发起经办、收款人和实际付款登记人，关联来源、统一占用及原付款记录，复用凭证与更正，覆盖取消、失败、重试及并发。 | 从当前结算结果连续开放款项、报价、代发起、审核、登记实际付款；数字进入相关记录，按所选人和周期完整导出。旧付款明确对应后计入周期，另有付款留言与精确提醒。 | 本地 API、Web、专项回归和独立复核已实现；现行 v2 政策未豁免，最终整体验收/发布另记，见[第四阶段契约](#settlement-payment-contract)。 |
 
 第一阶段交付时，旧记录收录仍根据执行人当前团队建立历史执行关系，此项作为第二阶段断点继续推进。第二阶段已接入可靠历史及就地补依据流程，最新结果见[本阶段契约与验证](#settlement-evidence-contract)。
 
@@ -2093,7 +2095,7 @@ summary 始终是所选团长完整范围的本人收益/应得分成；impacts 
 
 保存结果列表明确标识“范围应得”，不把它当作本次确认金额；本地示例的范围应得 97 元与本次团长确认 10 元分别显示，不为每行新增详情查询。原报表分析也区分 44 单中的已计价 37 单、尚未计价 7 单及 5 条待处理记录，已计价但待处理的记录仍须补齐资料，不用已知金额或数量冒充完整总值。两处标签已在最终构建实际读取核对，结算详情仍披露团长 10 元、达人 160 元和未付款状态。
 
-确认后 `paymentStatus` 固定为 `not_initiated`。第 6 项仅完成结果/更正追溯，主动付款、结算周期已付关联及定向导出未完成。原报表财务路径仍可用 importId + reviewHash 对其真实报表范围核对，和本节按团长选择的接口分别使用。
+第三阶段交付时，确认后 `paymentStatus` 固定为 `not_initiated`，第 6 项仅完成结果/更正追溯。第四阶段已补主动付款、周期已付关联及定向导出，当前列表和付款概览使用实时状态，原确认文档及原账不改。原报表财务路径仍可用 importId + reviewHash 对其真实报表范围核对，和本节按团长选择的接口分别使用。
 
 ### 状态变化、权限与重试
 
@@ -2114,3 +2116,77 @@ Web 最终通过 9 项类型任务和 121 项测试（管理端 67、共享组�
 六个真实角色已在本地 1440px/375px 登录操作。完整管理员从成员详情带入团长、补 Li 历史并自动恢复，然后预览和确认同一来源的团长 10 元/达人 160 元，保存结果重新读取一致，另 2 条缺作品继续阻塞，未付款状态明确。财务重新登录可读持久结果与财务线程；运营只读共享资料留言，不读财务留言或金额；团长贡献链接保留 `2026-10-12..2026-11-10`、performerId=3 和 group=team，只读本人 10 元；达人只读本人 160 元，待开放 160、可提 0、已付 0；开发者执行真实 DB/队列当前连通检查，不把它当历史巡检。
 
 已完成日期、按钮、待办、抽屉颜色与宽度、手机登录可见性的最终移动复验；运营资料抽屉实际跨 49.168 秒、3 轮同范围刷新仍保持打开，未发送留言逐字一致。最终截图使用 `*-final.jpg`（含 `settlement-confirmation-final.jpg`）与 `operator-evidence-refresh-stable.jpg`，业务过程及角色证据索引见任务书；`evidence/browser-observations.json` 最终为 passed、资源标识 `index-C6mtGDrd`，旧 before 图不作为最终通过证据。盐选与风险页本地只观察到外部响应错误与可用重试入口，未写成上游成功接通。自动化大数据场景不当作浏览器大样本操作。服务为本地独立 MySQL/Redis，作品外部回执采用本地模拟响应；代码已安全同步 D 盘活跃 Web 树，本轮未向生产部署、未上传小程序、未转账。
+
+<a id="settlement-payment-contract"></a>
+## 2026-11-10 第四阶段：主动付款、提醒及收尾契约
+
+本节为最新已实现契约，接续上面的阶段三接口与第二阶段自动核验；前端生产路径使用真实 API，失败不得回退到 Mock 成功。原型布局和组件探索仍可继续，但金额、资格、归属、状态和权限以以下服务端结果为准。正式业务口径及发布边界见[任务书第四阶段](../../改造/Codex实施任务书_报表归因与拉新拉活_2026-10-08.md#settlement-payment-closeout-20261110)。本轮为本地交付，尚不声明生产上线。
+
+### 页面入口及人员操作
+
+| 原有入口 | 实际接线及行为 |
+| --- | --- |
+| 团长成员详情 / 财务中的收款人选择 | 带入团长、项目、来源和业务日期，进入 `SettlementWorkbench`。当前团队只是入口；后端按已保存收款归属核对本人收益及应得团队分成。 |
+| 已确认结算 → 付款办理 | `SettlementPayments` 保留当前结算范围，依次开放所选款项、读取服务端报价、财务代发起、审核及登记实际付款。其他成员虽在共源确认预览中出现，款项不会一起开放或发放。 |
+| 付款金额卡 / 本期记录 | 已确认、尚未办理数字打开收益来源；办理中、已付数字请求后端状态分页并聚焦记录。已付详情顶部展示实际付款日期、流水、发起经办、付款登记人及凭证入口。 |
+| 历史付款对应关系 | 原付款必须明确对应收益并预览确认；已全部对应仍能从付款详情更正。输入零可解除当前来源对应，其他范围只读，不按现有团队或先后顺序猜历史。 |
+| 本次完整明细 | 导出当前收款人和保存周期的全部结果，包含阻塞、更正、已对应及待核对付款，独立于当前列表页和付款状态筛选。 |
+| 顶部原提醒入口 | 展示未读/全部、已读/未读和继续办理，金融与非金额资料提醒按权限分别定位原记录，不增加一级导航或工种。 |
+| 我的收益 | `IncomeView → PlatformIncome → CashWallet` 接收 `withdrawalId`，定位本人付款详情、凭证和原发票要求；不显示团队其他成员个人金额或财务留言。 |
+
+### 付款 API
+
+沿用阶段三 `Owner={moduleId,projectId,accountId,leaderId}`，本节 `id` 是已保存且已确认的结算 ID，业务日期及业绩类型来自该结果，不接受客户端扩大范围。接口前缀为 `/api/v1/core/settlements`，共享类型位于 `packages/shared-contracts/src/settlement-payment.ts`，服务封装为 `createSettlementPaymentApi`，Web 下载类型为 `SettlementPaymentApi<Blob>`。
+
+| 方法及后缀 | 请求及关键响应 |
+| --- | --- |
+| GET `/:id/payments` | Owner + page/pageSize + `paymentView?=all/processing/paid` + `withdrawalId?`。返回实时概览、全范围金额、全部来源及后端分页付款记录；状态过滤在分页前执行，金额仍为完整范围。指定 withdrawalId 时优先精确定位其所在页，不受过时状态筛选影响；无权或无关联记录拒绝。 |
+| POST `/:id/payment-quote` | Owner + amount + expectedVersion。返回服务器 amount/feeAmount/netAmount、policyVersion、quoteToken、expectedVersion、期限及 allocations。前端不重算金额或费用。 |
+| POST `/:id/payments` | Owner + 服务端报价 amount/quoteToken/policyVersion/expectedVersion + receiverName/payMethod/payAccount + requestKey，返回 withdrawalId/settlementId。实际申请占用沿用原提现表。 |
+| POST `/:id/funding` | Owner + expectedVersion + requestKey + reference（选填）。版本取概览 `overview.version`，不能取展示用 `funding.version`。资金备妥确认由财务显式操作，只开放所选来源和收款人。 |
+| POST `/:id/payments/:withdrawalId/action` | Owner + expectedVersion/requestKey + action=`cancel/failed/retry` + reason。取消、失败必须有原因；恢复备注选填。失败和恢复继续原记录及条款，不重新扣款。 |
+| GET `/:id/legacy-payments` | Owner + 分页，返回待核对历史付款及版本；不是周期已付金额的证明。已关联记录的再更正入口在付款详情。 |
+| POST `/:id/payment-links/preview` | Owner + withdrawalId + `allocations:[{sourceId,amount}]`，返回 version、明确对应金额及 warnings。 |
+| POST `/:id/payment-links` | 上述明确选择 + expectedVersion/requestKey。只保存对应关系和审计，不改原申请或已确认账。 |
+| GET/POST `/:id/payments/:withdrawalId/comments` | Owner；GET 分页，POST body/requestKey。沿原 `RecordComments`，仅财务权限可读写；普通成员不取得此线程。 |
+| GET `/:id/export` | Owner，返回完整保存范围 UTF-8 CSV。预计净额与实际已付分列，非 paid 的实际已付为零；防公式执行。 |
+
+复用 `/api/v1/core/finance/withdrawals/:withdrawalId` 的 `/review`、`/pay`（multipart）、`/proof`、`/correct`、`/history` 和原发票系列接口。登记实际付款须核对真实账号、净额和实际转账情况；凭证为图片/PDF，最大 5 MB。`history` 保留原 `list`，财务另返回 `settlementEvents`（actorName、action、reason、createdAt、beforeData、afterData）；界面只投影业务含义及前后对应金额，不展示原始技术 JSON。成员自己的付款历史不返回财务对应事件。
+
+### DTO 与状态含义
+
+- 概览包括 `paymentStatus`、`version`、`totals`、`payments/total/page/pageSize`、`sources`、`funding`、`policy`、`blockers`。状态为 `not_initiated/processing/partially_paid/paid/needs_review`。已确认文档及历史金额不随付款进度改写。
+- `totals.confirmedAmount` 是本期确认金额，`processingAmount` 是办理中占用；`paidGrossAmount/paidNetAmount` 是已明确对应的本期实际付款口径；`remainingAmount` 为尚未发起占用，展示“本期尚未办理”，不是所有未付金额。`availableAmount` 为当前可办理，`legacyUnallocatedAmount` 单列尚未核对周期的历史申请，`residualAmount` 保留不足一分余额。
+- 付款行区分 `initiatedBy/initiatorName` 与 `paidByName`（可空）。保存 `paidOn/paymentReference/proofName`，历史未留存须明确显示；不能用发起人冒充实际付款登记人。整笔 amount/feeAmount/netAmount 与本期 allocatedAmount/allocatedNetAmount 分开；跨期整笔净额不可当本期净额。
+- `allocations[].editable=false` 表示当前范围外对应，只读保留；本期来源展示 `originalConfirmedAmount/currentConfirmedAmount/correctionAmount` 和具体原因。关联全部清零后仍保留可授权追溯的原留言及提醒，零对应不占用资金。
+- 取消/退回释放未付款占用；失败保留占用并通过原记录恢复；付款撤销标记回到 approved 并继续占用。变更已确认金额用更正行，新旧入口、重叠结算范围共用来源和全局余额保护。
+- 异步结果不确定时，原 endpoint、范围、正文、文件和 requestKey 一并保留；原样重试不取当前表单生成另一笔申请。409 重新核对并报价，确定拒绝后才释放请求。留言刷新同一记录不清空输入；原始 Network Error 等技术英文换成中文原因及重试动作。
+
+### 现行政策与自动化边界
+
+政策固定依据为服务端当前 `2026-10-21-v2`：无最低起提门槛和固定次数，申请大于零且精确到分；手续费为申请总额 1%，由服务端整数规则取分；实际收款人当前为团长每日累计 500 元、达人 100 元，按北京时间自然日、同账号跨项目/双端合并。财务发起沿同一规则，不按经办人的角色取额度。新申请按下一个工作日起算 3 个工作日处理，不要求发票；已受理旧申请保留当时费用、期限和发票条件。不能恢复旧 README 的门槛/阶梯，也不能由前端填入免手续费或绕过额度。
+
+作品审核依 R7 默认通过；实际缺作品、报送失败及争议仍独立处理。自动核验沿已有 Excel/CSV、原始来源与六维业务键、任务和可靠历史执行；有效零、缺资料、缺行、冲突、撤回与读取失败不可混淆。补齐可信依据后自动重核未确认项，已确认差异追加更正。普通历史说明不构成已核实依据，当前团队不回填历史归属。自动确认账、开放资金、银行支付、抓取邮箱/解析任意邮件正文均不在已交付能力内；现行实际付款是人工转账后登记结果及证明。
+
+### 提醒和精确跳转
+
+`GET /api/v1/core/reminders` 接受 `state=unread|all`、page/pageSize；`POST /api/v1/core/reminders/:id/read` 接受 `{read:boolean}`。调用者身份来自当前会话，不能提交另一个用户 ID。个人已读状态持久化且重复标记幂等；新留言或付款状态版本变化会产生新的未读身份。已读不等于已处理，资料是否处理完成由真实提供器结果判断。
+
+| 业务对象 | 实际目标与必要上下文 |
+| --- | --- |
+| 财务结算/付款 | `/finance?moduleId=&projectId=&accountId=&leaderId=&settlementId=&withdrawalId=`，完整打开对应结算及付款抽屉；原提现显式对应后也能定位，不能只有 withdrawalId 跳到空白财务首页。 |
+| 财务来源留言 | `/finance` 加 sourceId、from、to、metricType 和所属范围，直接读取来源详情，即使不在当前列表页。 |
+| 成员本人付款 | `/income` 加 projectId/accountId/moduleId/withdrawalId，打开本人的实际付款详情。 |
+| 非金额核验及留言 | `/dashboard?reminderContext=evidence` 加 moduleId/projectId/accountId/channelRef/taskRef/businessDate/metricType，由 Shell 复用核验/补资料抽屉和非金额留言，不进入运营无权访问的财务页。 |
+
+所有提醒列表、数量、分页及已读写入都按 SQL 业务范围、当前有效岗位、项目/来源状态和本人归属检查；旧读回执不恢复权限。摘要只含获准项目、对象、日期，不抄留言正文或项目提供器的财务字段。运营不见金额/财务线程，团长不见团队成员个人金额，成员只查本人付款；跳转后的接口重新鉴权。通知仅为站内读取与阅读状态，没有外部聊天、邮件推送或新增角色。
+
+### 验证、迁移和发布状态
+
+新增 `server/schema/extensions/028_settlement_payments.sql` 与 `029_business_reminders.sql`，前者保存付款发起、收益对应及事件并扩展留言上下文，后者保存个人已读。须连同前三阶段迁移验证并用于一致的 API/Worker 版本。核心不查询项目模块表，核验仍通过平台契约；原钱包保持单一资金占用。新付款实际使用后，旧处理器缺少来源保护，回退需保留保护或停写后向前修复，不能直接覆盖新账。
+
+本地 Web 类型 9/9、138 单测和构建通过；后端聚焦 49 项、独立 6 个探针通过，五个 P2 审阅问题已修复。上述是各自无重复的专项结果，不累计旧阶段或重跑次数；最终全量套件由协调者补充。真实 3338 演示已走通补资料、确认团长 10/达人 160、仅开放团长 10、财务代申请、失败→原记录恢复→审核→模拟付款登记，已付总额 10/净额 9.90。合成 PDF 上传/下载摘要一致；这些均为隔离数据，没有银行转账。最新角色复核已观察到团长提醒精确打开本人付款，达人只见本人 160，不见团长 10 或财务留言。
+
+最终角色/375 px 截图、整体验收、迁移及上线后核验仍按最新证据收口。达人收益详情暗色汇总卡使用主题背景/文字/边框，避免近白文字落在固定浅色底，交付构建须由实际页面再次验证。证据位于本轮 Run `.workflow/sessions/20261110-team-planex-settlement-closeout/runs/20261110-001-team-planex/` 的 outputs、`evidence/web-payment-cua-*`、`backend-payment-review-final.log`、`backend-independent-probes-fixed.log`、`browser-review.json` 与 screenshots；不以旧 before 图或上一构建冒充最终验收。
+
+本轮阶段四代码与隔离验证交付和生产发布分别记载：协调者正在构建完整候选镜像及可执行发布包，生产切流仍由既有发布管理会话负责。正式发布前须有对应窗口的新备份、同版 API/Worker 和迁移/回退复核；本轮未执行生产发布，也不向生产写入模拟财务记录。最终上线状态由发布回执确认。
