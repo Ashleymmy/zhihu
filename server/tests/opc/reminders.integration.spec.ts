@@ -234,6 +234,9 @@ it('filters financial comments in SQL before counts and paginates full evidence 
   expect(result.body.data.list[0].path).toContain('taskRef=11');
   expect(result.body.data.list[0].path).toContain('businessDate=2026-10-01');
   expect(result.body.data.list[0].path).toContain('metricType=activation');
+  expect(result.body.data.list[0].title).toContain('资料');
+  expect(result.body.data.list[0].title).toContain('2026-10-01');
+  expect(result.body.data.list[0].body).toContain('一');
   expect(JSON.stringify(result.body)).not.toContain('12345');
   expect(JSON.stringify(result.body)).not.toContain('财务办理');
   expect((await read(finance, '3')).status).toBe(404);
@@ -331,6 +334,8 @@ it('links financial payment comments and failures to the exact settlement/paymen
     expect(row.path).toContain('settlementId=1');
     expect(row.path).toContain('withdrawalId=1');
     expect(row.path).toContain('leaderId=4');
+    expect(row.title).toContain('人员4');
+    expect(row.body).toContain('一');
   }
   expect((await read(id, '4')).status).toBe(404);
   expect((await get('7')).body.data.total).toBe(0);

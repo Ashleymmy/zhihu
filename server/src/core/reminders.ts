@@ -41,6 +41,16 @@ function events(runtime: ModuleRuntime, user: AuthUser) {
   const evidenceModules = modules.filter((m) => !!m.dataProvider?.evidenceInTransaction).map((m) => m.manifest.id);
   const walletModules = modules.map((m) => m.manifest.id);
   const params: unknown[] = [];
+  // Legacy withdrawals have no origin row. Their explicit (including later zeroed)
+  // associations provide an authorized, durable route back to the financial thread.
+  const paymentSettlement = (w: string, origin: string) => `COALESCE(
+    (SELECT origin_st.id FROM opc_settlements origin_st WHERE origin_st.id=${origin}.settlement_id
+      AND origin_st.module_id=${w}.module_id AND origin_st.project_id=${w}.project_id AND origin_st.account_id=${w}.account_id
+      AND origin_st.leader_id=${w}.user_id AND origin_st.status='confirmed'),
+    (SELECT linked_st.id FROM opc_settlement_payment_allocations pa JOIN opc_settlements linked_st ON linked_st.id=pa.settlement_id
+      WHERE pa.withdrawal_id=${w}.id AND pa.user_id=${w}.user_id
+      AND linked_st.module_id=${w}.module_id AND linked_st.project_id=${w}.project_id AND linked_st.account_id=${w}.account_id
+      AND linked_st.leader_id=${w}.user_id AND linked_st.status='confirmed' ORDER BY pa.linked_at DESC,pa.id DESC LIMIT 1))`;
   const scopes = (alias: string) => `EXISTS(SELECT 1 FROM integration_accounts a
     JOIN project_integrations pi ON pi.account_id=a.id JOIN projects p ON p.id=pi.project_id
     JOIN module_installations mi ON mi.module_id=a.module_id
@@ -68,17 +78,20 @@ function events(runtime: ModuleRuntime, user: AuthUser) {
     CAST(cm.leader_id AS CHAR) leader_id,cm.channel_ref,DATE_FORMAT(cm.business_date,'%Y-%m-%d') business_date,cm.metric_type,
     DATE_FORMAT(COALESCE(st.business_from,es.business_date),'%Y-%m-%d') business_from,
     DATE_FORMAT(COALESCE(st.business_to,es.business_date),'%Y-%m-%d') business_to,
-    CAST(COALESCE(st.id,po.settlement_id) AS CHAR) settlement_id,
+    CAST(COALESCE(st.id,${paymentSettlement('cw', 'po')}) AS CHAR) settlement_id,
     cm.created_at event_at,NULL payment_status,NULL failure_reason,
     CASE WHEN cm.context_kind='withdrawal' THEN cw.status IN ('paid','cancelled','rejected')
       WHEN cm.context_kind='settlement' THEN st.status='confirmed'
       WHEN cm.context_kind='earning_source' THEN NOT EXISTS(SELECT 1 FROM opc_earning_lines pending_line WHERE pending_line.source_id=es.id AND pending_line.source_version=es.current_version AND pending_line.is_internal=0 AND (pending_line.is_ready=0 OR pending_line.confirmed_at IS NULL))
-      ELSE 0 END handled
+      ELSE 0 END handled,
+    CASE WHEN cm.context_kind='earning_source' THEN es.task_name ELSE recipient.display_name END context_name,
+    (SELECT p.name FROM projects p WHERE p.id=cm.project_id) project_name
     FROM opc_record_comments cm
     LEFT JOIN opc_settlements st ON cm.context_kind='settlement' AND st.id=cm.context_id AND st.module_id=cm.module_id AND st.project_id=cm.project_id AND st.account_id=cm.account_id AND st.leader_id=cm.leader_id
     LEFT JOIN opc_earning_sources es ON cm.context_kind='earning_source' AND es.id=cm.context_id AND es.module_id=cm.module_id AND es.project_id=cm.project_id AND es.account_id=cm.account_id
     LEFT JOIN opc_withdrawals cw ON cm.context_kind='withdrawal' AND cw.id=cm.context_id AND cw.module_id=cm.module_id AND cw.project_id=cm.project_id AND cw.account_id=cm.account_id AND cw.user_id=cm.leader_id
     LEFT JOIN opc_settlement_payment_origins po ON po.withdrawal_id=cw.id
+    LEFT JOIN users recipient ON recipient.id=cm.leader_id
     WHERE (${commentConditions.join(' OR ') || '0=1'}) AND cm.author_id<>? AND ${scopes('cm')}`;
   params.push(user.sub);
   const member = ['leader', 'creator'].includes(user.role);
@@ -96,11 +109,13 @@ function events(runtime: ModuleRuntime, user: AuthUser) {
       COALESCE(w.reviewed_at,''),COALESCE(w.paid_at,''),COALESCE(po.attempt_version,0)),256),24)) event_key,
     'payment' kind,'withdrawal' context_kind,CAST(w.id AS CHAR) context_id,w.module_id,CAST(w.project_id AS CHAR) project_id,
     CAST(w.account_id AS CHAR) account_id,CAST(w.user_id AS CHAR) leader_id,NULL channel_ref,NULL business_date,NULL metric_type,
-    NULL business_from,NULL business_to,CAST(po.settlement_id AS CHAR) settlement_id,
+    NULL business_from,NULL business_to,CAST(${paymentSettlement('w', 'po')} AS CHAR) settlement_id,
     GREATEST(w.created_at,COALESCE(w.reviewed_at,w.created_at),COALESCE(w.paid_at,w.created_at),
       COALESCE((SELECT MAX(pe.created_at) FROM opc_settlement_payment_events pe WHERE pe.withdrawal_id=w.id),w.created_at)) event_at,
-    w.status payment_status,po.failure_reason,w.status IN ('paid','cancelled','rejected') handled
+    w.status payment_status,po.failure_reason,w.status IN ('paid','cancelled','rejected') handled,
+    recipient.display_name context_name,(SELECT p.name FROM projects p WHERE p.id=w.project_id) project_name
     FROM opc_withdrawals w LEFT JOIN opc_settlement_payment_origins po ON po.withdrawal_id=w.id
+    JOIN users recipient ON recipient.id=w.user_id
     WHERE ${paymentCondition} AND ${scopes('w')}`;
   return { sql: `${comments} UNION ALL ${payments}`, params, finance };
 }
@@ -116,8 +131,16 @@ function view(row: RowDataPacket, finance: boolean): ReminderItem {
     body = '',
     next = '查看付款记录';
   if (row.kind === 'comment') {
-    title = row.context_kind === 'evidence' ? '资料核对有新留言' : '财务办理有新留言';
-    body = '打开对应记录查看留言并继续处理。';
+    const name = String(row.context_name ?? '');
+    title =
+      row.context_kind === 'evidence'
+        ? `${name || '资料'} · ${String(row.business_date)}核对有新留言`
+        : row.context_kind === 'withdrawal'
+          ? `${name || '收款人'}的付款有新留言`
+          : row.context_kind === 'settlement'
+            ? `${name || '收款人'}的结算有新留言`
+            : `${name || '收益记录'}有新留言`;
+    body = `${String(row.project_name ?? '当前项目')} · 打开记录查看留言并继续处理。`;
     next = '查看留言';
     if (row.context_kind === 'evidence') {
       path = '/dashboard';
@@ -139,9 +162,12 @@ function view(row: RowDataPacket, finance: boolean): ReminderItem {
       ? '上次付款办理未完成，记录与款项仍保留。'
       : `当前状态：${labels[String(row.payment_status)] ?? '待核对'}。`;
     if (finance) {
-      title = row.failure_reason ? '付款需要继续处理' : '有付款等待办理';
+      title = row.failure_reason
+        ? `${String(row.context_name || '收款人')}的付款需要继续处理`
+        : `${String(row.context_name || '收款人')}有付款等待办理`;
       next = row.payment_status === 'pending' ? '财务：审核申请' : '财务：继续付款办理';
     }
+    body = `${String(row.project_name ?? '当前项目')} · ${body}`;
   }
   if (row.context_kind !== 'evidence') {
     if (row.leader_id && finance) query.set('leaderId', String(row.leader_id));
@@ -182,8 +208,8 @@ export async function listReminders(runtime: ModuleRuntime, user: AuthUser, quer
       ORDER BY e.event_at DESC,e.event_key DESC LIMIT ? OFFSET ?`,
       [...params, query.pageSize, (query.page - 1) * query.pageSize],
     );
-    // The provider supplies only completion state here. Do not copy financial fields into a reminder.
-    const states = new Map<string, boolean>();
+    // Copy only the authorized record's title and completion state, never message bodies or financial fields.
+    const states = new Map<string, { handled: boolean; title: string | null }>();
     for (const row of rows) {
       if (row.context_kind !== 'evidence') continue;
       const key = JSON.stringify([
@@ -197,7 +223,8 @@ export async function listReminders(runtime: ModuleRuntime, user: AuthUser, quer
       ]);
       if (!states.has(key)) {
         const provider = runtime.get(String(row.module_id))?.dataProvider?.evidenceInTransaction;
-        let handled = false;
+        let handled = false,
+          title: string | null = null;
         if (provider) {
           const evidence = await provider(
             c,
@@ -217,7 +244,7 @@ export async function listReminders(runtime: ModuleRuntime, user: AuthUser, quer
             },
           );
           const result = evidence.list[0];
-          handled =
+          const matches =
             !!result &&
             evidence.list.length === 1 &&
             result.key.projectId === String(row.project_id) &&
@@ -225,12 +252,14 @@ export async function listReminders(runtime: ModuleRuntime, user: AuthUser, quer
             result.key.channelRef === String(row.channel_ref) &&
             result.key.taskRef === String(row.context_id) &&
             result.key.businessDate === String(row.business_date) &&
-            result.key.metricType === String(row.metric_type) &&
-            result.result.status === 'ready';
+            result.key.metricType === String(row.metric_type);
+          handled = matches && result.result.status === 'ready';
+          if (matches) title = result.title.slice(0, 255);
         }
-        states.set(key, handled);
+        states.set(key, { handled, title });
       }
-      row.handled = states.get(key) ? 1 : 0;
+      row.handled = states.get(key)?.handled ? 1 : 0;
+      row.context_name = states.get(key)?.title ?? null;
     }
     return {
       list: rows.map((r) => view(r, event.finance)),

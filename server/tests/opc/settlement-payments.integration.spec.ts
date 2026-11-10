@@ -630,10 +630,10 @@ it('explicitly links legacy payment, saves exact net allocations and audits a co
   ).toBe(200);
   const events = await q('SELECT event_type FROM opc_settlement_payment_events WHERE withdrawal_id=?', [wid]);
   expect(events).toHaveLength(2);
-  const history=await get(`finance/withdrawals/${wid}/history`,base);
-  expect(history.status,history.text).toBe(200);
-  expect(history.body.data.settlementEvents.map((e:{action:string})=>e.action)).toEqual(['link','link']);
-  expect((await get(`finance/withdrawals/${wid}/history`,base,'4')).body.data.settlementEvents).toEqual([]);
+  const history = await get(`finance/withdrawals/${wid}/history`, base);
+  expect(history.status, history.text).toBe(200);
+  expect(history.body.data.settlementEvents.map((e: { action: string }) => e.action)).toEqual(['link', 'link']);
+  expect((await get(`finance/withdrawals/${wid}/history`, base, '4')).body.data.settlementEvents).toEqual([]);
   expect(
     (await q('SELECT status,CAST(amount AS CHAR) amount FROM opc_withdrawals WHERE id=?', [wid]))[0],
   ).toMatchObject({ status: 'paid', amount: '80.0000' });
@@ -845,32 +845,265 @@ it('limits overlapping settlement documents by the same source allocations', asy
   const v = await overview(second.id);
   expect(v.totals.confirmedAmount).toBe('105.0000');
   expect(v.totals.availableAmount).toBe('5.0000');
-  expect((await post(`settlements/${second.id}/payment-quote`, { ...owner, amount: '6', expectedVersion: v.version })).status).toBe(409);
+  expect(
+    (await post(`settlements/${second.id}/payment-quote`, { ...owner, amount: '6', expectedVersion: v.version }))
+      .status,
+  ).toBe(409);
   const b = await create(second.id, '5');
   expect(a.id).not.toBe(b.id);
   expect((await overview(first.id)).totals.processingAmount).toBe('100.0000');
   expect((await overview(second.id)).totals.processingAmount).toBe('105.0000');
-  expect((await q("SELECT CAST(SUM(amount) AS CHAR) amount FROM opc_withdrawals WHERE status IN ('pending','approved','paid')"))[0].amount).toBe('105.0000');
+  expect(
+    (
+      await q(
+        "SELECT CAST(SUM(amount) AS CHAR) amount FROM opc_withdrawals WHERE status IN ('pending','approved','paid')",
+      )
+    )[0].amount,
+  ).toBe('105.0000');
 });
 
 it('rejects excessive legacy association and allows audited unlink from a blocked source', async () => {
   const doc = await setup('40');
   await open(doc.id);
   const oldQuote = await get('finance/withdrawal-quote', { ...base, amount: '40' }, '4');
-  const old = await post('finance/withdrawals', { ...base, amount: '40', requestKey: key(), policyVersion: oldQuote.body.data.policyVersion, quoteToken: oldQuote.body.data.quoteToken, receiverName: '测试', payMethod: 'bank', payAccount: 'TEST' }, '4');
+  const old = await post(
+    'finance/withdrawals',
+    {
+      ...base,
+      amount: '40',
+      requestKey: key(),
+      policyVersion: oldQuote.body.data.policyVersion,
+      quoteToken: oldQuote.body.data.quoteToken,
+      receiverName: '测试',
+      payMethod: 'bank',
+      payAccount: 'TEST',
+    },
+    '4',
+  );
   expect(old.status, old.text).toBe(201);
-  const wid = old.body.data.id, sourceId = doc.items[0].record.id;
-  expect((await post(`settlements/${doc.id}/payment-links/preview`, { ...owner, withdrawalId: wid, allocations: [{ sourceId, amount: '41' }] })).status).toBe(409);
+  const wid = old.body.data.id,
+    sourceId = doc.items[0].record.id;
+  expect(
+    (
+      await post(`settlements/${doc.id}/payment-links/preview`, {
+        ...owner,
+        withdrawalId: wid,
+        allocations: [{ sourceId, amount: '41' }],
+      })
+    ).status,
+  ).toBe(409);
   const allocations = [{ sourceId, amount: '40' }];
-  const previewLink = await post(`settlements/${doc.id}/payment-links/preview`, { ...owner, withdrawalId: wid, allocations });
-  expect((await post(`settlements/${doc.id}/payment-links`, { ...owner, withdrawalId: wid, allocations, expectedVersion: previewLink.body.data.version, requestKey: key() })).status).toBe(200);
+  const previewLink = await post(`settlements/${doc.id}/payment-links/preview`, {
+    ...owner,
+    withdrawalId: wid,
+    allocations,
+  });
+  expect(
+    (
+      await post(`settlements/${doc.id}/payment-links`, {
+        ...owner,
+        withdrawalId: wid,
+        allocations,
+        expectedVersion: previewLink.body.data.version,
+        requestKey: key(),
+      })
+    ).status,
+  ).toBe(200);
   await c.query("UPDATE opc_earning_sources SET blocked_reason='待核实' WHERE id=?", [sourceId]);
   const cleared = [{ sourceId, amount: '0' }];
-  const removal = await post(`settlements/${doc.id}/payment-links/preview`, { ...owner, withdrawalId: wid, allocations: cleared });
+  const removal = await post(`settlements/${doc.id}/payment-links/preview`, {
+    ...owner,
+    withdrawalId: wid,
+    allocations: cleared,
+  });
   expect(removal.status, removal.text).toBe(200);
-  expect((await post(`settlements/${doc.id}/payment-links`, { ...owner, withdrawalId: wid, allocations: cleared, expectedVersion: removal.body.data.version, requestKey: key() })).status).toBe(200);
+  expect(
+    (
+      await post(`settlements/${doc.id}/payment-links`, {
+        ...owner,
+        withdrawalId: wid,
+        allocations: cleared,
+        expectedVersion: removal.body.data.version,
+        requestKey: key(),
+      })
+    ).status,
+  ).toBe(200);
   const v = await overview(doc.id);
   expect(v.totals.legacyUnallocatedAmount).toBe('40.0000');
   expect(v.totals.availableAmount).toBe('0.0000');
   expect(await q('SELECT id FROM opc_settlement_payment_events WHERE withdrawal_id=?', [wid])).toHaveLength(2);
+});
+
+it('exports expected payment separately from paid amounts and exposes the actual recording staff', async () => {
+  const doc = await setup('30');
+  await open(doc.id);
+  const made = await create(doc.id, '10');
+  const fields = async () => {
+    const output = await get(`settlements/${doc.id}/export`, owner);
+    expect(output.status, output.text).toBe(200);
+    return output.text
+      .split('\r\n')
+      .find((line: string) => line.startsWith('"' + made.id + '",'))!
+      .slice(1, -1)
+      .split('","');
+  };
+  let row = await fields();
+  expect(row[4]).toBe('0.0000');
+  expect(row[6]).toBe('0.0000');
+  expect(row[11]).toBe('9.9000');
+  expect(row[12]).toBe('9.9000');
+  const processing = await get(`settlements/${doc.id}/payments`, { ...owner, paymentView: 'processing', pageSize: 1 });
+  expect(processing.status, processing.text).toBe(200);
+  expect(processing.body.data.total).toBe(1);
+  expect(processing.body.data.totals.confirmedAmount).toBe('30.0000');
+  expect((await get(`settlements/${doc.id}/payments`, { ...owner, paymentView: 'paid' })).body.data.total).toBe(0);
+  await pay(made.id, made.quoted);
+  row = await fields();
+  expect(row[4]).toBe('9.9000');
+  expect(row[6]).toBe('9.9000');
+  expect(row[11]).toBe('0.0000');
+  expect((await overview(doc.id)).payments[0].paidByName).toBe('人员2');
+  expect((await get(`settlements/${doc.id}/payments`, { ...owner, paymentView: 'paid' })).body.data.total).toBe(1);
+  expect((await get(`settlements/${doc.id}/payments`, { ...owner, paymentView: 'processing' })).body.data.total).toBe(
+    0,
+  );
+  const direct = await get(`settlements/${doc.id}/payments`, {
+    ...owner,
+    paymentView: 'processing',
+    withdrawalId: made.id,
+  });
+  expect(direct.status, direct.text).toBe(200);
+  expect(direct.body.data.payments[0].withdrawalId).toBe(made.id);
+});
+
+it('continues an overlapping payment from its displayed context and preserves original provenance', async () => {
+  const first = await setup('100');
+  await open(first.id);
+  const made = await create(first.id, '10');
+  const date = '2026-10-' + String(sequence).padStart(2, '0');
+  await write(source('overlap-actions', date, '5', '4'));
+  const second = await preview(scope(date));
+  expect((await confirm(second)).status).toBe(200);
+  await open(second.id);
+  await action(second.id, made.id, 'failed');
+  const view = await overview(second.id);
+  const retry = await post(`settlements/${second.id}/payments/${made.id}/action`, {
+    ...owner,
+    action: 'retry',
+    expectedVersion: view.version,
+    requestKey: key(),
+    reason: '',
+  });
+  expect(retry.status, retry.text).toBe(200);
+  const [event] = await q(
+    "SELECT CAST(settlement_id AS CHAR) settlement_id,reason,after_json FROM opc_settlement_payment_events WHERE withdrawal_id=? AND event_type='retry'",
+    [made.id],
+  );
+  expect(event.settlement_id).toBe(first.id);
+  expect(event.reason).toBe('核对后继续原付款办理');
+  expect(event.after_json.openedFromSettlementId).toBe(second.id);
+  const next = await overview(second.id);
+  expect(
+    (
+      await post(`settlements/${second.id}/payments/${made.id}/action`, {
+        ...owner,
+        action: 'cancel',
+        expectedVersion: next.version,
+        requestKey: key(),
+        reason: '',
+      })
+    ).status,
+  ).toBe(422);
+  expect(
+    (
+      await post(`settlements/${second.id}/payments/${made.id}/action`, {
+        ...owner,
+        action: 'failed',
+        expectedVersion: next.version,
+        requestKey: key(),
+        reason: '',
+      })
+    ).status,
+  ).toBe(422);
+  const unrelated = await setup('1');
+  expect(
+    (
+      await post(`settlements/${unrelated.id}/payments/${made.id}/action`, {
+        ...owner,
+        action: 'cancel',
+        expectedVersion: (await overview(unrelated.id)).version,
+        requestKey: key(),
+        reason: '不可跨记录',
+      })
+    ).status,
+  ).toBe(404);
+  await action(second.id, made.id, 'cancel');
+  expect((await overview(first.id)).totals.processingAmount).toBe('0.0000');
+});
+
+it('routes legacy-payment reminders to the precise thread and retains it after association removal', async () => {
+  const doc = await setup('30');
+  await open(doc.id);
+  const oldQuote = await get('finance/withdrawal-quote', { ...base, amount: '10' }, '4');
+  const made = await post(
+    'finance/withdrawals',
+    {
+      ...base,
+      amount: '10',
+      requestKey: key(),
+      policyVersion: oldQuote.body.data.policyVersion,
+      quoteToken: oldQuote.body.data.quoteToken,
+      receiverName: '测试',
+      payMethod: 'bank',
+      payAccount: 'TEST',
+    },
+    '4',
+  );
+  expect(made.status, made.text).toBe(201);
+  const wid = made.body.data.id,
+    sourceId = doc.items[0].record.id;
+  async function link(value: string) {
+    const allocations = [{ sourceId, amount: value }],
+      p = await post(`settlements/${doc.id}/payment-links/preview`, { ...owner, withdrawalId: wid, allocations });
+    expect(p.status, p.text).toBe(200);
+    expect(
+      (
+        await post(`settlements/${doc.id}/payment-links`, {
+          ...owner,
+          withdrawalId: wid,
+          allocations,
+          requestKey: key(),
+          expectedVersion: p.body.data.version,
+        })
+      ).status,
+    ).toBe(200);
+  }
+  await link('10');
+  const path = `settlements/${doc.id}/payments/${wid}/comments`;
+  const added = await post(path, { ...owner, body: '核对原付款资料，不在提醒泄漏正文', requestKey: key() }, '1');
+  expect(added.status, added.text).toBe(201);
+  async function checkReminder() {
+    const reminders = await get('reminders', { state: 'all', pageSize: 100 });
+    expect(reminders.status, reminders.text).toBe(200);
+    const row = reminders.body.data.list.find((r: { id: string }) => r.id === 'comment:' + added.body.data.id);
+    expect(row).toBeTruthy();
+    const params = new URL(row.path, 'http://local').searchParams;
+    expect(params.get('settlementId')).toBe(doc.id);
+    expect(params.get('withdrawalId')).toBe(wid);
+    expect(params.get('leaderId')).toBe(owner.leaderId);
+    expect(row.title).toContain('人员4');
+    expect(JSON.stringify(row)).not.toContain('不在提醒泄漏正文');
+  }
+  await checkReminder();
+  await link('0');
+  await checkReminder();
+  const comments = await get(path, owner);
+  expect(comments.status, comments.text).toBe(200);
+  expect(comments.body.data.list.some((r: { id: string }) => r.id === added.body.data.id)).toBe(true);
+  const deep = await get(`settlements/${doc.id}/payments`, { ...owner, withdrawalId: wid });
+  expect(deep.status, deep.text).toBe(200);
+  expect(deep.body.data.payments.find((w: { withdrawalId: string }) => w.withdrawalId === wid).allocatedAmount).toBe(
+    '0.0000',
+  );
+  expect((await get(path, owner, '3')).status).toBe(403);
 });

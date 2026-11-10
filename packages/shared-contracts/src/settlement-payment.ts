@@ -11,6 +11,7 @@ export interface SettlementPaymentTotals {
 export interface SettlementPaymentRow {
   withdrawalId: string; settlementId: string | null; initiatedBy: string | null
   initiatorName: string | null; recipientId: string; recipientName: string
+  paidByName?: string | null
   amount: string; feeAmount: string; netAmount: string
   allocatedAmount: string; allocatedNetAmount: string; unallocatedAmount: string
   allocations: Array<SettlementPaymentAllocation & { editable: boolean }>
@@ -53,7 +54,7 @@ export interface SettlementPaymentLinkPreview {
   totalAmount: string; warnings: string[]
 }
 export interface SettlementPaymentApi<Download = unknown> {
-  overview(id: string, input: SettlementRecipientScope & PageQuery & { withdrawalId?: string }): Promise<SettlementPaymentOverview>
+  overview(id: string, input: SettlementRecipientScope & PageQuery & { withdrawalId?: string; paymentView?: 'all' | 'processing' | 'paid' }): Promise<SettlementPaymentOverview>
   quote(id: string, input: SettlementRecipientScope & { amount: string; expectedVersion: string }): Promise<SettlementPaymentQuote>
   create(id: string, input: SettlementRecipientScope & SettlementPaymentCreate): Promise<{ withdrawalId: string; settlementId: string }>
   funding(id: string, input: SettlementRecipientScope & { requestKey: string; expectedVersion: string; reference: string }): Promise<{ amount: string }>

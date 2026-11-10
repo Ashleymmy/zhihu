@@ -30,15 +30,19 @@ const action = {
   requestKey: settlementKey,
   expectedVersion: version,
   action: z.enum(['cancel', 'failed', 'retry']),
-  reason: z.string().trim().min(1).max(500),
+  reason: z.string().trim().max(500).default(''),
 };
 export function createSettlementPaymentsRouter(runtime: ModuleRuntime) {
   const r = Router();
   r.get(
     '/:id/payments',
     asyncHandler(async (req, res) => {
-      const { page, pageSize, withdrawalId, ...owner } = settlementOwnerSchema
-        .extend({ ...settlementPage, withdrawalId: settlementId.optional() })
+      const { page, pageSize, withdrawalId, paymentView, ...owner } = settlementOwnerSchema
+        .extend({
+          ...settlementPage,
+          withdrawalId: settlementId.optional(),
+          paymentView: z.enum(['all', 'processing', 'paid']).default('all'),
+        })
         .strict()
         .parse(req.query);
       ok(
@@ -51,6 +55,7 @@ export function createSettlementPaymentsRouter(runtime: ModuleRuntime) {
           page,
           pageSize,
           withdrawalId,
+          paymentView,
         ),
       );
     }),
@@ -143,7 +148,14 @@ export function createSettlementPaymentsRouter(runtime: ModuleRuntime) {
         action: command,
         reason,
         ...owner
-      } = settlementOwnerSchema.extend(action).strict().parse(req.body);
+      } = settlementOwnerSchema
+        .extend(action)
+        .strict()
+        .refine((input) => input.action === 'retry' || input.reason.length > 0, {
+          message: '请填写取消或失败的原因',
+          path: ['reason'],
+        })
+        .parse(req.body);
       ok(
         res,
         await settlementPaymentAction(

@@ -3,12 +3,12 @@ import { AppError } from '../middleware/errors';
 import { cash } from './money';
 
 /** Called under the existing finance scope lock by both payment entry points. */
-export async function assertSettlementPaymentSafe(c: PoolConnection, withdrawalId: string) {
+export async function assertSettlementPaymentSafe(c: PoolConnection, withdrawalId: string, resumingFailure = false) {
   const [origins] = await c.query<RowDataPacket[]>(
     'SELECT failure_reason FROM opc_settlement_payment_origins WHERE withdrawal_id=?',
     [withdrawalId],
   );
-  if (origins[0]?.failure_reason)
+  if (origins[0]?.failure_reason && !resumingFailure)
     throw new AppError(409, 40900, '这笔付款办理已记录失败，请先核对原因并继续原办理记录');
   const [allocated] = await c.query<RowDataPacket[]>(
     `SELECT a.income_source_id,a.user_id,s.blocked_reason,

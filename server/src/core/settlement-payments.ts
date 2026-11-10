@@ -8,6 +8,7 @@ import { writeAudit } from '../services/audit.service';
 import { cash, cashText, checksum } from './money';
 import { balance, dailyQuota, checkQuota } from './finance';
 import { financeReceipt } from './finance-receipts';
+import { assertSettlementPaymentSafe } from './settlement-payment-guards';
 import { calculateWithdrawal, withdrawalPolicyEnabled, withdrawalRules } from './withdrawal-policy';
 import { settlementAccess, storedDocument, commentView } from './settlements';
 
@@ -93,11 +94,12 @@ async function readModel(c: PoolConnection, owner: PaymentOwner, ctx: Context) {
     DATE_FORMAT(t.review_deadline,'%Y-%m-%d') review_deadline,DATE_FORMAT(t.settlement_deadline,'%Y-%m-%d') settlement_deadline,
     COALESCE(t.invoice_required,0) invoice_required,i.status invoice_status,COALESCE(i.version,0) invoice_version,i.filename invoice_name,i.reason invoice_reason,ii.instructions invoice_instructions,
     CAST(o.settlement_id AS CHAR) origin_settlement_id,CAST(o.initiated_by AS CHAR) initiated_by,o.failure_reason,o.attempt_version,
-    initiator.display_name initiator_name
+    initiator.display_name initiator_name,payer.display_name paid_by_name
     FROM opc_withdrawals w LEFT JOIN opc_withdrawal_terms t ON t.withdrawal_id=w.id
     LEFT JOIN opc_withdrawal_invoices i ON i.id=(SELECT MAX(i2.id) FROM opc_withdrawal_invoices i2 WHERE i2.withdrawal_id=w.id)
     LEFT JOIN opc_withdrawal_invoice_instructions ii ON ii.withdrawal_id=w.id
     LEFT JOIN opc_settlement_payment_origins o ON o.withdrawal_id=w.id LEFT JOIN users initiator ON initiator.id=o.initiated_by
+    LEFT JOIN users payer ON payer.id=w.paid_by
     WHERE w.module_id=? AND w.project_id=? AND w.account_id=? AND w.user_id=? ORDER BY w.id`,
     ownerArgs(owner),
   );
@@ -179,6 +181,7 @@ async function readModel(c: PoolConnection, owner: PaymentOwner, ctx: Context) {
       settlementId: w.origin_settlement_id ? String(w.origin_settlement_id) : null,
       initiatedBy: w.initiated_by ? String(w.initiated_by) : null,
       initiatorName: w.initiator_name ? String(w.initiator_name) : null,
+      paidByName: w.paid_by_name ? String(w.paid_by_name) : null,
       recipientId: owner.leaderId,
       recipientName: String(ctx.recipient.display_name),
       amount: cashText(gross),
@@ -226,7 +229,13 @@ async function readModel(c: PoolConnection, owner: PaymentOwner, ctx: Context) {
       canRetry: !!w.initiated_by && !!w.failure_reason && ['pending', 'approved'].includes(w.status),
     };
   });
-  const visible = paymentRows.filter((w) => amount(w.allocatedAmount) > 0n || w.settlementId === ctx.doc.id);
+  // Zeroed historical links retain a reachable audit/comment context without reserving money.
+  const visible = paymentRows.filter(
+    (w) =>
+      amount(w.allocatedAmount) > 0n ||
+      w.settlementId === ctx.doc.id ||
+      allocations.some((a) => a.withdrawal_id === w.withdrawalId && sourceIds.includes(a.source_id)),
+  );
   const legacy = paymentRows.filter((w) => active(w.status) && amount(w.unallocatedAmount) > 0n);
   const legacyAmount = legacy.reduce((n, w) => n + amount(w.unallocatedAmount), 0n);
   const total = (field: 'confirmedAmount' | 'remainingAmount' | 'availableAmount') =>
@@ -380,6 +389,7 @@ export async function settlementPayments(
   page = 1,
   pageSize = 25,
   withdrawalId?: string,
+  paymentView: 'all' | 'processing' | 'paid' = 'all',
 ) {
   return withTransaction(async (c) => {
     const model = await readModel(c, owner, await context(c, runtime, u, owner, id));
@@ -388,7 +398,13 @@ export async function settlementPayments(
       if (index < 0) fail('该付款记录不在当前结算范围', 404);
       page = Math.floor(index / pageSize) + 1;
     }
-    const { list, ...paging } = pageOf(model.overview.payments, page, pageSize);
+    const displayed =
+      withdrawalId || paymentView === 'all'
+        ? model.overview.payments
+        : model.overview.payments.filter((w) =>
+            paymentView === 'paid' ? w.status === 'paid' : ['pending', 'approved'].includes(w.status),
+          );
+    const { list, ...paging } = pageOf(displayed, page, pageSize);
     return { ...model.overview, ...paging, payments: list };
   });
 }
@@ -615,6 +631,8 @@ export async function settlementPaymentAction(
   wid: string,
   input: { requestKey: string; expectedVersion: string; action: 'cancel' | 'failed' | 'retry'; reason: string },
 ) {
+  const reason = input.reason.trim() || (input.action === 'retry' ? '核对后继续原付款办理' : '');
+  if (!reason) fail('请填写取消或失败的原因', 422);
   return withTransaction(async (c) => {
     const ctx = await context(c, runtime, u, owner, id, true);
     return financeReceipt(
@@ -627,22 +645,26 @@ export async function settlementPaymentAction(
       async () => {
         const model = await readModel(c, owner, ctx);
         requireVersion(model, input.expectedVersion);
-        const w = model.withdrawals.find((w) => w.id === wid && w.origin_settlement_id === id);
+        const w = model.withdrawals.find(
+          (w) =>
+            w.id === wid && !!w.origin_settlement_id && model.overview.payments.some((row) => row.withdrawalId === wid),
+        );
         if (!w) fail('该付款办理不属于当前结算记录', 404);
         if (!['pending', 'approved'].includes(w.status)) fail('仅能处理尚未付款的办理记录，请刷新核对');
         if (input.action === 'retry') {
           if (!w.failure_reason) fail('这笔付款没有待恢复的失败记录');
           if (model.sources.some((s) => s.reason) || amount(model.overview.totals.offsetAmount) > 0n)
             fail('收益或付款金额有变化，请先核对后继续办理');
+          await assertSettlementPaymentSafe(c, wid, true);
         }
         const after = {
           status: input.action === 'cancel' ? 'cancelled' : w.status,
-          failureReason: input.action === 'failed' ? input.reason : null,
+          failureReason: input.action === 'failed' ? reason : null,
         };
         if (input.action === 'cancel')
           await c.query(
             "UPDATE opc_withdrawals SET status='cancelled',remark=?,reviewed_by=?,reviewed_at=NOW(3),payment_version=payment_version+1 WHERE id=?",
-            [input.reason, ctx.actor.sub, wid],
+            [reason, ctx.actor.sub, wid],
           );
         await c.query(
           'UPDATE opc_settlement_payment_origins SET failure_reason=?,attempt_version=attempt_version+1 WHERE withdrawal_id=?',
@@ -652,12 +674,16 @@ export async function settlementPaymentAction(
           'INSERT INTO opc_settlement_payment_events(withdrawal_id,settlement_id,actor_id,event_type,reason,before_json,after_json) VALUES(?,?,?,?,?,?,?)',
           [
             wid,
-            id,
+            w.origin_settlement_id,
             ctx.actor.sub,
             input.action,
-            input.reason,
-            JSON.stringify({ status: w.status, failureReason: w.failure_reason }),
-            JSON.stringify(after),
+            reason,
+            JSON.stringify({
+              status: w.status,
+              failureReason: w.failure_reason,
+              originSettlementId: w.origin_settlement_id,
+            }),
+            JSON.stringify({ ...after, openedFromSettlementId: id }),
           ],
         );
         await writeAudit(
@@ -666,7 +692,7 @@ export async function settlementPaymentAction(
             action: 'settlement.payment_' + input.action,
             resourceType: 'withdrawal',
             resourceId: wid,
-            detail: { settlementId: id, reason: input.reason },
+            detail: { settlementId: w.origin_settlement_id, openedFromSettlementId: id, reason },
           },
           c,
         );
@@ -877,6 +903,8 @@ export async function settlementPaymentExport(runtime: ModuleRuntime, u: AuthUse
         '付款流水',
         '经办人',
         '待处理原因',
+        '预计实付金额',
+        '本期预计实付金额',
       ],
     );
     const names: Record<string, string> = {
@@ -892,13 +920,15 @@ export async function settlementPaymentExport(runtime: ModuleRuntime, u: AuthUse
         names[w.status],
         w.amount,
         w.feeAmount,
-        w.netAmount,
+        w.status === 'paid' ? w.netAmount : '0.0000',
         w.allocatedAmount,
-        w.allocatedNetAmount,
+        w.status === 'paid' ? w.allocatedNetAmount : '0.0000',
         w.paidOn,
         w.paymentReference,
         w.initiatorName,
         w.failureReason || w.next,
+        ['pending', 'approved'].includes(w.status) ? w.netAmount : '0.0000',
+        ['pending', 'approved'].includes(w.status) ? w.allocatedNetAmount : '0.0000',
       ]);
     lines.push([], ['尚未明确对应收益的已有款项', '状态', '申请金额', '尚未对应金额', '付款日期']);
     for (const w of model.legacy)
