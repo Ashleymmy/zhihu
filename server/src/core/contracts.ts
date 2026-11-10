@@ -1,6 +1,7 @@
 import type { Express, Router } from 'express';
 import type { AuthUser, Role } from '../types';
 import type { PoolConnection } from 'mysql2/promise';
+import type { SettlementProvider } from './settlement-contracts';
 
 export const MODULE_CONTRACT_VERSION = 2;
 export interface ModuleManifest {
@@ -41,6 +42,8 @@ export interface ModuleSummary {
 export interface ModuleDataProvider {
   summary(scope: DataScope, user: AuthUser): Promise<ModuleSummary>;
   evidence?(scope: DataScope, user: AuthUser, filter: EvidenceFilter): Promise<EvidenceResult>;
+  /** Read evidence under the caller's authorized transaction for record-linked collaboration. */
+  evidenceInTransaction?(connection: PoolConnection, scope: DataScope, user: AuthUser, filter: EvidenceFilter): Promise<EvidenceResult>;
   activity?(scope: DataScope, user: AuthUser, filter: ActivityFilter): Promise<ActivityResult>;
   // Aggregate upstream amounts only; never expose individual members' income.
   teamTurnover?(connection: PoolConnection, scope: DataScope, user: AuthUser): Promise<TeamTurnover>;
@@ -209,6 +212,7 @@ export interface BusinessModule {
   dispose?: () => Promise<void>;
   dataProvider?: ModuleDataProvider;
   financeProvider?: FinanceProvider;
+  settlementProvider?: SettlementProvider;
   accountLifecycle?: ModuleAccountLifecycle;
   rateProvider?: ModuleRateProvider;
   todoProvider?: ModuleTodoProvider;

@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import { createEvidenceRouter } from './evidence-routes';
+import { createSettlementRouter } from './settlement-routes';
+import { createRecordCommentRouter } from './record-comments';
+import { createInsightsRouter } from './insights-routes';
+import { createFinanceOverviewRouter } from './finance-overview';
 import { createMemberExportRouter } from './member-export-routes';
 import { createMemberActivityRouter } from './member-activity-routes';
 import { createSupportRouter } from './support-routes';
@@ -38,7 +42,11 @@ const date = z
 export function createPlatformRouter(runtime: ModuleRuntime) {
   const r = Router();
   r.use(requireAuth);
+  r.use('/insights', createInsightsRouter(runtime));
+  r.use('/finance', createFinanceOverviewRouter(runtime));
   r.use('/evidence', createEvidenceRouter(runtime));
+  r.use('/settlements', createSettlementRouter(runtime));
+  r.use('/record-comments', createRecordCommentRouter(runtime));
   r.use('/support', createSupportRouter());
   r.use('/member-exports', createMemberExportRouter(runtime));
   r.use('/member-activity', createMemberActivityRouter(runtime));

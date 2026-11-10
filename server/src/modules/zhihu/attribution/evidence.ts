@@ -21,19 +21,30 @@ const day = (v: unknown) => String(v ?? '').slice(0, 10);
 
 /** Read the existing adopted sources. This query deliberately never attributes,
  * reviews, confirms or pays; a GET must not change financial or work state. */
-export async function readEvidence(c: PoolConnection, scope: DataScope, user: AuthUser, filter: EvidenceFilter): Promise<EvidenceResult> {
+export async function readEvidence(c: PoolConnection, scope: DataScope, user: AuthUser, filter: EvidenceFilter,
+  selectedKeys?: {taskRef:string;businessDate:string;metricType:string}[]): Promise<EvidenceResult> {
   const finance = dutyAllows(user, 'finance'), metrics = filter.metricType ? [filter.metricType] : ['new_user', 'activation'];
   const days = (Date.parse(scope.to) - Date.parse(scope.from)) / 86400000 + 1;
   const where = `k.project_id=? AND k.account_id=?${filter.channelRef ? ' AND k.channel_mapping_id=?' : ''}${filter.taskRef ? ' AND k.id=?' : ''}`;
   const args = [scope.projectId, scope.accountId, ...(filter.channelRef ? [filter.channelRef] : []), ...(filter.taskRef ? [filter.taskRef] : [])];
-  const [count] = await select(c, `SELECT COUNT(*) total FROM zh_keywords k WHERE ${where}`, args);
-  const total = Number(count.total) * days * metrics.length;
+  // Internal callers may inspect an exact frozen source set without expanding a date × task grid.
+  // This parameter is never accepted by the public query schema. SQL scope filters still apply.
+  if(selectedKeys?.some(key=>!/^\d+$/.test(key.taskRef)||key.businessDate<scope.from||key.businessDate>scope.to||!metrics.includes(key.metricType)))
+    fail('资料核验范围不正确');
+  const desired=selectedKeys?.length?selectedKeys.map(()=>"SELECT ? keyword_id,CAST(? AS DATE) business_day,? metric").join(' UNION ALL '):null;
+  const desiredArgs=selectedKeys?.flatMap(key=>[key.taskRef,key.businessDate,key.metricType])??[];
+  const [count] = desired?await select(c,`SELECT COUNT(*) total FROM zh_keywords k JOIN (${desired}) wanted ON wanted.keyword_id=k.id WHERE ${where}`,[...desiredArgs,...args]):
+    await select(c, `SELECT COUNT(*) total FROM zh_keywords k WHERE ${where}`, args);
+  const total = desired?Number(count.total):selectedKeys?0:Number(count.total) * days * metrics.length;
   const result: EvidenceResult = { ...scope, moduleId: 'zhihu', status: total ? 'ready' : 'empty', total,
     page: filter.page, pageSize: filter.pageSize, list: [], limits: { maxDays: 31, maxPageSize: 100 } };
   if ((filter.page - 1) * filter.pageSize >= total) return result;
   // Scope and optional filters precede both COUNT and paging. Dates without a
   // report remain visible, including explicit zero versus an absent record.
-  const grid = await select(c, `WITH RECURSIVE days AS (
+  const grid = desired?await select(c,`SELECT k.id,k.keyword,k.task_id,k.plan_id,k.channel_mapping_id,k.version,k.legacy_mode,
+      DATE_FORMAT(wanted.business_day,'%Y-%m-%d') business_day,wanted.metric
+      FROM zh_keywords k JOIN (${desired}) wanted ON wanted.keyword_id=k.id WHERE ${where}
+      ORDER BY k.id,wanted.business_day,wanted.metric LIMIT ? OFFSET ?`,[...desiredArgs,...args,filter.pageSize,(filter.page-1)*filter.pageSize]):await select(c, `WITH RECURSIVE days AS (
     SELECT CAST(? AS DATE) d UNION ALL SELECT DATE_ADD(d,INTERVAL 1 DAY) FROM days WHERE d<CAST(? AS DATE)),
     metrics AS (${metrics.map(() => 'SELECT ? metric').join(' UNION ALL ')})
     SELECT k.id,k.keyword,k.task_id,k.plan_id,k.channel_mapping_id,k.version,k.legacy_mode,

@@ -246,6 +246,7 @@ async function confirmEntry(
   id: string,
   expectedHash: string,
   central = false,
+  context?: FinancialConfirmationContext,
 ) {
   const [ref] = await select(
     c,
@@ -283,7 +284,12 @@ async function confirmEntry(
   const [binding] = await select(c, 'SELECT * FROM zh_keyword_bindings WHERE id=? FOR SHARE', [entry.binding_id]);
   if (binding.verification_status !== 'passed' && currentResult?.reason_code!=='REPORT_WITHDRAWN') fail('首次作品尚未通过核验或绑定存在争议', 409);
   if (currentResult?.reason_code !== 'REPORT_WITHDRAWN') {
-    const workReview = await reconcileWorkReview(c, scope, String(fact.keyword_id), { apply: false, lock: true, trigger: 'finance.confirm' });
+    const reviewKey = `${scope.projectId}:${scope.accountId}:${fact.keyword_id}`;
+    let workReview = context?.workReviews.get(reviewKey);
+    if(!workReview) {
+      workReview = await reconcileWorkReview(c, scope, String(fact.keyword_id), { apply: false, lock: true, trigger: 'finance.confirm' });
+      context?.workReviews.set(reviewKey,workReview);
+    }
     const currentWork = workReview.find(item => item.bindingId === String(entry.binding_id));
     if (currentWork?.status === 'blocked') fail('作品资料已变化，请先处理作品问题后确认', 409);
   }
@@ -377,6 +383,8 @@ export async function listStatements(user: AuthUser, scope: Scope, page: number,
   });
 }
 
+/** Cache is created by a single source-confirmation transaction; locked work rows stay stable until commit. */
+export interface FinancialConfirmationContext { workReviews: Map<string,Awaited<ReturnType<typeof reconcileWorkReview>>> }
 export async function confirmFinancialFact(
   c: PoolConnection,
   user: AuthUser,
@@ -384,6 +392,7 @@ export async function confirmFinancialFact(
   factId: string,
   resultId: string,
   revisionId: string,
+  context?: FinancialConfirmationContext,
 ) {
   assertDuty(user, 'finance');
   const [fact] = await select(
@@ -402,7 +411,7 @@ export async function confirmFinancialFact(
     const entry = await buildEntry(c, scope, fact, resultId, snapshot, o, ['RISK_EXCLUDED','REPORT_WITHDRAWN'].includes(String(r.reason_code)));
     if (entry) {
       const [e] = await select(c, 'SELECT input_hash FROM zh_statement_entries WHERE id=?', [entry.id]);
-      await confirmEntry(c, user, scope, entry.id, String(e.input_hash), true);
+      await confirmEntry(c, user, scope, entry.id, String(e.input_hash), true, context);
     }
   }
   return snapshot;
