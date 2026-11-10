@@ -600,8 +600,9 @@ function close() {
 }
 .income-calculation {
   padding: 18px;
-  background: #f5f3ec;
-  border: 1px solid #d6d3c7;
+  background: var(--paper-deep);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 8px;
   overflow-wrap: anywhere;
 }
