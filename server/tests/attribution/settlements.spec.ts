@@ -62,7 +62,7 @@ async function upload(lines: string[], filename = '结算报表.csv') {
     mimetype: 'text/csv',
   });
 }
-async function makeWord(label: string, assign = true) {
+async function makeWord(label: string, assign = true, submitWork = true) {
   const made = await resources.createKeyword(admin, scope, key(), {
     keyword: label,
     taskId: '1',
@@ -82,21 +82,24 @@ async function makeWord(label: string, assign = true) {
     "UPDATE zh_keyword_bindings SET activated_on='2026-07-01',claimed_at='2026-07-01',assigned_at='2026-07-01',used_at='2026-07-01' WHERE id=?",
     [binding.id],
   );
-  const submitted = await modulePost(
-    'evidence',
-    {
-      ...scope,
-      bindingId: binding.id,
-      requestKey: key(),
-      url: 'https://example.com/work/' + made.id,
-      description: '结算历史作品',
-    },
-    creator,
-  );
-  expect(submitted.status, submitted.text).toBe(201);
+  if (submitWork) {
+    const submitted = await modulePost(
+      'evidence',
+      {
+        ...scope,
+        bindingId: binding.id,
+        requestKey: key(),
+        url: 'https://example.com/work/' + made.id,
+        description: '结算历史作品',
+      },
+      creator,
+    );
+    expect(submitted.status, submitted.text).toBe(201);
+  }
   return { ...made, bindingId: binding.id };
 }
 let measureQueries = 0;
+let queryProbe: ((sql: string, run: () => Promise<unknown>) => Promise<unknown>) | undefined;
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.0')
     .withDatabase('zhihu_settlements')
@@ -157,7 +160,8 @@ beforeAll(async () => {
       original = conn.query;
     conn.query = function (this: PoolConnection, ...args: unknown[]) {
       measureQueries++;
-      return Reflect.apply(original, this, args);
+      const run = () => Reflect.apply(original, this, args) as Promise<unknown>;
+      return queryProbe ? queryProbe(String(args[0]), run) : run();
     } as typeof conn.query;
     return conn;
   };
@@ -394,4 +398,166 @@ it('received pending and withdrawn reports remain distinguishable from reports t
   expect(withdrawn.body.data.coverage.status).toBe('withdrawn');
   expect(withdrawn.body.data.unresolvedContext.records).toBe(0);
   expect(withdrawn.body.data.summary.records).toBe(0);
+});
+
+it('an actual old confirmation owning the account lock makes a waiting settlement refresh instead of duplicating money', async () => {
+  const date = '2026-11-02',
+    period = { from: date, to: date };
+  await upload([`${date},结算渠道,${name},10,2,40`], '真实确认锁竞争.csv');
+  const review = await get('settlements/review', selected(date));
+  const preview = await post('settlements/previews', {
+    ...selected(date),
+    expectedReviewVersion: review.body.data.reviewVersion,
+    requestKey: key(),
+  });
+  expect(preview.status, preview.text).toBe(201);
+  const doc = preview.body.data,
+    old = await workbench.overview(fin, scope, period);
+  let releaseOld!: () => void, oldAcquired!: () => void, modernWaiting!: () => void;
+  const released = new Promise<void>((resolve) => {
+      releaseOld = resolve;
+    }),
+    acquired = new Promise<void>((resolve) => {
+      oldAcquired = resolve;
+    }),
+    waiting = new Promise<void>((resolve) => {
+      modernWaiting = resolve;
+    });
+  let attempts = 0;
+  queryProbe = async (sql, run) => {
+    if (!sql.includes('FROM integration_accounts a') || !sql.includes('FOR UPDATE')) return run();
+    const attempt = ++attempts;
+    if (attempt === 1) {
+      const result = await run();
+      oldAcquired();
+      await released;
+      return result;
+    }
+    if (attempt === 2) modernWaiting();
+    return run();
+  };
+  const prior = workbench.confirmBills(fin, scope, period, key(), old.reviewHash);
+  let modern: Promise<request.Response> | undefined;
+  try {
+    await acquired;
+    modern = post('settlements/' + doc.id + '/confirm', {
+      ...owner(),
+      expectedVersion: doc.version,
+      requestKey: key(),
+    }).then((response) => response);
+    await waiting;
+    releaseOld();
+    const [oldResult, result] = await Promise.all([prior, modern]);
+    expect(oldResult.confirmed).toBe(1);
+    expect(result.status, result.text).toBe(409);
+    const values = await q(
+      `SELECT CAST(e.user_id AS CHAR) user_id,COUNT(*) records,CAST(SUM(e.amount) AS CHAR) amount
+      FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.business_date=? GROUP BY e.user_id`,
+      [date],
+    );
+    expect(values).toHaveLength(2);
+    for (const value of values) {
+      expect(Number(value.records)).toBe(1);
+      expect(value.amount).toBe(doc.impacts.find((i: { payeeId: string }) => i.payeeId === value.user_id).amount);
+    }
+  } finally {
+    releaseOld();
+    await Promise.allSettled([prior, modern]);
+    queryProbe = undefined;
+  }
+});
+
+it('blocked next steps follow missing historical evidence while missing work retains the actual executor action', async () => {
+  const date = '2026-11-03';
+  await upload([`${date},结算渠道,${name},10,2,40`], '历史依据下一步.csv');
+  await c.query("UPDATE project_membership_history SET effective_from='2026-12-01' WHERE user_id=3 AND project_id=1");
+  try {
+    const review = await get('settlements/review', selected(date));
+    expect(review.status, review.text).toBe(200);
+    expect(review.body.data.list[0]).toMatchObject({
+      status: 'blocked',
+      next: '运营：补充历史依据',
+      nextAction: { key: 'complete_member_history', requiredDuty: 'operations' },
+    });
+    expect(review.body.data.list[0].reason).toContain('项目参与');
+  } finally {
+    await c.query("UPDATE project_membership_history SET effective_from='2026-01-01' WHERE user_id=3 AND project_id=1");
+  }
+  const missing = await makeWord('需要达人补作品', true, false);
+  await upload([`${date},结算渠道,需要达人补作品,10,2,40`], '作品下一步.csv');
+  const review = await get('settlements/review', selected(date));
+  expect(review.status, review.text).toBe(200);
+  const record = review.body.data.list.find((row: { taskId: string }) => row.taskId === missing.id);
+  expect(record).toMatchObject({ status: 'blocked', next: '达人 人员3：补登记作品' });
+});
+
+it('the route gate retains absent-table compatibility and propagates other database failures', async () => {
+  const { gate } = await import('../../src/modules/zhihu/attribution/routing'),
+    { withTransaction } = await import('../../src/db');
+  expect(await withTransaction((conn) => gate(conn))).toBe(true);
+  await c.query('RENAME TABLE zh_engine_gate TO zh_engine_gate_test_absent');
+  try {
+    expect(await withTransaction((conn) => gate(conn))).toBe(false);
+    expect(await withTransaction((conn) => gate(conn, true))).toBe(false);
+  } finally {
+    await c.query('RENAME TABLE zh_engine_gate_test_absent TO zh_engine_gate');
+  }
+  const denied = Object.assign(new Error('table access denied'), { code: 'ER_TABLEACCESS_DENIED_ERROR' });
+  await expect(
+    gate({
+      query: async () => {
+        throw denied;
+      },
+    } as unknown as PoolConnection),
+  ).rejects.toBe(denied);
+});
+
+it('mixed scope retains processing or withdrawn coverage while ready sources can still be confirmed', async () => {
+  const date = '2026-11-05';
+  const active = await upload([`${date},结算渠道,${name},10,2,40`], '混合范围可确认.csv');
+  const facts = await import('../../src/modules/zhihu/attribution/facts'),
+    withdrawal = await import('../../src/modules/zhihu/attribution/import-withdrawal');
+  const buffer = Buffer.from(`日期,渠道名称,关键词,搜索量,订单,收益\n${date},结算渠道,尚在处理的未知关键词,10,1,20`);
+  const pending = await facts.previewImport(
+    fin,
+    scope,
+    {
+      buffer,
+      size: buffer.length,
+      originalname: '混合范围处理中.csv',
+      mimetype: 'text/csv',
+    },
+    'order',
+  );
+  const review = await get('settlements/review', selected(date));
+  expect(review.status, review.text).toBe(200);
+  expect(review.body.data).toMatchObject({
+    coverage: { status: 'processing' },
+    summary: { ready: 1, records: 1, amount: '1.0000' },
+    unresolvedContext: { records: 0 },
+  });
+  const preview = await post('settlements/previews', {
+    ...selected(date),
+    expectedReviewVersion: review.body.data.reviewVersion,
+    requestKey: key(),
+  });
+  expect(preview.status, preview.text).toBe(201);
+  expect(preview.body.data.impactSummary.records).toBe(1);
+  const confirmed = await post('settlements/' + preview.body.data.id + '/confirm', {
+    ...owner(),
+    expectedVersion: preview.body.data.version,
+    requestKey: key(),
+  });
+  expect(confirmed.status, confirmed.text).toBe(200);
+  expect((await get('settlements/review', selected(date))).body.data.coverage.status).toBe('processing');
+  for (const batch of [active, pending]) {
+    const plan = await withdrawal.previewImportWithdrawal(fin, scope, batch.id);
+    await withdrawal.withdrawImport(fin, scope, batch.id, key(), plan.reviewHash);
+  }
+  const correction = await get('settlements/review', selected(date));
+  expect(correction.status, correction.text).toBe(200);
+  expect(correction.body.data).toMatchObject({
+    coverage: { status: 'withdrawn' },
+    summary: { ready: 1, records: 1, amount: '0.0000', confirmableAmount: '-1.0000' },
+  });
 });

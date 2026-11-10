@@ -71,6 +71,23 @@ export const zhihuSettlementProvider: SettlementProvider = {
       const confirmed = entries.every((e) => e.status === 'confirmed');
       const ready = entries.every((e) => e.ready) && (evidence?.result.status === 'ready' || correction);
       const status = confirmed ? 'confirmed' : ready ? 'ready' : 'blocked';
+      const evidenceBlocked = evidence && evidence.result.status !== 'ready';
+      // Workbench names the actual executor/leader for work submission/review.
+      // Other evidence blockers must not inherit its generic "finance confirm" next step.
+      const useWorkNext =
+        evidenceBlocked &&
+        ['ready', 'valid_zero'].includes(evidence.official.status) &&
+        !['ready', 'not_applicable'].includes(evidence.checks.work.status) &&
+        first.reasonCode.startsWith('WORK_');
+      const blockedNext = useWorkNext
+        ? first.next
+        : evidenceBlocked && evidence.result.nextAction
+          ? `${evidence.result.responsibleRole === 'finance' ? '财务' : '运营'}：${evidence.result.nextAction.label}`
+          : first.blocked && first.next
+            ? first.next
+            : evidenceBlocked
+              ? `${evidence.result.responsibleRole === 'finance' ? '财务' : '运营'}：核对所缺资料`
+              : first.next || '运营：核对所缺资料';
       result.push({
         sourceKey: key,
         version: first.resultId,
@@ -85,13 +102,10 @@ export const zhihuSettlementProvider: SettlementProvider = {
             ? '金额已确认'
             : status === 'ready'
               ? '资料齐备，可核对并确认'
-              : first.blocked || evidence?.result.reason || '资料尚未齐备',
-        next:
-          status === 'confirmed'
-            ? ''
-            : status === 'ready'
-              ? '财务：核对并确认金额'
-              : first.next || '运营：核对所缺资料',
+              : evidenceBlocked
+                ? evidence.result.reason
+                : first.blocked || '资料尚未齐备',
+        next: status === 'confirmed' ? '' : status === 'ready' ? '财务：核对并确认金额' : blockedNext,
         nextAction: status === 'blocked' ? (evidence?.result.nextAction ?? null) : null,
         evidence,
         allocations: entries

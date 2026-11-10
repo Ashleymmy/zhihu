@@ -370,7 +370,7 @@ export async function settlementReview(
       reviewVersion: versionOf(scope, loaded),
       summary: summarizeSettlement(loaded.map((l) => l.record)),
       ...context,
-      coverage: loaded.length
+      coverage: loaded.length && context.coverage.status === 'no_performance'
         ? { status: 'observed' as const, message: '按已保存的应得归属核对，未齐资料保留下一步' }
         : context.coverage,
       list: filtered.slice((page - 1) * pageSize, page * pageSize).map((l) => l.record),

@@ -2,13 +2,15 @@ import type { PoolConnection } from 'mysql2/promise';
 import { fail, type Scope } from './domain';
 import { select } from './store';
 export async function gate(c: PoolConnection, exclusive = false) {
-  const installed = await select(
-    c,
-    "SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zh_engine_gate'",
-  );
-  if (installed.length)
+  // A nonlocking metadata lookup here can establish an RR read view before the
+  // caller waits for its account lock. Start with a current locking read instead.
+  try {
     await select(c, `SELECT id FROM zh_engine_gate WHERE id=1 ${exclusive ? 'FOR UPDATE' : 'FOR SHARE'}`);
-  return installed.length > 0;
+    return true;
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ER_NO_SUCH_TABLE') return false;
+    throw error;
+  }
 }
 export async function assertNewRoute(c: PoolConnection, scope: Scope, date: string, confirm = false) {
   await gate(c);
