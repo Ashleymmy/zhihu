@@ -4,11 +4,13 @@ import {AnalysisRun,DetailDrawer,HistoryEvidenceForm} from '@zhihu-koc/shared-co
 import type {HistoryTarget} from '@zhihu-koc/shared-contracts/core'
 import {errorText,executorOptions,type EngineContext,type Option} from './context'
 import type {NameSelection,ReportAnswer,ReportRun,RiskCase} from './report-analysis'
+import {reportAnalysisForDisplay} from './report-analysis'
 import AgencySettings from './AgencySettings.vue'
 import RiskReview from './RiskReview.vue'
 import HistoricalWorks from './HistoricalWorks.vue'
 const props=defineProps<{context:EngineContext;run:ReportRun;busyAskId?:string;errors?:Record<string,string>;busyAction?:string;historyTarget?:HistoryTarget|null}>()
 const emit=defineEmits<{answer:[answer:ReportAnswer];action:[key:string];refresh:[];historyClosed:[]}>()
+const displayedRun=computed(()=>reportAnalysisForDisplay(props.run))
 const agencyOpen=ref(false)
 const risk=ref<RiskCase|null>(null)
 const channelAsk=ref(''),channelId=ref(''),upstreamId=ref(''),generation=ref<1|2>(1),channels=ref<Option[]>([]),mappings=ref<Option[]>([]),loading=ref(false),error=ref('')
@@ -37,7 +39,7 @@ function saveKeyword(){
 }
 </script>
 <template>
- <AnalysisRun :run="run" :busy-ask-id="busyAskId" :errors="errors" :busy-action="busyAction" @answer="answer" @action="emit('action',$event)" />
+ <AnalysisRun :run="displayedRun" :busy-ask-id="busyAskId" :errors="errors" :busy-action="busyAction" @answer="answer" @action="emit('action',$event)" />
  <HistoryEvidenceForm v-if="historyTarget&&!keywordAsk&&!channelAsk" :target="historyTarget" @updated="emit('refresh')" @completed="emit('historyClosed')" @cancel="emit('historyClosed')" @stale="emit('historyClosed');emit('refresh')" />
  <article v-if="run.agencyCheck" class="agency-check"><strong>{{run.agencyCheck.rows}} 条拉活记录的代理名称需要核对</strong><p>报表填写：{{run.agencyCheck.reportedNames.join('、')}}；项目登记：{{run.agencyCheck.registeredName??'尚未填写'}}。</p><p>下一步：运营或财务核对名称，这些行暂不计费。</p><button @click="agencyOpen=true">核对代理名称</button></article>
  <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;emit('refresh')" />

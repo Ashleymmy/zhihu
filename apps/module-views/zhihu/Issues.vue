@@ -7,6 +7,7 @@ import AgencySettings from './AgencySettings.vue'
 import AssignExecutor from './AssignExecutor.vue'
 import ReportAnalysis from './ReportAnalysis.vue'
 import type {RiskCase,ReportAnswer} from './report-analysis'
+import {reportAnalysisForDisplay} from './report-analysis'
 import RiskReview from './RiskReview.vue'
 import {errorText,requestKey,type EngineContext} from './context'
 const props=defineProps<{context:EngineContext;headless?:boolean}>()
@@ -52,7 +53,7 @@ async function reload(){if(analysis.value)analysis.value=await props.context.htt
 async function changed(){await reload();emit('changed')}
 async function answer(value:ReportAnswer){
  if(!analysis.value||busyAskId.value)return;busyAskId.value=value.askId;askErrors[value.askId]=''
- try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});notice.value='已保存选择，报表已更新。'+(analysis.value.conclusion?.pendingText??'');await changed()}
+ try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});notice.value='已保存选择，报表已更新。'+(reportAnalysisForDisplay(analysis.value).conclusion?.pendingText??'');await changed()}
  catch(e){historyTarget.value=historyTargetFromError(e);askErrors[value.askId]=errorText(e)}finally{busyAskId.value=''}
 }
 async function handle(i:Issue){
