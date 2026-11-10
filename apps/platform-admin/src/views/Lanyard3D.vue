@@ -976,7 +976,7 @@ onMounted(() => {
   const frameView = () => {
     const aspect = view.width / view.height
     let viewHeight = layout.height / clamp(props.size, 0.15, 0.9)
-    const minimumWidth = layout.width / 0.72
+    const minimumWidth = layout.width / (presented ? 0.9 : 0.72)
     if (viewHeight * aspect < minimumWidth) viewHeight = minimumWidth / aspect
     const viewWidth = viewHeight * aspect
     camera.aspect = aspect
@@ -1373,6 +1373,7 @@ onMounted(() => {
   // 递卡：抓到镜头正中央、背面朝前（登录表在背面）
   api.present = () => {
     presented = true
+    frameView()
     presentHold = {
       local: new THREE.Vector3(0, 0, 0),
       rotation: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI),
@@ -1385,6 +1386,7 @@ onMounted(() => {
   }
   api.dismiss = () => {
     presented = false
+    frameView()
     if (presentHold) {
       // 先翻回正面，再松手让绳子接回去
       presentHold.rotation.identity()

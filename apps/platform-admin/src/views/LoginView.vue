@@ -293,7 +293,7 @@ async function submit() {
       <div class="badge-stage">
         <Lanyard3D
           ref="badge"
-          :size="0.56"
+          :size="cardOut ? 0.8 : 0.56"
           :strap-length="0.22"
           :card-color="'#fbfaf6'"
           :strap-color="'#1c1c20'"
@@ -482,6 +482,8 @@ async function submit() {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
   scrollbar-width: none;
 }
 .face-scroll::-webkit-scrollbar { display: none; }
@@ -548,6 +550,13 @@ async function submit() {
 }
 
 .login-access input:not([type=checkbox]) { min-height:44px; box-sizing:border-box; padding:10px 12px; font:inherit }
+.face-scroll form, .face-scroll .form-grid, .face-scroll .form-grid > div { min-width:0; width:100%; box-sizing:border-box; }
+.face-scroll .form-grid input { width:100%; min-width:0; }
+.face-scroll .form-grid { gap:10px; }
+.face-scroll .form-grid > div { gap:5px; }
+.face-scroll .access-action { margin-top:12px !important; min-height:44px; }
+.face-scroll .auth-switch { margin-top:12px; margin-bottom:0; }
+.face-scroll .auth-modes button { min-width:0; padding:6px; }
 .auth-modes { display:flex; gap:2px; padding:3px; border-radius:12px; background:var(--paper-deep) }
 .auth-modes button { flex:1; min-height:38px; border:0; border-radius:9px; background:transparent; color:var(--ink-soft); font-size:13.5px; transition:background .2s, color .2s }
 .auth-modes button[aria-pressed=true] { background:var(--white); color:var(--ink); font-weight:600; box-shadow:0 1px 3px rgba(20,20,19,.1) }
@@ -568,5 +577,10 @@ async function submit() {
 @media (prefers-reduced-motion: reduce) {
   .login-veil, .face-layer, .verify-overlay, .verify-mark { animation-duration: 0.01ms !important; }
   .verify-scan, .face-layer[data-verify='fail'] .face-scroll { animation: none !important; }
+}
+@media (max-width: 900px) {
+  .login-access.veiled { position:fixed; inset:0; min-height:0; height:100dvh; width:100%; padding:0; background:transparent; }
+  .face-scroll { padding:38% 8% 6%; scrollbar-width:thin; }
+  .face-scroll small { font-size:12px; line-height:1.35; }
 }
 </style>
