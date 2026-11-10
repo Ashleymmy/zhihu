@@ -6,6 +6,7 @@ import DetailDrawer from './DetailDrawer.vue'
 import HistoryEvidenceForm from './HistoryEvidenceForm.vue'
 import RecordComments from './RecordComments.vue'
 import { evidenceDateRanges, evidenceHistoryTarget } from './history-evidence'
+import { evidenceContextSources, evidenceFilterSources } from './evidence-context'
 import { earningMoney } from './platform-earnings'
 const props = defineProps<{ scope: Pick<EvidenceQuery, 'projectId' | 'moduleId' | 'accountId'>; from?: string; to?: string; taskRef?: string }>()
 const emit = defineEmits<{ updated: []; action: [action: EvidenceAction] }>()
@@ -13,6 +14,7 @@ const workspace = inject<CoreWorkspace>('opc')!
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
 const filter = reactive({ from: props.from || today.slice(0, 8) + '01', to: props.to || today, metricType: '' })
 const data = ref<EvidenceResult | null>(null), selected = ref<EvidenceRow | null>(null), history = ref<HistoryTarget | null>(null)
+const selectedModuleId = ref('')
 const loading = ref(false), error = ref(''), page = ref(1), segment = ref(0)
 const ranges = ref<{ from: string; to: string }[]>([])
 let generation = 0
@@ -20,7 +22,7 @@ const officialLabels: Record<EvidenceRow['official']['status'], string> = { read
 const checkLabels = { work: '作品登记', historicalOwnership: '历史归属', projectParticipation: '项目参与', pricing: '计费资料', existingCalculation: '已有计算' }
 const canAction = (action: EvidenceAction) => action.requiredDuty === 'finance' ? ['admin', 'developer'].includes(workspace.role.value) && workspace.duty?.value !== 'operations' : ['admin', 'operator', 'developer'].includes(workspace.role.value) && workspace.duty?.value !== 'finance'
 const range = computed(() => ranges.value[segment.value])
-const comments = computed(() => selected.value && workspace.evidenceComments?.({ ...selected.value.key, moduleId: props.scope.moduleId }))
+const comments = computed(() => selected.value && workspace.evidenceComments?.({ ...selected.value.key, moduleId: selectedModuleId.value }))
 async function load(reset = false) {
   const version = ++generation
   loading.value = true; error.value = ''; data.value = null
@@ -33,7 +35,9 @@ async function load(reset = false) {
   } catch (e) { if (version === generation) error.value = e && typeof e === 'object' && 'message' in e ? String(e.message) : '资料暂时没加载出来，请重试。' }
   finally { if (version === generation) loading.value = false }
 }
-watch(() => [props.scope.projectId, props.scope.accountId, props.scope.moduleId, props.taskRef, props.from, props.to], () => { filter.from = props.from || filter.from; filter.to = props.to || filter.to; selected.value = null; history.value = null; void load(true) }, { immediate: true })
+function clearSelection() { selected.value = null; history.value = null }
+watch(evidenceContextSources(props), () => { filter.from = props.from || filter.from; filter.to = props.to || filter.to; clearSelection(); void load(true) }, { immediate: true })
+watch(evidenceFilterSources(filter), clearSelection)
 function perform(action: EvidenceAction) {
   if (!canAction(action)) return
   const target = evidenceHistoryTarget(action)
@@ -41,7 +45,7 @@ function perform(action: EvidenceAction) {
   else { selected.value = null; emit('action', action) }
 }
 async function repaired() { history.value = null; selected.value = null; await load(); emit('updated') }
-function inspect(row: EvidenceRow) { selected.value = row; history.value = null }
+function inspect(row: EvidenceRow) { selectedModuleId.value = props.scope.moduleId; selected.value = row; history.value = null }
 defineExpose({ reload: () => load() })
 </script>
 <template>
