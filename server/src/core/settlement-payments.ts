@@ -590,36 +590,45 @@ export async function settlementPaymentFunding(
   u: AuthUser,
   owner: PaymentOwner,
   id: string,
-  input: { requestKey: string; expectedVersion: string; reference: string },
+  input: { requestKey: string; expectedVersion: string; reference?: string },
 ) {
+  const reference = input.reference?.trim() || '财务已核实所选款项到账';
   return withTransaction(async (c) => {
     const ctx = await context(c, runtime, u, owner, id, true);
-    return financeReceipt(c, ctx.actor, owner, 'settlement.funding', input.requestKey, { id, ...input }, async () => {
-      const model = await readModel(c, owner, ctx);
-      requireVersion(model, input.expectedVersion);
-      if (!model.fundingRows.length || cash(model.overview.funding.amount) <= 0n)
-        fail('没有可开放的款项，请核对收益来源');
-      await c.query(
-        "UPDATE opc_income_entries SET availability='available',released_by=?,released_at=NOW(3),release_reference=? WHERE id IN (?) AND availability='held'",
-        [ctx.actor.sub, input.reference, model.fundingRows.map((e) => e.id)],
-      );
-      await writeAudit(
-        {
-          userId: ctx.actor.sub,
-          action: 'settlement.funding_release',
-          resourceType: 'settlement',
-          resourceId: id,
-          detail: {
-            recipientId: owner.leaderId,
-            amount: model.overview.funding.amount,
-            entryIds: model.fundingRows.map((e) => e.id),
-            reference: input.reference,
+    return financeReceipt(
+      c,
+      ctx.actor,
+      owner,
+      'settlement.funding',
+      input.requestKey,
+      { id, ...input, reference },
+      async () => {
+        const model = await readModel(c, owner, ctx);
+        requireVersion(model, input.expectedVersion);
+        if (!model.fundingRows.length || cash(model.overview.funding.amount) <= 0n)
+          fail('没有可开放的款项，请核对收益来源');
+        await c.query(
+          "UPDATE opc_income_entries SET availability='available',released_by=?,released_at=NOW(3),release_reference=? WHERE id IN (?) AND availability='held'",
+          [ctx.actor.sub, reference, model.fundingRows.map((e) => e.id)],
+        );
+        await writeAudit(
+          {
+            userId: ctx.actor.sub,
+            action: 'settlement.funding_release',
+            resourceType: 'settlement',
+            resourceId: id,
+            detail: {
+              recipientId: owner.leaderId,
+              amount: model.overview.funding.amount,
+              entryIds: model.fundingRows.map((e) => e.id),
+              reference,
+            },
           },
-        },
-        c,
-      );
-      return { amount: model.overview.funding.amount };
-    });
+          c,
+        );
+        return { amount: model.overview.funding.amount };
+      },
+    );
   });
 }
 

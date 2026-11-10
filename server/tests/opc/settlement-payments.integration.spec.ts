@@ -418,6 +418,44 @@ it('reserves selected recipient only, shares existing approval/payment and prese
   expect(changed.status).toBe(409);
 });
 
+it('funding accepts an omitted or empty note with one audited release and retains version checks', async () => {
+  const doc = await setup('12.3456');
+  const view = await overview(doc.id);
+  const body = { ...owner, expectedVersion: view.version, requestKey: key() };
+  const path = `settlements/${doc.id}/funding`;
+  const denied = await post(path, body, '3');
+  expect(denied.status).toBe(403);
+  const released = await post(path, body);
+  expect(released.status, released.text).toBe(200);
+  expect(released.body.data.amount).toBe('12.3456');
+  const repeated = await post(path, { ...body, reference: '   ' });
+  expect(repeated.status, repeated.text).toBe(200);
+  expect(repeated.body.data).toEqual(released.body.data);
+  const [audit] = await q(
+    "SELECT COUNT(*) count, MAX(JSON_UNQUOTE(JSON_EXTRACT(detail_json,'$.reference'))) reference FROM audit_logs WHERE action='settlement.funding_release' AND resource_id=?",
+    [doc.id],
+  );
+  expect(Number(audit.count)).toBe(1);
+  expect(audit.reference).toBe('财务已核实所选款项到账');
+  const references = await q(
+    "SELECT DISTINCT release_reference FROM opc_income_entries WHERE released_by=2 AND availability='available'",
+  );
+  expect(references.map((row) => row.release_reference)).toEqual(['财务已核实所选款项到账']);
+  expect((await overview(doc.id)).funding.amount).toBe('0.0000');
+  const stale = await post(path, { ...body, requestKey: key(), reference: '' });
+  expect(stale.status).toBe(409);
+  const second = await setup('7');
+  const secondView = await overview(second.id);
+  const blank = await post(`settlements/${second.id}/funding`, {
+    ...owner,
+    requestKey: key(),
+    expectedVersion: secondView.version,
+    reference: '',
+  });
+  expect(blank.status, blank.text).toBe(200);
+  expect(blank.body.data.amount).toBe('7.0000');
+});
+
 it('all new endpoints reject operations, members and forged recipient scopes', async () => {
   const doc = await setup();
   await open(doc.id);

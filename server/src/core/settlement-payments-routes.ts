@@ -126,7 +126,11 @@ export function createSettlementPaymentsRouter(runtime: ModuleRuntime) {
     '/:id/funding',
     asyncHandler(async (req, res) => {
       const { requestKey, expectedVersion, reference, ...owner } = settlementOwnerSchema
-        .extend({ requestKey: settlementKey, expectedVersion: version, reference: z.string().trim().min(1).max(255) })
+        .extend({
+          requestKey: settlementKey,
+          expectedVersion: version,
+          reference: z.string().trim().max(255).optional(),
+        })
         .strict()
         .parse(req.body);
       ok(

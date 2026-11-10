@@ -57,7 +57,7 @@ export interface SettlementPaymentApi<Download = unknown> {
   overview(id: string, input: SettlementRecipientScope & PageQuery & { withdrawalId?: string; paymentView?: 'all' | 'processing' | 'paid' }): Promise<SettlementPaymentOverview>
   quote(id: string, input: SettlementRecipientScope & { amount: string; expectedVersion: string }): Promise<SettlementPaymentQuote>
   create(id: string, input: SettlementRecipientScope & SettlementPaymentCreate): Promise<{ withdrawalId: string; settlementId: string }>
-  funding(id: string, input: SettlementRecipientScope & { requestKey: string; expectedVersion: string; reference: string }): Promise<{ amount: string }>
+  funding(id: string, input: SettlementRecipientScope & { requestKey: string; expectedVersion: string; reference?: string }): Promise<{ amount: string }>
   action(id: string, withdrawalId: string, input: SettlementRecipientScope & { requestKey: string; expectedVersion: string; action: 'cancel' | 'failed' | 'retry'; reason: string }): Promise<{ withdrawalId: string }>
   legacy(id: string, input: SettlementRecipientScope & PageQuery): Promise<PageResult<SettlementPaymentRow> & { version: string }>
   previewLink(id: string, input: SettlementRecipientScope & SettlementPaymentLinkInput): Promise<SettlementPaymentLinkPreview>
