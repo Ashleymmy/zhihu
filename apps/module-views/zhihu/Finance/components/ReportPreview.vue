@@ -4,7 +4,7 @@ import {ActionDialog} from '@zhihu-koc/shared-components'
 import {moneyValue,cashText} from '../../bill-entry'
 import {errorText,requestKey,type EngineContext} from '../../context'
 const props=defineProps<{context:EngineContext}>()
-const emit=defineEmits<{committed:[result:{id:string;from:string;to:string;duplicate:boolean}]}>()
+const emit=defineEmits<{committed:[result:{id:string;from:string;to:string;duplicate:boolean;fileName?:string}]}>()
 interface Row {id:string;lineNumber:number;date:string;channel:string;keyword:string;orders:string|null;activations:string|null;settlement:string|null;error:string|null;status:string}
 interface Preview {id:string;from:string;to:string;duplicate:boolean;previewHash:string;total:number;invalidRows:number;rows:Row[];status:string;reportType:'new_user'|'activation'}
 const earningMoney=(value:string|null|undefined)=>value==null?'原表未提供':'¥'+cashText(moneyValue(value))
@@ -31,7 +31,7 @@ async function changePage(next:number){
 async function commit(){
  if(!preview.value)return
  await props.context.http.post('/workbench/import/'+preview.value.id+'/commit',{...props.context.scope,previewHash:preview.value.previewHash,requestKey:commitKey})
- open.value=false;emit('committed',preview.value)
+ open.value=false;emit('committed',{...preview.value,fileName:file.value?.name})
 }
 async function resume(batch:{id:string;fileName:string;reportKind:string}){
  await run(async()=>{const blob=await props.context.http.getBlob('/imports/'+batch.id+'/file?'+new URLSearchParams({projectId:props.context.scope.projectId,accountId:props.context.scope.accountId}));file.value=new File([blob],batch.fileName,{type:blob.type});reportType.value=batch.reportKind==='activation'?'activation':'new_user';reset();await inspect()})

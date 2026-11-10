@@ -12,6 +12,9 @@ import type { CoreWorkspace } from "./core-workspace";
 import DataGrid from "./DataGrid.vue";
 import CashWallet from "./CashWallet.vue";
 import FinanceHistoryLinks from "./FinanceHistoryLinks.vue";
+import SettlementWorkbench from './SettlementWorkbench.vue';
+import RateSettings from './RateSettings.vue';
+import type { EvidenceAction, SettlementScope } from '@zhihu-koc/shared-contracts/core';
 import { earningMoney as money, cashUnits } from "./platform-earnings";
 import type { DataGridRow } from "./data-grid";
 interface Scope {
@@ -40,7 +43,11 @@ const props = defineProps<{
   initialAccountId?: string;
   initialFrom?: string;
   initialTo?: string;
+  initialLeaderId?: string;
+  initialImportId?: string;
 }>();
+const emit = defineEmits<{ context: [value: SettlementScope]; navigate: [path: string] }>();
+const section = ref(props.initialLeaderId ? 'settlement' : 'reports'), ratesOpen = ref(false), rateMetric = ref('new_user'), reportId = ref(props.initialImportId || ''), actionNotice = ref(''), settlementLocked = ref(false);
 const w = inject<CoreWorkspace>("opc")!,
   panels = inject<Record<string, Component>>("opc-finance-panels", {});
 const scopes = ref<Scope[]>([]),
@@ -57,6 +64,15 @@ const panel = computed(() =>
 const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Shanghai",
 }).format(new Date());
+function action(value: EvidenceAction) {
+  actionNotice.value = '';
+  if (value.key === 'set_pricing') { rateMetric.value = value.parameters.metricType || 'new_user'; ratesOpen.value = true; return; }
+  const task = /^\/api\/v1\/core\/tasks\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(value.path);
+  if (task && current.value) { emit('navigate', '/tasks?' + new URLSearchParams({ projectId: current.value.projectId, moduleId: task[1]!, accountId: task[2]!, taskId: task[3]! })); return; }
+  const report = /^\/api\/v1\/modules\/zhihu\/imports\/([^/]+)\/analysis$/.exec(value.path);
+  if (report || value.key === 'upload_official_report') { reportId.value = report?.[1] || ''; section.value = 'reports'; return; }
+  actionNotice.value = '下一步：' + (value.requiredDuty === 'operations' ? '运营' : '财务') + '：' + value.label;
+}
 const period = reactive({
   from: props.initialFrom || today.slice(0, 8) + "01",
   to: props.initialTo || today,
@@ -85,7 +101,7 @@ async function load() {
             s.projectId === props.initialProjectId &&
             (!props.initialAccountId || s.accountId === props.initialAccountId),
         ) ?? scopes.value[0];
-      key.value = initial ? initial.projectId + ":" + initial.accountId : "";
+      key.value = props.initialLeaderId && !props.initialAccountId && scopes.value.length > 1 ? '' : initial ? initial.projectId + ":" + initial.accountId : "";
     }
     revision.value++;
   } catch (e) {
@@ -185,7 +201,8 @@ const rows = computed<DataGridRow[]>(
       </div>
       <div class="finance-controls">
         <label v-if="scopes.length"
-          >项目<select v-model="key">
+          >项目与来源<select v-model="key" :disabled="settlementLocked">
+            <option value="" disabled>选择本次要核对的项目来源</option>
             <option
               v-for="s in scopes"
               :key="s.projectId + ':' + s.accountId"
@@ -199,7 +216,7 @@ const rows = computed<DataGridRow[]>(
               }}
             </option>
           </select></label
-        ><button @click="load" :disabled="loading">刷新项目</button>
+        ><button @click="load" :disabled="loading || settlementLocked">刷新项目</button>
       </div>
     </header>
     <div v-if="error" role="alert">
@@ -211,11 +228,15 @@ const rows = computed<DataGridRow[]>(
       <p>项目开通后，这里会显示账目和付款进度。</p>
       <router-link to="/projects">查看项目设置</router-link>
     </article>
+    <article v-if="!current && scopes.length" class="panel finance-empty"><h2>选择本次核对的项目来源</h2><p>不同来源分别核对和确认。请在上方选择项目来源，随后查看这位收款人的本人收益与应得团队分成。</p></article>
     <template v-if="current">
+      <nav v-if="current.available && w.settlementApi" class="finance-sections" aria-label="财务处理"><button :aria-current="section==='reports' ? 'page' : undefined" @click="section='reports'" :disabled="settlementLocked">报表与付款</button><button :aria-current="section==='settlement' ? 'page' : undefined" @click="section='settlement'" :disabled="settlementLocked">团长收益核对</button></nav>
+      <p v-if="actionNotice" role="status">{{ actionNotice }}</p>
       <div v-if="!current.available" class="panel finance-empty" role="alert">
         <p>这个项目暂时未加载，其他项目仍可处理。</p>
         <button @click="load">重新加载</button>
       </div>
+      <SettlementWorkbench v-else-if="section==='settlement' && w.settlementApi" :key="key" :scope="current" :leader-id="initialLeaderId" :from="period.from" :to="period.to" @context="Object.assign(period,{from:$event.from,to:$event.to});emit('context',$event)" @action="action" @lock="settlementLocked=$event" />
       <component
         v-else-if="panel"
         :is="panel"
@@ -223,6 +244,7 @@ const rows = computed<DataGridRow[]>(
         :scope="current"
         :initial-from="period.from"
         :initial-to="period.to"
+        :initial-import-id="reportId"
       />
       <template v-else>
         <form
@@ -292,6 +314,7 @@ const rows = computed<DataGridRow[]>(
         />
         <FinanceHistoryLinks />
       </template>
+      <RateSettings :open="ratesOpen" :project-id="current.projectId" :module-id="current.moduleId" :http="w.http" :initial-metric-type="rateMetric" @close="ratesOpen=false" @published="ratesOpen=false;revision++" />
     </template>
   </section>
 </template>
@@ -299,6 +322,7 @@ const rows = computed<DataGridRow[]>(
 .public-finance {
   min-width: 0;
 }
+.finance-sections { display:flex; flex-wrap:wrap; gap:8px; }.finance-sections button[aria-current=page] { background:var(--ink); color:var(--paper); }
 .finance-controls,
 .finance-period,
 .finance-pagination {

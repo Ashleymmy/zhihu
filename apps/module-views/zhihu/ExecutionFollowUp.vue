@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue'
-import {DetailDrawer} from '@zhihu-koc/shared-components'
+import type {HistoryTarget} from '@zhihu-koc/shared-contracts/core'
+import {DetailDrawer,HistoryEvidenceForm,historyTargetFromError} from '@zhihu-koc/shared-components'
 import {upstreamReview} from './work-status'
 import {errorText,requestKey,type EngineContext} from './context'
 export interface ExecutionItem {keywordId:string;keyword:string;bindingId?:string;executorName?:string;reasonCode:string;next:string;retroFromDate?:string;legacyMode?:string}
@@ -8,6 +9,8 @@ interface Work {id:string;url:string;title:string|null;publishedAt:string|null;o
 interface Progress {planId:string;bindingId:string|null;executorName:string|null;fromDate:string|null;verificationStatus:string|null;canSubmit:boolean;canResolve:boolean;works:Work[];evidence:{id:string;url:string;description:string;status:string;reason:string|null;canReview:boolean}[]}
 const props=defineProps<{context:EngineContext;item:ExecutionItem}>()
 const emit=defineEmits<{close:[];changed:[];navigate:[path:string]}>()
+const history=ref<HistoryTarget|null>(null)
+async function repaired(){history.value=null;await run(load);emit('changed')}
 const busy=ref(false),error=ref(''),saved=ref(false),notice=ref(''),fromDate=ref(props.item.retroFromDate??''),url=ref(''),description=ref(''),progress=ref<Progress|null>(null)
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date())
 const disputeReason=ref('')
@@ -15,7 +18,7 @@ const canRecord=computed(()=>props.context.role==='admin'&&props.context.adminDu
 const checkLabel=computed(()=>progress.value?.verificationStatus==='passed'?'已核对执行归属与作品':progress.value?.verificationStatus==='disputed'?'作品归属有争议':'执行记录待核对')
 const workStatus=(w:Work)=>upstreamReview({source:'composition',...w,failureReason:w.syncError})
 async function load(){progress.value=await props.context.http.get<Progress>('/keywords/'+props.item.keywordId+'/execution-progress',props.context.scope)}
-async function run(action:()=>Promise<void>){busy.value=true;error.value='';try{await action()}catch(e){error.value=errorText(e)}finally{busy.value=false}}
+async function run(action:()=>Promise<void>){busy.value=true;error.value='';try{await action()}catch(e){history.value=historyTargetFromError(e);error.value=errorText(e)}finally{busy.value=false}}
 onMounted(()=>run(load))
 async function save(){await props.context.http.post('/keywords/'+props.item.keywordId+'/execution-history',{...props.context.scope,bindingId:props.item.bindingId,fromDate:fromDate.value,url:url.value,description:description.value,requestKey:requestKey()});saved.value=true;notice.value='历史执行已保存，相关报表已自动更新。';await load();emit('changed')}
 async function review(work:Work){await props.context.http.post('/keywords/'+props.item.keywordId+'/review-existing-work',{...props.context.scope,bindingId:progress.value!.bindingId,compositionId:work.id,requestKey:requestKey()});notice.value='已核验原作品，金额和待办已自动更新。';await load();emit('changed')}
@@ -26,7 +29,7 @@ function task(){emit('close');emit('navigate','/tasks?'+new URLSearchParams({...
 </script>
 <template>
  <DetailDrawer :open="true" :title="item.keyword+' · 执行与作品'" @close="emit('close')">
-  <div class="execution-followup">
+  <HistoryEvidenceForm v-if="history" :target="history" @completed="repaired" @updated="emit('changed')" @cancel="history=null" @stale="repaired" /><div v-else class="execution-followup">
    <p v-if="progress">执行人：{{progress.executorName||'尚未指定'}}<span v-if="progress.fromDate"> · 从 {{progress.fromDate}} 开始</span></p>
    <strong v-if="progress">{{checkLabel}}</strong>
    <form v-if="progress?.canResolve" @submit.prevent="run(resolveDispute)"><label>作品归属核实结果<input v-model="disputeReason" required maxlength="500" /></label><button :disabled="busy">解除争议并更新报表</button></form>

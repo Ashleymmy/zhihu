@@ -70,7 +70,7 @@ export function groupGridRows(
       groups.set(key, {
         key,
         label: field === "status" ? row.status.label : key || "未填写",
-        description: field === "status" ? (row.status.description ?? "") : "",
+        description: "",
         tone: field === "status" ? row.status.tone : "neutral",
         rows: [],
       });

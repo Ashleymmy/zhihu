@@ -1,70 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { http } from '../stores/auth'
-
-/** 任务队列：收益计算 / 回传 / 通知等后台任务的执行流水（demo mock 契约） */
-interface QueueRow { task: string; type: string; at: string; status: string; duration: string }
-interface QueueData { backlog: number; successRate: string; rows: QueueRow[] }
-
-const data = ref<QueueData | null>(null)
-const loading = ref(true)
-
-const unwrap = <T,>(r: unknown): T => {
-  const o = r as { data?: T } | null
-  return o && typeof o === 'object' && 'data' in o && o.data !== undefined ? o.data : (r as T)
-}
-
-async function load() {
-  loading.value = true
-  try { data.value = unwrap(await http.get<{ code: number; data: QueueData }>('/insights/dev-queue')) }
-  catch { data.value = null }
-  finally { loading.value = false }
-}
+interface QueueRow { id:string;task:string;type:string;at:string;status:string;duration:string;attempts:number }
+interface QueueData { backlog:number;successRate:null;successRateReason:string;rows:QueueRow[];total:number;page:number;pageSize:number;historyScope:'retained_jobs_only'|'current_process_in_flight';observedAt:string }
+const data=ref<QueueData|null>(null),loading=ref(false),error=ref(''),page=ref(1)
+async function load(){loading.value=true;error.value='';data.value=null;try{data.value=await http.get('/insights/dev-queue',{page:page.value,pageSize:25})}catch(e){error.value=e instanceof Error?e.message:'队列观测暂未读取，请重试。'}finally{loading.value=false}}
 onMounted(load)
 </script>
-
-<template>
-  <div class="page-stack queue-page">
-    <div class="bento enter">
-      <article class="card" style="--s:12;--i:0" aria-labelledby="queue-title">
-        <div class="card-h">
-          <h3 id="queue-title">任务队列</h3>
-          <span class="muted r" style="font-size:12px">收益计算 / 回传 / 通知</span>
-        </div>
-        <div v-if="data" class="queue-summary">
-          <span class="chip" :class="data.backlog ? 'clay' : 'soft'">{{ data.backlog ? `${data.backlog} 条积压` : '队列当前无积压' }}</span>
-          <span class="muted" style="font-size:12.5px">近 24 小时成功率 <b style="color:var(--ink)">{{ data.successRate }}</b></span>
-        </div>
-        <div v-if="data?.rows.length" class="queue-table" role="table" aria-label="任务执行流水">
-          <div class="queue-tr queue-th" role="row">
-            <span>任务</span><span>类型</span><span>提交时间</span><span>状态</span><span style="text-align:right">耗时</span>
-          </div>
-          <div v-for="(r, i) in data.rows" :key="i" class="queue-tr" role="row">
-            <b>{{ r.task }}</b>
-            <span class="muted">{{ r.type }}</span>
-            <span class="muted num">{{ r.at }}</span>
-            <span><i class="queue-dot" :data-warn="r.status !== '完成'" />{{ r.status }}</span>
-            <span class="num muted" style="text-align:right">{{ r.duration }}</span>
-          </div>
-        </div>
-        <div v-else-if="!loading" class="bento-empty home-empty"><b>队列为空</b><p>同步、回传和通知任务执行后会出现在这里。</p></div>
-        <p v-else role="status" class="muted" style="font-size:13px">正在读取队列…</p>
-      </article>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.queue-page { min-width: 0; }
-.queue-summary { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
-.queue-table { display: grid; }
-.queue-tr { display: grid; grid-template-columns: 1fr 64px 80px 120px 70px; gap: 10px; align-items: center; padding: 11px 4px; font-size: 13px; border-top: 1px solid var(--line-2); }
-.queue-tr:first-child { border-top: 0; }
-.queue-th { padding: 0 4px 10px; border-top: 0; color: var(--muted); font-size: 12px; }
-.queue-dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #4e9a4a; }
-.queue-dot[data-warn="true"] { background: var(--clay); }
-@media (max-width: 720px) {
-  .queue-tr { grid-template-columns: 1fr 100px; }
-  .queue-tr > :nth-child(2), .queue-tr > :nth-child(3), .queue-tr > :nth-child(5) { display: none; }
-}
-</style>
+<template><div class="page-stack queue-page"><div class="bento enter"><article class="card" style="--s:12;--i:0"><div class="card-h"><h3>当前任务队列</h3><button class="btn r" :disabled="loading" @click="load">刷新队列</button></div><div v-if="error" role="alert"><p>{{error}}</p><button class="btn" @click="load">重新读取队列</button></div><p v-if="loading" role="status">正在读取队列…</p><template v-if="data"><div class="queue-summary"><span class="chip" :class="data.backlog?'clay':'soft'">{{data.backlog?data.backlog+' 条待处理':'当前队列无积压'}}</span><span class="muted">读取时间：{{new Date(data.observedAt).toLocaleString('zh-CN')}}</span></div><p class="muted">{{data.historyScope==='current_process_in_flight'?'仅展示当前服务进程中正在处理的任务。':'仅展示队列仍保留的任务记录。'}}{{data.successRateReason || '这些记录不能代表完整历史或每日成功率。'}}</p><div class="queue-table"><article v-for="r in data.rows" :key="r.id" class="queue-tr"><b>{{r.task}}</b><span>{{r.type}}</span><time>{{r.at?new Date(r.at).toLocaleString('zh-CN'):'时间未记录'}}</time><span>{{r.status}}</span><small>耗时 {{r.duration}}</small></article></div><div v-if="!data.rows.length" class="bento-empty home-empty"><b>当前观测范围没有任务</b><p>可以刷新查看新的任务；这不代表历史任务全部成功。</p></div><div class="queue-summary"><span>共 {{data.total}} 条 · 第 {{page}} 页</span><button class="btn" :disabled="page===1||loading" @click="page--;load()">上一页</button><button class="btn" :disabled="page*data.pageSize>=data.total||loading" @click="page++;load()">下一页</button></div></template></article></div></div></template>
+<style scoped>.queue-page{min-width:0}.queue-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}.queue-table{display:grid}.queue-tr{display:grid;grid-template-columns:1fr 80px minmax(130px,1fr) 120px 100px;gap:12px;padding:14px 0;border-top:1px solid var(--line);font-size:13px;overflow-wrap:anywhere}@media(max-width:720px){.queue-tr{grid-template-columns:1fr 1fr}.queue-tr b,.queue-tr time{grid-column:1/-1}}</style>

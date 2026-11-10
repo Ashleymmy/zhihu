@@ -11,7 +11,7 @@ import {
   type EarningView,
 } from "./platform-earnings";
 import type { DataGridRow } from "./data-grid";
-const props = defineProps<{ initialProjectId?: string }>(),
+const props = defineProps<{ initialProjectId?: string; initialAccountId?: string; initialModuleId?: string; initialFrom?: string; initialTo?: string; initialGroup?: string; initialPerformerId?: string }>(),
   emit = defineEmits<{ navigate: [path: string] }>();
 const w = inject<CoreWorkspace>("opc")!;
 const earningPanels = inject<Record<string,Component>>("opc-earning-panels", {});
@@ -19,12 +19,13 @@ const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Shanghai",
 }).format(new Date());
 const filter = reactive({
-  from: today.slice(0, 8) + "01",
-  to: today,
+  from: props.initialFrom || today.slice(0, 8) + "01",
+  to: props.initialTo || today,
   projectId: props.initialProjectId ?? "",
   metricType: "",
   search: "",
-  group: "all",
+  group: ['self','team'].includes(props.initialGroup || '') ? props.initialGroup! : 'all',
+  performerId: props.initialPerformerId || '',
   page: 1,
 });
 const view = ref<EarningView | null>(null),
@@ -74,6 +75,9 @@ async function load(reset = false) {
       page: filter.page,
       pageSize: 25,
       ...(filter.projectId ? { projectId: filter.projectId } : {}),
+      ...(props.initialAccountId ? { accountId: props.initialAccountId } : {}),
+      ...(props.initialModuleId ? { moduleId: props.initialModuleId } : {}),
+      ...(filter.performerId ? { performerId: filter.performerId } : {}),
       ...(filter.metricType ? { metricType: filter.metricType } : {}),
       ...(filter.group !== "all" ? { group: filter.group } : {}),
       ...(filter.search ? { search: filter.search } : {}),
@@ -283,8 +287,8 @@ function close() {
       <details class="income-rules">
         <summary>收益是怎么算的</summary>
         <dl>
-          <div><dt>任务收益</dt><dd>你本人完成的业绩数量 × 项目公布的单价。项目报表核对后计入「已确认收入」。</dd></div>
-          <div v-if="w.role.value === 'leader'"><dt>团队管理收益</dt><dd>团队成员的业绩数量 × 团队管理单价，对应你在任务分配、作品审核和培训上的工作。成员调到其他团队或晋升为团长后，之后的业绩不再计入。</dd></div>
+          <div><dt>任务收益</dt><dd>你本人完成的业绩，由平台按该项任务保存的规则核对。确认后计入「已确认收入」。</dd></div>
+          <div v-if="w.role.value === 'leader'"><dt>团队管理收益</dt><dd>这是你应得的团队分成。保留的旧任务继续按原先保存的归属核对，后续新任务按新的团队关系办理。</dd></div>
           <div><dt>不会产生收益的情况</dt><dd>邀请他人注册本身没有奖励；第二层及以下成员的业绩不会给你带来收益。</dd></div>
         </dl>
       </details>

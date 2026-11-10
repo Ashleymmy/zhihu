@@ -1,5 +1,6 @@
 import type { Ref, ComputedRef } from 'vue'
 import type { OperationGuideModel } from './operation-guide'
+import type { CommentApi, EvidenceApi, EvidenceRow, SettlementApi } from '@zhihu-koc/shared-contracts/core'
 export interface WorkspaceModule {
   id: string
   name: string
@@ -22,6 +23,9 @@ export interface WorkspaceHttp {
 }
 export interface CoreWorkspace {
   http: WorkspaceHttp
+  evidenceApi?: EvidenceApi
+  settlementApi?: SettlementApi
+  evidenceComments?: (key: EvidenceRow['key'] & { moduleId: string }) => CommentApi
   role: ComputedRef<string>
   /** 登录者的显示名（首页个人卡等使用） */
   userName?: ComputedRef<string>

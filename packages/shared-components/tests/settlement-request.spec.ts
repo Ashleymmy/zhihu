@@ -1,0 +1,8 @@
+import { describe, expect, it, vi } from 'vitest'
+import { apiMessage, canPreviewSettlement, createMutationAttempt, isStaleSettlement } from '../src/settlement-request'
+describe('settlement request intent',()=>{
+ it('keeps the frozen scope and key after timeout and prevents an expanded retry',()=>{const key=vi.fn(()=> 'request-key-1'),attempt=createMutationAttempt<{leaderId:string;from:string;to:string;expectedReviewVersion:string}>(key);const original=attempt.prepare({leaderId:'5',from:'2026-01-30',to:'2026-03-06',expectedReviewVersion:'review-original'});attempt.reject({status:408});const retry=attempt.prepare({leaderId:'9',from:'2026-01-01',to:'2026-12-31',expectedReviewVersion:'different'});expect(retry).toBe(original);expect(key).toHaveBeenCalledTimes(1);expect(retry.leaderId).toBe('5');expect(Object.isFrozen(retry)).toBe(true)})
+ it('requires a fresh intentional preview after conflict while preserving a failed server response for retry',()=>{const attempt=createMutationAttempt<{expectedVersion:string}>(()=>'key');attempt.prepare({expectedVersion:'a'});attempt.reject({status:503});expect(attempt.pending).not.toBeNull();attempt.reject({status:409});expect(attempt.pending).toBeNull();expect(isStaleSettlement({status:409})).toBe(true);expect(attempt.prepare({expectedVersion:'b'}).expectedVersion).toBe('b')})
+ it('uses ready records, so zero-value and negative corrections can be previewed',()=>{expect(canPreviewSettlement({ready:1})).toBe(true);expect(canPreviewSettlement({ready:0})).toBe(false)})
+ it('preserves a human next step from structured API errors',()=>{expect(apiMessage({status:409,message:'来源已有变化，请重新核对。'},'读取失败')).toBe('来源已有变化，请重新核对。');expect(apiMessage(null,'读取失败')).toBe('读取失败')})
+})

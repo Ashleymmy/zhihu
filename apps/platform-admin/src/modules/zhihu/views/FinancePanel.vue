@@ -8,11 +8,10 @@ const props = defineProps<{
   scope: { projectId: string; accountId: string };
   initialFrom?: string;
   initialTo?: string;
+  initialImportId?: string;
 }>();
 const route=useRoute(),router=useRouter();
-const initialPeriod=ref(String(route.query.from||'').slice(0,7));
-const {period,from,to,step,...baseQuery}=route.query;
-if(period||from||to||step)void router.replace({query:baseQuery});
+const initialPeriod=computed(()=>String(props.initialFrom || route.query.from || '').slice(0,7));
 type EngineOptions = InstanceType<
   typeof Finance
 >["$props"]["context"]["options"];
@@ -66,6 +65,7 @@ const context = computed(() => ({
       :key="scope.projectId + ':' + scope.accountId"
       :context="context"
       :initial-period="initialPeriod"
+      :initial-import-id="initialImportId"
       @navigate="router.push"
     />
   </div>

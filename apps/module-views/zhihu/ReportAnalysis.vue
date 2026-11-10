@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue'
-import {AnalysisRun,DetailDrawer} from '@zhihu-koc/shared-components'
+import {AnalysisRun,DetailDrawer,HistoryEvidenceForm} from '@zhihu-koc/shared-components'
+import type {HistoryTarget} from '@zhihu-koc/shared-contracts/core'
 import {errorText,executorOptions,type EngineContext,type Option} from './context'
 import type {NameSelection,ReportAnswer,ReportRun,RiskCase} from './report-analysis'
 import AgencySettings from './AgencySettings.vue'
 import RiskReview from './RiskReview.vue'
 import HistoricalWorks from './HistoricalWorks.vue'
-const props=defineProps<{context:EngineContext;run:ReportRun;busyAskId?:string;errors?:Record<string,string>;busyAction?:string}>()
-const emit=defineEmits<{answer:[answer:ReportAnswer];action:[key:string];refresh:[]}>()
+const props=defineProps<{context:EngineContext;run:ReportRun;busyAskId?:string;errors?:Record<string,string>;busyAction?:string;historyTarget?:HistoryTarget|null}>()
+const emit=defineEmits<{answer:[answer:ReportAnswer];action:[key:string];refresh:[];historyClosed:[]}>()
 const agencyOpen=ref(false)
 const risk=ref<RiskCase|null>(null)
 const channelAsk=ref(''),channelId=ref(''),upstreamId=ref(''),generation=ref<1|2>(1),channels=ref<Option[]>([]),mappings=ref<Option[]>([]),loading=ref(false),error=ref('')
@@ -37,6 +38,7 @@ function saveKeyword(){
 </script>
 <template>
  <AnalysisRun :run="run" :busy-ask-id="busyAskId" :errors="errors" :busy-action="busyAction" @answer="answer" @action="emit('action',$event)" />
+ <HistoryEvidenceForm v-if="historyTarget&&!keywordAsk&&!channelAsk" :target="historyTarget" @updated="emit('refresh')" @completed="emit('historyClosed')" @cancel="emit('historyClosed')" @stale="emit('historyClosed');emit('refresh')" />
  <article v-if="run.agencyCheck" class="agency-check"><strong>{{run.agencyCheck.rows}} 条拉活记录的代理名称需要核对</strong><p>报表填写：{{run.agencyCheck.reportedNames.join('、')}}；项目登记：{{run.agencyCheck.registeredName??'尚未填写'}}。</p><p>下一步：运营或财务核对名称，这些行暂不计费。</p><button @click="agencyOpen=true">核对代理名称</button></article>
  <AgencySettings :http="context.http" :scope="context.scope" :open="agencyOpen" @close="agencyOpen=false" @saved="agencyOpen=false;emit('refresh')" />
  <ul v-if="run.riskCases?.length" class="risk-cases"><li v-for="item in run.riskCases" :key="item.factId"><strong>{{item.keyword}}</strong><span>知乎标记：{{item.riskAssessment}}</span><span>下一步：运营核实，金额已算出的部分保留。</span><button v-if="context.adminDuty!=='finance'" :disabled="!!busyAction||!!busyAskId" @click="risk=item">核实风险</button></li></ul>
@@ -57,7 +59,8 @@ function saveKeyword(){
   </form>
  </DetailDrawer>
  <DetailDrawer :open="!!keywordAsk" title="登记历史关键词" @close="keywordAsk=''">
-  <form class="channel-choice" @submit.prevent="saveKeyword">
+  <HistoryEvidenceForm v-if="historyTarget" :target="historyTarget" @updated="emit('refresh')" @completed="keywordAsk='';emit('historyClosed')" @cancel="emit('historyClosed')" @stale="keywordAsk='';emit('historyClosed');emit('refresh')" />
+  <form v-else class="channel-choice" @submit.prevent="saveKeyword">
    <p>报表中的关键词：<strong>{{keywordMatch?.keyword}}</strong><br>渠道：{{keywordMatch?.channel}}</p>
    <p v-if="loading" role="status">正在读取成员和推广活动…</p>
    <p v-if="error||errors?.[keywordAsk]" class="engine-error" role="alert">{{error||errors?.[keywordAsk]}}</p>

@@ -8,17 +8,19 @@ const state=inject<PeriodState>('financeState')!,toast=inject<(text:string)=>voi
 const entries=computed(()=>state.workbench.value?.entries??[]),summary=computed(()=>state.workbench.value?.summary)
 // Workbench groups are team totals; this panel names actual recipients.
 const rawMoney=(n:bigint)=>{const a=n<0n?-n:n;return(n<0n?'-':'')+String(a/10000n)+'.'+String(a%10000n).padStart(4,'0')}
-const groups=computed(()=>{const people=new Map<string,BillEntry[]>();for(const e of entries.value.filter(e=>e.ownPayable&&!e.internal&&e.payeeId)){const rows=people.get(e.payeeId)??[];rows.push(e);people.set(e.payeeId,rows)}return [...people].map(([payeeId,rows])=>({payeeId,name:rows[0]!.payeeName,total:rawMoney(rows.reduce((n,e)=>n+moneyValue(e.amount??'0'),0n)),confirmed:rawMoney(rows.reduce((n,e)=>n+moneyValue(e.confirmedAmount),0n)),pending:rawMoney(rows.reduce((n,e)=>n+moneyValue(e.pendingAmount),0n)),blockers:[...new Set(rows.filter(e=>!e.ready&&e.status!=='confirmed'&&e.reason).map(e=>e.reason))]}))})
+const groups=computed(()=>{const people=new Map<string,BillEntry[]>();for(const e of entries.value.filter(e=>e.ownPayable&&!e.internal&&e.payeeId)){const rows=people.get(e.payeeId)??[];rows.push(e);people.set(e.payeeId,rows)}return [...people].map(([payeeId,rows])=>({payeeId,name:rows[0]!.payeeName,total:rows.some(e=>e.amount===null)?null:rawMoney(rows.reduce((n,e)=>n+moneyValue(e.amount!),0n)),confirmed:rawMoney(rows.reduce((n,e)=>n+moneyValue(e.confirmedAmount),0n)),pending:rawMoney(rows.reduce((n,e)=>n+moneyValue(e.pendingAmount),0n)),blockers:[...new Set(rows.filter(e=>!e.ready&&e.status!=='confirmed'&&e.reason).map(e=>e.reason))]}))})
 const metrics=[{key:'newUser' as const,name:'拉新',unit:'单'},{key:'activation' as const,name:'拉活',unit:'个'}]
 const metricOf=(key:'newUser'|'activation')=>summary.value?.byType[key]
 const hasTypeData=(key:'newUser'|'activation')=>!!metricOf(key)?.records||entries.value.some(e=>e.metricType===(key==='newUser'?'new_user':'activation'))
 const moneyOrMissing=(v:string|null|undefined)=>v==null?'原表未提供':fmtMoney(v)
 const totalPayable=computed(()=>cashText(moneyValue(state.totalPayable.value)))
+const confirmedTotal=computed(()=>entries.value.filter(e=>e.ownPayable&&!e.internal).reduce((n,e)=>n+moneyValue(e.confirmedAmount),0n))
+const pendingTotal=computed(()=>entries.value.filter(e=>e.ownPayable&&!e.internal).reduce((n,e)=>n+moneyValue(e.pendingAmount),0n))
 const page=ref(1),pageSize=20,expanded=ref<string|null>(null),seen=ref<Set<string>>(new Set())
 const visibleEntries=computed(()=>entries.value.slice((page.value-1)*pageSize,page.value*pageSize)),seenCount=computed(()=>seen.value.size)
 watch(entries,()=>{page.value=Math.min(page.value,Math.max(1,Math.ceil(entries.value.length/pageSize)))})
 function toggleFact(e:BillEntry){expanded.value=expanded.value===e.id?null:e.id;if(expanded.value)seen.value.add(e.id)}
-function factTags(e:BillEntry){const tags=[];if(e.kind==='adjustment')tags.push({cls:'badge warn',label:'差额调整'});if(e.amount===null)tags.push({cls:'badge warn',label:'待计算'});if(e.riskReview?.decision)tags.push({cls:'badge info',label:'风险已核实'});return tags}
+function factTags(e:BillEntry){const tags=[];if(e.status==='confirmed')tags.push({cls:'badge ok',label:'已确认'});if(e.kind==='adjustment')tags.push({cls:'badge warn',label:'差额调整'});if(e.amount===null)tags.push({cls:'badge warn',label:'待计算'});if(e.riskReview?.decision)tags.push({cls:'badge info',label:'风险已核实'});return tags}
 function quantityText(e:BillEntry){return (e.metricType==='activation'?'拉活 ':'拉新 ')+(e.quantity??e.orders??'—')+(e.metricType==='activation'?' 个':' 单')}
 const readyEntries=computed(()=>entries.value.filter(e=>e.ready&&e.ownPayable&&!e.internal)),readyGroups=computed(()=>new Set(readyEntries.value.map(e=>e.payeeId))),readyTotal=computed(()=>readyEntries.value.reduce((n,e)=>n+moneyValue(e.pendingAmount),0n))
 const canConfirm=computed(()=>readyEntries.value.length>0&&!state.loading.value&&!state.error.value&&!['pending','failed'].includes(state.confirmation.value?.status??''))
@@ -42,11 +44,11 @@ watch(()=>progress.value?.status,status=>{if(status==='done')progressOpen.value=
     <div class="review-grid">
       <!-- 左栏：对账面板（拉新/拉活分组） -->
       <div class="card" style="margin: 0">
-        <h3>对账面板</h3>
+        <h3>{{state.reviewScopeLabel.value}}核对</h3>
         <template v-for="m in metrics" :key="m.key">
           <section v-if="hasTypeData(m.key)">
             <h4 style="margin: 12px 0 4px; font-size: 13px">{{ m.name }}</h4>
-            <div class="recon-item"><span>报表数量</span><b class="num">{{ metricOf(m.key)?.quantity }} {{ m.unit }}</b></div>
+            <div class="recon-item"><span>{{state.reviewScopeLabel.value}}数量</span><b class="num">{{ metricOf(m.key)?.quantity }} {{ m.unit }}</b></div>
             <div class="recon-item"><span>计费数量</span><b class="num">{{ metricOf(m.key)?.billableQuantity }} {{ m.unit }}</b></div>
             <div class="recon-item"><span>待处理数量</span><b class="num">{{ metricOf(m.key)?.pendingQuantity }} {{ m.unit }}</b></div>
             <div class="recon-item"><span>不计费数量</span><b class="num">{{ metricOf(m.key)?.excludedQuantity }} {{ m.unit }}</b></div>
@@ -62,6 +64,8 @@ watch(()=>progress.value?.status,status=>{if(status==='done')progressOpen.value=
           </section>
         </template>
         <div class="recon-item" style="margin-top: 8px"><span>应付合计</span><b class="num">¥{{ totalPayable ?? '—' }}</b></div>
+        <div class="recon-item"><span>已确认金额</span><b class="num">¥{{cashText(confirmedTotal)}}</b></div>
+        <div class="recon-item"><span>待确认金额</span><b class="num">¥{{cashText(pendingTotal)}}</b></div>
         <div class="recon-item">
           <span>对账结果</span>
           <span class="small muted">按各成员单价计算，请逐项核对</span>
@@ -98,7 +102,7 @@ watch(()=>progress.value?.status,status=>{if(status==='done')progressOpen.value=
 
       <!-- 右栏：本期财务账单 -->
       <div class="card" style="margin: 0">
-        <h3>本期财务账单</h3>
+        <h3>{{state.reviewScopeLabel.value}}收款明细</h3>
         <p class="small muted">按收款人核对，确认后生成可结算收入。</p>
         <div v-for="g in groups" :key="g.payeeId" class="confirm-row">
           <div>
@@ -111,7 +115,7 @@ watch(()=>progress.value?.status,status=>{if(status==='done')progressOpen.value=
         <div v-if="!groups.length" class="empty">本期尚无成员应付，请查看明细中的原因。</div>
         <hr class="hr" />
         <button v-if="canConfirm" class="primary" style="width: 100%" @click="askConfirm">
-          核对并确认账单（{{ readyGroups.size }} 人 · ¥{{ cashText(readyTotal) }}）
+          核对并确认账单（{{state.reviewScopeLabel.value}} · {{ readyGroups.size }} 人 · ¥{{ cashText(readyTotal) }}）
         </button>
         <div v-else class="small muted" style="text-align: center">没有可确认内容时这里不会出现确认按钮</div>
         <hr class="hr" />
@@ -123,7 +127,7 @@ watch(()=>progress.value?.status,status=>{if(status==='done')progressOpen.value=
     <Modal :open="confirmOpen" :busy="confirming" @close="confirmOpen = false">
       <h3>确认入账</h3>
       <p>
-        将把本期 <b>{{ readyGroups.size }}</b> 位成员的就绪账单、合计
+        将把{{state.reviewScopeLabel.value}}内 <b>{{ readyGroups.size }}</b> 位成员的就绪账单、合计
         <b class="num">¥{{ cashText(readyTotal) }}</b> 计入「待到账」。
       </p>
       <p class="small muted">确认后不可直接修改；若上游再更正，会自动生成差额调整，由你再次核对。</p>

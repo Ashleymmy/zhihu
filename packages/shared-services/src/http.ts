@@ -28,7 +28,7 @@ export interface HttpClientOptions {
 
 export interface HttpClient {
   get<T>(url: string, params?: object): Promise<T>
-  post<T>(url: string, data?: unknown): Promise<T>
+  post<T>(url: string, data?: unknown, options?: { timeout?: number }): Promise<T>
   /** multipart 上传（FormData），axios 会自动带上 boundary */
   postForm<T>(url: string, form: FormData): Promise<T>
   put<T>(url: string, data?: unknown): Promise<T>
@@ -162,7 +162,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
       const response = await instance.request<Blob>({ method: 'GET', url, responseType: 'blob' })
       return response.data
     },
-    post: (url, data) => request({ method: 'POST', url, data }),
+    post: (url, data, options) => request({ method: 'POST', url, data, ...(options?.timeout ? { timeout: options.timeout } : {}) }),
     postForm: (url, form) =>
       request({ method: 'POST', url, data: form, headers: { 'Content-Type': 'multipart/form-data' } }),
     put: (url, data) => request({ method: 'PUT', url, data }),

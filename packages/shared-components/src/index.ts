@@ -48,3 +48,8 @@ export { default as RateSettings } from "./RateSettings.vue";
 export { default as PlatformTasks } from "./PlatformTasks.vue";
 
 export { default as FinanceHistoryLinks } from "./FinanceHistoryLinks.vue";
+export { default as HistoryEvidenceForm } from './HistoryEvidenceForm.vue';
+export * from './history-evidence';
+export { default as EvidencePanel } from './EvidencePanel.vue';
+export { default as SettlementWorkbench } from './SettlementWorkbench.vue';
+export { default as RecordComments } from './RecordComments.vue';

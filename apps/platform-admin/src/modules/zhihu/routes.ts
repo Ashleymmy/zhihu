@@ -50,6 +50,10 @@ export function modulePagesFor(role: GlobalRole, duty = 'all'): RouteRecordRaw[]
       { path: 'works/new', name: 'zhihu-register-work', component: works, meta: { moduleId: 'zhihu', title: '登记作品' } },
     )
   }
+  if (staff && duty !== 'finance') {
+    pages.push({ path: 'salt', name: 'zhihu-salt', component: () => import('./views/ProjectContentTools.vue'), meta: { moduleId: 'zhihu', tool: 'salt', title: '盐选榜单' } })
+    if (role !== 'operator') pages.push({ path: 'risk', name: 'zhihu-risk', component: () => import('./views/ExclusiveView.vue'), meta: { moduleId: 'zhihu', section: 'risk', pageKind: 'risk', title: '风险举报' } })
+  }
   if (staff && duty !== 'operations') {
     pages.push({ path: 'finance', name: 'zhihu-finance', component: () => import('./views/ExclusiveView.vue'), meta: { moduleId: 'zhihu', section: 'finance', title: '财务做账' } })
   }

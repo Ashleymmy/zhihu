@@ -7,6 +7,7 @@ import Keywords from './Keywords.vue'
 import Prices from './Prices.vue'
 import Finance from './Finance/FinanceFlow.vue'
 import Works from './Works.vue'
+import RiskReports from './RiskReports.vue'
 import WorkActivity from './WorkActivity.vue'
 import Issues from './Issues.vue'
 import Channels from './Channels.vue'
@@ -17,8 +18,8 @@ const projects=ref<Option[]>([]),accounts=ref<Option[]>([]),error=ref(''),loadin
 const scope=reactive({projectId:'',accountId:''})
 const options=ref<EngineOptions>({tasks:[],channels:[],mappings:[],users:[]})
 const section=computed(()=>props.section||'operations'),admin=computed(()=>isStaffRole(props.role))
-const title=computed(()=>props.pageKind==='tasks'?(admin.value?'任务管理':props.role==='leader'?'团队任务':'我的任务'):props.pageKind==='task-hall'?'任务大厅':props.pageKind==='works'?'作品记录':props.pageKind==='issues'?'数据待办':props.pageKind==='income'?'我的收益':props.pageKind==='finance'?'财务':section.value==='activity'?'数据看板':section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'关键词与团队':props.role==='leader'?'团队业务':'我的关键词')
-const intro=computed(()=>props.pageKind==='tasks'?'查看任务进展，领取或分配后提交作品。':props.pageKind==='task-hall'?'挑选可以领取的任务，查看原文后开始创作。':props.pageKind==='works'?'查看作品提交结果，失败的作品可以直接修改重试。':props.pageKind==='issues'?'处理数据问题，补齐后系统自动继续核对。':section.value==='activity'?'查看自己和成员登记了多少作品，跟进提交结果。':section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与作品。':props.role==='leader'?'分发关键词并跟进团队作品。':'选择关键词，提交作品，查看审核结果。')
+const title=computed(()=>section.value==='risk'?'风险举报':props.pageKind==='tasks'?(admin.value?'任务管理':props.role==='leader'?'团队任务':'我的任务'):props.pageKind==='task-hall'?'任务大厅':props.pageKind==='works'?'作品记录':props.pageKind==='issues'?'数据待办':props.pageKind==='income'?'我的收益':props.pageKind==='finance'?'财务':section.value==='activity'?'数据看板':section.value==='finance'?'财务做账':section.value==='wallet'?'收入与提现':admin.value?'关键词与团队':props.role==='leader'?'团队业务':'我的关键词')
+const intro=computed(()=>section.value==='risk'?'核对官方风险记录，提交举报并跟进处理结果。':props.pageKind==='tasks'?'查看任务进展，领取或分配后提交作品。':props.pageKind==='task-hall'?'挑选可以领取的任务，查看原文后开始创作。':props.pageKind==='works'?'查看作品提交结果，失败的作品可以直接修改重试。':props.pageKind==='issues'?'处理数据问题，补齐后系统自动继续核对。':section.value==='activity'?'查看自己和成员登记了多少作品，跟进提交结果。':section.value==='finance'?'上传报表，核对金额，办理付款。':section.value==='wallet'?'查看自己的收入、可提现余额和收款进度。':admin.value?'管理渠道、人员、关键词与作品。':props.role==='leader'?'分发关键词并跟进团队作品。':'选择关键词，提交作品，查看审核结果。')
 const context=computed(()=>({http:props.http,coreHttp:props.coreHttp,scope:{...scope},role:isStaffRole(props.role)?'admin':props.role,authRole:props.role,userId:props.userId,parentId:props.parentId??null,adminDuty:props.adminDuty??'all',options:options.value}))
 const tabs=computed(()=>[{key:'keywords',label:'关键词'}, {key:'works',label:'作品记录'},...(props.role==='creator'?[]:[{key:'people',label:'人员与权限'}]),...(admin.value?[{key:'channels',label:'渠道与任务'},{key:'issues',label:'数据待办'}]:[])])
 watch([()=>props.activeTab,tabs],()=>{tab.value=props.activeTab==='prices'||tabs.value.some(t=>t.key===props.activeTab)?props.activeTab!:'keywords'},{immediate:true})
@@ -56,6 +57,7 @@ onMounted(async()=>{try{projects.value=await props.coreHttp.get<Option[]>('/proj
 <div v-if="!ready&&!loading&&!error" class="work-card empty-state"><h2>还没有可以使用的项目</h2><p>{{admin?'请先在项目设置中接通业务服务并添加项目成员。':'请联系团长或运营，在成员编辑中分配业务项目，再创建或领取关键词。'}}</p><button v-if="admin&&adminDuty!=='finance'" @click="emit('navigate','/projects')">设置项目</button></div>
 <template v-if="ready">
  <WorkActivity v-if="section==='activity'" :key="scope.projectId+'-'+scope.accountId+'-'+userId" :context="context" />
+ <RiskReports v-else-if="section==='risk'" :context="context" @back="emit('navigate','/works')" />
  <Finance v-else-if="section==='finance'||section==='wallet'" :key="scope.projectId+'-'+scope.accountId+'-'+section" :context="context" :wallet="section==='wallet'" :initial-period="initialFrom?.slice(0,7)" @navigate="emit('navigate',$event)" />
  <template v-else><nav v-if="!pageKind" class="work-tabs" aria-label="工作事项"><button v-for="t in tabs" :key="t.key" :class="{active:tab===t.key}" :aria-current="tab===t.key?'page':undefined" @click="tab=t.key">{{t.label}}</button></nav>
  <Keywords v-if="tab==='keywords'" :key="scope.projectId+'-'+scope.accountId+'-'+pageKind" :context="context" :initial-view="pageKind==='task-hall'?'available':pageKind==='tasks'&&!admin?'owned':'all'" :initial-search="initialKeyword" :initial-create="initialCreate" @refresh="refreshOptions" @navigate="emit('navigate',$event)" />

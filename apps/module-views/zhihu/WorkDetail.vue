@@ -3,7 +3,7 @@ import { ref, watch, onBeforeUnmount, computed } from "vue";
 import { ActionDialog } from "@zhihu-koc/shared-components";
 import type { HttpClient } from "@zhihu-koc/shared-services/core";
 import { errorText, type Scope } from "./context";
-import { upstreamReview, evidenceReview, type WorkStatus } from "./work-status";
+import { upstreamReview, evidenceReview, rawUpstreamReview, type WorkStatus } from "./work-status";
 export interface WorkDetailRecord extends WorkStatus {
   id: string;
   keyword?: string;
@@ -118,6 +118,7 @@ async function copy() {
       <div class="work-result">
         <strong>{{ review.label }}</strong>
         <p v-if="review.reason">{{ review.reason }}</p>
+        <details v-if="item.compositionId"><summary>查看原始报送信息</summary><p>{{rawUpstreamReview(item).label}}</p><p v-if="rawUpstreamReview(item).reason">{{rawUpstreamReview(item).reason}}</p></details>
       </div>
       <dl class="work-detail">
         <dt>登记人</dt>

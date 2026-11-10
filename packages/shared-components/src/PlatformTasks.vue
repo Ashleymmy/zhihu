@@ -3,6 +3,9 @@ import { computed, inject, reactive, ref, watch } from "vue";
 import type { CoreWorkspace } from "./core-workspace";
 import DataGrid from "./DataGrid.vue";
 import DetailDrawer from "./DetailDrawer.vue";
+import HistoryEvidenceForm from './HistoryEvidenceForm.vue';
+import { historyTargetFromError } from './history-evidence';
+import type { HistoryTarget } from '@zhihu-koc/shared-contracts/core';
 import WorkRegistrationReport from "./WorkRegistrationReport.vue";
 import type { DataGridRow } from "./data-grid";
 import type {
@@ -29,6 +32,7 @@ const groups = ref<TaskGroup[]>([]),
   loading = ref(false),
   error = ref(""),
   notice = ref("");
+const historyRepair = ref<HistoryTarget | null>(null);
 const selected = ref<TaskReference | null>(null),
   detail = ref<PlatformTaskDetail | null>(null),
   detailLoading = ref(false),
@@ -210,6 +214,7 @@ async function inspect(row: DataGridRow, actionKey?: string) {
   await inspectEntry(entry, actionKey);
 }
 async function inspectEntry(entry: TaskReference, actionKey?: string) {
+  historyRepair.value = null;
   const current = ++detailGeneration;
   selected.value = entry;
   detail.value = null;
@@ -241,6 +246,12 @@ function close() {
   selected.value = null;
   detail.value = null;
   action.value = null;
+  historyRepair.value = null;
+}
+async function repairedHistory() {
+  historyRepair.value = null;
+  await load();
+  if (selected.value) await inspectEntry(selected.value);
 }
 async function perform() {
   if (!selected.value || !action.value || saving.value) return;
@@ -267,6 +278,7 @@ async function perform() {
     action.value = null;
     notice.value = result.message;
   } catch (e) {
+    historyRepair.value = historyTargetFromError(e);
     detailError.value =
       typeof e === "object" && e && "message" in e
         ? String(e.message)
@@ -414,7 +426,8 @@ async function copy(value: string) {
           重新加载
         </button>
       </div>
-      <template v-if="detail">
+      <HistoryEvidenceForm v-if="historyRepair" :target="historyRepair" @completed="repairedHistory" @cancel="historyRepair=null" @stale="repairedHistory" />
+      <template v-else-if="detail">
         <p class="task-detail-status">
           {{ detail.status.label }} · {{ detail.executor }}
         </p>

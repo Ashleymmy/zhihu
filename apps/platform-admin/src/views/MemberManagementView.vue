@@ -1297,6 +1297,7 @@ onMounted(() => run(load));
             </dd>
           </dl>
           <MemberClientDetails :member="selected" />
+          <router-link v-if="(selected.role === 'leader' || Number(selected.memberCount)>0) && (auth.user?.role === 'developer' || (auth.user?.role === 'admin' && auth.user.adminDuty !== 'operations'))" class="team-link" :to="{path:'/finance',query:{leaderId:selected.id,...(projectFilter ? {projectId:projectFilter} : {})}}">核对本人收益与应得团队分成</router-link>
           <h3>角色权限</h3>
           <p>
             {{

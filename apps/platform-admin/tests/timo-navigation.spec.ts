@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fakeUser } from "@zhihu-koc/test-support";
 import { canAccessPath } from "../src/access";
 import { zhihuRoutesFor } from "../src/modules/zhihu/routes";
+import { workspaceNavigation } from '../src/navigation';
 
 const childPaths = (role: "developer" | "admin" | "operator" | "leader" | "creator", duty?: string) =>
   zhihuRoutesFor(role, duty).flatMap((route) => route.children ?? []).map((route) => route.path);
@@ -53,8 +54,15 @@ describe("Timo navigation", () => {
   it("removed legacy pages are gone from every role's route table", () => {
     for (const role of ["developer", "admin", "operator", "leader", "creator"] as const) {
       const paths = childPaths(role, "all");
-      for (const path of ["more", "dashboard", "orders", "plans", "tasks", "history", "salt", "comments", "risk", "media", "tags", "products", "assets", "knowledge", "analytics", "creative-tools", "system", "system/data", "system/site"])
+      for (const path of ["more", "dashboard", "orders", "plans", "tasks", "history", "comments", "media", "tags", "products", "assets", "knowledge", "analytics", "creative-tools", "system", "system/data", "system/site"])
         expect(paths, `${role} ${path}`).not.toContain(path);
     }
   });
+  it('published project tools have live scoped routes without primary navigation or extra role access',()=>{
+    expect(childPaths('admin','operations')).toContain('risk');expect(childPaths('developer')).toContain('salt');expect(childPaths('operator')).toContain('salt');expect(childPaths('operator')).not.toContain('risk');
+    for(const role of ['leader','creator'] as const){expect(childPaths(role)).not.toContain('salt');expect(childPaths(role)).not.toContain('risk')}
+    expect(childPaths('admin','finance')).not.toContain('salt');expect(childPaths('admin','finance')).not.toContain('risk');
+    for(const role of ['developer','admin','operator','leader','creator'] as const){const nav=workspaceNavigation(fakeUser({role}),true).flatMap(g=>g.items).map(i=>i.path);expect(nav).not.toContain('/modules/zhihu/salt');expect(nav).not.toContain('/modules/zhihu/risk')}
+  });
+  it('current inspection and queue observations are developer-only',()=>{for(const role of ['admin','operator','leader','creator'] as const)for(const path of ['/system/inspect','/system/queue'])expect(canAccessPath(fakeUser({role}),path)).toBe(false);expect(canAccessPath(fakeUser({role:'developer'}),'/system/inspect')).toBe(true)});
 });

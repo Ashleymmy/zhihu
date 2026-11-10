@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import type { SettlementScope } from '@zhihu-koc/shared-contracts/core';
 import { PublicFinance } from "@zhihu-koc/shared-components";
-const route = useRoute();
+const route = useRoute(), router = useRouter();
+function context(value: SettlementScope) { void router.replace({query:{...route.query,...value}}); }
 </script>
 <template>
   <PublicFinance
@@ -9,5 +11,9 @@ const route = useRoute();
     :initial-account-id="String(route.query.accountId || '')"
     :initial-from="String(route.query.from || '')"
     :initial-to="String(route.query.to || '')"
+    :initial-leader-id="String(route.query.leaderId || route.query.payeeId || '')"
+    :initial-import-id="String(route.query.importId || '')"
+    @context="context"
+    @navigate="router.push"
   />
 </template>

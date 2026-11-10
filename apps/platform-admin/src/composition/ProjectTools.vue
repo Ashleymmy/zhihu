@@ -14,6 +14,8 @@ const rateModules=computed(()=>canAccessPath(auth.user,'/rates')?workspace.modul
 async function load() { error.value = ''; try { accounts.value = await http.get('/projects/' + props.projectId + '/integrations') } catch { error.value = '项目工具加载失败，请重试。' } }
 onMounted(load)
 const tools = [
+  { label: '盐选榜单', path: '/modules/zhihu/salt', tab: '' },
+  ...(auth.user?.role === 'operator' ? [] : [{ label: '风险举报', path: '/modules/zhihu/risk', tab: '' }]),
   { label: '推广活动与渠道', path: '/modules/zhihu/operations', tab: 'channels' },
   { label: '报表中的渠道名称', path: '/modules/zhihu/operations', tab: 'channels' },
 ]

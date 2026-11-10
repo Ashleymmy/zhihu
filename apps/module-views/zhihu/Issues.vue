@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed,nextTick,onMounted,reactive,ref} from 'vue'
-import {DataGrid,DetailDrawer,ValueComparison,RateSettings,type AnalysisComparison,type AnalysisRunModel,type DataGridRow} from '@zhihu-koc/shared-components'
+import {DataGrid,DetailDrawer,ValueComparison,RateSettings,EvidencePanel,historyTargetFromError,type AnalysisComparison,type AnalysisRunModel,type DataGridRow} from '@zhihu-koc/shared-components'
+import type {EvidenceAction,HistoryTarget} from '@zhihu-koc/shared-contracts/core'
 import ExecutionFollowUp,{type ExecutionItem} from './ExecutionFollowUp.vue'
 import AgencySettings from './AgencySettings.vue'
 import AssignExecutor from './AssignExecutor.vue'
@@ -26,6 +27,15 @@ const ratesOpen=ref(false),ratesType=ref('new_user')
 const canSetRates=(i:Issue)=>props.context.role==='admin'&&!operations&&i.status==='open'&&i.reasonCode.startsWith('PRICE_')
 async function ratesPublished(result:{effectiveFrom:string;recalculated:number}){notice.value='已发布单价，'+result.effectiveFrom+' 起生效。';try{await changed()}catch(e){error.value=errorText(e)}}
 const analysis=ref<AnalysisRunModel|null>(null),analysisHost=ref<HTMLElement|null>(null),busyAskId=ref(''),askErrors=reactive<Record<string,string>>({})
+const historyTarget=ref<HistoryTarget|null>(null)
+async function evidenceAction(a:EvidenceAction){
+ const report=/\/imports\/([1-9]\d*)\/analysis$/.exec(a.path),task=/\/core\/tasks\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(a.path)
+ if(report){await inspect({batchId:report[1]} as Issue);return}
+ if(a.key==='set_pricing'){ratesOpen.value=true;return}
+ if(task){emit('navigate','/tasks?'+new URLSearchParams({projectId:props.context.scope.projectId,moduleId:task[1]!,accountId:task[2]!,taskId:task[3]!}));return}
+ if(a.key==='upload_official_report'){emit('navigate','/finance?'+new URLSearchParams({...props.context.scope}));return}
+ error.value='请在当前记录的下一步操作中继续处理。'
+}
 const title=(i:Issue)=>i.normalizedJson?.keyword||i.keyword||'报表记录'
 const canMatch=(i:Issue)=>i.status==='open'&&!!i.batchId&&!finance&&['CHANNEL_UNMAPPED','CHANNEL_AMBIGUOUS','PROJECT_MISMATCH','KEYWORD_UNKNOWN'].includes(i.reasonCode)
 const canReviewRisk=(i:Issue)=>!finance&&i.status==='open'&&i.reasonCode==='RISK_REVIEW_REQUIRED'&&!!i.factId&&!!i.expectedRevisionId
@@ -43,7 +53,7 @@ async function changed(){await reload();emit('changed')}
 async function answer(value:ReportAnswer){
  if(!analysis.value||busyAskId.value)return;busyAskId.value=value.askId;askErrors[value.askId]=''
  try{analysis.value=await props.context.http.post<AnalysisRunModel>('/imports/'+analysis.value.id+'/answers',{...props.context.scope,...value,requestKey:requestKey()});notice.value='已保存选择，报表已更新。'+(analysis.value.conclusion?.pendingText??'');await changed()}
- catch(e){askErrors[value.askId]=errorText(e)}finally{busyAskId.value=''}
+ catch(e){historyTarget.value=historyTargetFromError(e);askErrors[value.askId]=errorText(e)}finally{busyAskId.value=''}
 }
 async function handle(i:Issue){
  selected.value=null;await nextTick()
@@ -71,7 +81,8 @@ onMounted(load)
  <section class="work-card issues">
   <div v-if="!headless" class="section-heading"><div><h2>数据待办</h2><p>按下一步补齐资料，金额已算出的记录可以继续核对。</p></div><button :disabled="busy" @click="load">刷新</button></div>
   <p v-if="error&&!selected" class="engine-error" role="alert">{{error}}</p><p v-if="notice" role="status">{{notice}}</p>
-  <div v-if="analysis" ref="analysisHost" class="issue-analysis"><ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" @answer="answer" @action="load" @refresh="changed" /><button @click="analysis=null">收起分析</button></div>
+  <details v-if="!headless" class="issue-evidence"><summary>核验已有资料与计算依据</summary><EvidencePanel :scope="{...context.scope,moduleId:'zhihu'}" @updated="changed" @action="evidenceAction" /></details>
+  <div v-if="analysis" ref="analysisHost" class="issue-analysis"><ReportAnalysis :context="context" :run="analysis" :busy-ask-id="busyAskId" :errors="askErrors" :history-target="historyTarget" @history-closed="historyTarget=null" @answer="answer" @action="load" @refresh="changed" /><button @click="analysis=null">收起分析</button></div>
   <DataGrid v-if="!headless" title="报表待办" title-label="关键词" :rows="rows" :columns="[{key:'reason',label:'需要处理什么'},...(operations?[]:[{key:'comparison',label:'原值与新值'}])]" :views="[{key:'pending',label:'需要跟进'},{key:'all',label:'全部'},{key:'done',label:'已处理'}]" :model-value="view" :view-counts="counts" :busy="busy" hide-search external-details :empty-text="appliedSearch?'没有找到这个关键词，清空搜索后可查看其他待办。':view==='pending'?'这里的报表问题已处理完，可以继续核对其他记录。':'这里还没有处理记录。'" @update:model-value="changeView" @inspect="selected=item($event)" @action="handle(item($event.row))">
    <template #filters><form class="issue-search" @submit.prevent="find"><label><span class="sr-only">搜索关键词</span><input v-model="search" type="search" maxlength="128" placeholder="搜索关键词" /></label><button :disabled="busy">查找</button><button v-if="appliedSearch" type="button" :disabled="busy" @click="search='';find()">清空搜索</button></form></template>
    <template #cell="{row,column,value}"><ValueComparison v-if="column.key==='comparison'&&item(row).comparison?.length" :rows="item(row).comparison!" /><template v-else>{{value}}</template></template>

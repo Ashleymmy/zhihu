@@ -13,7 +13,7 @@ const auth = useAuthStore(),
 /** 侧栏角标：把待办数按路径聚合到导航项（精确或前缀匹配） */
 const navigation = computed<NavGroup[]>(() => {
   const base = workspaceNavigation(auth.user, workspace.modules.value.some(m => m.status === 'enabled'))
-  const list = todos.value
+  const list = todosError.value ? undefined : todos.value
   if (!list?.length) return base
   return base.map(group => ({
     ...group,
@@ -32,6 +32,7 @@ const tabs = computed(() => mobileTabs(auth.user, navigation.value))
 interface DashboardTodo { kind: string; count: number; label: string; actor: string; actionLabel: string; path: string }
 interface DashboardOverview { groups: { id: string; name: string; services: { accountId: string; todos: DashboardTodo[] }[] }[]; todos?: DashboardTodo[] }
 const todos = ref<ShellTodo[] | undefined>()
+const todosError = ref('')
 let todosLoadedAt = 0
 async function loadTodos(force = false) {
   if (!auth.user || (!force && Date.now() - todosLoadedAt < 60_000)) return
@@ -53,7 +54,8 @@ async function loadTodos(force = false) {
       detail: `平台 · ${todo.actor}`,
       actionLabel: todo.actionLabel,
     })))
-  } catch { /* 保留上一次的结果 */ }
+    todosError.value = ''
+  } catch { todosError.value = '待办暂未更新，下面保留上次读取的内容。请重新读取确认最新进度。' }
 }
 watch(() => route.path, () => { void loadTodos() })
 onMounted(async () => {
@@ -77,9 +79,11 @@ async function logout() {
     :current-path="route.path"
     :announcements="announcements"
     :todos="todos"
+    :todos-error="todosError"
     :mobile-tabs="tabs"
     @navigate="router.push"
     @logout="logout"
+    @refresh-todos="loadTodos(true)"
     ><router-view :key="auth.user?.id + '-' + auth.user?.role + '-' + auth.user?.adminDuty + '-' + route.path"
   /></AppShell>
 </template>

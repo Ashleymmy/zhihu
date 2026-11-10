@@ -40,6 +40,7 @@ const props = defineProps<{
   announcements?: ShellAnnouncement[]
   /** 不传则不显示待办铃铛（未接通的功能不出现） */
   todos?: ShellTodo[]
+  todosError?: string
   /** 手机底部标签栏；不传则手机端只用侧栏抽屉 */
   mobileTabs?: NavItem[]
 }>()
@@ -47,6 +48,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   navigate: [path: string]
   logout: []
+  'refresh-todos': []
 }>()
 
 /* ---------- 图标：线性 24 栅格，按导航 key 取 ---------- */
@@ -293,19 +295,20 @@ onBeforeUnmount(() => {
             <span>搜索页面</span>
             <kbd>Ctrl K</kbd>
           </button>
-          <div v-if="todos" class="shell-pop-anchor">
+          <div v-if="todos || todosError" class="shell-pop-anchor">
             <button type="button" class="shell-icon-btn" data-popover-trigger :aria-expanded="popover === 'todos'" :aria-label="todoTotal ? `待办 ${todoTotal} 项` : '待办'" @click="togglePopover('todos')">
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-              <span v-if="todoTotal" class="shell-badge">{{ todoTotal > 99 ? '99+' : todoTotal }}</span>
+              <span v-if="todosError" class="shell-badge">!</span><span v-else-if="todoTotal" class="shell-badge">{{ todoTotal > 99 ? '99+' : todoTotal }}</span>
             </button>
             <div v-if="popover === 'todos'" class="shell-popover shell-todos" role="dialog" aria-label="待办">
-              <p class="shell-pop-title">现在要做<span v-if="todos.length">{{ todos.length }} 项</span></p>
+              <p class="shell-pop-title">现在要做<span v-if="todos?.length">{{ todos.length }} 项</span></p>
+              <div v-if="todosError" class="shell-pop-empty" role="alert"><span>{{todosError}}</span><button type="button" class="btn" @click="emit('refresh-todos')">重新读取待办</button></div>
               <button v-for="todo in todos" :key="todo.key" type="button" class="shell-todo" @click="handleNav(todo.path)">
                 <span class="shell-todo-count">{{ todo.count }}</span>
                 <span class="shell-todo-text"><b>{{ todo.label }}</b><small v-if="todo.detail">{{ todo.detail }}</small></span>
                 <span class="shell-todo-go">{{ todo.actionLabel ?? '去处理' }} →</span>
               </button>
-              <div v-if="!todos.length" class="shell-pop-empty">
+              <div v-if="!todos?.length && !todosError" class="shell-pop-empty">
                 <b>都处理完了</b>
                 <span>新的待办会出现在这里。</span>
                 <button type="button" class="ghost-aurora" @click="handleNav(homeItem?.path ?? '/dashboard')">回到首页</button>

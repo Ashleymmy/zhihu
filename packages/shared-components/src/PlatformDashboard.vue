@@ -7,15 +7,16 @@ import AnimatedNumber from './AnimatedNumber.vue'
 import TrendChart, { type TrendSeries } from './TrendChart.vue'
 import ShareBar, { type ShareItem } from './ShareBar.vue'
 import BarChart from './BarChart.vue'
+import { earningMoney as displayMoney } from './platform-earnings'
 const w = inject<CoreWorkspace>('opc')!
 
 interface Todo { kind: string; count: number; label: string; actor: string; actionLabel: string; path: string }
 interface Metric { key: string; label: string; value: string | null; unit: string; path: string }
 interface Service { moduleId: string; accountId: string; status: string; todos: Todo[]; metrics: Metric[] }
 interface Overview { period: { from: string; to: string }; projects: { id: string; name: string }[]; groups: { id: string; name: string; services: Service[] }[]; todos?: Todo[] }
-interface MineGroup { projectId: string; projectName?: string; metricType: string; metricLabel: string; amount: string; quantity?: string; quantityUnit?: string }
-interface MineLine { id: string; taskName: string | null; businessDate: string; metricLabel: string; quantity: string; amount: string; confirmedAt: string | null; performerName?: string | null }
-interface Mine { summary: { amount: string; confirmedAmount: string; pendingAmount: string }; groups: MineGroup[]; list?: MineLine[] }
+interface MineGroup { projectId: string; projectName?: string; metricType: string; metricLabel: string; amount: string|null; quantity?: string|null; quantityUnit?: string }
+interface MineLine { id: string; taskName: string | null; businessDate: string; metricLabel: string; quantity: string|null; amount: string|null; confirmedAt: string | null; performerName?: string | null }
+interface Mine { summary: { amount: string|null; confirmedAmount: string; pendingAmount: string|null; pendingCalculations?:number }; groups: MineGroup[]; list?: MineLine[] }
 interface Daily { from: string; to: string; days: { date: string; group: 'self' | 'team'; amount: string }[] }
 interface Periods { total: string; today: string; yesterday: string }
 interface GrowthMetrics { activeDays: number; records: number; memberDays: number; quantities: { label: string; unit: string; quantity: string }[] }
@@ -23,28 +24,38 @@ interface MemberSummary { direct: Periods; team: null | { memberCount: number; r
 interface RelationMine { inviter: { name: string } | null; channel: string | null; team: { leaderName: string | null } | null; counts: { direct: number; indirect: number }; directList: { name: string; active: boolean }[]; indirectList?: { name: string; depth: number; active: boolean }[] }
 
 const data = ref<Overview | null>(null), projectId = ref(''), loading = ref(false), error = ref('')
-const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([]), teamLines = ref<MineLine[]>([])
-const selfMine = ref<Mine | null>(null), teamSummary = ref<Mine | null>(null), availableTasks = ref<{ projectId: string; total: number | null }[]>([])
+const mine = ref<Mine | null>(null), daily = ref<Daily | null>(null), summary = ref<MemberSummary | null>(null), relation = ref<RelationMine | null>(null), recent = ref<MineLine[]>([]), contributorData = ref<Contributors | null>(null)
+const selfMine = ref<Mine | null>(null), availableTasks = ref<{ projectId: string; total: number | null }[]>([])
 /* 公告（员工右栏）：有效公告 */
 interface Announcement { id: string; title: string; content: string; createdAt: string }
 const announcements = ref<Announcement[]>([])
 
-/* ===== 员工首页可视化数据（demo mock 契约；正式账源上线后同路径替换） ===== */
-interface InsightsSummary { upstream?: string; memberPayout?: string; retention?: string; activeMembers: number; upstreamChange?: string; payoutRatio?: string; retentionRate?: string; taskCount?: number; activeTeams?: number; newMembers?: number; weekStats?: { label: string; value: string }[] }
-interface InsightsDaily { labels: string[]; series: { key: string; label: string; unit: string; values: string[] }[] }
-interface TeamTop { list: { name: string; quantity: number; amount?: string }[] }
-interface Retention { rate?: number; parts?: { label: string; amount: string }[]; teamCount?: number; newTeams?: number; soloCreators?: number; activeRate?: number }
-interface TodayPayouts { count: number; list: { name: string; amount: string; method: string; status: string }[] }
-interface ReconcileProgress { rate: number; checkedDays: number; totalDays: number; byProject: { name: string; checked: number; total: number }[] }
-/* 关系森林（员工共享，含隐性荐邀层快照）与实时动态 */
-interface ForestNode { name: string; via?: 'team' | 'invite'; children?: ForestNode[] }
-interface RelationForest { roots: ForestNode[] }
-interface LiveFeed { list: { name: string; project: string; quantity: string; at: string }[] }
-interface PendingWithdrawals { totalAmount: string; count: number; earliest: string; todayPaid: string; monthPaid: string; failedCount: number; oldest?: { name: string; amount: string; waiting: string }[] }
+/* Real role-scoped readers. Null means unresolved; capability absence is explicit. */
+interface InsightContext { status?: string; observedAt?: string; message?: string; capability?: { available: boolean; reason: string } }
+interface DetailLink { path: string; query?: Record<string,string|undefined> }
+interface Quantity { metricType:string; label:string; unit:string; quantity:string|null; records:number }
+interface InsightsSummary extends InsightContext { memberPayout?:string; expectedAmount?:string|null; knownExpectedAmount?:string; pendingCalculations?:number; activeMembers:number; taskCount:number; activeTeams:number; newMembers:number; memberCount:number; teamCount:number; availability?:Record<string,{reason:string}>; weekStats?:{label:string;value:string}[] }
+interface InsightsDaily extends InsightContext { labels:string[]; series:{key:string;label:string;unit:string;values:(string|null)[]}[] }
+interface TeamTop extends InsightContext { list:{memberId:string;name:string;quantities:Quantity[];quantity:string|null;amount?:string|null;knownAmount?:string;pendingCalculations?:number;detail:DetailLink}[];total:number;page:number;pageSize:number }
+interface Retention extends InsightContext { rate?:number|null;parts?:{label:string;amount:string}[]|null;teamCount?:number;newTeams?:number;soloCreators?:number;activeRate?:number|null }
+interface TodayPayouts extends InsightContext { count:number;totalAmount:string;list:{id:string;name:string;amount:string;method:string;status:string;detail:DetailLink}[] }
+interface ReconcileProgress extends InsightContext { rate:number|null;checkedDays:number;totalDays:number;byProject:{projectId:string;name:string;checked:number;total:number}[] }
+interface ForestNode { id:string;name:string;active?:boolean;via?:'team'|'invite';children?:ForestNode[];hasMoreChildren?:boolean }
+interface RelationForest extends InsightContext { roots:ForestNode[];total:number;page:number;pageSize:number;hasMore:boolean }
+interface LiveFeed extends InsightContext { list:{id:string;name:string;project:string;quantity:string;at:string;detail:DetailLink}[];total:number;page:number;pageSize:number }
+interface PendingWithdrawals extends InsightContext {totalAmount:string;count:number;earliest:string|null;todayPaid:string;monthPaid:string;failedCount:null;failedCountReason:string;oldest?:{id:string;name:string;amount:string;waiting:string;detail:DetailLink}[]}
+interface Contributors { list:{performerId:string;name:string;amount:string|null;knownAmount:string;pendingAmount:string|null;confirmedAmount:string;pendingCalculations:number;quantities:Quantity[];detail:{query:Record<string,string|undefined>}}[];total:number;page:number;pageSize:number;summary:{amount:string|null;knownAmount:string;pendingAmount:string|null;confirmedAmount:string;pendingCalculations:number} }
+const contributorPage=ref(1), cardErrors=ref<Record<string,string>>({}), insightsBusy=ref(false)
+const insightFrom=ref(shanghaiToday().slice(0,8)+'01'), insightTo=ref(shanghaiToday())
+const insightQuery=()=>({...(projectId.value?{projectId:projectId.value}:{}),from:insightFrom.value,to:insightTo.value})
+const shownTime=(value:string)=>new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value))
+function link(detail?:DetailLink){return detail?{path:detail.path,query:Object.fromEntries(Object.entries(detail.query||{}).filter(([,v])=>v!==undefined&&v!==null&&v!==''))}:'/dashboard'}
+async function readCard<T>(label:string,path:string,query:object={}) { try { const result=await w.http.get<T>(path,query);delete cardErrors.value[label];return result }catch(e){cardErrors.value[label]=e instanceof Error?e.message:'暂未加载，请重试。';return null} }
+async function loadContributors(version=revision){const today=shanghaiToday(),from=new Date(Date.parse(today)-29*86400000).toISOString().slice(0,10);const value=await readCard<Contributors>('成员贡献','/member-summary/contributors',{...(projectId.value?{projectId:projectId.value}:{}),from,to:today,page:contributorPage.value,pageSize:8});if(version===revision){contributorData.value=value}}
 const insightsSummary = ref<InsightsSummary | null>(null), insightsDaily = ref<InsightsDaily | null>(null), teamTop = ref<TeamTop | null>(null),
   retention = ref<Retention | null>(null), todayPayouts = ref<TodayPayouts | null>(null), reconcile = ref<ReconcileProgress | null>(null),
   pendingWithdrawals = ref<PendingWithdrawals | null>(null), relationForest = ref<RelationForest | null>(null), liveFeed = ref<LiveFeed | null>(null)
-/** 实时动态自动刷新开关（30s 轮询，页面卸载即停） */
+/** 最近业绩记录自动刷新开关（30s 轮询，页面卸载即停） */
 const liveOn = ref(true)
 /** 员工（非成员）才需要总览可视化；运营收窄到非金额字段由接口按岗位控制 */
 const isStaff = computed(() => !isMember.value)
@@ -59,7 +70,7 @@ async function reviewApplication(id: string, action: 'approve' | 'reject') {
   try {
     await w.http.post(`/team/applications/${id}/review`, { action })
     applications.value = applications.value.filter(a => a.id !== id)
-  } catch { /* 失败时保留申请项，用户可重试 */ }
+  } catch { cardErrors.value['入团申请']='处理未成功，申请仍保留，请重试。' }
   finally { applicationBusy.value = '' }
 }
 const isMember = computed(() => ['creator', 'leader'].includes(w.role.value))
@@ -69,26 +80,21 @@ const staffWorkbenchPath = computed(() => {
   return '/team'
 })
 
-/* ===== 员工首页可视化（数据来自 demo mock 契约，接口未上线时各卡自动隐藏） ===== */
+/* ===== 员工首页真实业务读数 ===== */
 const isFinanceStaff = computed(() => isStaff.value && canSeeAmount.value && w.role.value !== 'operator')
 const isOperator = computed(() => w.role.value === 'operator' || (w.role.value === 'admin' && w.duty?.value === 'operations'))
 /** 趋势图：财务/管理员是上游收入 vs 成员支出；运营是各项目业务量 */
 const staffTrend = computed(() => {
-  if (!insightsDaily.value) return null
+  if (!insightsDaily.value || insightsDaily.value.series.some(s=>s.values.some(v=>v===null))) return null
   const palette = ['#d46b45', '#8e6cc9', '#5b8fe0', '#4e9a4a']
   const series: TrendSeries[] = insightsDaily.value.series.map((s, i) => ({
-    label: s.label, color: palette[i % palette.length]!, points: s.values.map(Number), area: i === 0,
+    label: s.label + '（' + s.unit + '）', color: palette[i % palette.length]!, points: s.values.map(Number), area: i === 0,
   }))
   return { labels: insightsDaily.value.labels, series, unit: insightsDaily.value.series[0]?.unit ?? '元' }
 })
 const staffTrendFormat = computed(() => staffTrend.value?.unit === '元' ? money : (v: number) => v.toLocaleString('zh-CN'))
 const staffTrendTotal = (points: number[]) => points.reduce((sum, v) => sum + v, 0)
 /** 团队排行：复用 BarChart（自带入场生长动画与数值格式化） */
-const teamTopItems = computed(() => (teamTop.value?.list ?? []).map(t => ({
-  label: t.name,
-  value: isOperator.value ? t.quantity : Number(t.amount ?? t.quantity),
-})))
-const teamTopFormat = computed(() => isOperator.value ? undefined : (v: number) => '¥' + v.toLocaleString('zh-CN', { maximumFractionDigits: 0 }))
 /** 对账进度环：数据到达后从 0 转到目标值（CSS transition 已带 1.4s 缓动） */
 const ringOn = ref(false)
 watch(reconcile, v => {
@@ -116,15 +122,15 @@ const forestColor = (name: string) => TEAM_PALETTE[[...name].reduce((s, c) => s 
 const latestFeed = computed(() => liveFeed.value?.list?.[0] ?? null)
 
 /* ===== 开发者首页可视化（系统视角：处理量/队列/Worker/巡检，无金额） ===== */
-interface DevSummary { processedToday: number; queueBacklog: number; syncTasks: number; patrols: number; failures24h: number; lastFailure: string | null; weekImports: number; weekPatrols: number; weekFixes: number }
-interface DevDaily { labels: string[]; values: string[] }
-interface DevWorkers { list: { name: string; note: string; ok: boolean }[] }
-interface DevActivity { list: { title: string; detail: string; tone: string }[] }
+interface DevSummary extends InsightContext { processedToday:null;queueBacklog:number;syncTasks:null;patrols:null;failures24h:null;lastFailure:null;weekImports:null;weekPatrols:null;weekFixes:null }
+interface DevDaily extends InsightContext { labels:string[];values:string[] }
+interface DevWorkers extends InsightContext { list:{name:string;note:string;ok:boolean}[] }
+interface DevActivity extends InsightContext { list:{id:string;title:string;detail:string;tone:string}[];historyScope:string }
 const devSummary = ref<DevSummary | null>(null), devDaily = ref<DevDaily | null>(null),
   devWorkers = ref<DevWorkers | null>(null), devActivity = ref<DevActivity | null>(null)
 const isDeveloper = computed(() => w.role.value === 'developer')
 const DEV_TONES: Record<string, string> = { ok: '#4e9a4a', info: '#3b7dd8', clay: '#d46b45', muted: '#b0aea5' }
-const devTrend = computed(() => devDaily.value ? {
+const devTrend = computed(() => devDaily.value?.status !== 'unavailable' && devDaily.value ? {
   labels: devDaily.value.labels,
   series: [{ label: '处理量', color: '#3b7dd8', points: devDaily.value.values.map(Number), area: true }] as TrendSeries[],
 } : null)
@@ -169,7 +175,7 @@ function shanghaiToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: '
 
 async function load() {
   const version = ++revision
-  loading.value = true; error.value = ''
+  loading.value = true; error.value = ''; cardErrors.value = {}
   void loadMoney(version)
   void loadAnnouncements(version)
   void loadStaffInsights(version)
@@ -196,6 +202,7 @@ async function loadMoney(version: number) {
     w.http.get<{ groups: { projectId: string; total: number | null }[] }>('/tasks', { view: 'available' }),
   ])
   if (version !== revision) return
+  ;[[m,'本月收益'],[d,'收益趋势'],[s,'成长资料'],[r,'成员关系'],[feed,'最近收益'],[self,'本人收益'],[avail,'可领任务']].forEach(([result,label])=>{if((result as PromiseSettledResult<unknown>).status==='rejected')cardErrors.value[String(label)]='暂未读取，请重试。'})
   mine.value = m.status === 'fulfilled' ? m.value : null
   daily.value = d.status === 'fulfilled' ? d.value : null
   summary.value = s.status === 'fulfilled' ? s.value : null
@@ -206,15 +213,13 @@ async function loadMoney(version: number) {
   /* 团长加取近 30 天团队业绩明细：成员贡献按业绩人聚合 */
   if (w.role.value === 'leader') {
     try {
-      const from = new Date(Date.parse(today) - 29 * 86400000).toISOString().slice(0, 10)
-      const team = await w.http.get<Mine>('/earnings/mine', { ...scope, from, to: today, group: 'team', pageSize: 100 })
-      if (version === revision) { teamLines.value = team.list ?? []; teamSummary.value = team }
+      await loadContributors(version)
       // 入团申请列表（M-L04：团长首页接回申请审批）
       try {
         const apps = await w.http.get<TeamApplication[]>('/team/applications')
         if (version === revision) applications.value = apps ?? []
-      } catch { /* 申请列表读不到时卡不显示 */ }
-    } catch { /* 团队明细读不到时成员贡献卡给空态 */ }
+      } catch { cardErrors.value['入团申请']='入团申请暂未加载，请重试。' }
+    } catch { cardErrors.value['团队收益']='团队收益暂未加载，请重试。' }
   }
 }
 /* 公告读取（右栏卡片用） */
@@ -224,67 +229,34 @@ async function loadAnnouncements(version: number) {
     if (version === revision) announcements.value = list ?? []
   } catch { /* 公告读不到时卡不显示 */ }
 }
-/* 员工首页可视化（demo mock 契约，接口 404/失败时对应卡不显示） */
-async function loadStaffInsights(version: number) {
-  if (!isStaff.value || isDeveloper.value) return
-  const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
-  const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
-    r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
-  const [sum, daily, top, ret, payouts, rec, pending, forest, feed] = await Promise.allSettled([
-    get<InsightsSummary>('/insights/summary'),
-    get<InsightsDaily>('/insights/daily'),
-    get<TeamTop>('/insights/team-top'),
-    get<Retention>('/insights/retention'),
-    get<TodayPayouts>('/finance/today-payouts'),
-    get<ReconcileProgress>('/finance/reconcile-progress'),
-    get<PendingWithdrawals>('/finance/withdrawals/pending'),
-    get<RelationForest>('/insights/relation-forest'),
-    get<LiveFeed>('/insights/live-feed'),
-  ])
-  if (version !== revision) return
-  insightsSummary.value = unwrap(sum)
-  insightsDaily.value = unwrap(daily)
-  teamTop.value = unwrap(top)
-  retention.value = unwrap(ret)
-  todayPayouts.value = unwrap(payouts)
-  reconcile.value = unwrap(rec)
-  pendingWithdrawals.value = unwrap(pending)
-  relationForest.value = unwrap(forest)
-  liveFeed.value = unwrap(feed)
+/* 员工首页真实接口；错误与空结果分别展示 */
+async function loadStaffInsights(version:number){
+ if(!isStaff.value||isDeveloper.value)return
+ insightsBusy.value=true
+ insightsSummary.value=null;insightsDaily.value=null;teamTop.value=null;retention.value=null;todayPayouts.value=null;reconcile.value=null;pendingWithdrawals.value=null;relationForest.value=null;liveFeed.value=null
+ const q=insightQuery()
+ const values=await Promise.all([
+ readCard<InsightsSummary>('经营概览','/insights/summary',q),readCard<InsightsDaily>('每日趋势','/insights/daily',q),readCard<TeamTop>('团队分成与业绩','/insights/team-top',{...q,pageSize:6}),readCard<Retention>('成员与统计范围','/insights/retention',q),
+ isFinanceStaff.value?readCard<TodayPayouts>('今日实际付款','/finance/today-payouts',q):Promise.resolve(null),
+ isFinanceStaff.value?readCard<ReconcileProgress>('资料核对进度','/finance/reconcile-progress',q):Promise.resolve(null),
+ isFinanceStaff.value?readCard<PendingWithdrawals>('提现申请','/finance/withdrawals/pending',q):Promise.resolve(null),
+ w.duty?.value!=='finance'?readCard<RelationForest>('关系森林','/insights/relation-forest',{...q,pageSize:6}):Promise.resolve(null),readCard<LiveFeed>('最近业绩记录','/insights/live-feed',{...q,pageSize:6})])
+ if(version!==revision)return
+ ;[insightsSummary.value,insightsDaily.value,teamTop.value,retention.value,todayPayouts.value,reconcile.value,pendingWithdrawals.value,relationForest.value,liveFeed.value]=values
+ insightsBusy.value=false
 }
-/* 实时动态 30s 轮询：只刷新动态卡，开关关闭即停 */
-async function refreshLive() {
-  try {
-    const r = await w.http.get<{ code: number; data: LiveFeed } | LiveFeed>('/insights/live-feed')
-    liveFeed.value = ('data' in r && r.data !== undefined ? r.data : r) as LiveFeed
-  } catch { /* 动态刷新失败不影响页面 */ }
-}
+async function refreshLive(){const result=await readCard<LiveFeed>('最近业绩记录','/insights/live-feed',{...insightQuery(),pageSize:6});if(result)liveFeed.value=result}
 let liveTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   liveTimer = setInterval(() => { if (liveOn.value && isStaff.value && !isDeveloper.value) void refreshLive() }, 30000)
 })
 onBeforeUnmount(() => { if (liveTimer) clearInterval(liveTimer) })
-/* 开发者首页可视化（系统视角，demo mock 契约） */
-async function loadDevInsights(version: number) {
-  if (!isDeveloper.value) return
-  const get = async <T,>(path: string) => (await w.http.get<{ code: number; data: T } | T>(path)) as { code?: number; data?: T } & T
-  const unwrap = <T,>(r: PromiseSettledResult<{ code?: number; data?: T } & T>): T | null =>
-    r.status === 'fulfilled' ? (('data' in r.value && r.value.data !== undefined ? r.value.data : r.value) as T) : null
-  const [sum, daily, workers, activity, monitor, mini] = await Promise.allSettled([
-    get<DevSummary>('/insights/dev-summary'),
-    get<DevDaily>('/insights/dev-daily'),
-    get<DevWorkers>('/insights/dev-workers'),
-    get<DevActivity>('/insights/dev-activity'),
-    get<AccountMonitorItem[]>('/admin-tools/monitor'),
-    get<MiniMonitor>('/mini-monitor'),
-  ])
-  if (version !== revision) return
-  devSummary.value = unwrap(sum)
-  devDaily.value = unwrap(daily)
-  devWorkers.value = unwrap(workers)
-  devActivity.value = unwrap(activity)
-  accountMonitor.value = unwrap(monitor)
-  miniMonitor.value = unwrap(mini)
+/* 开发者当前系统观测 */
+async function loadDevInsights(version:number){
+ if(!isDeveloper.value)return
+ const values=await Promise.all([readCard<DevSummary>('当前系统观测','/insights/dev-summary'),readCard<DevDaily>('每日处理历史','/insights/dev-daily'),readCard<DevWorkers>('处理进程状态','/insights/dev-workers'),readCard<DevActivity>('当前队列动态','/insights/dev-activity'),readCard<AccountMonitorItem[]>('账号监控','/admin-tools/monitor'),readCard<MiniMonitor>('服务监控','/mini-monitor')])
+ if(version!==revision)return
+ ;[devSummary.value,devDaily.value,devWorkers.value,devActivity.value,accountMonitor.value,miniMonitor.value]=values
 }
 onMounted(load)
 
@@ -349,7 +321,7 @@ const trend = computed(() => {
 // 业绩类型用绿、紫，和「本人任务 / 团队分成」的橙、蓝区分开（同一张卡里颜色不重复含义）
 const TYPE_COLORS = ['var(--chart-3)', 'var(--chart-4)', 'var(--chart-2)', 'var(--chart-1)']
 const composition = computed<ShareItem[]>(() => {
-  if (!mine.value) return []
+  if (!mine.value || mine.value.groups.some(g=>g.amount===null)) return []
   const byType = new Map<string, { label: string; units: bigint }>()
   for (const group of mine.value.groups) {
     const entry = byType.get(group.metricType) ?? { label: group.metricLabel, units: 0n }
@@ -393,9 +365,9 @@ const taskSplit = computed(() => {
     .join(' · ')
 })
 /* 任务收益小卡金额：本人执行的业绩（M-H03：group=self，不含收到的团队分成） */
-const selfTaskUnits = computed(() => selfMine.value ? units(selfMine.value.summary.amount) : null)
+const selfTaskUnits = computed(() => selfMine.value?.summary.amount != null ? units(selfMine.value.summary.amount) : null)
 /* 近 30 天团队收益（M-L02：与成员贡献同口径，不再用累计冒充本月） */
-const teamMonthUnits = computed(() => teamSummary.value ? units(teamSummary.value.summary.amount) : null)
+const teamMonthUnits = computed(() => contributorData.value?.summary.amount != null ? units(contributorData.value.summary.amount) : null)
 /* 最近收益 feed：最近 6 笔（不限月份） */
 const recentLines = computed(() => recent.value.slice(0, 6))
 /* 项目广场：已开通项目 + 抽象插画（按项目名取色与形状） */
@@ -408,7 +380,7 @@ function art(projectName: string) {
 }
 const projectCards = computed(() => (data.value?.groups ?? []).map(project => {
   const groups = mine.value?.groups.filter(group => group.projectId === project.id) ?? []
-  const amount = groups.reduce((sum, group) => sum + units(group.amount), 0n)
+  const amount = groups.some(group=>group.amount===null) ? null : groups.reduce((sum, group) => sum + units(group.amount), 0n)
   const available = availableTasks.value.find(group => group.projectId === project.id)?.total ?? null
   return { id: project.id, name: project.name, art: art(project.name), available, amount }
 }))
@@ -416,15 +388,8 @@ const projectCards = computed(() => (data.value?.groups ?? []).map(project => {
 /* 团长专属：成员贡献（本月团队业绩按业绩人聚合，取前 8） */
 const isLeader = computed(() => w.role.value === 'leader')
 const contributors = computed(() => {
-  const byName = new Map<string, bigint>()
-  for (const line of teamLines.value) {
-    const name = line.performerName ?? '成员'
-    byName.set(name, (byName.get(name) ?? 0n) + units(line.amount))
-  }
-  const list = [...byName.entries()].map(([name, amount]) => ({ name, amount, value: toNumber(amount) }))
-    .sort((a, b) => b.value - a.value).slice(0, 8)
-  const max = Math.max(1, ...list.map(item => item.value))
-  return { list, max, total: list.reduce((sum, item) => sum + item.amount, 0n) }
+ const list=(contributorData.value?.list||[]).map(item=>({...item,value:item.amount===null?null:Number(item.amount),path:{path:'/income',query:Object.fromEntries(Object.entries(item.detail.query).filter(([,v])=>v!==undefined&&v!==null&&v!==''))}}))
+ return {list,max:Math.max(1,...list.map(item=>item.value??0))}
 })
 
 /* 主卡倾斜：只是视觉反馈 */
@@ -443,6 +408,8 @@ function untilt(event: PointerEvent) {
   <section class="page-stack home-page" :aria-busy="loading">
     <div v-if="error || unavailable" class="home-error" role="alert"><p>{{ error || '部分项目暂时没加载出来，已加载的待办仍可处理。' }}</p><button class="ghost-aurora" @click="load" :disabled="loading">重新加载</button></div>
 
+    <div v-if="Object.keys(cardErrors).length" class="home-error" role="alert"><p v-for="(message,label) in cardErrors" :key="label">{{label}}：{{message}}</p><button class="btn" @click="load" :disabled="loading">重新读取未加载资料</button></div>
+    <form v-if="isStaff && !isDeveloper" class="home-toolbar" @submit.prevent="load"><label>开始日期<input type="date" v-model="insightFrom" required /></label><label>结束日期<input type="date" v-model="insightTo" :min="insightFrom" required /></label><button class="btn" :disabled="insightsBusy">查看这段日期</button></form>
     <!-- ===== 成员视图：v2 三栏（钱包+趋势+小卡矩阵+项目广场 | 右栏） ===== -->
     <template v-if="isMember">
       <div class="home-toolbar">
@@ -455,11 +422,11 @@ function untilt(event: PointerEvent) {
           <article v-if="wallet || month" class="card wallet float lift" style="--s:5;--i:0" @pointermove="tilt" @pointerleave="untilt">
             <svg v-if="spark" class="spark" width="110" height="22" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true"><path :d="spark" pathLength="1" fill="none" stroke="#f0b49b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <div class="lbl">{{ month ? '本月收益' : '可提现余额' }}</div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(heroUnits)" :decimals="2" :text="yuan(heroUnits)" /></div>
+            <div class="big num"><template v-if="mine && mine.summary.amount===null">待核对</template><template v-else><small>¥</small><AnimatedNumber :value="toNumber(heroUnits)" :decimals="2" :text="yuan(heroUnits)" /></template></div><p v-if="mine?.summary.pendingCalculations">另有 {{mine.summary.pendingCalculations}} 条尚待核对，补齐后自动更新。</p>
             <div v-if="month" class="meta">
               <div v-if="wallet"><b>¥{{ yuan(wallet.units) }}</b>可提现</div>
               <div><b>¥{{ yuan(month.confirmed) }}</b>已确认</div>
-              <div><b>¥{{ yuan(month.pending) }}</b>待确认</div>
+              <div><b>{{displayMoney(mine?.summary.pendingAmount)}}</b>待确认</div>
             </div>
             <div class="acts">
               <router-link class="btn white" :to="wallet?.path ?? '/income'">{{ wallet ? '申请提现' : '查看收益' }}</router-link>
@@ -489,10 +456,10 @@ function untilt(event: PointerEvent) {
           </article>
 
           <!-- 团长专属：近 30 天团队收益（M-L02：与贡献图同口径，不再用累计冒充本月） -->
-          <article v-if="isLeader && teamMonthUnits !== null" class="card lift" style="--s:4;--i:4">
+          <article v-if="isLeader && contributorData" class="card lift" style="--s:4;--i:4">
             <div class="card-h"><h3>近 30 天团队收益</h3><span class="r"><span class="chip soft">团队 {{ summary?.team?.memberCount ?? 0 }} 人</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(teamMonthUnits)" :decimals="2" :text="yuan(teamMonthUnits)" /></div>
-            <p class="muted" style="font-size:12.5px;margin-top:4px">成员业绩 × 团长单价，按业绩当天归属计算</p>
+            <div class="big num">{{displayMoney(contributorData.summary.amount)}}</div><p v-if="contributorData.summary.pendingCalculations" class="muted">已核对部分 {{displayMoney(contributorData.summary.knownAmount)}}，另有 {{contributorData.summary.pendingCalculations}} 条待核对。</p>
+            <p class="muted" style="font-size:12.5px;margin-top:4px">只展示你应得的团队分成，旧任务按保存的归属核对。</p>
           </article>
 
           <!-- 任务收益（本人执行的业绩） -->
@@ -541,15 +508,15 @@ function untilt(event: PointerEvent) {
 
           <!-- 团长专属：成员贡献（近 30 天团队业绩按业绩人，前 8） -->
           <article v-if="isLeader" class="card lift" style="--s:12;--i:8">
-            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span class="r"><span v-if="contributors.list.length" class="chip soft">前 8 名</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
+            <div class="card-h"><h3>成员贡献</h3><span class="muted" style="font-size:12.5px">近 30 天带来的团队收益</span><span class="r"><span v-if="contributorData" class="chip soft">共 {{contributorData.total}} 人</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
             <div v-if="contributors.list.length" class="cbars" role="img" aria-label="成员贡献柱状图">
-              <div v-for="item in contributors.list" :key="item.name" class="cb-col" :title="`${item.name}：¥${yuan(item.amount)}`">
-                <span class="cb-val">¥{{ Math.round(item.value) }}</span>
-                <div class="cb-track"><i class="cb-bar" :style="{ height: `${Math.max(4, (item.value / contributors.max) * 100)}%` }" /></div>
+              <div v-for="item in contributors.list" :key="item.performerId" class="cb-col" :title="`${item.name}：${displayMoney(item.amount)}`">
+                <router-link class="cb-val" :to="item.path">{{displayMoney(item.amount)}}</router-link><small v-if="item.pendingCalculations">已核对 {{displayMoney(item.knownAmount)}}，{{item.pendingCalculations}} 条待核对</small>
+                <div v-if="item.value!==null" class="cb-track"><i class="cb-bar" :style="{ height: `${Math.max(4, (item.value / contributors.max) * 100)}%` }" /></div>
                 <span class="cb-name">{{ item.name }}</span>
               </div>
             </div>
-            <p v-else class="muted" style="font-size:12.5px">近 30 天还没有团队业绩，成员完成任务后这里会按人拆开。</p>
+            <p v-else-if="!cardErrors['成员贡献']" class="muted" style="font-size:12.5px">近 30 天还没有可归属给你的团队分成记录。</p><div v-if="contributorData && contributorData.total>contributorData.pageSize" class="home-toolbar"><button class="btn" :disabled="contributorPage===1" @click="contributorPage--;loadContributors()">上一页成员</button><span>第 {{contributorPage}} 页</span><button class="btn" :disabled="contributorPage*contributorData.pageSize>=contributorData.total" @click="contributorPage++;loadContributors()">下一页成员</button></div>
           </article>
 
           <!-- 团长专属：入团申请（待审批才显示） -->
@@ -580,7 +547,7 @@ function untilt(event: PointerEvent) {
                 <svg class="art" viewBox="0 0 200 92" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="200" height="92" :fill="project.art.c2" /><circle :cx="150 - project.art.seed * 10" :cy="30 + project.art.seed * 6" :r="34 + project.art.seed * 4" :fill="project.art.c1" opacity=".9" /><circle :cx="60 + project.art.seed * 14" cy="78" :r="26 - project.art.seed * 3" fill="#fff" opacity=".55" /><rect :x="20 + project.art.seed * 8" y="22" width="56" height="10" rx="5" fill="#fff" opacity=".8" /><rect :x="20 + project.art.seed * 8" y="38" width="34" height="8" rx="4" fill="#fff" opacity=".6" /></svg>
                 <span v-if="project.available" class="chip up tg">{{ project.available }} 个任务可领取</span>
                 <b>{{ project.name }}</b>
-                <small>按业绩计酬 · 本月 ¥{{ yuan(project.amount) }}</small>
+                <small>按业绩计酬 · 本月 {{project.amount===null?'待核对':'¥'+yuan(project.amount)}}</small>
               </router-link>
               <div class="proj add"><div style="font-size:26px;line-height:1">＋</div><b style="color:var(--ink-3);margin-top:6px">更多项目接入中</b><small>聚合平台 · 即插即用</small></div>
             </div>
@@ -602,8 +569,8 @@ function untilt(event: PointerEvent) {
           <div v-if="relation" class="card">
             <div class="card-h"><h3>我的关系</h3><span class="muted r" style="font-size:12px">永久记录</span></div>
             <div class="row"><span class="av" style="background:var(--c2)">{{ (relation.inviter?.name ?? '自').slice(0, 1) }}</span><div class="t"><b>{{ relation.inviter ? relation.inviter.name + ' 邀请了你' : '自行注册' }}</b><small>{{ relation.inviter ? (relation.channel ?? '邀请加入') : '直接加入平台，没有邀请人' }}</small></div></div>
-            <div class="row"><span class="av" style="background:var(--c2)">{{ (relation.team?.leaderName ?? '平').slice(0, 1) }}</span><div class="t"><b>{{ relation.team?.leaderName ? `你在 ${relation.team.leaderName} 的团队` : '平台直管' }}</b><small>团队收益按业绩当天的归属计算</small></div></div>
-            <router-link class="row" to="/invite-center" style="text-decoration:none;color:inherit"><span class="av" style="background:var(--c3)">{{ relation.counts.direct }}</span><div class="t"><b>你直接邀请了 {{ relation.counts.direct }} 位好友</b><small>好友注册 180 天内的业绩都有邀请收益</small></div></router-link>
+            <div class="row"><span class="av" style="background:var(--c2)">{{ (relation.team?.leaderName ?? '平').slice(0, 1) }}</span><div class="t"><b>{{ relation.team?.leaderName ? `你在 ${relation.team.leaderName} 的团队` : '平台直管' }}</b><small>旧任务按保存的归属核对收益</small></div></div>
+            <router-link class="row" to="/invite-center" style="text-decoration:none;color:inherit"><span class="av" style="background:var(--c3)">{{ relation.counts.direct }}</span><div class="t"><b>你直接邀请了 {{ relation.counts.direct }} 位好友</b><small>邀请收益按已保存的规则核对</small></div></router-link>
           </div>
           <div class="card feed">
             <div class="card-h"><h3>最近收益</h3><router-link class="muted r" to="/income" style="font-size:12px;text-decoration:none">收益明细 →</router-link></div>
@@ -611,7 +578,7 @@ function untilt(event: PointerEvent) {
               <div v-for="line in recentLines" :key="line.id" class="it">
                 <span class="ic2" style="background:var(--clay-soft);color:var(--clay-deep)">¥</span>
                 <div class="t" style="flex:1;min-width:0"><b style="font-size:13px">{{ line.taskName ?? line.metricLabel }}</b><div class="muted" style="font-size:12px">{{ line.businessDate.slice(5) }} · {{ line.confirmedAt ? '已确认' : '待确认' }}</div></div>
-                <b class="amt">+¥{{ yuan(units(line.amount)) }}</b>
+                <b class="amt">{{ displayMoney(line.amount) }}</b>
               </div>
             </template>
             <p v-else class="muted" style="font-size:12.5px">本月还没有收益记录，完成任务后收益会出现在这里。</p>
@@ -626,14 +593,7 @@ function untilt(event: PointerEvent) {
       <div class="bento enter">
         <!-- 今日处理主卡 -->
         <article v-if="devSummary" class="card wallet float lift" style="--s:5;--i:0">
-          <div class="lbl">今日处理业绩</div>
-          <div class="big num"><AnimatedNumber :value="devSummary.processedToday" :decimals="0" :text="devSummary.processedToday.toLocaleString('zh-CN')" /><small style="font-size:16px;margin-left:4px">条</small></div>
-          <div class="pill">{{ devSummary.queueBacklog ? `队列 ${devSummary.queueBacklog} 条积压` : '队列无积压' }} · {{ devSummary.failures24h ? `近 24 小时 ${devSummary.failures24h} 条失败` : '全部按时完成' }}</div>
-          <div class="meta">
-            <div><b>{{ devSummary.syncTasks }}</b>同步任务</div>
-            <div><b>{{ devSummary.patrols }}</b>定时巡检</div>
-            <div><b>{{ devSummary.failures24h }}</b>失败</div>
-          </div>
+          <div class="lbl">当前后台任务</div><div class="big num"><AnimatedNumber :value="devSummary.queueBacklog" :decimals="0" /><small>条待处理</small></div><div class="pill">{{devSummary.message || '这是当前队列观测；系统尚未保存完整的每日处理历史。'}}</div>
           <div class="acts">
             <router-link class="btn white" to="/system/monitor">查看监控</router-link>
             <router-link class="btn light" to="/audit-log">审计日志 →</router-link>
@@ -656,12 +616,12 @@ function untilt(event: PointerEvent) {
 
         <!-- 处理量趋势 -->
         <article v-if="devTrend" class="card lift" style="--s:7;--i:2">
-          <div class="card-h"><h3>处理量趋势</h3><span class="muted" style="font-size:12.5px">业绩条数 · 近 30 天 · 演示数据</span><router-link class="card-go r" to="/system/queue">任务队列 →</router-link></div>
+          <div class="card-h"><h3>处理量趋势</h3><span class="muted" style="font-size:12.5px">业绩条数 · {{insightFrom}} 至 {{insightTo}}</span><router-link class="card-go r" to="/system/queue">任务队列 →</router-link></div>
           <TrendChart :labels="devTrend.labels" :series="devTrend.series" :height="210" :format="(v: number) => v.toLocaleString('zh-CN')" caption="近 30 天每日处理量" />
         </article>
 
         <!-- Worker 状态 -->
-        <article v-if="devWorkers" class="card lift" style="--s:5;--i:3">
+        <article v-if="devWorkers && devWorkers.status!=='unavailable'" class="card lift" style="--s:5;--i:3">
           <div class="card-h"><h3>Worker 状态</h3><span class="r"><span style="display:flex;align-items:center;gap:6px;color:var(--ok,#4e9a4a);font-size:12.5px"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block"></span>{{ devWorkers.list.every(x => x.ok) ? '全部正常' : '有异常' }}</span><router-link class="card-go" to="/system/monitor">监控 →</router-link></span></div>
           <div v-for="x in devWorkers.list" :key="x.name" style="display:flex;font-size:13px;padding:6px 0">
             <span class="muted">{{ x.name }}</span><b style="margin-left:auto;font-weight:600" :style="{ color: x.ok ? 'inherit' : 'var(--clay-deep)' }">{{ x.note }}</b>
@@ -676,12 +636,7 @@ function untilt(event: PointerEvent) {
           <p class="muted" style="font-size:12.5px;margin-top:4px">收益计算 / 回传 / 通知队列</p>
         </article>
 
-        <!-- 近 24 小时失败 -->
-        <article v-if="devSummary" class="card lift" style="--s:4;--i:5">
-          <div class="card-h"><h3>近 24 小时失败</h3><router-link class="card-go r" to="/system/queue">队列 →</router-link></div>
-          <div class="big num" style="font-size:30px"><AnimatedNumber :value="devSummary.failures24h" :decimals="0" /><small>条</small></div>
-          <p class="muted" style="font-size:12.5px;margin-top:4px">{{ devSummary.lastFailure ? `最近一次失败：${devSummary.lastFailure}` : '没有失败记录' }}</p>
-        </article>
+        <article v-if="devDaily?.status==='unavailable' || devWorkers?.status==='unavailable'" class="card lift" style="--s:4;--i:5"><div class="card-h"><h3>观测范围</h3></div><p class="muted">{{devDaily?.capability?.reason}}</p><p class="muted">{{devWorkers?.capability?.reason}}</p><router-link class="card-go" to="/system/inspect">检查当前连接 →</router-link></article>
 
         <!-- 接口健康（真实数据：小程序接入监控） -->
         <article v-if="apiHealth" class="card lift" style="--s:4;--i:6">
@@ -722,14 +677,10 @@ function untilt(event: PointerEvent) {
           <div class="big-av" style="background:linear-gradient(135deg,#3b7dd8,#1d4ed8)">{{ (w.userName?.value ?? '我').slice(0, 1) }}</div>
           <h4>{{ w.userName?.value ?? '我' }}</h4>
           <p class="muted" style="font-size:12.5px">开发者 · 数据与队列</p>
-          <div v-if="devSummary" class="profile-stats">
-            <div><b>{{ devSummary.weekImports }}</b><span>本周导入</span></div>
-            <div><b>{{ devSummary.weekPatrols }}</b><span>本周巡检</span></div>
-            <div><b>{{ devSummary.weekFixes }}</b><span>本周修复</span></div>
-          </div>
+          <p v-if="devSummary" class="muted">{{devSummary.observedAt ? '最近读取：'+new Date(devSummary.observedAt).toLocaleString('zh-CN') : '正在读取当前系统状态'}}</p>
         </div>
         <div v-if="devActivity?.list.length" class="card">
-          <div class="card-h"><h3>任务动态</h3><span class="r"><span class="muted" style="font-size:12px">演示数据</span><router-link class="card-go" to="/system/queue">队列 →</router-link></span></div>
+          <div class="card-h"><h3>任务动态</h3><span class="r"><span class="muted" style="font-size:12px">当前已保存的关系</span><router-link class="card-go" to="/system/queue">队列 →</router-link></span></div>
           <div v-for="(x, i) in devActivity.list" :key="i" class="row">
             <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: DEV_TONES[x.tone] ?? '#b0aea5', flex: 'none' }"></span>
             <div class="t"><b>{{ x.title }}</b><small>{{ x.detail }}</small></div>
@@ -763,7 +714,7 @@ function untilt(event: PointerEvent) {
           </div>
           <div v-else class="hero-calm">
             <p>喝杯茶，新事项一出现就会来找你。</p>
-            <p v-if="latestFeed" class="hero-calm-feed">最新业绩 · {{ latestFeed.at }} · {{ latestFeed.name }} {{ latestFeed.project }} {{ latestFeed.quantity }}</p>
+            <p v-if="latestFeed" class="hero-calm-feed">最新业绩 · {{ shownTime(latestFeed.at) }} · {{ latestFeed.name }} {{ latestFeed.project }} {{ latestFeed.quantity }}</p>
           </div>
           <div class="acts"><router-link v-if="todos[0]" class="btn white" :to="todos[0].path">{{ todos[0].actionLabel || '去处理' }}</router-link><router-link v-else class="btn light" :to="staffWorkbenchPath">去工作台</router-link></div>
         </article>
@@ -787,36 +738,24 @@ function untilt(event: PointerEvent) {
             <router-link class="btn white" to="/finance">去审批提现</router-link>
             <span v-if="pendingWithdrawals.failedCount" class="chip clay" style="align-self:center">{{ pendingWithdrawals.failedCount }} 笔发放失败</span>
           </div>
-          <p class="muted" style="font-size:12px;margin-top:10px">最早一笔提交于 {{ pendingWithdrawals.earliest }}</p>
+          <p class="muted" style="font-size:12px;margin-top:10px">{{pendingWithdrawals.earliest?'最早一笔提交于 '+new Date(pendingWithdrawals.earliest).toLocaleString('zh-CN'):'当前没有待审批申请'}}</p>
         </article>
 
-        <!-- 员工共享：实时动态（30s 自动刷新）——顶行第三张，业绩产生即出现在这里 -->
+        <!-- 员工共享：最近业绩记录（30s 自动刷新）——顶行第三张，业绩产生即出现在这里 -->
         <article v-if="liveFeed" class="card lift" :style="{ '--s': isOperator ? 8 : 4, '--i': isOperator ? 1 : 2 }">
-          <div class="card-h"><h3>实时动态</h3><span class="r"><button type="button" class="live-toggle" :aria-pressed="liveOn" @click="liveOn = !liveOn"><i :class="{ on: liveOn }" />自动刷新</button></span></div>
-          <div v-for="(x, i) in liveFeed.list" :key="i" class="row">
+          <div class="card-h"><h3>最近业绩记录</h3><span class="r"><button type="button" class="live-toggle" :aria-pressed="liveOn" @click="liveOn = !liveOn"><i :class="{ on: liveOn }" />自动刷新</button></span></div>
+          <router-link v-for="(x, i) in liveFeed.list" :key="x.id" :to="link(x.detail)" class="row" style="color:inherit;text-decoration:none">
             <span :style="{ width: '8px', height: '8px', borderRadius: '50%', background: TEAM_PALETTE[i % TEAM_PALETTE.length], flex: 'none' }"></span>
-            <div class="t"><b>{{ x.name }} · {{ x.project }} {{ x.quantity }}</b><small>{{ x.at }}</small></div>
-          </div>
-          <p class="muted" style="font-size:12px;margin-top:8px">业绩产生即出现在这里，名字已脱敏 · 演示数据</p>
+            <div class="t"><b>{{ x.name }} · {{ x.project }} {{ x.quantity }}</b><small>{{ shownTime(x.at) }}</small></div>
+          </router-link>
+          <p class="muted" style="font-size:12px;margin-top:8px">按保存时间展示已登记的业绩记录，姓名已隐藏。</p>
         </article>
 
         <!-- 财务/管理员：总览四数 -->
         <template v-if="isFinanceStaff && insightsSummary">
-          <article class="card lift" style="--s:4;--i:3">
-            <div class="card-h"><h3>上游收入</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.upstream))" :decimals="2" :text="yuan(units(insightsSummary.upstream))" /></div>
-            <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}</p>
-          </article>
-          <article class="card lift" style="--s:4;--i:4">
-            <div class="card-h"><h3>成员支出</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.memberPayout))" :decimals="2" :text="yuan(units(insightsSummary.memberPayout))" /></div>
-            <p class="muted" style="font-size:12.5px;margin-top:10px">占上游 {{ insightsSummary.payoutRatio }}</p>
-          </article>
-          <article class="card lift" style="--s:4;--i:5">
-            <div class="card-h"><h3>平台留存</h3><span class="r"><span class="chip clay">{{ insightsSummary.retentionRate }}</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
-            <div class="big num"><small>¥</small><AnimatedNumber :value="toNumber(units(insightsSummary.retention))" :decimals="2" :text="yuan(units(insightsSummary.retention))" /></div>
-            <p class="muted" style="font-size:12.5px;margin-top:10px">活跃成员 {{ insightsSummary.activeMembers }} 人</p>
-          </article>
+          <article class="card lift" style="--s:4;--i:3"><div class="card-h"><h3>已确认成员收益</h3><router-link class="card-go r" :to="{path:'/finance',query:insightQuery()}">查看账目 →</router-link></div><div class="big num">{{displayMoney(insightsSummary.memberPayout)}}</div><p class="muted">按业务日期汇总的已确认收益，付款进度单独查看。</p></article>
+          <article class="card lift" style="--s:4;--i:4"><div class="card-h"><h3>预计成员应得</h3><router-link class="card-go r" :to="{path:'/finance',query:insightQuery()}">核对来源 →</router-link></div><div class="big num">{{displayMoney(insightsSummary.expectedAmount)}}</div><p v-if="insightsSummary.pendingCalculations" class="muted">已核对 {{displayMoney(insightsSummary.knownExpectedAmount)}}，另有 {{insightsSummary.pendingCalculations}} 条待核对。</p></article>
+          <article class="card lift" style="--s:4;--i:5"><div class="card-h"><h3>上游收入与平台留存</h3></div><p class="muted">{{retention?.capability?.reason || '尚无完整的上游收入依据，暂不能核算平台留存。'}}</p><router-link class="card-go" :to="{path:'/finance',query:insightQuery()}">查看已收到的报表 →</router-link></article>
         </template>
 
         <!-- 运营：业务量总览（无金额权限，接口已按岗位收窄） -->
@@ -824,10 +763,10 @@ function untilt(event: PointerEvent) {
           <article class="card lift" style="--s:4;--i:2">
             <div class="card-h"><h3>活跃成员</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/team">成员 →</router-link></span></div>
             <div class="big num"><AnimatedNumber :value="insightsSummary.activeMembers" :decimals="0" /><small style="margin-left:4px">人</small></div>
-            <p class="muted" style="font-size:12.5px;margin-top:10px">环比 {{ insightsSummary.upstreamChange }}，新增 {{ insightsSummary.newMembers }} 人</p>
+            <p class="muted" style="font-size:12.5px;margin-top:10px">当前范围内有已保存业绩的成员；期间新增 {{ insightsSummary.newMembers }} 人</p>
           </article>
           <article class="card lift" style="--s:4;--i:3">
-            <div class="card-h"><h3>业绩量</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/tasks">任务 →</router-link></span></div>
+            <div class="card-h"><h3>有记录的任务</h3><span class="r"><span class="chip soft">近 30 天</span><router-link class="card-go" to="/tasks">任务 →</router-link></span></div>
             <div class="big num"><AnimatedNumber :value="insightsSummary.taskCount ?? 0" :decimals="0" :text="(insightsSummary.taskCount ?? 0).toLocaleString('zh-CN')" /></div>
             <p class="muted" style="font-size:12.5px;margin-top:10px">全部项目合计</p>
           </article>
@@ -838,13 +777,14 @@ function untilt(event: PointerEvent) {
           </article>
         </template>
 
-        <!-- 员工共用：趋势图（财务=上游收入 vs 成员支出；运营=分项目业务量） -->
+        <!-- Scoped real daily records. Missing quantities retain their unavailable state. -->
         <article v-if="staffTrend" class="card lift" :style="{ '--s': isOperator ? 8 : 12, '--i': 6 }">
-          <div class="card-h"><h3>{{ isOperator ? '业务量趋势' : '上游收入 vs 成员支出' }}</h3><span class="muted" style="font-size:12.5px">近 30 天 · 演示数据</span><router-link class="card-go r" :to="isOperator ? '/tasks' : '/finance'">{{ isOperator ? '任务 →' : '财务 →' }}</router-link></div>
-          <div class="legend" style="margin-bottom:10px"><span v-for="s in staffTrend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}<b>{{ staffTrendFormat(staffTrendTotal(s.points)) }}</b></span></div>
+          <div class="card-h"><h3>{{ isOperator ? '业务量趋势' : '已确认成员收益趋势' }}</h3><span class="muted" style="font-size:12.5px">{{insightFrom}} 至 {{insightTo}}</span><router-link class="card-go r" :to="isOperator ? '/tasks' : '/finance'">{{ isOperator ? '任务 →' : '财务 →' }}</router-link></div>
+          <div class="legend" style="margin-bottom:10px"><span v-for="s in staffTrend.series" :key="s.label"><i :style="{ background: s.color }" />{{ s.label }}</span></div>
           <TrendChart :labels="staffTrend.labels" :series="staffTrend.series" :height="210" :format="staffTrendFormat" caption="近 30 天每日走势" />
         </article>
 
+        <article v-if="insightsDaily && !staffTrend" class="card lift" style="--s:12;--i:6"><div class="card-h"><h3>每日趋势资料待补齐</h3><router-link class="card-go r" :to="{path:isOperator?'/data-issues':'/finance',query:insightQuery()}">核对资料 →</router-link></div><p class="muted">有日期数量尚未确定，完整趋势暂不能绘制。</p><details><summary>查看已收到的每日数据</summary><p v-for="(date,i) in insightsDaily.labels" :key="date">{{date}}：<span v-for="series in insightsDaily.series" :key="series.key">{{series.label}} {{series.values[i]===null?'待核对':series.values[i]+' '+series.unit}}；</span></p></details></article>
         <!-- 财务/管理员：对账进度环 -->
         <article v-if="isFinanceStaff && reconcile" class="card lift" style="--s:4;--i:7">
           <div class="card-h"><h3>对账进度</h3><span class="r"><span class="chip soft">{{ reconcile.checkedDays }}/{{ reconcile.totalDays }} 天</span><router-link class="card-go" to="/finance">财务 →</router-link></span></div>
@@ -854,9 +794,9 @@ function untilt(event: PointerEvent) {
               <circle class="v" cx="46" cy="46" r="40" fill="none" stroke="#d46b45" stroke-width="10" stroke-linecap="round"
                 :stroke-dasharray="RING_C" :stroke-dashoffset="ringOffset" transform="rotate(-90 46 46)" />
             </svg>
-            <div><div class="big num" style="font-size:26px">{{ Math.round(reconcile.rate * 100) }}<small style="font-size:14px">%</small></div><p class="muted" style="font-size:12.5px">已核对</p></div>
+            <div><div class="big num" style="font-size:26px">{{ reconcile.rate === null ? '待核对' : Math.round(reconcile.rate * 100) }}<small style="font-size:14px">%</small></div><p class="muted" style="font-size:12.5px">仅统计已收到资料的日期</p></div>
           </div>
-          <div class="growth-rules" style="margin-top:12px">
+          <p class="muted">{{reconcile.message}}</p><div class="growth-rules" style="margin-top:12px">
             <div v-for="p in reconcile.byProject" :key="p.name"><b>{{ p.name }}</b> · {{ p.checked }}/{{ p.total }} 天</div>
           </div>
         </article>
@@ -871,22 +811,12 @@ function untilt(event: PointerEvent) {
         </article>
 
         <!-- 员工共用：团队排行（BarChart 自带入场生长动画） -->
-        <article v-if="teamTopItems.length" class="card lift" :style="{ '--s': isFinanceStaff ? 4 : 12, '--i': 9 }">
-          <div class="card-h"><h3>团队排行</h3><span class="muted" style="font-size:12.5px">{{ isOperator ? '按业绩量' : '按上游贡献' }} · 演示数据</span><router-link class="card-go r" to="/team">全部团队 →</router-link></div>
-          <BarChart :items="teamTopItems" :format="teamTopFormat" :max-items="6" />
-        </article>
+        <article v-if="teamTop" class="card lift" :style="{'--s':isFinanceStaff?4:12,'--i':9}"><div class="card-h"><h3>{{isOperator?'团队业绩':'应得团队分成'}}</h3><span class="r muted">本范围 {{teamTop.total}} 位收款人</span></div><router-link v-for="team in teamTop.list" :key="team.memberId" :to="link(team.detail)" class="row" style="text-decoration:none;color:inherit"><div class="t"><b>{{team.name}}</b><small v-for="q in team.quantities" :key="q.metricType">{{q.label}}：{{q.quantity===null?'待核对':q.quantity+' '+q.unit}}</small><small v-if="team.pendingCalculations">已核对部分 {{displayMoney(team.knownAmount)}} · {{team.pendingCalculations}} 条待核对</small></div><b v-if="isFinanceStaff">{{displayMoney(team.amount)}}</b><span>分来源核对 →</span></router-link><p v-if="!teamTop.list.length" class="muted">这段范围还没有可归属的团队记录。</p></article>
 
         <!-- 运营：成员留存与形态（非金额，环形） -->
         <article v-if="isOperator && retention?.teamCount !== undefined" class="card lift" style="--s:6;--i:9">
-          <div class="card-h"><h3>成员留存与形态</h3><span class="r"><span class="chip soft">当前</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
-          <div class="ring-wrap" style="margin-top:6px">
-            <svg class="ring" width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
-              <circle cx="46" cy="46" r="40" fill="none" stroke="var(--card-2)" stroke-width="10" />
-              <circle class="v" cx="46" cy="46" r="40" fill="none" stroke="#4e9a4a" stroke-width="10" stroke-linecap="round"
-                :stroke-dasharray="RING_C" :stroke-dashoffset="ringOffsetRet" transform="rotate(-90 46 46)" />
-            </svg>
-            <div><div class="big num" style="font-size:26px"><AnimatedNumber :value="Math.round((retention.activeRate ?? 0) * 100)" :decimals="0" /><small style="font-size:14px">%</small></div><p class="muted" style="font-size:12.5px">成员活跃率</p></div>
-          </div>
+          <div class="card-h"><h3>当前团队与成员</h3><span class="r"><span class="chip soft">当前</span><router-link class="card-go" to="/team">团队 →</router-link></span></div>
+          <p class="muted">暂未提供完整历史活跃率；以下为当前成员关系。</p>
           <div class="profile-stats" style="margin-top:14px">
             <div><b>{{ retention.teamCount }}</b><span>团队</span></div>
             <div><b>{{ retention.newTeams }}</b><span>本月新建</span></div>
@@ -896,9 +826,9 @@ function untilt(event: PointerEvent) {
 
         <!-- 员工共享：关系森林（实线=当前团队，虚线=原始邀请；隐性层只在员工端可见） -->
         <article v-if="relationForest" class="card lift forest-card" :style="{ '--s': 12, '--i': 10 }">
-          <div class="card-h"><h3>关系森林</h3><span class="muted" style="font-size:12.5px">演示数据</span><router-link class="card-go r" to="/team/relations">关系图 →</router-link></div>
+          <div class="card-h"><h3>关系森林</h3><span class="muted" style="font-size:12.5px">当前已保存的关系</span><router-link class="card-go r" to="/team/relations">关系图 →</router-link></div>
           <div class="forest" @mouseleave="forestHover = ''">
-            <div v-for="(root, ri) in relationForest.roots" :key="root.name" class="forest-tree">
+            <div v-for="(root, ri) in relationForest.roots" :key="root.id" class="forest-tree">
               <router-link v-slot="{ navigate }" to="/team/relations" custom>
                 <button
                   type="button"
@@ -997,9 +927,9 @@ function untilt(event: PointerEvent) {
         </div>
         <div v-if="isFinanceStaff && todayPayouts" class="card">
           <div class="card-h"><h3>今日打款</h3><span class="r"><span class="muted" style="font-size:12px">{{ todayPayouts.count }} 笔</span><router-link class="card-go" to="/finance">全部 →</router-link></span></div>
-          <div v-for="p in todayPayouts.list" :key="p.name" class="row">
-            <div class="t"><b>{{ p.name }} · ¥{{ p.amount }}</b><small>{{ p.method }} · {{ p.status }}</small></div>
-          </div>
+          <router-link v-for="p in todayPayouts.list" :key="p.id" :to="link(p.detail)" class="row" style="color:inherit;text-decoration:none">
+            <div class="t"><b>{{ p.name }} · {{displayMoney(p.amount)}}</b><small>{{ p.method }} · 已付款</small></div>
+          </router-link>
         </div>
         <div v-if="announcements.length" class="card">
           <div class="card-h"><h3>公告</h3><span class="muted r" style="font-size:12px">{{ announcements.length }} 条</span></div>
@@ -1089,7 +1019,7 @@ function untilt(event: PointerEvent) {
 @keyframes forest-line { from { transform: scaleY(0); } }
 @media (prefers-reduced-motion: reduce) { .f-node, .f-col::before { animation: none; } }
 @media (max-width: 700px) { .f-col { padding-left: 22px; } .f-node::before { left: -14px; width: 14px; } }
-/* 实时动态开关 */
+/* 最近业绩记录开关 */
 .live-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; }
 .live-toggle i { position: relative; width: 26px; height: 15px; border-radius: 999px; background: var(--line-2); transition: background 0.2s; }
 .live-toggle i::after { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; content: ""; transition: left 0.25s var(--spring); }

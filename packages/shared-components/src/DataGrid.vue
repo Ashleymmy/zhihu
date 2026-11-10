@@ -241,7 +241,7 @@ function text(row: DataGridRow, column: DataGridColumn) {
             <td class="next-cell">
               <template v-if="row.next"
                 ><p>
-                  <strong>{{ row.next.actor }}：</strong>{{ row.next.text }}
+                  <strong v-if="row.next.actor">{{ row.next.actor }}：</strong>{{ row.next.text }}
                 </p>
                 <button
                   v-if="row.next.action"
@@ -303,7 +303,7 @@ function text(row: DataGridRow, column: DataGridColumn) {
             </dl>
             <footer v-if="row.next">
               <p>
-                <strong>{{ row.next.actor }}：</strong>{{ row.next.text }}
+                <strong v-if="row.next.actor">{{ row.next.actor }}：</strong>{{ row.next.text }}
               </p>
               <button
                 v-if="row.next.action"
