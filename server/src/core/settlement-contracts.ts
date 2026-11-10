@@ -127,5 +127,5 @@ export interface SettlementDocument {
   total: number;
   page: number;
   pageSize: number;
-  paymentStatus: 'not_initiated';
+  paymentStatus: 'not_initiated' | 'processing' | 'partially_paid' | 'paid' | 'needs_review';
 }

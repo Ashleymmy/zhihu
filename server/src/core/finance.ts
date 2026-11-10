@@ -1,4 +1,5 @@
 import {financeReceipt} from './finance-receipts';
+import {assertSettlementPaymentSafe} from './settlement-payment-guards';
 import {calculateWithdrawal,dailyWithdrawalLimit,shanghaiDay,withdrawalRules,withdrawalPolicyEnabled} from './withdrawal-policy';
 import { isStaffRole } from '../auth/roles';
 import type { PoolConnection } from 'mysql2/promise';
@@ -54,7 +55,7 @@ export async function blockIncome(c:PoolConnection,s:FinanceScope,sourceKey:stri
  await lockFinance(c,s);await c.query('UPDATE opc_income_sources SET blocked_reason=? WHERE module_id=? AND account_id=? AND source_key=?',[reason,s.moduleId,s.accountId,sourceKey]);
  await c.query('UPDATE opc_earning_sources SET blocked_reason=?,next_action=? WHERE module_id=? AND project_id=? AND account_id=? AND source_key=?',[reason,next,s.moduleId,s.projectId,s.accountId,sourceKey]);
 }
-async function balance(c:PoolConnection,u:AuthUser,s:FinanceScope){
+export async function balance(c:PoolConnection,u:AuthUser,s:FinanceScope){
  const [income]=await q(c,`SELECT CAST(COALESCE(SUM(e.amount),0) AS CHAR) confirmed,
  CAST(COALESCE(SUM(CASE WHEN e.availability='available' AND (src.blocked_reason IS NULL OR e.amount<0) THEN e.amount ELSE 0 END),0) AS CHAR) released,
  CAST(COALESCE(SUM(CASE WHEN e.availability='held' THEN e.amount ELSE 0 END),0) AS CHAR) held
@@ -71,7 +72,7 @@ async function fundingRows(c:PoolConnection,s:FinanceScope){
 }
 // Read active gross reservations across every project/channel. Cancelled and rejected
 // applications release their original day's quota; paid and approved ones still occupy it.
-async function dailyQuota(c:PoolConnection,u:AuthUser,day=shanghaiDay(),locked=false){
+export async function dailyQuota(c:PoolConnection,u:AuthUser,day=shanghaiDay(),locked=false){
  const entries=await q(c,`SELECT CAST(w.amount AS CHAR) amount FROM opc_withdrawals w
  LEFT JOIN opc_withdrawal_terms t ON t.withdrawal_id=w.id
  WHERE w.user_id=? AND w.status IN ('pending','approved','paid')
@@ -79,7 +80,7 @@ async function dailyQuota(c:PoolConnection,u:AuthUser,day=shanghaiDay(),locked=f
  const used=entries.reduce((n,r)=>n+cash(String(r.amount)),0n),limit=cash(dailyWithdrawalLimit(u.role));
  return {appliedDay:day,dailyAmountLimit:cashText(limit),todayAmount:cashText(used),remainingAmount:cashText(used<limit?limit-used:0n)};
 }
-function checkQuota(amount:string,quota:Awaited<ReturnType<typeof dailyQuota>>){
+export function checkQuota(amount:string,quota:Awaited<ReturnType<typeof dailyQuota>>){
  if(cash(amount)>cash(quota.remainingAmount))fail('今日剩余可申请额度为 '+quota.remainingAmount.slice(0,-2)+' 元，请调整金额或明天再申请');
 }
 export async function financeOverview(u:AuthUser,s:FinanceScope,page=1,attention:'all'|'due'|'overdue'='all'){
@@ -163,7 +164,7 @@ export async function reviewWithdrawal(u:AuthUser,s:FinanceScope,id:string,actio
   if(w.status!=='pending')fail('申请状态已变化，请刷新',409);
   if(action==='reject'&&!reason.trim())fail('请填写退回原因');
   // Corrections and disputes may have reduced the balance after application.
-  if(action==='approve'){const funds=await balance(c,{...u,sub:String(w.user_id)},s);if(cash(funds.offset)>0n)fail('来源金额或状态发生变化，请先核对账单',409)}
+  if(action==='approve'){await assertSettlementPaymentSafe(c,id);const funds=await balance(c,{...u,sub:String(w.user_id)},s);if(cash(funds.offset)>0n)fail('来源金额或状态发生变化，请先核对账单',409)}
   await c.query('UPDATE opc_withdrawals SET status=?,reviewed_by=?,reviewed_at=NOW(3),remark=? WHERE id=?',[status,u.sub,reason||null,id]);
   await writeAudit({userId:u.sub,action:'finance.withdraw_'+action,resourceType:'withdrawal',resourceId:id,detail:{reason}},c);return{id};
  });
@@ -202,6 +203,7 @@ export async function recordPayment(u:AuthUser,s:FinanceScope,id:string,input:Pa
     if(w.status!=='approved')fail('请先完成提现审核，再登记实际付款',409);
     if(terms.invoice_required){const [invoice]=await q(c,'SELECT status FROM opc_withdrawal_invoices WHERE withdrawal_id=? ORDER BY version DESC LIMIT 1',[id]);if(invoice?.status!=='accepted')fail('团长发票尚未核验通过，请先核验发票',409);}
    }
+   await assertSettlementPaymentSafe(c,id);
    const funds=await balance(c,{...u,sub:String(w.user_id)},s);if(cash(funds.offset)>0n)fail('来源金额或状态发生变化，请先核对账单',409);
    if(reference&&(await q(c,'SELECT id FROM opc_withdrawals WHERE payment_reference=? AND id<>?',[reference,id])).length)fail('该付款流水已经登记，不能重复使用',409);
    await c.query("UPDATE opc_withdrawals SET status='paid',payment_reference=?,paid_on=?,paid_by=?,paid_at=NOW(3),proof_name=?,proof_type=?,proof_bytes=?,proof_hash=?,pay_method=?,pay_account=?,remark=?,payment_version=payment_version+1 WHERE id=?",[reference,input.paidOn,u.sub,file?file.originalname.replace(/[\r\n/\\]/g,'_').slice(0,255):null,type,file?.buffer??null,proofHash,method,account,remark,id]);
@@ -229,7 +231,13 @@ export async function correctPayment(u:AuthUser,s:FinanceScope,id:string,input:{
  });
 }
 export async function paymentHistory(u:AuthUser,s:FinanceScope,id:string){
- await authorize(u,s);return withTransaction(async c=>{const w=await withdrawal(c,s,id);if(!isStaffRole(u.role)&&String(w.user_id)!==u.sub)fail('无权查看此发放记录',403);return {list:await q(c,'SELECT CAST(id AS CHAR) id,action,reason,before_json,after_json,created_at,CAST(actor_id AS CHAR) actor_id,proof_name FROM opc_payment_changes WHERE withdrawal_id=? ORDER BY id DESC LIMIT 100',[id])};});
+ await authorize(u,s);return withTransaction(async c=>{const w=await withdrawal(c,s,id);if(!isStaffRole(u.role)&&String(w.user_id)!==u.sub)fail('无权查看此发放记录',403);
+  const list=await q(c,'SELECT CAST(id AS CHAR) id,action,reason,before_json,after_json,created_at,CAST(actor_id AS CHAR) actor_id,proof_name FROM opc_payment_changes WHERE withdrawal_id=? ORDER BY id DESC LIMIT 100',[id]);
+  // Financial association details stay staff-only; recipients retain their existing payment history.
+  const settlementEvents=isStaffRole(u.role)?await q(c,`SELECT CAST(e.id AS CHAR) id,e.event_type action,e.reason,DATE_FORMAT(e.created_at,'%Y-%m-%d %H:%i:%s') createdAt,
+   u.display_name actorName,e.before_json beforeData,e.after_json afterData
+   FROM opc_settlement_payment_events e JOIN users u ON u.id=e.actor_id WHERE e.withdrawal_id=? ORDER BY e.id DESC`,[id]):[];
+  return {list,settlementEvents};});
 }
 export async function paymentProof(u:AuthUser,s:FinanceScope,id:string){
  await authorize(u,s);return withTransaction(async c=>{const w=await withdrawal(c,s,id);if(!isStaffRole(u.role)&&String(w.user_id)!==u.sub)fail('无权查看此付款凭证',403);if(!w.proof_bytes)fail('尚未登记付款凭证',404);return{name:String(w.proof_name),type:String(w.proof_type),buffer:w.proof_bytes as Buffer};});

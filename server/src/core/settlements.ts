@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errors';
 import { writeAudit } from '../services/audit.service';
 import { assertDuty } from './duties';
 import { cash, cashText, checksum } from './money';
+import { settlementPaymentStatus } from './settlement-payments-state';
 import type { ModuleRuntime } from './module-runtime';
 import type {
   SettlementDocument,
@@ -443,7 +444,7 @@ function documentPage(doc: SettlementDocument, page = 1, pageSize = 25): Settlem
     pageSize,
   };
 }
-async function storedDocument(c: PoolConnection, id: string, owner: Owner, lock = false) {
+export async function storedDocument(c: PoolConnection, id: string, owner: Owner, lock = false) {
   const [stored] = await rows(
     c,
     `SELECT *,DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s') created_text,
@@ -620,7 +621,9 @@ export async function settlementDetail(
 ) {
   return withTransaction(async (c) => {
     await settlementAccess(c, runtime, user, owner);
-    return documentPage((await storedDocument(c, id, owner)).doc, page, pageSize);
+    const doc=(await storedDocument(c,id,owner)).doc;
+    doc.paymentStatus=await settlementPaymentStatus(c,doc);
+    return documentPage(doc, page, pageSize);
   });
 }
 export async function settlementList(
@@ -641,7 +644,7 @@ export async function settlementList(
       [...args, pageSize, (page - 1) * pageSize],
     );
     return {
-      list: list.map((r) => {
+      list: await Promise.all(list.map(async (r) => {
         const {
           items,
           impacts,
@@ -652,10 +655,11 @@ export async function settlementList(
         } = json<SettlementDocument>(r.document_json);
         return {
           ...doc,
+          paymentStatus: await settlementPaymentStatus(c,json<SettlementDocument>(r.document_json)),
           createdAt: String(r.created_text),
           confirmedAt: r.confirmed_text ? String(r.confirmed_text) : null,
         };
-      }),
+      })),
       total: Number(count.total),
       page,
       pageSize,

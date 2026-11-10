@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../middleware/errors';
 import { ok } from '../utils/response';
 import type { ModuleRuntime } from './module-runtime';
+import { createSettlementPaymentsRouter } from './settlement-payments-routes';
 import {
   settlementBaseSchema,
   settlementOwnerSchema,
@@ -24,6 +25,7 @@ const version = z.string().regex(/^[a-f0-9]{64}$/);
 const comment = { body: z.string().trim().min(1).max(2000), requestKey: settlementKey };
 export function createSettlementRouter(runtime: ModuleRuntime) {
   const r = Router();
+  r.use(createSettlementPaymentsRouter(runtime));
   r.get(
     '/recipients',
     asyncHandler(async (req, res) => {
