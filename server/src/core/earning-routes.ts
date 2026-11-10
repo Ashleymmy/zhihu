@@ -17,6 +17,8 @@ const filter = z
   .object({
     projectId: id.optional(),
     accountId: id.optional(),
+    moduleId: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/).optional(),
+    performerId: id.optional(),
     from: day,
     to: day,
     metricType: z.string().max(32).optional(),
@@ -71,12 +73,18 @@ export function createEarningRouter(runtime: ModuleRuntime) {
             scope.args,
           );
           if (
-            f.projectId &&
-            !scopes.some((s) => s.project_id === f.projectId && (!f.accountId || s.account_id === f.accountId))
+            (f.projectId || f.moduleId) &&
+            !scopes.some((s) => (!f.projectId || s.project_id === f.projectId) && (!f.accountId || s.account_id === f.accountId) && (!f.moduleId || s.module_id === f.moduleId))
           )
             throw new AppError(403, 40300, '这个项目暂不可查看');
-          const where = `l.payee_id=? AND l.source_version=s.current_version AND ${scope.sql} AND s.business_date BETWEEN ? AND ?
+          const selectedLine = f.performerId ? `(l.source_version=s.current_version OR (
+            NOT EXISTS(SELECT 1 FROM opc_earning_lines current_line WHERE current_line.source_id=s.id AND current_line.payee_id=l.payee_id AND current_line.source_version=s.current_version)
+            AND l.id=(SELECT past.id FROM opc_earning_lines past WHERE past.source_id=s.id AND past.payee_id=l.payee_id AND past.confirmed_at IS NOT NULL ORDER BY past.confirmed_at DESC,past.id DESC LIMIT 1)))` : 'l.source_version=s.current_version';
+          const effectiveAmount = f.performerId ? 'CASE WHEN l.source_version=s.current_version THEN l.amount ELSE COALESCE(paid.confirmed,0) END' : 'l.amount';
+          const where = `l.payee_id=? AND ${selectedLine} AND ${scope.sql} AND s.business_date BETWEEN ? AND ?
         ${f.projectId ? 'AND s.project_id=?' : ''} ${f.accountId ? 'AND s.account_id=?' : ''} ${f.metricType ? 'AND s.metric_type=?' : ''}
+        ${f.moduleId ? 'AND s.module_id=?' : ''}
+        ${f.performerId ? 'AND l.performer_id=?' : ''}
         ${f.group === 'team' ? 'AND l.performer_id<>l.payee_id' : f.group === 'self' ? 'AND (l.performer_id=l.payee_id OR l.performer_id IS NULL)' : ''}
         ${f.search ? 'AND (s.task_name LIKE ? OR l.performer_name LIKE ?)' : ''}`;
           const args = [
@@ -87,22 +95,25 @@ export function createEarningRouter(runtime: ModuleRuntime) {
             ...(f.projectId ? [f.projectId] : []),
             ...(f.accountId ? [f.accountId] : []),
             ...(f.metricType ? [f.metricType] : []),
+            ...(f.moduleId ? [f.moduleId] : []),
+            ...(f.performerId ? [f.performerId] : []),
             ...(f.search ? ['%' + f.search + '%', '%' + f.search + '%'] : []),
           ];
           const [list] = await c.query<RowDataPacket[]>(
             `SELECT CAST(l.id AS CHAR) id,s.module_id,CAST(s.project_id AS CHAR) project_id,p.name project_name,CAST(s.account_id AS CHAR) account_id,s.task_id,s.task_name,DATE_FORMAT(s.business_date,'%Y-%m-%d') business_date,s.metric_type,s.metric_label,s.quantity_unit,
-        CAST(l.performer_id AS CHAR) performer_id,l.performer_name,l.rule_code,CAST(l.quantity AS CHAR) quantity,${canViewUnitPrices(req.user) ? 'CAST(l.unit_price AS CHAR)' : 'NULL'} unit_price,${canViewUnitPrices(req.user) ? 'CAST(l.quantity*l.unit_price AS CHAR)' : 'NULL'} calculation_amount,CAST(l.amount AS CHAR) amount,l.is_internal,IF(COALESCE(s.blocked_reason,inc.blocked_reason,'')='',l.is_ready,0) is_ready,l.confirmed_at,
+        CAST(l.performer_id AS CHAR) performer_id,l.performer_name,l.rule_code,CAST(l.quantity AS CHAR) quantity,${canViewUnitPrices(req.user) ? 'CAST(l.unit_price AS CHAR)' : 'NULL'} unit_price,${canViewUnitPrices(req.user) ? 'CAST(l.quantity*l.unit_price AS CHAR)' : 'NULL'} calculation_amount,CAST(${effectiveAmount} AS CHAR) amount,l.is_internal,IF(COALESCE(s.blocked_reason,inc.blocked_reason,'')='',l.is_ready,0) is_ready,l.confirmed_at,
         COALESCE(s.blocked_reason,inc.blocked_reason,NULLIF(l.blocked_reason,''),'') reason,
-        COALESCE(NULLIF(s.next_action,''),CASE WHEN l.is_ready=1 AND l.confirmed_at IS NOT NULL AND COALESCE(s.blocked_reason,inc.blocked_reason,'')='' THEN '金额已确认，可查看提现状态' ELSE l.next_action END) next_action,
-        CAST(COALESCE(paid.confirmed,0) AS CHAR) confirmed_amount,CAST(l.amount-COALESCE(paid.confirmed,0) AS CHAR) pending_amount,
+        CASE WHEN l.source_version<>s.current_version THEN CASE WHEN inc.source_version=s.current_version THEN '更正已确认，可查看原收入与更正明细' ELSE '原已确认收入保留；财务核对当前来源更正后再确认差额' END ELSE COALESCE(NULLIF(s.next_action,''),CASE WHEN l.is_ready=1 AND l.confirmed_at IS NOT NULL AND COALESCE(s.blocked_reason,inc.blocked_reason,'')='' THEN '金额已确认，可查看提现状态' ELSE l.next_action END) END next_action,
+        l.source_version<>s.current_version historical_only,
+        CAST(COALESCE(paid.confirmed,0) AS CHAR) confirmed_amount,CAST((${effectiveAmount})-COALESCE(paid.confirmed,0) AS CHAR) pending_amount,
         IF(l.performer_id<>l.payee_id,'team','self') earning_group
         ${joins} ${cashJoins} WHERE ${where} ORDER BY s.business_date DESC,l.id DESC LIMIT ? OFFSET ?`,
             [req.user.sub, ...args, f.pageSize, (f.page - 1) * f.pageSize],
           );
           const [groups] = await c.query<RowDataPacket[]>(
             `SELECT CAST(s.project_id AS CHAR) project_id,p.name project_name,s.metric_type,s.metric_label,s.quantity_unit,
-        COUNT(*) records,SUM(l.amount IS NULL) pending_calculations,CAST(COALESCE(SUM(l.quantity),0) AS CHAR) quantity,
-        CAST(COALESCE(SUM(IF(l.is_internal=0,l.amount,0)),0) AS CHAR) amount,
+        COUNT(*) records,SUM((${effectiveAmount}) IS NULL) pending_calculations,${f.performerId ? 'CASE WHEN SUM(l.quantity IS NULL)>0 THEN NULL ELSE CAST(SUM(l.quantity) AS CHAR) END' : 'CAST(COALESCE(SUM(l.quantity),0) AS CHAR)'} quantity,
+        CAST(COALESCE(SUM(IF(l.is_internal=0,(${effectiveAmount}),0)),0) AS CHAR) amount,
         CAST(COALESCE(SUM(IF(l.is_internal=0,paid.confirmed,0)),0) AS CHAR) confirmed_amount,
         CAST(COALESCE(SUM(IF(l.is_internal=1,l.amount,0)),0) AS CHAR) internal_amount
         ${joins} ${cashJoins} WHERE ${where} GROUP BY s.project_id,p.name,s.metric_type,s.metric_label,s.quantity_unit ORDER BY s.project_id,s.metric_type`,
@@ -112,14 +123,15 @@ export function createEarningRouter(runtime: ModuleRuntime) {
           return {
             scopes,
             list,
-            groups,
+            groups: f.performerId ? groups.map(g => ({ ...g, known_amount: g.amount, amount: Number(g.pending_calculations) ? null : g.amount })) : groups,
             total: groups.reduce((n, g) => n + Number(g.records), 0),
             page: f.page,
             pageSize: f.pageSize,
             summary: {
-              amount: sum('amount'),
+              amount: f.performerId && groups.some(g => Number(g.pending_calculations)) ? null : sum('amount'),
+              ...(f.performerId ? { knownAmount: sum('amount') } : {}),
               confirmedAmount: sum('confirmed_amount'),
-              pendingAmount: cashText(cash(sum('amount'), true) - cash(sum('confirmed_amount'), true)),
+              pendingAmount: f.performerId && groups.some(g => Number(g.pending_calculations)) ? null : cashText(cash(sum('amount'), true) - cash(sum('confirmed_amount'), true)),
               internalAmount: sum('internal_amount'),
               pendingCalculations: groups.reduce((n, g) => n + Number(g.pending_calculations), 0),
             },

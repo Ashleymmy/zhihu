@@ -9,6 +9,7 @@ import type { AmountPeriods, TeamTurnover } from './contracts';
 import type { ModuleRuntime } from './module-runtime';
 import { cash, cashText } from './money';
 import { promotionMetrics } from './member-promotions';
+import { leaderContributors } from './member-summary-contributors';
 
 const periods = ['total', 'today', 'yesterday'] as const;
 const zero = (): AmountPeriods => ({ total: '0.0000', today: '0.0000', yesterday: '0.0000' });
@@ -99,6 +100,7 @@ export async function memberSummary(runtime: ModuleRuntime, user: AuthUser) {
 }
 export function createMemberSummaryRouter(runtime: ModuleRuntime) {
   const router = Router();
+  router.get('/contributors', asyncHandler(async (req, res) => ok(res, await leaderContributors(runtime, req.user, req.query))));
   router.get(
     '/',
     asyncHandler(async (req, res) => {

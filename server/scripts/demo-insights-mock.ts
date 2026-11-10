@@ -31,6 +31,8 @@ function dailySeries(days: number, base: number, amp: number, seed = 0): { date:
 }
 
 export function mountDemoInsights(app: Express) {
+  if (process.env.NODE_ENV === 'production' || process.env.DEMO_INSIGHTS_MOCK !== '1')
+    throw new Error('合成统计仅允许通过显式本地演示开关启用');
   const authed = (req: Request): AuthUser | undefined => (req as Request & { user?: AuthUser }).user;
 
   /** 员工总览四数卡：上游收入、成员支出、平台留存、活跃成员 + 资料卡本周统计 */

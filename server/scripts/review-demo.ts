@@ -7,17 +7,22 @@ import bcrypt from 'bcryptjs';
 import * as XLSX from 'xlsx';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
+import express from 'express';
 
 if (process.env.NODE_ENV === 'production') throw new Error('演示数据禁止写入生产环境');
 process.env.OPC_MODULES = 'zhihu';
-process.env.QUEUE_DRIVER = 'memory';
+process.env.QUEUE_DRIVER ??= 'memory';
+// Keep the real authentication/session path even during synthetic card exploration.
+process.env.DEV_DEMO_AUTH = '0';
 process.env.ZHIHU_API_BASE = 'https://open.zhihu.com';
 const DEMO_USERS = ['leader_wang', 'creator_li', 'creator_zhang', 'creator_chen', 'operator_chen', 'finance_wang', 'developer_sun'];
 
 let planSeq = 2071265453767400;
+let compositionSeq = 2071265453767500;
 async function main() {
   const network = setupServer(
     http.post('*/alliance/api/popularize_plan', () => HttpResponse.json({ data: { plan_id: String(++planSeq) } })),
+    http.post('*/alliance/api/popularize_composition/v2', () => HttpResponse.json({ data: { composition_id: String(++compositionSeq) } })),
     http.all('https://open.zhihu.com/*', () => HttpResponse.json({ error: { message: 'mock upstream' } }, { status: 503 })),
   );
   network.listen({ onUnhandledRequest: 'bypass' });
@@ -27,6 +32,14 @@ async function main() {
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
+    timezone: '+08:00',
+  });
+  await c.query("SET SESSION time_zone='+08:00'");
+  // The review database may share a UTC MySQL instance. Configure only this
+  // process's sessions, before queries are queued, to match the normal driver.
+  const { db } = await import('../src/db');
+  db.pool.on('connection', (connection: import('mysql2').PoolConnection) => {
+    connection.query("SET SESSION time_zone='+08:00'");
   });
   const [[{ total }]] = await c.query<mysql.RowDataPacket[]>('SELECT COUNT(*) total FROM users');
   const [seeded] = await c.query<mysql.RowDataPacket[]>('SELECT id FROM users WHERE username IN (?)', [DEMO_USERS]);
@@ -54,20 +67,28 @@ async function main() {
   const { createCoreApp } = await import('../src/core/app');
   const { loadModules } = await import('../src/composition/modules');
   const { mountStatic } = await import('../src/composition/static');
-  const { mountDemoInsights } = await import('./demo-insights-mock');
   const runtime = loadModules();
-  // 演示 mock 接口必须挂在 notFound 之前；createApp() 内部已收尾 404，这里展开同样的组合
-  const app = createCoreApp(runtime, (a) => { mountStatic(a); mountDemoInsights(a); });
+  const realApp = createCoreApp(runtime, mountStatic);
+  const app = express();
+  if (process.env.DEMO_INSIGHTS_MOCK === '1') {
+    const { mountDemoInsights } = await import('./demo-insights-mock');
+    app.use(express.json({ limit: '1mb' }));
+    mountDemoInsights(app);
+    console.warn('已明确启用合成统计演示；这些卡片不用于真实接口验收');
+  }
+  app.use(realApp);
+  const { errorHandler } = await import('../src/middleware/errors');
+  app.use(errorHandler);
   app.locals.moduleRuntime = runtime;
-  const { registerJob } = await import('../src/queue');
-  const { pushPlan } = await import('../src/modules/zhihu/jobs/pushPlan');
-  registerJob('zhihu.push-plan', pushPlan);
-  const port = Number(process.env.PORT ?? 3000);
-  app.listen(port, '127.0.0.1', () => console.log(`演示服务已启动：http://127.0.0.1:${port}/app/`));
-  if (fresh) await seed(c);
+  if (fresh) {
+    await seed(c);
+  }
+  await c.end();
   // Match the real server lifecycle so committed previews and confirmation jobs
   // are consumed during browser review as well.
   if (process.env.RUN_BACKGROUND_JOBS === 'true') app.locals.moduleRuntime.start();
+  const port = Number(process.env.PORT ?? 3000);
+  app.listen(port, '127.0.0.1', () => console.log(`演示服务已就绪：http://127.0.0.1:${port}/app/`));
 }
 
 async function seed(c: mysql.Connection) {
@@ -116,14 +137,17 @@ async function seed(c: mysql.Connection) {
     const d = await prices.draftPrice(payer, scope, randomUUID(), { taskId: '1', payeeId, unitPrice, from: today, reason: '本地体验报价' });
     await prices.publishPrice(payer, scope, d.id, randomUUID());
   }
-  await withTransaction(async (conn) => {
-    await insertComposition(li, {
+  const compositionId = await withTransaction(async (conn) => {
+    const id = await insertComposition(li, {
       planId: words['重生千金'].planId, mediaType: 'KOC抖音', mediaAccount: 'xiaoli_dy', compositionType: 1,
       compositionSubType: 1, title: '重生千金推文第一期', promoUrl: 'https://www.douyin.com/video/7300000000000000001',
       releaseTime: new Date().toISOString(),
     }, conn);
     await statements.insertEvidence(conn, li, scope, { bindingId: liBinding, url: 'https://www.douyin.com/video/7300000000000000001', description: '重生千金推文第一期' });
+    return id;
   });
+  const { pushComposition } = await import('../src/modules/zhihu/jobs/pushComposition');
+  await pushComposition({ compositionId });
   const [ev] = await c.query<mysql.RowDataPacket[]>('SELECT id FROM zh_evidence WHERE binding_id=?', [liBinding]);
   await statements.reviewEvidence(leader, scope, String(ev[0].id), randomUUID(), true, '已核对作品');
   const sheet = XLSX.utils.aoa_to_sheet([

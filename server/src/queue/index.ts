@@ -69,3 +69,29 @@ export async function closeQueue() {
   if (bullQueue) await bullQueue.close();
   bullQueue = null;
 }
+
+/** Read only. Retained Bull jobs are not a complete daily execution history. */
+export async function observeQueue(page = 1, pageSize = 20) {
+  const observedAt = new Date().toISOString();
+  if (config.queueDriver === 'memory') return {
+    driver: 'memory' as const, observedAt, historyScope: 'current_process_in_flight' as const,
+    counts: { inFlight: activeMemoryJobs.size, waiting: null, active: null, delayed: null, paused: null, completed: null, failed: null },
+    total: activeMemoryJobs.size, page, pageSize,
+    jobs: [...activeMemoryJobs].slice((page - 1) * pageSize, page * pageSize).map(id => ({ id, state: 'in_flight', queuedAt: null, startedAt: null, finishedAt: null, attempts: null, durationMs: null })),
+    registeredHandlers: handlers.size, workerHeartbeatAvailable: false,
+  };
+  const current = queue();
+  const counts = await current.getJobCounts();
+  const paused = await current.getPausedCount();
+  const jobs = await current.getJobs(['waiting', 'active', 'delayed', 'completed', 'failed', 'paused'], (page - 1) * pageSize, page * pageSize - 1, false);
+  return {
+    driver: 'bull' as const, observedAt, historyScope: 'retained_jobs_only' as const,
+    counts: { inFlight: counts.waiting + counts.active + counts.delayed + paused, waiting: counts.waiting, active: counts.active, delayed: counts.delayed, paused, completed: counts.completed, failed: counts.failed },
+    total: Object.values(counts).reduce((sum, count) => sum + count, 0), page, pageSize,
+    jobs: await Promise.all(jobs.map(async job => ({ id: String(job.id), state: await job.getState(),
+      queuedAt: new Date(job.timestamp).toISOString(), startedAt: job.processedOn ? new Date(job.processedOn).toISOString() : null,
+      finishedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null, attempts: job.attemptsMade,
+      durationMs: job.finishedOn && job.processedOn ? Math.max(0, job.finishedOn - job.processedOn) : null }))),
+    registeredHandlers: handlers.size, workerHeartbeatAvailable: false,
+  };
+}
