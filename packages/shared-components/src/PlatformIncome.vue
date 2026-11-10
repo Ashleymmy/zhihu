@@ -500,9 +500,9 @@ function close() {
   outline-offset: 2px;
 }
 .income-filter > button {
-  border-color: var(--forest-deep);
+  border-color: var(--ink);
   color: var(--paper);
-  background: var(--forest-deep);
+  background: var(--ink);
 }
 .income-totals strong,
 .income-projects strong,

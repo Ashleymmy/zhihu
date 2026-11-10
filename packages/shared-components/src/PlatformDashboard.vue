@@ -604,7 +604,7 @@ function untilt(event: PointerEvent) {
         <section class="card" :style="{ '--s': devSummary ? 7 : 12, '--i': 1 }" aria-labelledby="home-todos-dev">
           <div class="card-h"><h3 id="home-todos-dev">待办</h3><span v-if="todos.length" class="chip clay r">{{ todos.length }} 项</span></div>
           <template v-if="todos.length">
-            <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row" style="text-decoration:none;color:inherit">
+            <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row home-todo-row" style="text-decoration:none;color:inherit">
               <span class="home-todo-count">{{ todo.count }}</span>
               <div class="t"><b>{{ todo.label }}</b><small>{{ todo.projectName }} · {{ todo.actor }}</small></div>
               <span class="home-todo-action">{{ todo.actionLabel }} →</span>
@@ -889,7 +889,7 @@ function untilt(event: PointerEvent) {
         <!-- 待办列表（有待办才显示；空时主卡 pill 已说明“都处理完了”） -->
         <section v-if="todos.length" class="card" :style="{ '--s': isOperator ? 7 : 12, '--i': 12 }" aria-labelledby="home-todos-staff">
           <div class="card-h"><h3 id="home-todos-staff">待办</h3><span class="chip clay r">{{ todos.length }} 项</span></div>
-          <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row" style="text-decoration:none;color:inherit">
+          <router-link v-for="todo in todos" :key="todo.key" :to="todo.path" class="row home-todo-row" style="text-decoration:none;color:inherit">
             <span class="home-todo-count">{{ todo.count }}</span>
             <div class="t"><b>{{ todo.label }}</b><small>{{ todo.projectName }} · {{ todo.actor }}</small></div>
             <span class="home-todo-action">{{ todo.actionLabel }} →</span>
@@ -1069,6 +1069,7 @@ function untilt(event: PointerEvent) {
 .home-todo { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 14px 16px; border-radius: 16px; color: inherit; background: var(--paper); text-decoration: none; transition: background 0.2s, transform 0.36s var(--spring); }
 .home-todo:hover { background: var(--hover); }
 .home-todo:active { transform: scale(0.98); }
+.home-todo > div { flex: 1; min-width: 0; }
 .home-todo-count { display: grid; min-width: 38px; height: 38px; flex: none; place-items: center; border-radius: 12px; color: var(--clay-deep); background: var(--clay-soft); font-family: var(--font-display); font-size: 18px; font-weight: 600; }
 .home-todo h3 { margin: 0 0 3px; font-size: 14.5px; font-weight: 600; }
 .home-todo p { margin: 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
@@ -1085,8 +1086,9 @@ function untilt(event: PointerEvent) {
 .home-metrics .home-metric-link { color: var(--clay-deep); font-size: 12.5px; font-weight: 600; }
 .home-empty h2 { margin: 0 0 8px; font-size: 18px; }
 @media (max-width: 700px) {
-  .home-todo { flex-wrap: wrap; padding: 14px; }
-  .home-todo-action { width: 100%; margin-left: 52px; }
+  .home-todo, .home-todo-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: start; gap: 8px 14px; }
+  .home-todo { padding: 14px; }
+  .home-todo .home-todo-action, .home-todo-row .home-todo-action { grid-column: 2; width: auto; margin-left: 0; white-space: normal; }
   .home-controls { width: 100%; }
   .home-controls label { flex: 1; min-width: 0; }
   .home-controls select { width: 100%; max-width: 100%; }
