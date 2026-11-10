@@ -156,7 +156,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
 
 <template>
   <div class="page-stack">
-    <router-link to="/modules/zhihu/history" class="back-link">← 返回知乎故事</router-link>
+    <router-link to="/works" class="back-link">← 返回作品记录</router-link>
     <header class="page-header">
       <div>
         <p class="section-index">02 / 作品管理</p>
@@ -269,7 +269,7 @@ onUnmounted(()=>{loadVersion++;planSearchVersion++;if(poll)clearInterval(poll)})
 </template>
 
 <style scoped>
-.work-batch-button { margin-left: auto; margin-right: 14px; padding: 7px 13px; border: 1px solid var(--line, #d6d3c7); border-radius: 2px; background: transparent; color: var(--ink, #2b2b29); font-size: 12px; font-weight: 600; cursor: pointer; }
+.work-batch-button { margin-left: auto; margin-right: 14px; padding: 7px 14px; border: 1px solid var(--line, #d6d3c7); border-radius: 10px; background: transparent; color: var(--ink, #2b2b29); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.3s var(--spring, ease); }
 .work-batch-button:hover { background: var(--paper, #f3f1ea); border-color: var(--ink-soft, #87867f); }
 .work-batch-button:disabled { opacity: .5; cursor: wait; }
 </style>

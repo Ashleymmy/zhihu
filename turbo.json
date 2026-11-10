@@ -34,9 +34,5 @@
       "cache": false,
       "persistent": true
     }
-  },
-  "globalDependencies": [
-    "apps/platform-leader/src/**",
-    "apps/platform-creator/src/**"
-  ]
+  }
 }

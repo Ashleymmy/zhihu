@@ -80,6 +80,6 @@ async function logout() {
     :mobile-tabs="tabs"
     @navigate="router.push"
     @logout="logout"
-    ><router-view :key="auth.user?.id + '-' + auth.user?.role + '-' + auth.user?.adminDuty"
+    ><router-view :key="auth.user?.id + '-' + auth.user?.role + '-' + auth.user?.adminDuty + '-' + route.path"
   /></AppShell>
 </template>

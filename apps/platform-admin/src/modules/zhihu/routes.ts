@@ -1,264 +1,96 @@
+import { defineComponent } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import {useAuthStore} from './context'
-import {businessPages} from '@zhihu-koc/zhihu-module-views/navigation'
-export const modulePages: RouteRecordRaw[] = [
-{path:'more',name:'zhihu-more',component:()=>import('./views/MoreFunctionsView.vue'),meta:{moduleId:'zhihu',title:'更多功能'}},
-{path:'works/new',name:'zhihu-register-work',component:()=>import('./views/StoryWorksView.vue'),meta:{moduleId:'zhihu',title:'登记作品'}},
-{path:'operations',name:'zhihu-operations',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'operations',title:'运营管理'}},
-{path:'wallet',name:'zhihu-wallet',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'wallet',title:'收入与提现'}},
-{path:'finance',name:'zhihu-finance',component:()=>import('./views/ExclusiveView.vue'),meta:{moduleId:'zhihu',section:'finance',title:'财务做账'}},
+import type { GlobalRole } from '@zhihu-koc/shared-contracts/core'
+import { useAuthStore } from './context'
 
-  {
-    path: 'dashboard',
-    name: 'zhihu-dashboard',
-    component: () => import('./views/DashboardView.vue'),
-    meta: { moduleId: 'zhihu', title: '数据看板' },
-  },
-  {
-    path: 'orders',
-    name: 'zhihu-orders',
-    component: () => import('./views/OrdersView.vue'),
-    meta: { moduleId: 'zhihu', title: '订单管理' },
-  },
-  {
-    path: 'settlements',
-    name: 'zhihu-settlements',
-    component: () => import('./views/SettlementView.vue'),
-    meta: { moduleId: 'zhihu', title: '结算管理' },
-  },
-  {
-    path: 'data-import',
-    name: 'zhihu-data-import',
-    component: () => import('./views/DataImportView.vue'),
-    meta: { moduleId: 'zhihu', title: '历史邮件 / Excel 导入' },
-  },
-  {
-    path: 'appeals',
-    name: 'zhihu-appeals',
-    component: () => import('./views/AppealsView.vue'),
-    meta: { moduleId: 'zhihu', title: '财务申诉' },
-  },
-  {
-    path: 'withdrawals',
-    name: 'zhihu-withdrawals',
-    component: () => import('./views/WithdrawalsView.vue'),
-    meta: { moduleId: 'zhihu', title: '提现审批' },
-  },
-  {
-    path: 'plans',
-    name: 'zhihu-plans',
-    component: () => import('./views/PlansView.vue'),
-    meta: { moduleId: 'zhihu', title: '推广计划' },
-  },
-  {
-    path: 'keywords',
-    name: 'zhihu-keywords',
-    component: () => import('./views/ExclusiveView.vue'),
-    meta: { moduleId: 'zhihu', title: '归因与对账' },
-  },
-  {
-    path: 'callbacks',
-    name: 'zhihu-callbacks',
-    component: () => import('./views/CallbackConfigView.vue'),
-    meta: { moduleId: 'zhihu', title: '回传配置' },
-  },
-  {
-    path: 'creative-tools',
-    name: 'zhihu-creative-tools',
-    component: () => import('./views/CreativeToolsView.vue'),
-    meta: { moduleId: 'zhihu', title: '创意工具坊' },
-  },
-  {
-    path: 'history',
-    name: 'zhihu-zhihu-story',
-    component: () => import('./views/ZhihuStoryView.vue'),
-    meta: { moduleId: 'zhihu', title: '知乎故事' },
-  },
-  {
-    path: 'works',
-    name: 'zhihu-story-works',
-    component: () => import('./views/StoryWorksView.vue'),
-    meta: { moduleId: 'zhihu', title: '作品管理' },
-  },
-  {
-    path: 'tasks',
-    name: 'zhihu-story-tasks',
-    component: () => import('./views/StoryTasksView.vue'),
-    meta: { moduleId: 'zhihu', title: '任务列表' },
-  },
-  {
-    path: 'salt',
-    name: 'zhihu-story-salt',
-    component: () => import('./views/StorySaltView.vue'),
-    meta: { moduleId: 'zhihu', title: '盐选榜单' },
-  },
-  {
-    path: 'comments',
-    name: 'zhihu-story-comments',
-    component: () => import('./views/StoryInterceptView.vue'),
-    meta: { moduleId: 'zhihu', title: '评论截流' },
-  },
-  {
-    path: 'risk',
-    name: 'zhihu-story-risk',
-    component: () => import('./views/StoryRiskView.vue'),
-    meta: { moduleId: 'zhihu', title: '风险举报' },
-  },
-  {
-    path: 'media',
-    name: 'zhihu-story-media',
-    component: () => import('./views/StoryMediaView.vue'),
-    meta: { moduleId: 'zhihu', title: '有声书漫画' },
-  },
-  {
-    path: 'tags',
-    name: 'zhihu-story-tags',
-    component: () => import('./views/StoryTagView.vue'),
-    meta: { moduleId: 'zhihu', title: '内容标签' },
-  },
-  {
-    path: 'products',
-    name: 'zhihu-story-products',
-    component: () => import('./views/StoryProductsView.vue'),
-    meta: { moduleId: 'zhihu', title: '产品库' },
-  },
-  {
-    path: 'assets',
-    name: 'zhihu-story-assets',
-    component: () => import('./views/StoryModuleView.vue'),
-    meta: { moduleId: 'zhihu', title: '素材库', storyModule: 'assets' },
-  },
-  {
-    path: 'knowledge',
-    name: 'zhihu-knowledge',
-    component: () => import('./views/KnowledgePayView.vue'),
-    meta: { moduleId: 'zhihu', title: '知识付费' },
-  },
-  {
-    path: 'analytics',
-    name: 'zhihu-analytics',
-    component: () => import('./views/AnalyticsView.vue'),
-    meta: { moduleId: 'zhihu', title: '数据分析' },
-  },
-  {
-    path: 'system',
-    name: 'zhihu-system',
-    component: () => import('./views/SystemToolsView.vue'),
-    meta: { moduleId: 'zhihu', title: '系统工具' },
-  },
-  {
-    path: 'system/data',
-    name: 'zhihu-system-data',
-    component: () => import('./views/SysDataView.vue'),
-    meta: { moduleId: 'zhihu', title: '数据处理与授权' },
-  },
-  {
-    path: 'system/site',
-    name: 'zhihu-system-site',
-    component: () => import('./views/SysSiteView.vue'),
-    meta: { moduleId: 'zhihu', title: '站点维护' },
-  },
-  {
-    path: 'earnings',
-    name: 'zhihu-earnings',
-    component: () => import('./views/EarningsView.vue'),
-    meta: { moduleId: 'zhihu', title: '收益结算' },
-  },
-]
-export const zhihuRoutes: RouteRecordRaw[] = [
-  {
-    path: 'modules/zhihu',
-    component: () => import('./ModuleLayout.vue'),
-    meta: { moduleId: 'zhihu' },
-    children: [{path:'',redirect:'/modules/zhihu/operations'},...modulePages.map(p=>({...p,beforeEnter:()=>{const user=useAuthStore().user;if(p.path==='more')return true;const path=p.path==='works/new'?'works':p.path==='keywords'?'operations':p.path;if(!businessPages([{path}],user?.role??'',user?.adminDuty,true).length)return user?.adminDuty==='finance'?'/modules/zhihu/finance':'/modules/zhihu/operations';return true}}))],
-  },
-  { path: 'orders', redirect: (to) => ({ path: '/modules/zhihu/orders', query: to.query, hash: to.hash }) },
-  {
-    path: 'settlements',
-    redirect: (to) => ({ path: '/modules/zhihu/settlements', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'data-import',
-    redirect: (to) => ({ path: '/modules/zhihu/data-import', query: to.query, hash: to.hash }),
-  },
-  { path: 'appeals', redirect: (to) => ({ path: '/modules/zhihu/appeals', query: to.query, hash: to.hash }) },
-  {
-    path: 'withdrawals',
-    redirect: (to) => ({ path: '/modules/zhihu/withdrawals', query: to.query, hash: to.hash }),
-  },
-  { path: 'plans', redirect: (to) => ({ path: '/modules/zhihu/plans', query: to.query, hash: to.hash }) },
-  {
-    path: 'keywords',
-    redirect: (to) => ({ path: '/modules/zhihu/keywords', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'callbacks',
-    redirect: (to) => ({ path: '/modules/zhihu/callbacks', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'creative-tools',
-    redirect: (to) => ({ path: '/modules/zhihu/creative-tools', query: to.query, hash: to.hash }),
-  },
-  { path: 'zhihu-story', redirect: (to) => ({ path: '/modules/zhihu/history', query: to.query, hash: to.hash }) },
-  {
-    path: 'zhihu-story/plans',
-    redirect: (to) => ({ path: '/modules/zhihu/plans', query: { ...to.query, from: 'story' }, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/works',
-    redirect: (to) => ({ path: '/modules/zhihu/works', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/tasks',
-    redirect: (to) => ({ path: '/modules/zhihu/tasks', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/salt',
-    redirect: (to) => ({ path: '/modules/zhihu/salt', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/comments',
-    redirect: (to) => ({ path: '/modules/zhihu/comments', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/risk',
-    redirect: (to) => ({ path: '/modules/zhihu/risk', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/media',
-    redirect: (to) => ({ path: '/modules/zhihu/media', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/tags',
-    redirect: (to) => ({ path: '/modules/zhihu/tags', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/products',
-    redirect: (to) => ({ path: '/modules/zhihu/products', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'zhihu-story/assets',
-    redirect: (to) => ({ path: '/modules/zhihu/assets', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'knowledge',
-    redirect: (to) => ({ path: '/modules/zhihu/knowledge', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'analytics',
-    redirect: (to) => ({ path: '/modules/zhihu/analytics', query: to.query, hash: to.hash }),
-  },
-  { path: 'system', redirect: (to) => ({ path: '/modules/zhihu/system', query: to.query, hash: to.hash }) },
-  {
-    path: 'system/data',
-    redirect: (to) => ({ path: '/modules/zhihu/system/data', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'system/site',
-    redirect: (to) => ({ path: '/modules/zhihu/system/site', query: to.query, hash: to.hash }),
-  },
-  {
-    path: 'earnings',
-    redirect: (to) => ({ path: '/modules/zhihu/earnings', query: to.query, hash: to.hash }),
-  },
-]
+// 财务旧页已合并进平台「财务 / 我的收益」，路由保留并由 ModuleNavigation 展示合并说明与历史记录。
+const mergedStub = defineComponent({ render: () => null })
+
+const isStaff = (role: GlobalRole) =>
+  role === 'admin' || role === 'developer' || role === 'operator'
+
+function operationsTitle(role: GlobalRole) {
+  return role === 'creator' ? '我的关键词' : role === 'leader' ? '团队业务' : '运营管理'
+}
+
+function retiredFinanceRoutes(role: GlobalRole): RouteRecordRaw[] {
+  if (role === 'operator') return []
+  const staff = isStaff(role)
+  const titles: Record<string, string> = {
+    settlements: staff ? '结算管理' : '结算中心',
+    earnings: '收益结算',
+    withdrawals: role === 'creator' ? '提现申请' : '提现审批',
+    appeals: '财务申诉',
+    'data-import': '历史邮件 / Excel 导入',
+  }
+  const paths = staff
+    ? ['settlements', 'earnings', 'withdrawals', 'appeals', 'data-import']
+    : ['settlements', 'earnings', 'withdrawals', 'appeals']
+  return paths.map((path) => ({
+    path,
+    name: `zhihu-${path}`,
+    component: mergedStub,
+    meta: { moduleId: 'zhihu', title: titles[path] },
+  }))
+}
+
+export function modulePagesFor(role: GlobalRole, duty = 'all'): RouteRecordRaw[] {
+  const staff = isStaff(role)
+  if (role === 'operator') duty = 'operations'
+  const title = operationsTitle(role)
+  const pages: RouteRecordRaw[] = []
+  if (!(staff && duty === 'finance')) {
+    const works = role === 'creator'
+      ? () => import('./views/StoryWorksViewCreator.vue')
+      : () => import('./views/StoryWorksView.vue')
+    pages.push(
+      { path: 'operations', name: 'zhihu-operations', component: () => import('./views/ExclusiveView.vue'), meta: { moduleId: 'zhihu', section: 'operations', title } },
+      { path: 'keywords', name: 'zhihu-keywords', component: () => import('./views/ExclusiveView.vue'), meta: { moduleId: 'zhihu', title } },
+      { path: 'works', name: 'zhihu-story-works', component: works, meta: { moduleId: 'zhihu', title: '作品管理' } },
+      { path: 'works/new', name: 'zhihu-register-work', component: works, meta: { moduleId: 'zhihu', title: '登记作品' } },
+    )
+  }
+  if (staff && duty !== 'operations') {
+    pages.push({ path: 'finance', name: 'zhihu-finance', component: () => import('./views/ExclusiveView.vue'), meta: { moduleId: 'zhihu', section: 'finance', title: '财务做账' } })
+  }
+  if (!staff) {
+    pages.push({ path: 'wallet', name: 'zhihu-wallet', redirect: (to) => ({ path: '/income', query: to.query }) })
+  }
+  pages.push(...retiredFinanceRoutes(role))
+  return pages
+}
+
+export function zhihuRoutesFor(role: GlobalRole, dutyOverride?: string): RouteRecordRaw[] {
+  const duty = dutyOverride ?? (role === 'operator'
+    ? 'operations'
+    : role === 'admin'
+      ? (useAuthStore().user?.adminDuty ?? 'all')
+      : 'all')
+  const pages = modulePagesFor(role, duty)
+  const routes: RouteRecordRaw[] = [
+    {
+      path: 'modules/zhihu',
+      component: () => import('./ModuleLayout.vue'),
+      meta: { moduleId: 'zhihu' },
+      children: [
+        { path: '', redirect: duty === 'finance' ? '/modules/zhihu/finance' : '/modules/zhihu/operations' },
+        ...pages,
+      ],
+    },
+  ]
+  // 旧分享链接别名，只保留仍存在的目标页。
+  const aliasTargets: Record<string, string> = {
+    settlements: '/modules/zhihu/settlements',
+    'data-import': '/modules/zhihu/data-import',
+    appeals: '/modules/zhihu/appeals',
+    withdrawals: '/modules/zhihu/withdrawals',
+    earnings: '/modules/zhihu/earnings',
+    keywords: '/modules/zhihu/keywords',
+  }
+  const available = new Set(pages.map((page) => page.path))
+  for (const [alias, target] of Object.entries(aliasTargets)) {
+    if (!available.has(target.replace('/modules/zhihu/', ''))) continue
+    routes.push({ path: alias, redirect: (to) => ({ path: target, query: to.query, hash: to.hash }) })
+  }
+  return routes
+}

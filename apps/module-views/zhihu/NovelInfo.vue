@@ -28,5 +28,5 @@ async function copy() {
 .novel-info{margin-top:10px;font-size:13px;line-height:1.6;color:var(--ink-soft,#6f6e68);text-align:left;min-width:0;max-width:480px;white-space:normal;overflow-wrap:anywhere}
 .novel-url{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-all;margin:4px 0;color:inherit}
 .novel-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.novel-actions a{color:var(--accent,#141413)}
-.novel-actions button{font:inherit;padding:4px 8px;border:1px solid var(--line,#e8e6dc);border-radius:5px;background:transparent;cursor:pointer;color:inherit}
+.novel-actions button{font:inherit;padding:4px 10px;border:1px solid var(--line,#e8e6dc);border-radius:10px;background:transparent;cursor:pointer;color:inherit;transition:background .2s}
 </style>

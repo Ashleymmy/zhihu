@@ -580,9 +580,9 @@ onMounted(() => run(load));
           :member-ids="filtered.map((m) => m.id)"
           :project-id="projectFilter || undefined"
         />
-        <router-link to="/invitations">管理邀请链接</router-link>
-        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/relations">成员关系图</router-link>
-        <router-link v-if="isStaffRole(auth.user?.role)" to="/team/promotions">晋升工作台</router-link>
+        <router-link class="btn" to="/invitations">管理邀请链接</router-link>
+        <router-link v-if="isStaffRole(auth.user?.role)" class="btn" to="/team/relations">成员关系图</router-link>
+        <router-link v-if="isStaffRole(auth.user?.role)" class="btn" to="/team/promotions">晋升工作台</router-link>
         <button
           @click="
             open('invite');

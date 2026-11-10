@@ -8,8 +8,8 @@ import { businessRole } from '@zhihu-koc/shared-contracts/core'
 
 const workspaceLoaders = {
   admin: () => import('./workspace-routes'),
-  leader: () => import('../../platform-leader/src/workspace-routes'),
-  creator: () => import('../../platform-creator/src/workspace-routes'),
+  leader: () => import('./workspace-routes-leader'),
+  creator: () => import('./workspace-routes-creator'),
 }
 export function createAppRouter(
   history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),

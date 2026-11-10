@@ -12,7 +12,7 @@ if (process.env.NODE_ENV === 'production') throw new Error('演示数据禁止�
 process.env.OPC_MODULES = 'zhihu';
 process.env.QUEUE_DRIVER = 'memory';
 process.env.ZHIHU_API_BASE = 'https://open.zhihu.com';
-const DEMO_USERS = ['leader_wang', 'creator_li', 'creator_zhang', 'creator_chen', 'operator_chen', 'finance_wang'];
+const DEMO_USERS = ['leader_wang', 'creator_li', 'creator_zhang', 'creator_chen', 'operator_chen', 'finance_wang', 'developer_sun'];
 
 let planSeq = 2071265453767400;
 async function main() {
@@ -42,17 +42,24 @@ async function main() {
     );
     await c.query(
       `INSERT INTO users(id,username,password_hash,role,display_name,parent_id,admin_duty) VALUES
-      (6,'operator_chen',?,'operator','陈运营',NULL,'all'),(7,'finance_wang',?,'admin','王财务',NULL,'finance')`,
-      [hash, hash],
+      (6,'operator_chen',?,'operator','陈运营',NULL,'all'),(7,'finance_wang',?,'admin','王财务',NULL,'finance'),
+      (8,'developer_sun',?,'developer','孙开发',NULL,'all')`,
+      [hash, hash, hash],
     );
     await c.query('INSERT INTO project_members(project_id,user_id) VALUES(1,2),(1,3),(1,4),(1,5)');
     await c.query("INSERT INTO channels(id,project_id,zhihu_channel_id,generation,name) VALUES(1,1,'ch-1',1,'知乎故事一代渠道')");
     await c.query("INSERT INTO tasks(id,project_id,zhihu_task_id,name,synced_at) VALUES(1,1,'task-1','知乎故事推广任务',NOW())");
   }
   if (fresh || seeded.length) await c.query('UPDATE users SET must_change_pwd=0 WHERE username IN (?)', [[...DEMO_USERS, 'admin']]);
-  const { createApp } = await import('../src/app');
+  const { createCoreApp } = await import('../src/core/app');
+  const { loadModules } = await import('../src/composition/modules');
+  const { mountStatic } = await import('../src/composition/static');
+  const { mountDemoInsights } = await import('./demo-insights-mock');
+  const runtime = loadModules();
+  // 演示 mock 接口必须挂在 notFound 之前；createApp() 内部已收尾 404，这里展开同样的组合
+  const app = createCoreApp(runtime, (a) => { mountStatic(a); mountDemoInsights(a); });
+  app.locals.moduleRuntime = runtime;
   const { registerJob } = await import('../src/queue');
-  const app = createApp();
   const { pushPlan } = await import('../src/modules/zhihu/jobs/pushPlan');
   registerJob('zhihu.push-plan', pushPlan);
   const port = Number(process.env.PORT ?? 3000);

@@ -224,7 +224,7 @@ watch(linePage, () => void loadLines());
          <template v-else>
           <p>{{removal.canRemove?'删除 '+removal.rows+' 行旧报表记录，并撤回 '+removal.linked.length+' 份关联报表的计账影响。':removal.blocked}}</p>
           <p v-if="removal.linked.some(row=>row.corrections)">已确认的金额会生成更正供财务核对，原账和付款记录保留。</p>
-          <div><button :disabled="removalBusy" @click="removal=null">取消</button> <button v-if="removal.canRemove" :disabled="removalBusy" @click="removeImport">确认删除旧报表</button><router-link v-else to="/finance">查看当前财务</router-link></div>
+          <div><button :disabled="removalBusy" @click="removal=null">取消</button> <button v-if="removal.canRemove" :disabled="removalBusy" @click="removeImport">确认删除旧报表</button><router-link v-else class="btn" to="/finance">查看当前财务</router-link></div>
          </template>
          <p v-if="removalError" role="alert">{{removalError}} <button :disabled="removalBusy" @click="prepareRemoval">重新核对</button></p>
         </section>

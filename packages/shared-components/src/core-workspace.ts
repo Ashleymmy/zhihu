@@ -25,6 +25,8 @@ export interface CoreWorkspace {
   role: ComputedRef<string>
   /** 登录者的显示名（首页个人卡等使用） */
   userName?: ComputedRef<string>
+  /** 管理员岗位细分（all/operations/finance），成员角色为空 */
+  duty?: ComputedRef<string>
   modules: Ref<WorkspaceModule[]>
   projectId: Ref<string>
   operationGuide?: ComputedRef<OperationGuideModel | null>

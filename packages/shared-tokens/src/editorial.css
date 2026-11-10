@@ -54,12 +54,12 @@
   --chart-3: #4e9a4a;
   --chart-4: #8e6cc9;
 
-  /* 形状与层次 */
-  --radius: 10px;
-  --radius-card: 16px;
+  /* 形状与层次（v2：大圆角、无边框、柔和扩散阴影） */
+  --radius: 12px;
+  --radius-card: 22px;
   --radius-sheet: 20px;
-  --shadow: 0 1px 2px rgba(20, 20, 19, 0.04), 0 8px 24px rgba(20, 20, 19, 0.05);
-  --shadow-float: 0 24px 60px rgba(20, 20, 19, 0.16), 0 2px 6px rgba(20, 20, 19, 0.06);
+  --shadow: 0 1px 2px rgba(20, 20, 19, 0.03), 0 10px 30px -8px rgba(20, 20, 19, 0.08);
+  --shadow-float: 0 2px 4px rgba(20, 20, 19, 0.04), 0 22px 48px -12px rgba(20, 20, 19, 0.16);
 
   /* 字体：--font-mono 旧名保留给标签、日期、金额，改用黑体 + 等宽数字；真正的代码用 --font-code */
   --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
@@ -113,6 +113,55 @@ body {
 }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
+/* ===== 裸控件基线：旧页面未挂 class 的按钮/输入框/选择框统一落到 v2 语言。
+   :where() 零权重——任何类选择器（.btn、.seg button、scoped 样式）都能盖过它，只有完全没样式的控件才吃这套。 ===== */
+button:where(:not([class])) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hover);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.2s var(--ease-out), transform 0.3s var(--spring);
+}
+button:where(:not([class])):hover { background: var(--line-2); }
+button:where(:not([class])):active { transform: scale(0.97); }
+button:where(:not([class])):disabled { opacity: 0.45; cursor: not-allowed; }
+input:where(:not([class]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset])),
+select:where(:not([class])) {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13.5px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+textarea:where(:not([class])) {
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13.5px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:where(:not([class]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset])):focus,
+select:where(:not([class])):focus,
+textarea:where(:not([class])):focus {
+  border-color: var(--clay);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--clay-soft);
+}
 a { color: inherit; text-decoration: none; }
 code, kbd, pre, samp { font-family: var(--font-code); }
 ::selection { color: var(--ink); background: var(--clay-soft); }
@@ -263,6 +312,10 @@ code, kbd, pre, samp { font-family: var(--font-code); }
 .studio-header[data-scrolled="true"] .shell-greet p { max-height: 0; margin-top: 0; opacity: 0; }
 .header-context { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .menu-toggle { display: none; width: 38px; height: 38px; flex: none; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--ink-soft); background: var(--white); }
+/* 二级页返回上级：只在深于导航页的路径出现，样式与 menu-toggle 同族 */
+.shell-back { display: inline-flex; flex: none; align-items: center; gap: 3px; height: 32px; padding: 0 12px 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); background: var(--white); font-size: 12.5px; font-weight: 600; transition: color 0.2s, border-color 0.2s, transform 0.3s var(--spring); }
+.shell-back:hover { color: var(--ink); border-color: var(--line-2); }
+.shell-back:active { transform: scale(0.96); }
 .shell-greet { display: grid; min-width: 0; }
 .shell-greet h1 { margin: 0; overflow: hidden; font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
 .shell-greet p { margin: 2px 0 0; overflow: hidden; color: var(--muted); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
@@ -340,7 +393,7 @@ button.header-initials:active { transform: scale(0.92); }
   transform-origin: top right;
   animation: pop-in 0.32s var(--spring) both;
 }
-@keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } }
+@keyframes pop-in { from { transform: translateY(-6px) scale(0.96); } }
 .shell-todos { width: 340px; }
 .shell-pop-title { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 8px 10px 6px; color: var(--muted); font-size: 12.5px; font-weight: 600; }
 .shell-todo { display: flex; width: 100%; align-items: center; gap: 12px; padding: 10px; border: 0; border-radius: 12px; background: transparent; text-align: left; transition: background var(--dur-fast) ease; }
@@ -381,8 +434,8 @@ button.header-initials:active { transform: scale(0.92); }
   gap: 7px;
   min-height: 36px;
   padding: 0 16px;
-  border: 1px solid var(--ink);
-  border-radius: 10px;
+  border: 0;
+  border-radius: var(--radius);
   color: var(--paper);
   background: var(--ink);
   box-shadow: none;
@@ -471,7 +524,7 @@ button.header-initials:active { transform: scale(0.92); }
 
 .metric-card,
 .panel {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius-card);
   background: var(--white);
   box-shadow: var(--shadow);
@@ -901,6 +954,23 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
 .page-enter-from { opacity: 0; transform: translateY(8px); }
 .page-leave-to { opacity: 0; transform: translateY(-4px); }
 
+/* 页面切换：路由按 path 重挂载，页面根节点播放入场 */
+.studio-page > *:not(.announce-stack) { animation: page-enter 0.42s var(--ease-out) both; }
+
+/* 页面内容块分拍入场（首页 bento 走 v-reveal，不在此列） */
+.studio-page > .page-stack > * { animation: page-enter 0.45s var(--ease-out) both; }
+.studio-page > .page-stack > *:nth-child(2) { animation-delay: 45ms; }
+.studio-page > .page-stack > *:nth-child(3) { animation-delay: 90ms; }
+.studio-page > .page-stack > *:nth-child(4) { animation-delay: 135ms; }
+.studio-page > .page-stack > *:nth-child(5) { animation-delay: 180ms; }
+.studio-page > .page-stack > *:nth-child(n+6) { animation-delay: 220ms; }
+
+/* 业务模块内部换页：模块壳不卸载，新页面内容就地入场 */
+.zhihu-module > *:not(.merged-page) { animation: page-enter 0.42s var(--ease-out) both; }
+
+/* 可点元素的按压反馈 */
+:is(button, .primary-action, .ghost-aurora):not(:disabled):active { transform: scale(0.96); }
+
 .reveal-init { opacity: 0; transform: translateY(10px); }
 .reveal-in { opacity: 1; transform: none; transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out); }
 
@@ -945,6 +1015,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: p
   .page-enter-active, .page-leave-active,
   .reveal-init, .reveal-in,
   .status-badge.paused { animation: none !important; transition: none !important; }
+  .studio-page > *:not(.announce-stack),
+  .studio-page > .page-stack > *,
+  .zhihu-module > *:not(.merged-page) { animation: none !important; }
+  :is(button, .primary-action, .ghost-aurora):not(:disabled):active { transform: none; }
   .reveal-init { opacity: 1; transform: none; }
   .skeleton::after { animation: none; }
 }
@@ -1623,6 +1697,19 @@ body:has(dialog.action-dialog[open]) .studio-page { transform: scale(0.985); fil
 .stack i { display: block; height: 100%; flex: 0 0 0; transition: flex-grow 1.1s var(--ease); }
 .stack i:first-child { border-radius: 6px 0 0 6px; }
 .stack i:last-child { border-radius: 0 6px 6px 0; }
+/* 卡片头快捷入口： subtle pill link，统一各首页卡片的跳转入口 */
+.card-go { display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 9px; border-radius: 999px; background: var(--hover); color: var(--ink-soft); font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: background 0.2s, color 0.2s, transform 0.3s var(--spring); }
+.card-go:hover { background: var(--line-2); color: var(--ink); }
+.card-go:active { transform: scale(0.95); }
+/* 堆叠条入场生长：元素挂载即播放（数据异步到达也能播），逐段错拍 */
+@keyframes grow-x { from { transform: scaleX(0); } }
+.stack i { transform-origin: left; animation: grow-x 0.7s var(--ease) both; }
+.stack i:nth-child(2) { animation-delay: 90ms; }
+.stack i:nth-child(3) { animation-delay: 180ms; }
+.stack i:nth-child(4) { animation-delay: 270ms; }
+.stack i:nth-child(5) { animation-delay: 360ms; }
+.stack i:nth-child(6) { animation-delay: 450ms; }
+@media (prefers-reduced-motion: reduce) { .stack i { animation: none; } }
 
 /* 头像 */
 .avs { display: flex; }

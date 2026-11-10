@@ -117,6 +117,17 @@ const flatItems = computed(() => props.groups.flatMap((group) => group.items.map
 const homeItem = computed(() => flatItems.value[0])
 const currentItem = computed(() => flatItems.value.filter((item) => isActive(item.path)).sort((a, b) => b.path.length - a.path.length)[0] ?? homeItem.value)
 const isHome = computed(() => !!homeItem.value && currentItem.value?.key === homeItem.value.key)
+/* 二级页面返回入口：深于导航项时回导航页；模块内页面（/modules/<id>/…）回模块首页；其余回首页 */
+const backTarget = computed(() => {
+  const item = currentItem.value
+  if (!item) return null
+  if (props.currentPath === item.path) return null
+  if (props.currentPath.startsWith(item.path + '/')) return item
+  const moduleRoot = /^\/modules\/[^/]+/.exec(props.currentPath)?.[0]
+  if (moduleRoot && props.currentPath.length > moduleRoot.length + 1) return { key: '$module', label: '模块首页', path: moduleRoot }
+  if (homeItem.value && item.key !== homeItem.value.key) return null
+  return homeItem.value ?? null
+})
 function isActive(path: string) {
   return props.currentPath === path || props.currentPath.startsWith(path + '/')
 }
@@ -262,6 +273,10 @@ onBeforeUnmount(() => {
         <div class="header-context">
           <button type="button" class="menu-toggle" aria-label="打开菜单" @click="mobileOpen = !mobileOpen">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          </button>
+          <button v-if="backTarget" type="button" class="shell-back" :aria-label="`返回${backTarget.label}`" @click="handleNav(backTarget.path)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6" /></svg>
+            <span>返回</span>
           </button>
           <div v-if="isHome" class="shell-greet">
             <h1>{{ greeting }}，{{ userName }}</h1>
