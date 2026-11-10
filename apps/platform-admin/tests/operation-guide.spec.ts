@@ -44,7 +44,17 @@ describe('operation guidance respects current responsibilities', () => {
     }
     expect(guide.management[0]!.action!.to).toBe('/team')
     expect(guide.steps[2]!.secondaryAction!.to).toContain('tab=works')
-    expect(guide.steps[2]!.instructions.join('')).toContain('不等于审核通过')
+    expect(guide.steps[2]!.instructions.join('')).toContain('无需等待它变化')
     expect(zhihuOperationGuide({ ...user, id: '8' })!.storageKey).not.toBe(zhihuOperationGuide(user)!.storageKey)
+  })
+  it('all operating roles follow registered-work success while retaining real failures and disputes', () => {
+    for (const role of ['creator', 'leader', 'operator', 'admin', 'developer']) {
+      const guide = zhihuOperationGuide({ ...user, role })!
+      const submitted = guide.steps.find(step => step.id === 'return')!
+      expect(submitted.description).toContain('正常登记按通过展示')
+      expect(submitted.instructions.join('')).toContain('提交失败、明确未通过或争议')
+      expect(submitted.action?.label).toBe('查看提交结果')
+      expect(JSON.stringify(guide)).not.toMatch(/回传与审核|查看审核进度|不等于审核通过/)
+    }
   })
 })
