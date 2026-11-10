@@ -332,3 +332,121 @@ it('成员报价旧接口全部停用且保留历史表，运营和未登录读�
  const mine=await get(a,path('/attribution-options'),scope);expect(mine.body.data.currentNewUserPrice).toBeUndefined();
  for(const actor of [leader,ops])expect((await get(actor,path('/attribution-options'),scope)).body.data).not.toHaveProperty('currentNewUserPrice');
 });
+
+it('新报表按来源隔离数量、金额和确认范围，同日其他上传与已确认旧账分别保留',async()=>{
+ const words=['范围旧团队词','范围旧独立词','范围本次词','范围同日其他词'];
+ for(const [i,keyword] of words.entries()){
+  const actor=i===1?solo:a;
+  const word=await resource.createKeyword(admin,scope,key(),{keyword,taskId:'1',mappingId:mapping,landingUrl:'https://example.com/report-scope',popularizeType:1});
+  await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['scope-'+word.id,word.planId]);
+  await resource.synchronizeKeywords(scope);
+  const bind=await resource.distribute(admin,scope,word.id,key(),actor.sub);
+  await resource.changeBinding(actor,scope,bind.id,key(),{action:'activate'});
+  const evidence=await statements.submitEvidence(actor,scope,key(),{bindingId:bind.id,url:'https://example.com/scope-work/'+i,description:'隔离报表范围验证'});
+  await statements.reviewEvidence(ops,scope,evidence.id,key(),true,'隔离核验');
+ }
+ const upload=async(rows:string[],suffix='')=>{
+  const buffer=Buffer.from('日期,渠道名称,关键词,订单量\n'+rows.map(row=>day+',联测渠道,'+row).join('\n')+suffix);
+  return workbench.uploadReport(fin,scope,{buffer,size:buffer.length,originalname:'范围测试.csv',mimetype:'text/csv'});
+ };
+ const old=await upload([words[0]+',6',words[1]+',1']);
+ const oldPeriod={from:day,to:day,importId:old.id};
+ const oldView=await workbench.overview(fin,scope,oldPeriod);
+ expect(oldView.summary.orders).toBe('7');expect(oldView.summary.payable).toBe('59.0000');
+ await workbench.confirmBills(fin,scope,oldPeriod,key(),oldView.reviewHash);
+ const oldLedger=await q('SELECT e.* FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.source_key IN (?) ORDER BY e.id',[oldView.entries.map(e=>'fact:'+e.factId)]);
+ const current=await upload([words[2]+',5']);
+ const period={from:day,to:day,importId:current.id};
+ const response=await get(fin,path('/workbench'),{...scope,...period,viewVersion:'2'});
+ expect(response.status,response.text).toBe(200);
+ const view=response.body.data;
+ expect(view.summary).toMatchObject({orders:'5',payable:'42.5000',confirmedPayable:'0.0000',pendingPayable:'42.5000'});
+ expect(view.entries).toHaveLength(2);expect(view.entries.every((e:{keyword:string})=>e.keyword===words[2])).toBe(true);
+ const oldScoped=await workbench.overview(fin,scope,oldPeriod);
+ expect(oldScoped.summary).toMatchObject({confirmedPayable:'59.0000',pendingPayable:'0.0000'});
+ const month=await workbench.overview(fin,scope,{from:day,to:day});
+ // Other tests have their own facts in the same period; only these two reports total 12 / 101.50.
+ const ours=month.entries.filter(e=>words.includes(e.keyword));
+ expect(new Map(ours.map(e=>[e.factId,e.quantity])).size).toBe(3);
+ expect(ours.reduce((n,e)=>n+BigInt(e.amount!.replace('.','')),0n)).toBe(1015000n);
+ const confirmPath=path('/workbench/confirm');
+ expect((await post(fin,confirmPath,{...scope,...period,viewVersion:'2',reviewHash:month.reviewHash,acknowledged:true,requestKey:key()})).status).toBe(409);
+ expect((await post(fin,confirmPath,{...scope,from:day,to:day,viewVersion:'2',reviewHash:view.reviewHash,acknowledged:true,requestKey:key()})).status).toBe(409);
+ const sibling=await upload([words[3]+',2']);
+ const before=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ expect((await workbench.overview(fin,scope,period)).reviewHash).toBe(view.reviewHash);
+ const confirmBody={...scope,...period,viewVersion:'2',reviewHash:view.reviewHash,acknowledged:true,requestKey:key()};
+ const confirmed=await post(fin,confirmPath,confirmBody);
+ expect(confirmed.status,confirmed.text).toBe(200);expect(confirmed.body.data).toMatchObject({confirmed:1,total:1,status:'done'});
+ const after=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ expect((await post(fin,confirmPath,confirmBody)).body.data).toEqual(confirmed.body.data);
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(after);
+ expect(after.length-before.length).toBe(2);
+ expect(await q('SELECT e.* FROM opc_income_entries e JOIN opc_income_sources s ON s.id=e.source_id WHERE s.source_key IN (?) ORDER BY e.id',[oldView.entries.map(e=>'fact:'+e.factId)])).toEqual(oldLedger);
+ const otherView=await workbench.overview(fin,scope,{from:day,to:day,importId:sibling.id});
+ expect(otherView.summary.pendingPayable).toBe('17.0000');expect(otherView.entries.every(e=>e.ready)).toBe(true);
+ const duplicate=await upload([words[2]+',5'],'\n');
+ const duplicateView=await workbench.overview(fin,scope,{from:day,to:day,importId:duplicate.id});
+ expect(duplicateView.summary).toMatchObject({orders:'5',payable:'42.5000',confirmedPayable:'42.5000',pendingPayable:'0.0000'});
+ expect(duplicateView.entries.every(e=>!e.ready)).toBe(true);
+});
+
+it('报表范围保留未识别行，空报表不能退回整月，报表和财务权限均由后端校验',async()=>{
+ const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${day},未登记的渠道,范围未知词,3`);
+ const file={buffer,size:buffer.length,originalname:'未识别.csv',mimetype:'text/csv'};
+ const unknown=await workbench.uploadReport(fin,scope,file);
+ const period={from:day,to:day,importId:unknown.id};
+ const view=await workbench.overview(fin,scope,period);
+ expect(view.summary.byType.new_user).toMatchObject({quantity:'3',pendingQuantity:'3',payable:'0.0000'});
+ expect(view.entries).toHaveLength(1);expect(view.entries[0]).toMatchObject({keyword:'范围未知词',amount:null,ready:false});
+ expect(view.summary.issues).toBe(1);
+ const blocked=await workbench.confirmBills(fin,scope,period,key(),view.reviewHash);expect(blocked).toMatchObject({confirmed:0,total:0});
+ const invalidBuffer=Buffer.from('日期,渠道名称,关键词,订单量\n错日期,联测渠道,范围错误日期词,5');
+ const empty=await workbench.uploadReport(fin,scope,{...file,buffer:invalidBuffer,size:invalidBuffer.length,originalname:'无有效记录.csv'});
+ const emptyView=await workbench.overview(fin,scope,{from:day,to:day,importId:empty.id});
+ expect(emptyView.entries).toHaveLength(0);expect(emptyView.summary.orders).toBe('0');expect(emptyView.summary.payable).toBe('0.0000');
+ for(const actor of [ops,a,leader])expect((await get(actor,path('/workbench'),{...scope,...period,viewVersion:'2'})).status).toBe(403);
+ expect((await get(fin,path('/workbench'),{...scope,...period,importId:'999999999'})).status).toBe(404);
+ const preview=await facts.previewImport(fin,scope,{...file,buffer:Buffer.concat([buffer,Buffer.from('\n\n')]),size:buffer.length+2},'order');
+ expect((await get(fin,path('/workbench'),{...scope,...period,importId:preview.id})).status).toBe(409);
+ await c.query("UPDATE zh_import_batches SET status='withdrawn' WHERE id=?",[unknown.id]);
+ expect((await get(fin,path('/workbench'),{...scope,...period})).status).toBe(409);
+ expect((await post(fin,path('/workbench/confirm'),{...scope,...period,reviewHash:view.reviewHash,acknowledged:true,requestKey:key()})).status).toBe(409);
+});
+
+it('同一关键词连续三日出单分别累计，重复导出同一天不会再增加收入',async()=>{
+ const keyword='连续出单核对词';
+ const dates=[2,1,0].map(offset=>new Date(Date.parse(day)-offset*86400000).toISOString().slice(0,10));
+ await resource.createMapping(admin,scope,key(),{channelId:'1',name:'连续日渠道',from:dates[0],canonicalId:mapping});
+ const word=await resource.createKeyword(admin,scope,key(),{keyword,taskId:'1',mappingId:mapping,landingUrl:'https://example.com/daily-orders',popularizeType:1});
+ await c.query("UPDATE plans SET sync_status='synced',status='active',zhihu_plan_id=? WHERE id=?",['daily-'+word.id,word.planId]);
+ const bind=await resource.distribute(admin,scope,word.id,key(),a.sub);
+ await resource.changeBinding(a,scope,bind.id,key(),{action:'activate'});
+ // This disposable fixture predates the three report dates.
+ await c.query('UPDATE zh_keyword_bindings SET activated_on=?,assigned_at=?,used_at=? WHERE id=?',[dates[0],dates[0],dates[0],bind.id]);
+ const evidence=await statements.submitEvidence(a,scope,key(),{bindingId:bind.id,url:'https://example.com/daily-work',description:'连续日期隔离核验'});
+ await statements.reviewEvidence(ops,scope,evidence.id,key(),true,'隔离核验');
+ for(const [index,date] of dates.entries()){
+  const orders=index===1?1:2;
+  const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${date},连续日渠道,${keyword},${orders}`);
+  const imported=await workbench.uploadReport(fin,scope,{buffer,size:buffer.length,originalname:'连续出单.csv',mimetype:'text/csv'});
+  const period={from:dates[0],to:day,importId:imported.id};
+  const view=await workbench.overview(fin,scope,period);
+  expect(view.summary.orders).toBe(String(orders));
+  expect(view.entries.every(entry=>entry.date===date)).toBe(true);
+  await workbench.confirmBills(fin,scope,period,key(),view.reviewHash);
+ }
+ const whole=await workbench.overview(fin,scope,{from:dates[0],to:day});
+ const entries=whole.entries.filter(entry=>entry.keyword===keyword);
+ const quantities=[...new Map(entries.map(entry=>[entry.factId,entry.quantity])).values()];
+ expect(quantities).toHaveLength(3);expect(quantities.reduce((sum,value)=>sum+BigInt(value!),0n)).toBe(5n);
+ expect(entries.reduce((sum,entry)=>sum+BigInt(entry.confirmedAmount.replace('.','')),0n)).toBe(425000n);
+ const ledger=await q('SELECT * FROM opc_income_entries ORDER BY id');
+ const buffer=Buffer.from(`日期,渠道名称,关键词,订单量\n${day},连续日渠道,${keyword},2\n`);
+ const repeated=await workbench.uploadReport(fin,scope,{buffer,size:buffer.length,originalname:'重新导出的同日数据.csv',mimetype:'text/csv'});
+ const period={from:dates[0],to:day,importId:repeated.id};
+ const duplicate=await workbench.overview(fin,scope,period);
+ expect(duplicate.summary).toMatchObject({orders:'2',payable:'17.0000',confirmedPayable:'17.0000',pendingPayable:'0.0000'});
+ expect(await workbench.confirmBills(fin,scope,period,key(),duplicate.reviewHash)).toMatchObject({confirmed:0,total:0});
+ expect(await q('SELECT * FROM opc_income_entries ORDER BY id')).toEqual(ledger);
+});

@@ -6,7 +6,7 @@ export type AllianceMethod = 'GET' | 'POST' | 'PUT';
 export type AllianceRequestKind = 'json' | 'multipart' | 'query';
 export type AllianceRequiredPermission = Extract<
   Permission,
-  'plan.create' | 'composition.create' | 'composition.edit' | 'project.manage' | 'earning.view_all' | 'story.read'
+  'plan.create' | 'composition.create' | 'composition.edit' | 'project.manage' | 'earning.view_all' | 'story.read' | 'salt.read'
 >;
 
 export interface AllianceEndpointDefinition {
@@ -118,8 +118,8 @@ const clientOnlyDefinitions: ReadonlyArray<AllianceEndpointDefinition> = [
     requiredPermission: 'earning.view_all',
   },
   // —— 知乎故事内容域（OpenApi V1.4.17 §2.7-2.13，仅供内部路由调用）——
-  { definitionKey: 'GET /vip/content/rule/labels', method: 'GET', publicPath: '/vip/content/rule/labels', clientPath: '/alliance/api/vip/content/rule/labels', upstreamPath: '/vip/content/rule/labels', requestKind: 'query', requiredPermission: 'story.read' },
-  { definitionKey: 'GET /vip/rule_contents', method: 'GET', publicPath: '/vip/rule_contents', clientPath: '/alliance/api/vip/rule_contents', upstreamPath: '/vip/rule_contents', requestKind: 'query', requiredPermission: 'story.read' },
+  { definitionKey: 'GET /vip/content/rule/labels', method: 'GET', publicPath: '/vip/content/rule/labels', clientPath: '/alliance/api/vip/content/rule/labels', upstreamPath: '/vip/content/rule/labels', requestKind: 'query', requiredPermission: 'salt.read' },
+  { definitionKey: 'GET /vip/rule_contents', method: 'GET', publicPath: '/vip/rule_contents', clientPath: '/alliance/api/vip/rule_contents', upstreamPath: '/vip/rule_contents', requestKind: 'query', requiredPermission: 'salt.read' },
   { definitionKey: 'GET /vip/audio/contents', method: 'GET', publicPath: '/vip/audio/contents', clientPath: '/alliance/api/vip/audio/contents', upstreamPath: '/vip/audio/contents', requestKind: 'query', requiredPermission: 'story.read' },
   { definitionKey: 'GET /comic_dramas', method: 'GET', publicPath: '/comic_dramas', clientPath: '/alliance/api/comic_dramas', upstreamPath: '/comic_dramas', requestKind: 'query', requiredPermission: 'story.read' },
   { definitionKey: 'GET /intercept_words', method: 'GET', publicPath: '/intercept_words', clientPath: '/alliance/api/intercept_words', upstreamPath: '/intercept_words', requestKind: 'query', requiredPermission: 'story.read' },
@@ -139,6 +139,7 @@ const ALLOWED_REQUIRED_PERMISSIONS: ReadonlySet<AllianceRequiredPermission> = ne
   'project.manage',
   'earning.view_all',
   'story.read',
+  'salt.read',
 ]);
 
 export function isAllowedRequiredPermission(value: unknown): value is AllianceRequiredPermission {
