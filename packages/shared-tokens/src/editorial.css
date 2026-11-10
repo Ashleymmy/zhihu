@@ -446,7 +446,7 @@ button.header-initials:active { transform: scale(0.92); }
 }
 
 .header-create:hover,
-.primary-action:hover { background: #2b2b29; }
+.primary-action:hover { background: var(--ink-soft); }
 
 .header-create:active,
 .primary-action:active { transform: scale(0.97); }
@@ -1651,10 +1651,10 @@ body:has(dialog.action-dialog[open]) .studio-page { transform: scale(0.985); fil
 .btn:hover { background: var(--line-2); }
 .btn:active { transform: scale(0.96); }
 .btn.ink { background: var(--ink); color: var(--bg); }
-.btn.ink:hover { background: #2b2b29; }
+.btn.ink:hover { background: var(--ink-soft); }
 .btn.light { background: rgba(255, 255, 255, 0.14); color: #fff; }
 .btn.light:hover { background: rgba(255, 255, 255, 0.22); }
-.btn.white { background: #fff; color: var(--ink); }
+.btn.white { background: var(--white); color: var(--ink); }
 
 /* 入场：错落浮现 */
 .enter > * { animation: v2-rise 0.7s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms); }

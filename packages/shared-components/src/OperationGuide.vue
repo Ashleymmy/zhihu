@@ -304,7 +304,7 @@ function toggle() {
   transition: transform 0.35s var(--spring), background 0.2s;
 }
 .guide-primary:hover {
-  background: #2b2b29;
+  background: var(--ink-soft, #5e5d59);
   text-decoration: none;
 }
 .guide-primary:active {

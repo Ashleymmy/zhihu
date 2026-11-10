@@ -59,9 +59,9 @@ function onKey(event: KeyboardEvent) {
   position: fixed;
   inset: 12px 12px 12px auto;
   margin: 0;
-  width: min(520px, calc(100vw - 24px));
+  width: min(520px, calc(100% - 24px));
   height: calc(100dvh - 24px);
-  max-width: 100vw;
+  max-width: 100%;
   max-height: 100dvh;
   padding: 0;
   border: 0;
@@ -85,7 +85,7 @@ header {
   border-bottom: 1px solid var(--line-soft, #f0eee6);
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--white, #fff) 92%, transparent);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   z-index: 1;
@@ -130,7 +130,7 @@ h2 {
   line-height: 1.65;
 }
 @media (max-width: 600px) {
-  .detail-drawer { inset: 0; width: 100vw; height: 100dvh; border-radius: 0; }
+  .detail-drawer { inset: 0; width: 100%; height: 100dvh; border-radius: 0; }
   header { padding: 16px 14px 12px 18px; }
   .drawer-body { padding: 18px; }
   .drawer-pos { display: none; }

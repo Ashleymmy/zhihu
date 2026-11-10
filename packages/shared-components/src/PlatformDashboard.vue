@@ -409,7 +409,7 @@ function untilt(event: PointerEvent) {
     <div v-if="error || unavailable" class="home-error" role="alert"><p>{{ error || '部分项目暂时没加载出来，已加载的待办仍可处理。' }}</p><button class="ghost-aurora" @click="load" :disabled="loading">重新加载</button></div>
 
     <div v-if="Object.keys(cardErrors).length" class="home-error" role="alert"><p v-for="(message,label) in cardErrors" :key="label">{{label}}：{{message}}</p><button class="btn" @click="load" :disabled="loading">重新读取未加载资料</button></div>
-    <form v-if="isStaff && !isDeveloper" class="home-toolbar" @submit.prevent="load"><label>开始日期<input type="date" v-model="insightFrom" required /></label><label>结束日期<input type="date" v-model="insightTo" :min="insightFrom" required /></label><button class="btn" :disabled="insightsBusy">查看这段日期</button></form>
+    <form v-if="isStaff && !isDeveloper" class="home-toolbar home-date-range" @submit.prevent="load"><label>开始日期<input type="date" v-model="insightFrom" required /></label><label>结束日期<input type="date" v-model="insightTo" :min="insightFrom" required /></label><button class="btn" :disabled="insightsBusy">查看这段日期</button></form>
     <!-- ===== 成员视图：v2 三栏（钱包+趋势+小卡矩阵+项目广场 | 右栏） ===== -->
     <template v-if="isMember">
       <div class="home-toolbar">
@@ -947,7 +947,9 @@ function untilt(event: PointerEvent) {
 .home-page { min-width: 0; }
 /* ===== v2 成员视图布局 ===== */
 .home-toolbar { display: flex; align-items: end; justify-content: flex-end; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-.home-toolbar label { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }
+.home-toolbar label { display: flex; min-width: 0; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }
+.home-date-range label { display: grid; gap: 6px; }
+.home-date-range input { min-width: 0; max-width: 100%; }
 .home-toolbar select { max-width: 220px; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font-size: 13px; }
 .home-v2 { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 /* 右栏吸附顶部独立滚动：主区滚动时右栏不跟着走（v2 原型行为） */
@@ -1040,6 +1042,8 @@ function untilt(event: PointerEvent) {
   .home-toolbar { justify-content: stretch; }
   .home-toolbar label { flex: 1; }
   .home-toolbar select { flex: 1; max-width: none; }
+  .home-date-range { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .home-date-range label, .home-date-range input, .home-date-range button { width: 100%; }
 }
 .relation-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .relation-cols > div { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 16px; border-radius: 16px; background: var(--paper); }

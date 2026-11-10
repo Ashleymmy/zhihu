@@ -396,8 +396,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .leader { color: #2d63ae; background: #e3ecf8; }
 .next-cell p { margin: 0 0 6px; color: var(--ink-soft, #5e5d59); font-size: 13px; line-height: 1.5; }
 .next-cell strong { color: var(--ink, #141413); }
-.next-cell button, .grid-card footer button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 10px; color: #fff; background: var(--ink, #141413); font-size: 13px; font-weight: 600; transition: background 0.2s, transform 0.36s var(--spring, ease); }
-.next-cell button:hover, .grid-card footer button:hover { background: #2b2b29; }
+.next-cell button, .grid-card footer button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 10px; color: var(--paper, #faf9f5); background: var(--ink, #141413); font-size: 13px; font-weight: 600; transition: background 0.2s, transform 0.36s var(--spring, ease); }
+.next-cell button:hover, .grid-card footer button:hover { background: var(--ink-soft, #5e5d59); }
 .next-cell button:active, .grid-card footer button:active { transform: scale(0.96); }
 .next-cell > span { color: var(--muted, #87867f); font-size: 13px; }
 .grid-totals { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 26px; padding: 14px 18px; border-top: 1px solid var(--line, #e8e6dc); background: var(--paper, #faf9f5); }
